@@ -30,6 +30,7 @@ Status as of March 10, 2026:
 - Phase 2 persistence foundation has started with SQLite-backed activity logging
 - SQLite-backed torrent state persistence is implemented for the current fake engine slice
 - tracked SQLite schema migrations are implemented
+- startup torrent-state rehydration is implemented for the persisted fake engine slice
 - real engine integration is not implemented yet
 
 Verified baseline:
@@ -256,6 +257,7 @@ Current assumptions unless superseded by later decisions:
 - TVMaze integration happens after the TorrentCore v1 boundary is proven
 - authentication and authorization are required, but the exact v1 model is still pending
 - logging will be TorrentCore-owned and not coupled to TVMaze infrastructure
+- startup recovery for the persisted fake engine normalizes active runtime states to `Queued` rather than pretending transfers survived a process restart
 
 ## Phase 0 Contract Review Decisions
 
@@ -329,6 +331,9 @@ Changes:
 - added restart-persistence coverage for torrent state and duplicate detection across restarts
 - added tracked SQLite schema migrations through a `schema_migrations` table
 - moved schema creation responsibility out of the stores and into a dedicated migrator
+- added startup recovery for persisted torrent state with explicit normalization rules for active runtime states
+- exposed startup recovery status through the host-status contract
+- added recovery activity-log events for normalized torrents and completed startup recovery
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -342,6 +347,7 @@ Assumptions:
 - log timestamps continue to be stored in UTC, while future UI surfaces must render them in local time
 - the current fake-engine behavior now persists torrent state in SQLite, but it is still not a real torrent runtime
 - schema evolution is now tracked through explicit migration versions rather than ad hoc table creation
+- persisted fake-engine recovery currently normalizes `ResolvingMetadata`, `Downloading`, and `Seeding` to `Queued` on startup and clears active transfer counters
 
 Progress:
 - planning completed
@@ -389,9 +395,12 @@ Completed:
 - added tests for torrent-state survival across restart and duplicate detection across restart
 - added a tracked SQLite migration runner and schema verification tests
 - added verification that legacy activity-log schema is upgraded to the current shape
+- added startup recovery state reporting in host status
+- added restart-recovery logging and recovery normalization tests for persisted torrent state
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
 
 Next:
 - continue toward real engine-backed state rehydration using the tracked SQLite schema foundation
+- expand persisted torrent state beyond the current fake-engine shape toward actual runtime metadata and engine-session recovery

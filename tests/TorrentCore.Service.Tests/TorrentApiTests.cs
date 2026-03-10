@@ -24,6 +24,9 @@ public sealed class TorrentApiTests
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal(EngineHostStatus.Ready, hostStatus.Status);
         Assert.True(hostStatus.SupportsMagnetAdds);
+        Assert.True(hostStatus.SupportsPersistentStorage);
+        Assert.True(hostStatus.StartupRecoveryCompleted);
+        Assert.NotEqual(Guid.Empty, hostStatus.ServiceInstanceId);
     }
 
     [Fact]
@@ -43,6 +46,7 @@ public sealed class TorrentApiTests
         Assert.True(Directory.Exists(downloadPath));
         Assert.True(Directory.Exists(storagePath));
         Assert.True(File.Exists(Path.Combine(storagePath, "torrentcore.db")));
+        Assert.True(hostStatus.StartupRecoveryCompleted);
     }
 
     [Fact]
@@ -107,6 +111,48 @@ public sealed class TorrentApiTests
             Assert.NotNull(torrent);
             Assert.Equal(TorrentState.Paused, torrent.State);
             Assert.Contains(torrents!, summary => summary.TorrentId == torrentId && summary.State == TorrentState.Paused);
+        }
+    }
+
+    [Fact]
+    public async Task StartupRecovery_NormalizesActiveTorrentState_AfterRestart()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-phase2-recovery");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(downloadPath, storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            var addResponse = await AddMagnetAsync(httpClient, "1212121212121212121212121212121212121212", "Recovery Torrent");
+            var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+        }
+
+        await using (var factory = CreateFactory(downloadPath, storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var recoveredTorrent = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}");
+            var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+            var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=50");
+
+            Assert.NotNull(recoveredTorrent);
+            Assert.Equal(TorrentState.Queued, recoveredTorrent.State);
+            Assert.Equal(0, recoveredTorrent.DownloadRateBytesPerSecond);
+            Assert.Equal(0, recoveredTorrent.UploadRateBytesPerSecond);
+
+            Assert.NotNull(hostStatus);
+            Assert.Equal(1, hostStatus.StartupRecoveredTorrentCount);
+            Assert.Equal(1, hostStatus.StartupNormalizedTorrentCount);
+            Assert.NotNull(hostStatus.StartupRecoveryCompletedAtUtc);
+
+            Assert.NotNull(logs);
+            Assert.Contains(logs, log => log.EventType == "service.recovery.completed" && log.ServiceInstanceId == hostStatus.ServiceInstanceId);
+            Assert.Contains(logs, log => log.EventType == "torrent.recovery.normalized" && log.TorrentId == torrentId);
+            Assert.Contains(logs, log => log.EventType == "service.startup.ready" && log.ServiceInstanceId == hostStatus.ServiceInstanceId);
         }
     }
 

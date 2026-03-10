@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
@@ -11,8 +10,6 @@ public sealed class SqlitePersistenceInitializer(
     SqliteSchemaMigrator sqliteSchemaMigrator,
     IActivityLogService activityLogService,
     ITorrentStateStore torrentStateStore,
-    ServiceInstanceContext serviceInstanceContext,
-    IHostEnvironment hostEnvironment,
     ILogger<SqlitePersistenceInitializer> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -29,18 +26,8 @@ public sealed class SqlitePersistenceInitializer(
         {
             Level = ActivityLogLevel.Information,
             Category = "startup",
-            EventType = "service.startup.ready",
-            Message = "TorrentCore service startup completed and SQLite persistence is ready.",
-            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-            DetailsJson = JsonSerializer.Serialize(new
-            {
-                serviceInstanceContext.ServiceInstanceId,
-                EnvironmentName = hostEnvironment.EnvironmentName,
-                HostName = Environment.MachineName,
-                servicePaths.DownloadRootPath,
-                servicePaths.StorageRootPath,
-                servicePaths.DatabaseFilePath,
-            }),
+            EventType = "service.persistence.ready",
+            Message = "SQLite persistence is initialized.",
         }, cancellationToken);
     }
 

@@ -15,6 +15,7 @@ public sealed class TorrentApplicationService(
     ITorrentEngineAdapter torrentEngineAdapter,
     IActivityLogService activityLogService,
     ServiceInstanceContext serviceInstanceContext,
+    StartupRecoveryState startupRecoveryState,
     ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
 {
     public async Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken)
@@ -23,7 +24,8 @@ public sealed class TorrentApplicationService(
         {
             ServiceName               = "TorrentCore.Service",
             ServiceVersion            = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
-            Status                    = EngineHostStatus.Ready,
+            ServiceInstanceId         = serviceInstanceContext.ServiceInstanceId,
+            Status                    = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
             EnvironmentName           = hostEnvironment.EnvironmentName,
             DownloadRootPath          = servicePaths.DownloadRootPath,
             TorrentCount              = await torrentEngineAdapter.GetTorrentCountAsync(cancellationToken),
@@ -31,8 +33,12 @@ public sealed class TorrentApplicationService(
             SupportsPause             = true,
             SupportsResume            = true,
             SupportsRemove            = true,
-            SupportsPersistentStorage = false,
+            SupportsPersistentStorage = true,
             SupportsMultiHost         = false,
+            StartupRecoveryCompleted  = startupRecoveryState.Completed,
+            StartupRecoveredTorrentCount = startupRecoveryState.RecoveredTorrentCount,
+            StartupNormalizedTorrentCount = startupRecoveryState.NormalizedTorrentCount,
+            StartupRecoveryCompletedAtUtc = startupRecoveryState.CompletedAtUtc,
             CheckedAtUtc              = DateTimeOffset.UtcNow,
         };
     }

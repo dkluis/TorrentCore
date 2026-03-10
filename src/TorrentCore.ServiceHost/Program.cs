@@ -35,6 +35,7 @@ builder.Services.AddSingleton(serviceProvider =>
     return TorrentCoreServicePathResolver.Resolve(hostEnvironment.ContentRootPath, serviceOptions);
 });
 builder.Services.AddSingleton<ServiceInstanceContext>();
+builder.Services.AddSingleton<StartupRecoveryState>();
 builder.Services.AddHostedService<TorrentCoreStorageInitializer>();
 builder.Services.AddSingleton<IActivityLogService>(serviceProvider =>
 {
@@ -53,6 +54,7 @@ builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
     return new SqliteTorrentStateStore(servicePaths.DatabaseFilePath);
 });
 builder.Services.AddHostedService<SqlitePersistenceInitializer>();
+builder.Services.AddHostedService<TorrentStartupRecoveryService>();
 builder.Services.AddSingleton<ITorrentEngineAdapter, PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentApplicationService, TorrentApplicationService>();
 

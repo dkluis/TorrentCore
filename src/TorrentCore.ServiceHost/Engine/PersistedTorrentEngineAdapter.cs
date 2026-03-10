@@ -11,6 +11,66 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
     public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken) =>
         torrentStateStore.CountAsync(cancellationToken);
 
+    public async Task<TorrentEngineRecoveryResult> RecoverAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var torrents = await torrentStateStore.ListAsync(cancellationToken);
+        var changes = new List<TorrentRecoveryChange>();
+
+        foreach (var torrent in torrents)
+        {
+            var previousState = torrent.State;
+            var normalizedState = NormalizeStateForStartup(previousState);
+            var requiresUpdate = false;
+
+            if (previousState != normalizedState)
+            {
+                torrent.State = normalizedState;
+                requiresUpdate = true;
+
+                changes.Add(new TorrentRecoveryChange
+                {
+                    TorrentId = torrent.TorrentId,
+                    Name = torrent.Name,
+                    PreviousState = previousState,
+                    CurrentState = normalizedState,
+                });
+            }
+
+            if (torrent.DownloadRateBytesPerSecond != 0)
+            {
+                torrent.DownloadRateBytesPerSecond = 0;
+                requiresUpdate = true;
+            }
+
+            if (torrent.UploadRateBytesPerSecond != 0)
+            {
+                torrent.UploadRateBytesPerSecond = 0;
+                requiresUpdate = true;
+            }
+
+            if (torrent.ConnectedPeerCount != 0)
+            {
+                torrent.ConnectedPeerCount = 0;
+                requiresUpdate = true;
+            }
+
+            if (requiresUpdate)
+            {
+                torrent.LastActivityAtUtc = now;
+                await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            }
+        }
+
+        return new TorrentEngineRecoveryResult
+        {
+            RecoveredTorrentCount = torrents.Count,
+            NormalizedTorrentCount = changes.Count,
+            CompletedAtUtc = now,
+            Changes = changes,
+        };
+    }
+
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken)
     {
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
@@ -212,6 +272,17 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             "MagnetUri must include a btih exact topic value.",
             StatusCodes.Status400BadRequest,
             nameof(AddMagnetRequest.MagnetUri));
+    }
+
+    private static TorrentState NormalizeStateForStartup(TorrentState state)
+    {
+        return state switch
+        {
+            TorrentState.ResolvingMetadata => TorrentState.Queued,
+            TorrentState.Downloading => TorrentState.Queued,
+            TorrentState.Seeding => TorrentState.Queued,
+            _ => state,
+        };
     }
 
     private static TorrentSummaryDto MapSummary(TorrentSnapshot snapshot)
