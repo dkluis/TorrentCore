@@ -67,6 +67,28 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         Assert.Contains(result.Failures, failure => failure.Contains("MaxActivityLogEntries", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Validate_Fails_ForInvalidRuntimeSettings()
+    {
+        var options = new TorrentCoreServiceOptions
+        {
+            DownloadRootPath = "Runtime/downloads",
+            StorageRootPath = "Runtime/storage",
+            MaxActiveDownloads = 0,
+            RuntimeTickIntervalMilliseconds = 49,
+            MetadataResolutionDelayMilliseconds = -1,
+            DownloadProgressPercentPerTick = 0,
+        };
+
+        var result = _validator.Validate(name: null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, failure => failure.Contains("MaxActiveDownloads", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("RuntimeTickIntervalMilliseconds", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("MetadataResolutionDelayMilliseconds", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("DownloadProgressPercentPerTick", StringComparison.Ordinal));
+    }
+
     private sealed class TestHostEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = Environments.Development;

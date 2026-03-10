@@ -31,6 +31,7 @@ Status as of March 10, 2026:
 - SQLite-backed torrent state persistence is implemented for the current fake engine slice
 - tracked SQLite schema migrations are implemented
 - startup torrent-state rehydration is implemented for the persisted fake engine slice
+- a managed fake runtime now resolves metadata, applies simple queueing, and advances persisted download state
 - real engine integration is not implemented yet
 
 Verified baseline:
@@ -43,6 +44,10 @@ Development API documentation:
 Current service configuration section:
 - `TorrentCore:DownloadRootPath`
 - `TorrentCore:StorageRootPath`
+- `TorrentCore:MaxActiveDownloads`
+- `TorrentCore:RuntimeTickIntervalMilliseconds`
+- `TorrentCore:MetadataResolutionDelayMilliseconds`
+- `TorrentCore:DownloadProgressPercentPerTick`
 - if not overridden, the service now defaults downloads to a dedicated `~/TorrentCore/downloads` folder and internal storage to the user's local app-data area
 - project-relative runtime folders were replaced as defaults because they are not appropriate for normal operator use
 
@@ -258,6 +263,7 @@ Current assumptions unless superseded by later decisions:
 - authentication and authorization are required, but the exact v1 model is still pending
 - logging will be TorrentCore-owned and not coupled to TVMaze infrastructure
 - startup recovery for the persisted fake engine normalizes active runtime states to `Queued` rather than pretending transfers survived a process restart
+- the current fake runtime is intentionally deterministic and exists to exercise queueing, metadata resolution, and restart behavior before MonoTorrent is integrated
 
 ## Phase 0 Contract Review Decisions
 
@@ -295,6 +301,7 @@ Reviewed and accepted on March 10, 2026:
 3. Add API and web surfaces for log inspection and diagnostics filtering.
 4. Prepare restart rehydration rules before real engine integration.
 5. Begin mapping persisted torrent state toward real engine lifecycle integration.
+6. Replace the fake managed runtime with a real MonoTorrent-backed runtime behind the same boundary.
 
 ## Change Log
 
@@ -334,6 +341,8 @@ Changes:
 - added startup recovery for persisted torrent state with explicit normalization rules for active runtime states
 - exposed startup recovery status through the host-status contract
 - added recovery activity-log events for normalized torrents and completed startup recovery
+- added a managed fake runtime loop that resolves metadata, starts queued downloads, applies a single-active-download queue, and completes downloads over time
+- added runtime configuration settings and validation for the managed fake runtime
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -348,6 +357,7 @@ Assumptions:
 - the current fake-engine behavior now persists torrent state in SQLite, but it is still not a real torrent runtime
 - schema evolution is now tracked through explicit migration versions rather than ad hoc table creation
 - persisted fake-engine recovery currently normalizes `ResolvingMetadata`, `Downloading`, and `Seeding` to `Queued` on startup and clears active transfer counters
+- the current fake runtime now simulates metadata resolution and download progression using deterministic background processing and persisted snapshots
 
 Progress:
 - planning completed
@@ -397,6 +407,7 @@ Completed:
 - added verification that legacy activity-log schema is upgraded to the current shape
 - added startup recovery state reporting in host status
 - added restart-recovery logging and recovery normalization tests for persisted torrent state
+- added managed fake-runtime processing and tests for automatic metadata resolution, queued download start, and completion
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -404,3 +415,4 @@ In progress:
 Next:
 - continue toward real engine-backed state rehydration using the tracked SQLite schema foundation
 - expand persisted torrent state beyond the current fake-engine shape toward actual runtime metadata and engine-session recovery
+- replace the managed fake runtime with a real MonoTorrent-backed adapter while preserving the public contracts

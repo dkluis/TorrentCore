@@ -82,6 +82,68 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_EventuallyResolvesMetadata_AndCompletesDownload()
+    {
+        await using var factory = CreateFactory(
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(httpClient, "ABABABABABABABABABABABABABABABABABABABAB", "Runtime Torrent");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var completedTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.Completed,
+            timeout: TimeSpan.FromSeconds(5));
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=50&torrentId=" + addedTorrent!.TorrentId);
+
+        Assert.NotNull(completedTorrent);
+        Assert.True(completedTorrent.TotalBytes > 0);
+        Assert.Equal(completedTorrent.TotalBytes, completedTorrent.DownloadedBytes);
+        Assert.Equal(100, completedTorrent.ProgressPercent);
+        Assert.True(completedTorrent.TrackerCount > 0);
+        Assert.NotNull(completedTorrent.CompletedAtUtc);
+
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.metadata.resolved");
+        Assert.Contains(logs, log => log.EventType == "torrent.download.started");
+        Assert.Contains(logs, log => log.EventType == "torrent.download.completed");
+    }
+
+    [Fact]
+    public async Task FakeRuntime_UsesSingleActiveDownloadQueue_ByDefault()
+    {
+        await using var factory = CreateFactory(
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 5,
+            maxActiveDownloads: 1);
+        using var httpClient = factory.CreateClient();
+
+        var firstResponse = await AddMagnetAsync(httpClient, "1010101010101010101010101010101010101010", "Queue One");
+        var firstTorrent = await firstResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var secondResponse = await AddMagnetAsync(httpClient, "2020202020202020202020202020202020202020", "Queue Two");
+        var secondTorrent = await secondResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var queuedAndActive = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            torrents => torrents is not null &&
+                        torrents.Count == 2 &&
+                        torrents.Count(torrent => torrent.State == TorrentState.Downloading) == 1 &&
+                        torrents.Count(torrent => torrent.State == TorrentState.Queued) == 1,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(queuedAndActive);
+        Assert.Contains(queuedAndActive, torrent => torrent.TorrentId == firstTorrent!.TorrentId || torrent.TorrentId == secondTorrent!.TorrentId);
+        Assert.Contains(queuedAndActive, torrent => torrent.State == TorrentState.Queued);
+        Assert.Contains(queuedAndActive, torrent => torrent.State == TorrentState.Downloading);
+    }
+
+    [Fact]
     public async Task TorrentState_SurvivesRestart()
     {
         var rootPath = CreateTempRootPath("torrentcore-phase2-restart");
@@ -140,9 +202,7 @@ public sealed class TorrentApiTests
             var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=50");
 
             Assert.NotNull(recoveredTorrent);
-            Assert.Equal(TorrentState.Queued, recoveredTorrent.State);
-            Assert.Equal(0, recoveredTorrent.DownloadRateBytesPerSecond);
-            Assert.Equal(0, recoveredTorrent.UploadRateBytesPerSecond);
+            Assert.NotEqual(TorrentState.ResolvingMetadata, recoveredTorrent.State);
 
             Assert.NotNull(hostStatus);
             Assert.Equal(1, hostStatus.StartupRecoveredTorrentCount);
@@ -261,7 +321,11 @@ public sealed class TorrentApiTests
     private static WebApplicationFactory<Program> CreateFactory(
         string? downloadPath = null,
         string? storagePath = null,
-        int? maxActivityLogEntries = null)
+        int? maxActivityLogEntries = null,
+        int? maxActiveDownloads = null,
+        int? runtimeTickIntervalMilliseconds = null,
+        int? metadataResolutionDelayMilliseconds = null,
+        double? downloadProgressPercentPerTick = null)
     {
         var rootPath = CreateTempRootPath("torrentcore-api");
         var resolvedDownloadPath = downloadPath ?? Path.Combine(rootPath, "downloads");
@@ -283,6 +347,26 @@ public sealed class TorrentApiTests
                         settings[$"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries"] = maxActivityLogEntries.Value.ToString();
                     }
 
+                    if (maxActiveDownloads is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:MaxActiveDownloads"] = maxActiveDownloads.Value.ToString();
+                    }
+
+                    if (runtimeTickIntervalMilliseconds is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:RuntimeTickIntervalMilliseconds"] = runtimeTickIntervalMilliseconds.Value.ToString();
+                    }
+
+                    if (metadataResolutionDelayMilliseconds is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionDelayMilliseconds"] = metadataResolutionDelayMilliseconds.Value.ToString();
+                    }
+
+                    if (downloadProgressPercentPerTick is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:DownloadProgressPercentPerTick"] = downloadProgressPercentPerTick.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+
                     configurationBuilder.AddInMemoryCollection(settings);
                 });
             });
@@ -299,5 +383,29 @@ public sealed class TorrentApiTests
     private static string CreateTempRootPath(string prefix)
     {
         return Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
+    }
+
+    private static async Task<T> WaitForAsync<T>(
+        Func<Task<T>> action,
+        Func<T, bool> predicate,
+        TimeSpan timeout,
+        int pollIntervalMilliseconds = 50)
+    {
+        var startedAt = DateTimeOffset.UtcNow;
+
+        while (DateTimeOffset.UtcNow - startedAt < timeout)
+        {
+            var result = await action();
+            if (predicate(result))
+            {
+                return result;
+            }
+
+            await Task.Delay(pollIntervalMilliseconds);
+        }
+
+        var finalResult = await action();
+        Assert.True(predicate(finalResult), "Timed out waiting for the expected condition.");
+        return finalResult;
     }
 }

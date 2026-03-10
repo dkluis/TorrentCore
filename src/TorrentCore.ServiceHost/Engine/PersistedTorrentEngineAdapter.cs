@@ -169,9 +169,10 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
                 nameof(torrentId));
         }
 
-        torrent.State = torrent.ProgressPercent >= 100 ? TorrentState.Seeding : TorrentState.Downloading;
-        torrent.DownloadRateBytesPerSecond = torrent.State == TorrentState.Downloading ? 3_250_000 : 0;
-        torrent.UploadRateBytesPerSecond = torrent.State == TorrentState.Seeding ? 760_000 : 120_000;
+        torrent.State = torrent.ProgressPercent >= 100 ? TorrentState.Completed : TorrentState.Queued;
+        torrent.DownloadRateBytesPerSecond = 0;
+        torrent.UploadRateBytesPerSecond = 0;
+        torrent.ConnectedPeerCount = 0;
         torrent.LastActivityAtUtc = DateTimeOffset.UtcNow;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);

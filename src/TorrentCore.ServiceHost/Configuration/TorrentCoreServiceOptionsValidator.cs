@@ -28,6 +28,26 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries must be 100 or greater.");
         }
 
+        if (options.MaxActiveDownloads < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActiveDownloads must be 1 or greater.");
+        }
+
+        if (options.RuntimeTickIntervalMilliseconds < 50)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:RuntimeTickIntervalMilliseconds must be 50 or greater.");
+        }
+
+        if (options.MetadataResolutionDelayMilliseconds < 0)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionDelayMilliseconds must be 0 or greater.");
+        }
+
+        if (options.DownloadProgressPercentPerTick <= 0 || options.DownloadProgressPercentPerTick > 100)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:DownloadProgressPercentPerTick must be greater than 0 and less than or equal to 100.");
+        }
+
         try
         {
             var resolvedPaths = TorrentCoreServicePathResolver.Resolve(hostEnvironment.ContentRootPath, options);

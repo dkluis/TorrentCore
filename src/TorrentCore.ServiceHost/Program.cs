@@ -55,6 +55,7 @@ builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
 });
 builder.Services.AddHostedService<SqlitePersistenceInitializer>();
 builder.Services.AddHostedService<TorrentStartupRecoveryService>();
+builder.Services.AddHostedService<FakeTorrentRuntimeService>();
 builder.Services.AddSingleton<ITorrentEngineAdapter, PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentApplicationService, TorrentApplicationService>();
 
