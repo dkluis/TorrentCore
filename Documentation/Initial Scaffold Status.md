@@ -9,7 +9,7 @@
   - `src/TorrentCore.Core`
   - `src/TorrentCore.Persistence.Sqlite`
   - `src/TorrentCore.Client`
-  - `src/TorrentCore.Service`
+  - `src/TorrentCore.ServiceHost`
   - `src/TorrentCore.Web`
   - `tests/TorrentCore.Service.Tests`
 

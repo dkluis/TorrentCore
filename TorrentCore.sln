@@ -13,7 +13,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TorrentCore.Persistence.Sql
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TorrentCore.Client", "src\TorrentCore.Client\TorrentCore.Client.csproj", "{E76D7198-145F-4245-B9A5-05AB66A95084}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TorrentCore.Service", "src\TorrentCore.Service\TorrentCore.Service.csproj", "{2C31D304-C1E0-4E6F-8E4A-C882F2548B8D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TorrentCore.Service", "src\TorrentCore.ServiceHost\TorrentCore.Service.csproj", "{2C31D304-C1E0-4E6F-8E4A-C882F2548B8D}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TorrentCore.Web", "src\TorrentCore.Web\TorrentCore.Web.csproj", "{5F68B454-B016-4F75-965A-630C42515DCD}"
 EndProject

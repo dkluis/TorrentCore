@@ -312,6 +312,7 @@ Changes:
 - added Phase 1 tests covering configuration validation and configured path behavior
 - changed the default path strategy so downloads resolve to a user-facing location and internal storage resolves to a user app-data location
 - changed the default download path again to avoid the user's `Downloads` folder as an unsafe cleanup target
+- renamed the service project folder from `src/TorrentCore.Service` to `src/TorrentCore.ServiceHost` to avoid macOS Finder package semantics
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -355,6 +356,7 @@ Completed:
 - added test coverage for options validation and configured service paths
 - replaced project-relative runtime defaults with user-accessible and user-profile-based defaults
 - changed the default managed-content location from `Downloads/TorrentCore` to `~/TorrentCore/downloads`
+- renamed the service source folder to make it directly accessible through Finder without `.service` package confusion
 
 In progress:
 - none
