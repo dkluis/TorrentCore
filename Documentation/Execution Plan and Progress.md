@@ -23,9 +23,10 @@ This document follows:
 Status as of March 10, 2026:
 - solution scaffolding exists and builds successfully
 - current test suite passes
-- Phase 0 contract work has started
+- Phase 0 contract work is complete
 - service, client, and web now expose a stubbed torrent-management boundary backed by an in-memory application service
 - Swagger UI is enabled for the service in development
+- Phase 1 configuration and startup validation are implemented
 - persistence and real engine integration are not implemented yet
 
 Verified baseline:
@@ -34,6 +35,12 @@ Verified baseline:
 
 Development API documentation:
 - `https://localhost:7033/swagger`
+
+Current service configuration section:
+- `TorrentCore:DownloadRootPath`
+- `TorrentCore:StorageRootPath`
+- if not overridden, the service now defaults downloads to a user-accessible `Downloads/TorrentCore` folder and internal storage to the user's local app-data area
+- project-relative runtime folders were replaced as defaults because they are not appropriate for normal operator use
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -274,11 +281,11 @@ Reviewed and accepted on March 10, 2026:
 
 ## Current Next Steps
 
-1. Review the Phase 0 contract shape and confirm no additional v1 fields are required before freezing it further.
-2. Begin Phase 1 startup options and validation work.
-3. Define the SQLite persistence model and migration strategy for Phase 2.
-4. Replace the in-memory application service with a persistence-backed fake-engine slice.
-5. Expand API and UI coverage around torrent detail and action flows.
+1. Begin Phase 2 persistence foundation work.
+2. Define the SQLite storage model and migration strategy.
+3. Replace the in-memory engine adapter with a persistence-backed fake-engine slice.
+4. Expand API and UI coverage around torrent detail and action flows.
+5. Prepare restart rehydration rules before real engine integration.
 
 ## Change Log
 
@@ -298,6 +305,12 @@ Changes:
 - enabled Swagger UI for the service API in development
 - added `LICENSE.md` using Apache License 2.0
 - added `DISCLAIMER.md` covering warranty, liability, and lawful-use responsibility
+- added Phase 1 service options for download and storage paths
+- added fail-fast startup validation and directory initialization
+- introduced an engine adapter registration boundary between the service layer and engine implementation
+- changed invalid operation responses to predictable problem-details payloads
+- added Phase 1 tests covering configuration validation and configured path behavior
+- changed the default path strategy so downloads resolve to a user-facing location and internal storage resolves to a user app-data location
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -306,12 +319,14 @@ Assumptions:
 - v1 detail remains torrent-level only and does not yet include per-file DTOs
 - magnet validation is intentionally limited to public-boundary checks, not engine-level parsing completeness
 - sorting and filtering are UI/API behaviors for later work, not embedded DTO concerns
+- the current engine implementation remains in-memory and is still a placeholder for later persistence and real engine work
 
 Progress:
 - planning completed
 - repository baseline reviewed
 - build and test baseline verified
 - Phase 0 completed and verified by build and tests
+- Phase 1 completed and verified by build and tests
 
 ## Progress Log
 
@@ -332,9 +347,15 @@ Completed:
 - added tracker and connected-peer counts to the torrent contract and list UI
 - enabled Swagger/OpenAPI UI for the local service API
 - added repository license and disclaimer documents
+- added `TorrentCore` service configuration with download and storage path settings
+- added startup validation and directory creation for configured service paths
+- moved torrent state logic behind an engine adapter registration boundary
+- changed invalid torrent operation failures to RFC 7807 problem-details responses
+- added test coverage for options validation and configured service paths
+- replaced project-relative runtime defaults with user-accessible and user-profile-based defaults
 
 In progress:
 - none
 
 Next:
-- Phase 1 configuration and startup validation
+- Phase 2 persistence foundation

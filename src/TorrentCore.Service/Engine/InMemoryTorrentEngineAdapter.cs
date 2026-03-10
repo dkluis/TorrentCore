@@ -1,39 +1,22 @@
-using System.Reflection;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Primitives;
-using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
+using TorrentCore.Service.Application;
 
-namespace TorrentCore.Service.Application;
+namespace TorrentCore.Service.Engine;
 
-public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvironment) : ITorrentApplicationService
+public sealed class InMemoryTorrentEngineAdapter : ITorrentEngineAdapter
 {
     private readonly object _syncRoot = new();
     private readonly Dictionary<Guid, TorrentRecord> _torrents = CreateSeedData();
-    private readonly string _downloadRootPath = Path.Combine(AppContext.BaseDirectory, "downloads");
 
-    public Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken)
+    public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_syncRoot)
         {
-            return Task.FromResult(new EngineHostStatusDto
-            {
-                ServiceName               = "TorrentCore.Service",
-                ServiceVersion            = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
-                Status                    = EngineHostStatus.Ready,
-                EnvironmentName           = hostEnvironment.EnvironmentName,
-                DownloadRootPath          = _downloadRootPath,
-                TorrentCount              = _torrents.Count,
-                SupportsMagnetAdds        = true,
-                SupportsPause             = true,
-                SupportsResume            = true,
-                SupportsRemove            = true,
-                SupportsPersistentStorage = false,
-                SupportsMultiHost         = false,
-                CheckedAtUtc              = DateTimeOffset.UtcNow,
-            });
+            return Task.FromResult(_torrents.Count);
         }
     }
 
@@ -52,20 +35,17 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
         }
     }
 
-    public Task<TorrentDetailDto?> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
+    public Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         lock (_syncRoot)
         {
-            return Task.FromResult(
-                _torrents.TryGetValue(torrentId, out var record)
-                    ? MapDetail(record)
-                    : null);
+            return Task.FromResult(MapDetail(GetRequiredRecord(torrentId)));
         }
     }
 
-    public Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken)
+    public Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -87,21 +67,21 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
             var torrentId = Guid.NewGuid();
             var record = new TorrentRecord
             {
-                TorrentId                   = torrentId,
-                Name                        = magnet.DisplayName,
-                MagnetUri                   = request.MagnetUri.Trim(),
-                InfoHash                    = magnet.InfoHash,
-                SavePath                    = Path.Combine(_downloadRootPath, SanitizePathSegment(magnet.DisplayName)),
-                State                       = TorrentState.ResolvingMetadata,
-                ProgressPercent             = 0,
-                DownloadedBytes             = 0,
-                TotalBytes                  = null,
-                DownloadRateBytesPerSecond  = 0,
-                UploadRateBytesPerSecond    = 0,
-                TrackerCount                = 0,
-                ConnectedPeerCount          = 0,
-                AddedAtUtc                  = now,
-                LastActivityAtUtc           = now,
+                TorrentId                  = torrentId,
+                Name                       = magnet.DisplayName,
+                MagnetUri                  = request.MagnetUri.Trim(),
+                InfoHash                   = magnet.InfoHash,
+                SavePath                   = Path.Combine(downloadRootPath, SanitizePathSegment(magnet.DisplayName)),
+                State                      = TorrentState.ResolvingMetadata,
+                ProgressPercent            = 0,
+                DownloadedBytes            = 0,
+                TotalBytes                 = null,
+                DownloadRateBytesPerSecond = 0,
+                UploadRateBytesPerSecond   = 0,
+                TrackerCount               = 0,
+                ConnectedPeerCount         = 0,
+                AddedAtUtc                 = now,
+                LastActivityAtUtc          = now,
             };
 
             _torrents.Add(torrentId, record);
@@ -133,11 +113,11 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
 
             return Task.FromResult(new TorrentActionResultDto
             {
-                TorrentId     = record.TorrentId,
-                Action        = "pause",
-                State         = record.State,
+                TorrentId      = record.TorrentId,
+                Action         = "pause",
+                State          = record.State,
                 ProcessedAtUtc = record.LastActivityAtUtc.Value,
-                DataDeleted   = false,
+                DataDeleted    = false,
             });
         }
     }
@@ -391,7 +371,7 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
         public required string Name { get; set; }
         public required string MagnetUri { get; init; }
         public string? InfoHash { get; init; }
-        public required string SavePath { get; init; }
+        public required string SavePath { get; set; }
         public required TorrentState State { get; set; }
         public required double ProgressPercent { get; init; }
         public required long DownloadedBytes { get; init; }

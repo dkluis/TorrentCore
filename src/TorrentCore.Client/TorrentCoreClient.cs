@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json;
 using TorrentCore.Contracts;
 using TorrentCore.Contracts.Diagnostics;
@@ -13,23 +14,27 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
 
     public async Task<ServiceHealthDto?> GetHealthAsync(CancellationToken cancellationToken = default)
     {
-        return await httpClient.GetFromJsonAsync<ServiceHealthDto>("api/health", JsonOptions, cancellationToken);
+        using var response = await httpClient.GetAsync("api/health", cancellationToken);
+        return await ReadResponseAsync<ServiceHealthDto>(response, cancellationToken);
     }
 
     public async Task<EngineHostStatusDto?> GetHostStatusAsync(CancellationToken cancellationToken = default)
     {
-        return await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status", JsonOptions, cancellationToken);
+        using var response = await httpClient.GetAsync("api/host/status", cancellationToken);
+        return await ReadResponseAsync<EngineHostStatusDto>(response, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken = default)
     {
-        return await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents", JsonOptions, cancellationToken)
+        using var response = await httpClient.GetAsync("api/torrents", cancellationToken);
+        return await ReadResponseAsync<IReadOnlyList<TorrentSummaryDto>>(response, cancellationToken)
                ?? Array.Empty<TorrentSummaryDto>();
     }
 
     public async Task<TorrentDetailDto?> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
-        return await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}", JsonOptions, cancellationToken);
+        using var response = await httpClient.GetAsync($"api/torrents/{torrentId}", cancellationToken);
+        return await ReadResponseAsync<TorrentDetailDto>(response, cancellationToken);
     }
 
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken = default)
@@ -67,8 +72,32 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
             return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken);
         }
 
-        var serviceError = await response.Content.ReadFromJsonAsync<ServiceErrorDto>(JsonOptions, cancellationToken);
+        var serviceError = await ReadServiceErrorAsync(response, cancellationToken);
         var message = serviceError?.Message ?? $"TorrentCore request failed with status code {(int)response.StatusCode}.";
         throw new TorrentCoreClientException(message, (int)response.StatusCode, serviceError);
+    }
+
+    private static async Task<ServiceErrorDto?> ReadServiceErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        if (response.Content.Headers.ContentLength is 0)
+        {
+            return null;
+        }
+
+        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var payload = await JsonNode.ParseAsync(contentStream, cancellationToken: cancellationToken);
+
+        if (payload is null)
+        {
+            return null;
+        }
+
+        return new ServiceErrorDto
+        {
+            Code    = payload["code"]?.GetValue<string>() ?? "request_failed",
+            Message = payload["message"]?.GetValue<string>() ?? payload["detail"]?.GetValue<string>() ?? "TorrentCore request failed.",
+            Target  = payload["target"]?.GetValue<string>(),
+            TraceId = payload["traceId"]?.GetValue<string>(),
+        };
     }
 }

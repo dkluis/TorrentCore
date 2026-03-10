@@ -1,8 +1,13 @@
 using TorrentCore.Service.Application;
+using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Engine;
+using TorrentCore.Service.Infrastructure;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ServiceOperationExceptionHandler>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -14,7 +19,19 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Management API for the TorrentCore service host.",
     });
 });
-builder.Services.AddSingleton<ITorrentApplicationService, InMemoryTorrentApplicationService>();
+builder.Services.AddSingleton<IValidateOptions<TorrentCoreServiceOptions>, TorrentCoreServiceOptionsValidator>();
+builder.Services.AddOptions<TorrentCoreServiceOptions>()
+    .Bind(builder.Configuration.GetSection(TorrentCoreServiceOptions.SectionName))
+    .ValidateOnStart();
+builder.Services.AddSingleton(serviceProvider =>
+{
+    var hostEnvironment = serviceProvider.GetRequiredService<IHostEnvironment>();
+    var serviceOptions = serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value;
+    return TorrentCoreServicePathResolver.Resolve(hostEnvironment.ContentRootPath, serviceOptions);
+});
+builder.Services.AddHostedService<TorrentCoreStorageInitializer>();
+builder.Services.AddSingleton<ITorrentEngineAdapter, InMemoryTorrentEngineAdapter>();
+builder.Services.AddSingleton<ITorrentApplicationService, TorrentApplicationService>();
 
 var app = builder.Build();
 
@@ -28,6 +45,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.MapControllers();
 

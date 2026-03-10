@@ -1,14 +1,13 @@
-using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 
-namespace TorrentCore.Service.Application;
+namespace TorrentCore.Service.Engine;
 
-public interface ITorrentApplicationService
+public interface ITorrentEngineAdapter
 {
-    Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken);
+    Task<int> GetTorrentCountAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken);
     Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken);
-    Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken);
+    Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken);
