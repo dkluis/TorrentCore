@@ -34,7 +34,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3], versions);
+        Assert.Equal([1, 2, 3, 4], versions);
     }
 
     [Fact]
@@ -88,6 +88,67 @@ public sealed class SqliteSchemaMigrationTests
         }
 
         Assert.Contains("service_instance_id", columns);
+    }
+
+    [Fact]
+    public async Task Startup_UpgradesLegacyTorrentsSchema()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-legacy-torrent-migrations");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        Directory.CreateDirectory(storagePath);
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+
+            var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                CREATE TABLE torrents (
+                    torrent_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    magnet_uri TEXT NOT NULL,
+                    info_hash TEXT NULL,
+                    save_path TEXT NOT NULL,
+                    progress_percent REAL NOT NULL,
+                    downloaded_bytes INTEGER NOT NULL,
+                    total_bytes INTEGER NULL,
+                    download_rate_bytes_per_second INTEGER NOT NULL,
+                    upload_rate_bytes_per_second INTEGER NOT NULL,
+                    tracker_count INTEGER NOT NULL,
+                    connected_peer_count INTEGER NOT NULL,
+                    added_at_utc TEXT NOT NULL,
+                    completed_at_utc TEXT NULL,
+                    last_activity_at_utc TEXT NULL,
+                    error_message TEXT NULL
+                );
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await using var factory = CreateFactory(downloadPath, storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.GetAsync("api/host/status");
+        response.EnsureSuccessStatusCode();
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+
+        var pragmaCommand = verifyConnection.CreateCommand();
+        pragmaCommand.CommandText = "PRAGMA table_info(torrents);";
+
+        var columns = new List<string>();
+        await using var reader = await pragmaCommand.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        Assert.Contains("download_root_path", columns);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string downloadPath, string storagePath)

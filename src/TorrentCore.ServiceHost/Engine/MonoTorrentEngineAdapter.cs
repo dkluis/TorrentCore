@@ -262,6 +262,7 @@ public sealed class MonoTorrentEngineAdapter(
         var torrentId = Guid.NewGuid();
         RegisterManager(torrentId, manager);
         await manager.StartAsync();
+        var persistedSavePath = MonoTorrentSavePathNormalizer.Normalize(manager.SavePath, string.IsNullOrWhiteSpace(magnet.Name) ? null : magnet.Name);
 
         var snapshot = new TorrentSnapshot
         {
@@ -270,7 +271,8 @@ public sealed class MonoTorrentEngineAdapter(
             State = ContractTorrentState.ResolvingMetadata,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = infoHash,
-            SavePath = downloadRootPath,
+            DownloadRootPath = downloadRootPath,
+            SavePath = persistedSavePath,
             ProgressPercent = 0,
             DownloadedBytes = 0,
             TotalBytes = magnet.Size,
@@ -468,7 +470,8 @@ public sealed class MonoTorrentEngineAdapter(
         }
 
         var magnet = MagnetLink.Parse(snapshot.MagnetUri);
-        var manager = await _engine!.AddAsync(magnet, snapshot.SavePath);
+        var recoveryDownloadRootPath = MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
+        var manager = await _engine!.AddAsync(magnet, recoveryDownloadRootPath);
         RegisterManager(snapshot.TorrentId, manager);
         _managers[snapshot.TorrentId] = manager;
         return manager;
@@ -514,9 +517,7 @@ public sealed class MonoTorrentEngineAdapter(
         var totalBytes = manager.HasMetadata
             ? manager.Torrent?.Size ?? existing.TotalBytes
             : existing.TotalBytes ?? manager.MagnetLink?.Size;
-        var savePath = manager.HasMetadata && !string.IsNullOrWhiteSpace(manager.ContainingDirectory)
-            ? manager.ContainingDirectory
-            : manager.SavePath;
+        var savePath = MonoTorrentSavePathNormalizer.Normalize(manager.SavePath, existing.Name);
         var downloadedBytes = CalculateDownloadedBytes(totalBytes, manager.Progress, existing.DownloadedBytes);
 
         if (manager.HasMetadata && state == ContractTorrentState.ResolvingMetadata)
@@ -531,6 +532,7 @@ public sealed class MonoTorrentEngineAdapter(
             State = state,
             MagnetUri = existing.MagnetUri,
             InfoHash = manager.InfoHashes.V1OrV2.ToHex().ToUpperInvariant(),
+            DownloadRootPath = existing.DownloadRootPath,
             SavePath = savePath,
             ProgressPercent = manager.Progress,
             DownloadedBytes = downloadedBytes,
@@ -540,9 +542,7 @@ public sealed class MonoTorrentEngineAdapter(
             TrackerCount = CountTrackers(manager),
             ConnectedPeerCount = manager.OpenConnections,
             AddedAtUtc = existing.AddedAtUtc,
-            CompletedAtUtc = manager.Complete
-                ? existing.CompletedAtUtc ?? now
-                : existing.CompletedAtUtc,
+            CompletedAtUtc = ResolveCompletedAtUtc(existing.CompletedAtUtc, state, manager.Progress, manager.Complete, now),
             LastActivityAtUtc = now,
             ErrorMessage = manager.Error?.Reason.ToString() ?? existing.ErrorMessage,
         };
@@ -671,6 +671,21 @@ public sealed class MonoTorrentEngineAdapter(
 
         var boundedProgress = Math.Clamp(progressPercent, 0, 100);
         return (long)Math.Round(totalBytes.Value * (boundedProgress / 100d), MidpointRounding.AwayFromZero);
+    }
+
+    private static DateTimeOffset? ResolveCompletedAtUtc(
+        DateTimeOffset? existingCompletedAtUtc,
+        ContractTorrentState state,
+        double progressPercent,
+        bool isComplete,
+        DateTimeOffset now)
+    {
+        var isCompletedState = state is ContractTorrentState.Completed or ContractTorrentState.Seeding;
+        var reachedFullProgress = progressPercent >= 100d;
+
+        return isComplete || isCompletedState || reachedFullProgress
+            ? existingCompletedAtUtc ?? now
+            : null;
     }
 
     private static ContractTorrentState MapState(TorrentManager manager, ContractTorrentState existingState)

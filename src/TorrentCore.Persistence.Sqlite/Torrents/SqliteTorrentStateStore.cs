@@ -85,6 +85,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 state,
                 magnet_uri,
                 info_hash,
+                download_root_path,
                 save_path,
                 progress_percent,
                 downloaded_bytes,
@@ -120,6 +121,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 state,
                 magnet_uri,
                 info_hash,
+                download_root_path,
                 save_path,
                 progress_percent,
                 downloaded_bytes,
@@ -192,18 +194,19 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 State = Enum.Parse<TorrentState>(reader.GetString(2), ignoreCase: true),
                 MagnetUri = reader.GetString(3),
                 InfoHash = reader.IsDBNull(4) ? null : reader.GetString(4),
-                SavePath = reader.GetString(5),
-                ProgressPercent = reader.GetDouble(6),
-                DownloadedBytes = reader.GetInt64(7),
-                TotalBytes = reader.IsDBNull(8) ? null : reader.GetInt64(8),
-                DownloadRateBytesPerSecond = reader.GetInt64(9),
-                UploadRateBytesPerSecond = reader.GetInt64(10),
-                TrackerCount = reader.GetInt32(11),
-                ConnectedPeerCount = reader.GetInt32(12),
-                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(13), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                CompletedAtUtc = reader.IsDBNull(14) ? null : DateTimeOffset.Parse(reader.GetString(14), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                LastActivityAtUtc = reader.IsDBNull(15) ? null : DateTimeOffset.Parse(reader.GetString(15), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                ErrorMessage = reader.IsDBNull(16) ? null : reader.GetString(16),
+                DownloadRootPath = reader.IsDBNull(5) ? null : reader.GetString(5),
+                SavePath = reader.GetString(6),
+                ProgressPercent = reader.GetDouble(7),
+                DownloadedBytes = reader.GetInt64(8),
+                TotalBytes = reader.IsDBNull(9) ? null : reader.GetInt64(9),
+                DownloadRateBytesPerSecond = reader.GetInt64(10),
+                UploadRateBytesPerSecond = reader.GetInt64(11),
+                TrackerCount = reader.GetInt32(12),
+                ConnectedPeerCount = reader.GetInt32(13),
+                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(14), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                CompletedAtUtc = reader.IsDBNull(15) ? null : DateTimeOffset.Parse(reader.GetString(15), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                LastActivityAtUtc = reader.IsDBNull(16) ? null : DateTimeOffset.Parse(reader.GetString(16), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                ErrorMessage = reader.IsDBNull(17) ? null : reader.GetString(17),
             });
         }
 
@@ -221,6 +224,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 state,
                 magnet_uri,
                 info_hash,
+                download_root_path,
                 save_path,
                 progress_percent,
                 downloaded_bytes,
@@ -240,6 +244,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 $state,
                 $magnet_uri,
                 $info_hash,
+                $download_root_path,
                 $save_path,
                 $progress_percent,
                 $downloaded_bytes,
@@ -260,6 +265,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue("$state", torrent.State.ToString());
         command.Parameters.AddWithValue("$magnet_uri", torrent.MagnetUri);
         command.Parameters.AddWithValue("$info_hash", torrent.InfoHash ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$download_root_path", torrent.DownloadRootPath ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$save_path", torrent.SavePath);
         command.Parameters.AddWithValue("$progress_percent", torrent.ProgressPercent);
         command.Parameters.AddWithValue("$downloaded_bytes", torrent.DownloadedBytes);

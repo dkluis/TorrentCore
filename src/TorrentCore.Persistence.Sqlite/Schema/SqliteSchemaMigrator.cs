@@ -173,6 +173,7 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                             state TEXT NOT NULL,
                             magnet_uri TEXT NOT NULL,
                             info_hash TEXT NULL,
+                            download_root_path TEXT NULL,
                             save_path TEXT NOT NULL,
                             progress_percent REAL NOT NULL,
                             downloaded_bytes INTEGER NOT NULL,
@@ -195,6 +196,18 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                             ON torrents (added_at_utc DESC);
                         """;
                     await command.ExecuteNonQueryAsync(cancellationToken);
+                }),
+            new SqliteMigrationDefinition(
+                4,
+                "add_torrents_download_root_path",
+                async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "download_root_path", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN download_root_path TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
                 }),
         ];
     }

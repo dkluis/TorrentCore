@@ -9,6 +9,7 @@ public sealed class TorrentSnapshot
     public required TorrentState State { get; set; }
     public required string MagnetUri { get; init; }
     public string? InfoHash { get; init; }
+    public string? DownloadRootPath { get; set; }
     public required string SavePath { get; set; }
     public required double ProgressPercent { get; set; }
     public required long DownloadedBytes { get; set; }

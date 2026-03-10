@@ -12,6 +12,8 @@ TorrentCore owns:
 - persistence
 - management API
 - dedicated management UI
+- file finalization behavior for incomplete vs completed content
+- seeding policy and stop conditions
 
 TVMaze does not own TorrentCore internals. TVMaze is only one client of TorrentCore.
 
@@ -37,7 +39,7 @@ Important context carried forward:
 - existing TVMaze Avalonia app should stay a lightweight integration surface
 - multi-host management is expected
 - magnet links only for v1
-- download-focused behavior
+- download-focused behavior that can expand into more general torrent-engine operation
 - strong API boundary between UI and engine internals
 
 ## Product Shape
@@ -90,6 +92,8 @@ TorrentCore owns:
 - torrent state
 - queue policy
 - download paths
+- incomplete-file handling such as `.part` suffix behavior
+- completion and seeding policy
 - host capabilities
 - logs and diagnostics
 - persistence schema
@@ -101,6 +105,7 @@ TVMaze may do only lightweight interaction:
 - view torrent summaries relevant to a TVMaze workflow
 - pause, resume, remove
 - surface completion or failure state
+- rely on completed files no longer carrying the configured incomplete suffix
 - deep-link to the dedicated TorrentCore UI for advanced work
 
 ## v1 Scope
@@ -114,6 +119,8 @@ Keep v1 narrow:
 - inspect torrent detail
 - pause, resume, remove
 - simple queueing rules
+- configurable incomplete-file finalization behavior with `.part` compatibility
+- configurable seeding stop policy
 - survive restart
 - host-local SQLite persistence
 - basic health and diagnostics
@@ -149,3 +156,4 @@ The initial scaffold is a boundary-first starter:
 3. Add service configuration and startup validation.
 4. Add SQLite persistence shape.
 5. Add first magnet workflow end to end.
+6. Add explicit incomplete-file and seeding-policy behavior rather than relying on engine defaults.

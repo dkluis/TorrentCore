@@ -7,6 +7,8 @@
 - add magnet workflow
 - queue and scheduling controls
 - storage path settings
+- incomplete-file suffix and finalization policy
+- seeding ratio and seeding-time policy
 - category or tag management
 - engine configuration
 - diagnostics, logs, and recovery actions
@@ -25,6 +27,7 @@
 - show progress and simple state
 - pause, resume, remove
 - display completion or error state
+- treat files without the configured incomplete suffix as ready for downstream processing
 - provide a link or launch path into the dedicated TorrentCore UI
 
 ## TVMaze Should Not Own
@@ -33,6 +36,8 @@
 - engine configuration
 - deep queue policy
 - storage policy
+- incomplete-file lifecycle policy
+- seeding policy
 - host administration
 - engine persistence
 - engine diagnostics

@@ -73,6 +73,7 @@ Note:
 - v1 stays intentionally narrow and is delivered through vertical slices.
 - Each slice must be testable through the API and exercisable through the web UI.
 - User-facing date/time values must be rendered in the operator's local time, not UTC.
+- Incomplete content must be distinguishable from completed content through explicit TorrentCore policy, not inferred only from file size or Finder display.
 
 ## Phased Execution Plan
 
@@ -156,6 +157,8 @@ Planned outputs:
 - pause/resume/remove operations
 - restart recovery behavior
 - operator-visible MonoTorrent runtime configuration and diagnostics
+- configurable seeding stop policy
+- explicit incomplete-file finalization behavior such as `.part` suffix handling
 
 Exit criteria:
 - no MonoTorrent types cross the public boundary
@@ -235,6 +238,7 @@ Cover:
 - migrations
 - locking behavior
 - restart rehydration
+- file finalization and rename behavior across restart
 
 Requirement:
 - use real SQLite-backed tests, not only in-memory substitutes
@@ -245,6 +249,7 @@ Cover:
 - fake adapter behavior for deterministic vertical-slice tests
 - MonoTorrent adapter behavior for real engine integration
 - deterministic testing for log throttling and runtime diagnostics behavior without depending on external peer or network conditions
+- seeding-policy transitions and incomplete-file rename/finalization behavior
 
 ### Web UI Tests
 
@@ -277,6 +282,9 @@ Current assumptions unless superseded by later decisions:
 - the current fake runtime is intentionally deterministic and exists to exercise queueing, metadata resolution, and restart behavior before MonoTorrent is integrated
 - the service now supports both `Fake` and `MonoTorrent` engine modes, with `MonoTorrent` as the default operator-facing mode and `Fake` retained for deterministic tests
 - MonoTorrent runtime configuration is currently file/config driven, but the service boundary should stay stable so those settings can later move behind the web UI without redefining the API surface
+- TorrentCore should evolve as a more general-purpose torrent engine, not only a narrowly TVMaze-oriented downloader
+- downstream consumers may rely on `.part` suffix semantics to determine when content is safe to process
+- finished torrents may legitimately remain in `Seeding` until a configured stop policy is reached
 
 ## Phase 0 Contract Review Decisions
 
@@ -306,15 +314,15 @@ Reviewed and accepted on March 10, 2026:
 - skipping restart and recovery testing until late in the project
 - letting the web UI outrun the contract boundary
 - adding TVMaze integration before TorrentCore behavior is stable
+- treating preallocated file size as proof of completion instead of using engine-verified completion and explicit finalization rules
 
 ## Current Next Steps
 
-1. Extend the SQLite schema from activity logging into persisted torrent state.
-2. Define the migration strategy for future schema changes.
-3. Add API and web surfaces for log inspection and diagnostics filtering.
-4. Prepare restart rehydration rules before real engine integration.
-5. Begin mapping persisted torrent state toward real engine lifecycle integration.
-6. Replace the fake managed runtime with a real MonoTorrent-backed runtime behind the same boundary.
+1. Add explicit incomplete-file handling with `.part` suffix compatibility.
+2. Add configurable seeding stop policy covering immediate stop, ratio, time, ratio-or-time, and unlimited seeding.
+3. Persist and test file finalization state across restart.
+4. Surface seeding and finalization policy through service configuration and later through the web UI.
+5. Continue expanding runtime diagnostics and operator controls around the real engine slice.
 
 ## Change Log
 
@@ -365,6 +373,8 @@ Changes:
 - exposed MonoTorrent runtime configuration through host status for diagnostics and future operator UI management
 - added `engine.monotorrent.ready` startup logging with the active runtime configuration in the event details
 - reduced repeated identical MonoTorrent connection-failure log noise by throttling after a configurable burst limit within a configurable time window
+- corrected MonoTorrent recovery-path persistence so restarted torrents do not nest duplicate content directories and lose track of previously downloaded data
+- added lightweight web refresh behavior so the home page keeps up with live torrent state changes without requiring a full browser reload
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -383,6 +393,7 @@ Assumptions:
 - the current MonoTorrent integration is the first real-engine slice and currently focuses on magnet add, host recovery, lifecycle commands, and persisted state synchronization without expanding the public DTOs
 - MonoTorrent runtime events are now written to the persistent activity log under the `engine` category so operators can inspect real engine behavior through the existing logs API
 - current MonoTorrent runtime settings are exposed through diagnostics now so a later web UI can manage them without reshaping the underlying service contract
+- MonoTorrent restart recovery must preserve the engine save-path semantics instead of persisting a display-oriented content path, or completed downloads can regress after restart
 
 Progress:
 - planning completed
@@ -437,6 +448,12 @@ Completed:
 - added MonoTorrent engine-event log coverage and strengthened real-engine synchronization fidelity
 - added host-status exposure for MonoTorrent listen/DHT ports, port-forwarding, local peer discovery, and connection-failure log throttling settings
 - added MonoTorrent engine-ready startup logging and deterministic test coverage for connection-failure log throttling
+- fixed a MonoTorrent restart regression where persisted save paths could duplicate the torrent directory name and cause restarted torrents to redownload into nested paths
+- added a manual and timed refresh path to the web home page so operator-visible torrent state does not stay stale after startup or runtime changes
+- split persisted MonoTorrent path semantics so torrent rows now retain a recovery-oriented `download_root_path` separately from the display/content `save_path`
+- broadened the documented product direction from a narrowly TVMaze-oriented downloader toward a more general-purpose torrent engine with reusable operator policies
+- documented `.part`-based incomplete-file compatibility as a first-class requirement because downstream consumers already rely on that convention
+- documented explicit seeding stop policies as part of the operator-facing runtime model
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -447,3 +464,4 @@ Next:
 - replace the managed fake runtime with a real MonoTorrent-backed adapter while preserving the public contracts
 - extend the MonoTorrent-backed slice with richer runtime diagnostics, explicit configuration, and more complete restart recovery semantics
 - continue building the operator-facing path so current MonoTorrent configuration can later move from config files into the web UI
+- implement `.part` incomplete-file handling and configurable seeding stop rules as the next operational storage/runtime slice

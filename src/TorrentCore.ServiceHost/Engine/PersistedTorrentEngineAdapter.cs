@@ -111,6 +111,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             Name = magnet.DisplayName,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = magnet.InfoHash,
+            DownloadRootPath = downloadRootPath,
             SavePath = Path.Combine(downloadRootPath, SanitizePathSegment(magnet.DisplayName)),
             State = TorrentState.ResolvingMetadata,
             ProgressPercent = 0,
