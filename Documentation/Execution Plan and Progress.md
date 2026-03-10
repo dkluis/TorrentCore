@@ -25,11 +25,15 @@ Status as of March 10, 2026:
 - current test suite passes
 - Phase 0 contract work has started
 - service, client, and web now expose a stubbed torrent-management boundary backed by an in-memory application service
+- Swagger UI is enabled for the service in development
 - persistence and real engine integration are not implemented yet
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
 - `dotnet test TorrentCore.sln`
+
+Development API documentation:
+- `https://localhost:7033/swagger`
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -291,6 +295,7 @@ Changes:
 - added API integration tests for host status, torrent listing, and magnet validation
 - completed contract review decisions for v1 scope
 - added tracker and connected-peer counts to torrent summary and detail contracts
+- enabled Swagger UI for the service API in development
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -323,6 +328,7 @@ Completed:
 - added API integration tests and re-verified the solution with build and test
 - completed contract review and folded the accepted decisions into the Phase 0 boundary
 - added tracker and connected-peer counts to the torrent contract and list UI
+- enabled Swagger/OpenAPI UI for the local service API
 
 In progress:
 - none
