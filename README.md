@@ -18,3 +18,7 @@ Start with these docs:
 - `Documentation/TVMaze Integration Boundary.md`
 - `Documentation/Initial Scaffold Status.md`
 - `Documentation/New Chat Starter.md`
+
+Repository legal documents:
+- `LICENSE.md`
+- `DISCLAIMER.md`

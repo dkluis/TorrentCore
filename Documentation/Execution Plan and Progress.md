@@ -296,6 +296,8 @@ Changes:
 - completed contract review decisions for v1 scope
 - added tracker and connected-peer counts to torrent summary and detail contracts
 - enabled Swagger UI for the service API in development
+- added `LICENSE.md` using Apache License 2.0
+- added `DISCLAIMER.md` covering warranty, liability, and lawful-use responsibility
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -329,6 +331,7 @@ Completed:
 - completed contract review and folded the accepted decisions into the Phase 0 boundary
 - added tracker and connected-peer counts to the torrent contract and list UI
 - enabled Swagger/OpenAPI UI for the local service API
+- added repository license and disclaimer documents
 
 In progress:
 - none
