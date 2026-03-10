@@ -6,6 +6,7 @@ using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace TorrentCore.Service.Application;
 
@@ -14,6 +15,7 @@ public sealed class TorrentApplicationService(
     ResolvedTorrentCoreServicePaths servicePaths,
     ITorrentEngineAdapter torrentEngineAdapter,
     IActivityLogService activityLogService,
+    IOptions<TorrentCoreServiceOptions> serviceOptions,
     ServiceInstanceContext serviceInstanceContext,
     StartupRecoveryState startupRecoveryState,
     ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
@@ -25,6 +27,7 @@ public sealed class TorrentApplicationService(
             ServiceName               = "TorrentCore.Service",
             ServiceVersion            = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
             ServiceInstanceId         = serviceInstanceContext.ServiceInstanceId,
+            EngineRuntime             = serviceOptions.Value.EngineMode.ToString(),
             Status                    = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
             EnvironmentName           = hostEnvironment.EnvironmentName,
             DownloadRootPath          = servicePaths.DownloadRootPath,

@@ -53,10 +53,17 @@ builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
     var servicePaths = serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>();
     return new SqliteTorrentStateStore(servicePaths.DatabaseFilePath);
 });
+builder.Services.AddSingleton<PersistedTorrentEngineAdapter>();
+builder.Services.AddSingleton<MonoTorrentEngineAdapter>();
+builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider =>
+    serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value.EngineMode == TorrentEngineMode.MonoTorrent
+        ? serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>()
+        : serviceProvider.GetRequiredService<PersistedTorrentEngineAdapter>());
 builder.Services.AddHostedService<SqlitePersistenceInitializer>();
 builder.Services.AddHostedService<TorrentStartupRecoveryService>();
 builder.Services.AddHostedService<FakeTorrentRuntimeService>();
-builder.Services.AddSingleton<ITorrentEngineAdapter, PersistedTorrentEngineAdapter>();
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>());
+builder.Services.AddHostedService<TorrentEngineSynchronizationService>();
 builder.Services.AddSingleton<ITorrentApplicationService, TorrentApplicationService>();
 
 var app = builder.Build();

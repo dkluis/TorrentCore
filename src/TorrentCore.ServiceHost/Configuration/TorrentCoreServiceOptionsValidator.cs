@@ -28,6 +28,11 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries must be 100 or greater.");
         }
 
+        if (!Enum.IsDefined(options.EngineMode))
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMode is invalid.");
+        }
+
         if (options.MaxActiveDownloads < 1)
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActiveDownloads must be 1 or greater.");

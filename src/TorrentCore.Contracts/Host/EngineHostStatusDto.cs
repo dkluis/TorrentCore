@@ -5,6 +5,7 @@ public sealed class EngineHostStatusDto
     public required string ServiceName { get; init; }
     public required string ServiceVersion { get; init; }
     public required Guid ServiceInstanceId { get; init; }
+    public required string EngineRuntime { get; init; }
     public required EngineHostStatus Status { get; init; }
     public required string EnvironmentName { get; init; }
     public required string DownloadRootPath { get; init; }

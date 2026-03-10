@@ -19,6 +19,11 @@ public sealed class FakeTorrentRuntimeService(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (_serviceOptions.EngineMode != TorrentEngineMode.Fake)
+        {
+            return;
+        }
+
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_serviceOptions.RuntimeTickIntervalMilliseconds));
 
         while (!stoppingToken.IsCancellationRequested)

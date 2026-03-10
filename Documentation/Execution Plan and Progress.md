@@ -32,7 +32,7 @@ Status as of March 10, 2026:
 - tracked SQLite schema migrations are implemented
 - startup torrent-state rehydration is implemented for the persisted fake engine slice
 - a managed fake runtime now resolves metadata, applies simple queueing, and advances persisted download state
-- real engine integration is not implemented yet
+- a first MonoTorrent-backed engine slice is implemented behind the existing adapter boundary
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
@@ -42,6 +42,7 @@ Development API documentation:
 - `https://localhost:7033/swagger`
 
 Current service configuration section:
+- `TorrentCore:EngineMode`
 - `TorrentCore:DownloadRootPath`
 - `TorrentCore:StorageRootPath`
 - `TorrentCore:MaxActiveDownloads`
@@ -264,6 +265,7 @@ Current assumptions unless superseded by later decisions:
 - logging will be TorrentCore-owned and not coupled to TVMaze infrastructure
 - startup recovery for the persisted fake engine normalizes active runtime states to `Queued` rather than pretending transfers survived a process restart
 - the current fake runtime is intentionally deterministic and exists to exercise queueing, metadata resolution, and restart behavior before MonoTorrent is integrated
+- the service now supports both `Fake` and `MonoTorrent` engine modes, with `MonoTorrent` as the default operator-facing mode and `Fake` retained for deterministic tests
 
 ## Phase 0 Contract Review Decisions
 
@@ -343,6 +345,9 @@ Changes:
 - added recovery activity-log events for normalized torrents and completed startup recovery
 - added a managed fake runtime loop that resolves metadata, starts queued downloads, applies a single-active-download queue, and completes downloads over time
 - added runtime configuration settings and validation for the managed fake runtime
+- added engine-mode selection so the host can switch between the fake runtime and a real MonoTorrent-backed runtime
+- added a first MonoTorrent-backed adapter with add/recover/pause/resume/remove and persisted state synchronization
+- added host-status visibility for the active engine runtime
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -358,6 +363,7 @@ Assumptions:
 - schema evolution is now tracked through explicit migration versions rather than ad hoc table creation
 - persisted fake-engine recovery currently normalizes `ResolvingMetadata`, `Downloading`, and `Seeding` to `Queued` on startup and clears active transfer counters
 - the current fake runtime now simulates metadata resolution and download progression using deterministic background processing and persisted snapshots
+- the current MonoTorrent integration is the first real-engine slice and currently focuses on magnet add, host recovery, lifecycle commands, and persisted state synchronization without expanding the public DTOs
 
 Progress:
 - planning completed
@@ -408,6 +414,7 @@ Completed:
 - added startup recovery state reporting in host status
 - added restart-recovery logging and recovery normalization tests for persisted torrent state
 - added managed fake-runtime processing and tests for automatic metadata resolution, queued download start, and completion
+- added MonoTorrent package integration and test coverage for the real engine mode while preserving deterministic fake-mode API tests
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -416,3 +423,4 @@ Next:
 - continue toward real engine-backed state rehydration using the tracked SQLite schema foundation
 - expand persisted torrent state beyond the current fake-engine shape toward actual runtime metadata and engine-session recovery
 - replace the managed fake runtime with a real MonoTorrent-backed adapter while preserving the public contracts
+- extend the MonoTorrent-backed slice with richer runtime diagnostics, explicit configuration, and more complete restart recovery semantics

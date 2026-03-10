@@ -22,6 +22,7 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
+        Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(EngineHostStatus.Ready, hostStatus.Status);
         Assert.True(hostStatus.SupportsMagnetAdds);
         Assert.True(hostStatus.SupportsPersistentStorage);
@@ -36,7 +37,7 @@ public sealed class TorrentApiTests
         var downloadPath = Path.Combine(rootPath, "downloads");
         var storagePath = Path.Combine(rootPath, "storage");
 
-        await using var factory = CreateFactory(downloadPath, storagePath);
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
         using var httpClient = factory.CreateClient();
 
         var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
@@ -79,6 +80,24 @@ public sealed class TorrentApiTests
         Assert.Equal("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", torrent.InfoHash);
         Assert.Equal(0, torrent.TrackerCount);
         Assert.Equal(0, torrent.ConnectedPeerCount);
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_AddMagnet_UsesRealEngineRuntime()
+    {
+        await using var factory = CreateFactory(engineMode: TorrentEngineMode.MonoTorrent);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(httpClient, "9999999999999999999999999999999999999999", "MonoTorrent Runtime");
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(torrent);
+        Assert.Equal("MonoTorrent", hostStatus!.EngineRuntime);
+        Assert.True(hostStatus.StartupRecoveryCompleted);
+        Assert.Equal("9999999999999999999999999999999999999999", torrent.InfoHash);
+        Assert.DoesNotContain(torrent.State, new[] { TorrentState.Error, TorrentState.Removed });
     }
 
     [Fact]
@@ -152,7 +171,7 @@ public sealed class TorrentApiTests
 
         Guid torrentId;
 
-        await using (var factory = CreateFactory(downloadPath, storagePath))
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
         {
             using var httpClient = factory.CreateClient();
             var addResponse = await AddMagnetAsync(httpClient, "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "Restarted Torrent");
@@ -163,7 +182,7 @@ public sealed class TorrentApiTests
             pauseResponse.EnsureSuccessStatusCode();
         }
 
-        await using (var factory = CreateFactory(downloadPath, storagePath))
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
         {
             using var httpClient = factory.CreateClient();
 
@@ -185,7 +204,7 @@ public sealed class TorrentApiTests
 
         Guid torrentId;
 
-        await using (var factory = CreateFactory(downloadPath, storagePath))
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
         {
             using var httpClient = factory.CreateClient();
             var addResponse = await AddMagnetAsync(httpClient, "1212121212121212121212121212121212121212", "Recovery Torrent");
@@ -193,7 +212,7 @@ public sealed class TorrentApiTests
             torrentId = addedTorrent!.TorrentId;
         }
 
-        await using (var factory = CreateFactory(downloadPath, storagePath))
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
         {
             using var httpClient = factory.CreateClient();
 
@@ -258,7 +277,7 @@ public sealed class TorrentApiTests
         var downloadPath = Path.Combine(rootPath, "downloads");
         var storagePath = Path.Combine(rootPath, "storage");
 
-        await using var factory = CreateFactory(downloadPath, storagePath, maxActivityLogEntries: 100);
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath, maxActivityLogEntries: 100);
         using var httpClient = factory.CreateClient();
 
         for (var index = 0; index < 130; index++)
@@ -300,14 +319,14 @@ public sealed class TorrentApiTests
         var downloadPath = Path.Combine(rootPath, "downloads");
         var storagePath = Path.Combine(rootPath, "storage");
 
-        await using (var factory = CreateFactory(downloadPath, storagePath))
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
         {
             using var httpClient = factory.CreateClient();
             var firstResponse = await AddMagnetAsync(httpClient, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "First Torrent");
             firstResponse.EnsureSuccessStatusCode();
         }
 
-        await using (var factory = CreateFactory(downloadPath, storagePath))
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
         {
             using var httpClient = factory.CreateClient();
             var duplicateResponse = await AddMagnetAsync(httpClient, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "Duplicate Torrent");
@@ -319,6 +338,7 @@ public sealed class TorrentApiTests
     }
 
     private static WebApplicationFactory<Program> CreateFactory(
+        TorrentEngineMode engineMode = TorrentEngineMode.Fake,
         string? downloadPath = null,
         string? storagePath = null,
         int? maxActivityLogEntries = null,
@@ -338,6 +358,7 @@ public sealed class TorrentApiTests
                 {
                     var settings = new Dictionary<string, string?>
                     {
+                        [$"{TorrentCoreServiceOptions.SectionName}:EngineMode"] = engineMode.ToString(),
                         [$"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath"] = resolvedDownloadPath,
                         [$"{TorrentCoreServiceOptions.SectionName}:StorageRootPath"] = resolvedStoragePath,
                     };

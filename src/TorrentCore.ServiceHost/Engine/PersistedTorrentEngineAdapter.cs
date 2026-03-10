@@ -71,6 +71,8 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         };
     }
 
+    public Task SynchronizeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken)
     {
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
