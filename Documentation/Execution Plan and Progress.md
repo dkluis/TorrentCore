@@ -33,6 +33,7 @@ Status as of March 10, 2026:
 - startup torrent-state rehydration is implemented for the persisted fake engine slice
 - a managed fake runtime now resolves metadata, applies simple queueing, and advances persisted download state
 - a first MonoTorrent-backed engine slice is implemented behind the existing adapter boundary
+- MonoTorrent host configuration, engine-ready diagnostics, and connection-failure log throttling are implemented
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
@@ -43,6 +44,12 @@ Development API documentation:
 
 Current service configuration section:
 - `TorrentCore:EngineMode`
+- `TorrentCore:EngineListenPort`
+- `TorrentCore:EngineDhtPort`
+- `TorrentCore:EngineAllowPortForwarding`
+- `TorrentCore:EngineAllowLocalPeerDiscovery`
+- `TorrentCore:EngineConnectionFailureLogBurstLimit`
+- `TorrentCore:EngineConnectionFailureLogWindowSeconds`
 - `TorrentCore:DownloadRootPath`
 - `TorrentCore:StorageRootPath`
 - `TorrentCore:MaxActiveDownloads`
@@ -51,6 +58,7 @@ Current service configuration section:
 - `TorrentCore:DownloadProgressPercentPerTick`
 - if not overridden, the service now defaults downloads to a dedicated `~/TorrentCore/downloads` folder and internal storage to the user's local app-data area
 - project-relative runtime folders were replaced as defaults because they are not appropriate for normal operator use
+- these settings are currently config-driven and exposed through host status for diagnostics; later they should be managed through the web UI
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -147,6 +155,7 @@ Planned outputs:
 - torrent lifecycle integration
 - pause/resume/remove operations
 - restart recovery behavior
+- operator-visible MonoTorrent runtime configuration and diagnostics
 
 Exit criteria:
 - no MonoTorrent types cross the public boundary
@@ -235,6 +244,7 @@ Requirement:
 Cover:
 - fake adapter behavior for deterministic vertical-slice tests
 - MonoTorrent adapter behavior for real engine integration
+- deterministic testing for log throttling and runtime diagnostics behavior without depending on external peer or network conditions
 
 ### Web UI Tests
 
@@ -266,6 +276,7 @@ Current assumptions unless superseded by later decisions:
 - startup recovery for the persisted fake engine normalizes active runtime states to `Queued` rather than pretending transfers survived a process restart
 - the current fake runtime is intentionally deterministic and exists to exercise queueing, metadata resolution, and restart behavior before MonoTorrent is integrated
 - the service now supports both `Fake` and `MonoTorrent` engine modes, with `MonoTorrent` as the default operator-facing mode and `Fake` retained for deterministic tests
+- MonoTorrent runtime configuration is currently file/config driven, but the service boundary should stay stable so those settings can later move behind the web UI without redefining the API surface
 
 ## Phase 0 Contract Review Decisions
 
@@ -350,6 +361,10 @@ Changes:
 - added host-status visibility for the active engine runtime
 - added MonoTorrent runtime observability through persisted engine activity logs for state changes, peer discovery, and connection failures
 - corrected persisted `DownloadedBytes` in MonoTorrent mode to be derived from synchronized torrent progress instead of session-only transfer counters
+- added explicit MonoTorrent configuration for listen/DHT ports, port forwarding, local peer discovery, and repeated connection-failure log throttling
+- exposed MonoTorrent runtime configuration through host status for diagnostics and future operator UI management
+- added `engine.monotorrent.ready` startup logging with the active runtime configuration in the event details
+- reduced repeated identical MonoTorrent connection-failure log noise by throttling after a configurable burst limit within a configurable time window
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -367,6 +382,7 @@ Assumptions:
 - the current fake runtime now simulates metadata resolution and download progression using deterministic background processing and persisted snapshots
 - the current MonoTorrent integration is the first real-engine slice and currently focuses on magnet add, host recovery, lifecycle commands, and persisted state synchronization without expanding the public DTOs
 - MonoTorrent runtime events are now written to the persistent activity log under the `engine` category so operators can inspect real engine behavior through the existing logs API
+- current MonoTorrent runtime settings are exposed through diagnostics now so a later web UI can manage them without reshaping the underlying service contract
 
 Progress:
 - planning completed
@@ -419,6 +435,8 @@ Completed:
 - added managed fake-runtime processing and tests for automatic metadata resolution, queued download start, and completion
 - added MonoTorrent package integration and test coverage for the real engine mode while preserving deterministic fake-mode API tests
 - added MonoTorrent engine-event log coverage and strengthened real-engine synchronization fidelity
+- added host-status exposure for MonoTorrent listen/DHT ports, port-forwarding, local peer discovery, and connection-failure log throttling settings
+- added MonoTorrent engine-ready startup logging and deterministic test coverage for connection-failure log throttling
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -428,4 +446,4 @@ Next:
 - expand persisted torrent state beyond the current fake-engine shape toward actual runtime metadata and engine-session recovery
 - replace the managed fake runtime with a real MonoTorrent-backed adapter while preserving the public contracts
 - extend the MonoTorrent-backed slice with richer runtime diagnostics, explicit configuration, and more complete restart recovery semantics
-- add explicit MonoTorrent host configuration such as listen/DHT settings and surface those values through host diagnostics
+- continue building the operator-facing path so current MonoTorrent configuration can later move from config files into the web UI

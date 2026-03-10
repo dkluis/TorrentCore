@@ -74,6 +74,10 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         {
             DownloadRootPath = "Runtime/downloads",
             StorageRootPath = "Runtime/storage",
+            EngineListenPort = -1,
+            EngineDhtPort = 70_000,
+            EngineConnectionFailureLogBurstLimit = 0,
+            EngineConnectionFailureLogWindowSeconds = 0,
             MaxActiveDownloads = 0,
             RuntimeTickIntervalMilliseconds = 49,
             MetadataResolutionDelayMilliseconds = -1,
@@ -83,6 +87,10 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         var result = _validator.Validate(name: null, options);
 
         Assert.True(result.Failed);
+        Assert.Contains(result.Failures, failure => failure.Contains("EngineListenPort", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("EngineDhtPort", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("EngineConnectionFailureLogBurstLimit", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("EngineConnectionFailureLogWindowSeconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MaxActiveDownloads", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("RuntimeTickIntervalMilliseconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MetadataResolutionDelayMilliseconds", StringComparison.Ordinal));

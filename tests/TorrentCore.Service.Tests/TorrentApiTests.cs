@@ -23,6 +23,8 @@ public sealed class TorrentApiTests
         Assert.NotNull(hostStatus);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
+        Assert.Equal(55_123, hostStatus.EngineListenPort);
+        Assert.Equal(55_124, hostStatus.EngineDhtPort);
         Assert.Equal(EngineHostStatus.Ready, hostStatus.Status);
         Assert.True(hostStatus.SupportsMagnetAdds);
         Assert.True(hostStatus.SupportsPersistentStorage);
@@ -95,6 +97,8 @@ public sealed class TorrentApiTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(torrent);
         Assert.Equal("MonoTorrent", hostStatus!.EngineRuntime);
+        Assert.Equal(55_123, hostStatus.EngineListenPort);
+        Assert.Equal(55_124, hostStatus.EngineDhtPort);
         Assert.True(hostStatus.StartupRecoveryCompleted);
         Assert.Equal("9999999999999999999999999999999999999999", torrent.InfoHash);
         Assert.DoesNotContain(torrent.State, new[] { TorrentState.Error, TorrentState.Removed });
@@ -119,6 +123,26 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(logs);
         Assert.Contains(logs, log => log.Category == "engine" && log.EventType == "torrent.engine.state_changed");
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_LogsEngineReadyAndThrottlesConnectionFailures()
+    {
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            engineConnectionFailureLogBurstLimit: 1,
+            engineConnectionFailureLogWindowSeconds: 300);
+        using var httpClient = factory.CreateClient();
+
+        await AddMagnetAsync(httpClient, "7777777777777777777777777777777777777777", "Throttle Torrent");
+
+        var logs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=200&category=engine"),
+            entries => entries is not null && entries.Any(entry => entry.EventType == "engine.monotorrent.ready"),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "engine.monotorrent.ready");
     }
 
     [Fact]
@@ -363,6 +387,12 @@ public sealed class TorrentApiTests
         string? downloadPath = null,
         string? storagePath = null,
         int? maxActivityLogEntries = null,
+        int? engineListenPort = null,
+        int? engineDhtPort = null,
+        bool? engineAllowPortForwarding = null,
+        bool? engineAllowLocalPeerDiscovery = null,
+        int? engineConnectionFailureLogBurstLimit = null,
+        int? engineConnectionFailureLogWindowSeconds = null,
         int? maxActiveDownloads = null,
         int? runtimeTickIntervalMilliseconds = null,
         int? metadataResolutionDelayMilliseconds = null,
@@ -387,6 +417,36 @@ public sealed class TorrentApiTests
                     if (maxActivityLogEntries is not null)
                     {
                         settings[$"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries"] = maxActivityLogEntries.Value.ToString();
+                    }
+
+                    if (engineListenPort is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:EngineListenPort"] = engineListenPort.Value.ToString();
+                    }
+
+                    if (engineDhtPort is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:EngineDhtPort"] = engineDhtPort.Value.ToString();
+                    }
+
+                    if (engineAllowPortForwarding is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:EngineAllowPortForwarding"] = engineAllowPortForwarding.Value.ToString();
+                    }
+
+                    if (engineAllowLocalPeerDiscovery is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:EngineAllowLocalPeerDiscovery"] = engineAllowLocalPeerDiscovery.Value.ToString();
+                    }
+
+                    if (engineConnectionFailureLogBurstLimit is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogBurstLimit"] = engineConnectionFailureLogBurstLimit.Value.ToString();
+                    }
+
+                    if (engineConnectionFailureLogWindowSeconds is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds"] = engineConnectionFailureLogWindowSeconds.Value.ToString();
                     }
 
                     if (maxActiveDownloads is not null)

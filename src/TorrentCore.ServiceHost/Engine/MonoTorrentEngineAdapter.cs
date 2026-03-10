@@ -1,6 +1,7 @@
 using MonoTorrent;
 using MonoTorrent.Client;
 using Microsoft.Extensions.Options;
+using System.Net;
 using System.Text.Json;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
@@ -23,6 +24,8 @@ public sealed class MonoTorrentEngineAdapter(
     private readonly Dictionary<Guid, TorrentManager> _managers = new();
     private readonly HashSet<Guid> _observedTorrentIds = [];
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
+    private readonly ConnectionFailureLogThrottle _connectionFailureLogThrottle =
+        new(serviceOptions.Value.EngineConnectionFailureLogBurstLimit, serviceOptions.Value.EngineConnectionFailureLogWindowSeconds);
 
     private ClientEngine? _engine;
     private bool _initialized;
@@ -74,6 +77,7 @@ public sealed class MonoTorrentEngineAdapter(
             await _engine.StopAllAsync(TimeSpan.FromSeconds(2));
             _managers.Clear();
             _observedTorrentIds.Clear();
+            _connectionFailureLogThrottle.Clear();
             _recovered = false;
             _lastRecoveryResult = null;
         }
@@ -414,15 +418,41 @@ public sealed class MonoTorrentEngineAdapter(
 
             var engineSettingsBuilder = new EngineSettingsBuilder
             {
+                AllowLocalPeerDiscovery = _serviceOptions.EngineAllowLocalPeerDiscovery,
+                AllowPortForwarding = _serviceOptions.EngineAllowPortForwarding,
                 CacheDirectory = cacheDirectory,
                 AutoSaveLoadFastResume = true,
                 AutoSaveLoadMagnetLinkMetadata = true,
+                DhtEndPoint = new IPEndPoint(IPAddress.Any, _serviceOptions.EngineDhtPort),
+                ListenEndPoints = new Dictionary<string, IPEndPoint>
+                {
+                    ["ipv4"] = new IPEndPoint(IPAddress.Any, _serviceOptions.EngineListenPort),
+                },
             };
 
             _engine = new ClientEngine(engineSettingsBuilder.ToSettings());
             _initialized = true;
 
             logger.LogInformation("MonoTorrent engine initialized. CacheDirectory={CacheDirectory}", cacheDirectory);
+
+            await activityLogService.WriteAsync(new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Information,
+                Category = "engine",
+                EventType = "engine.monotorrent.ready",
+                Message = "MonoTorrent engine is initialized and ready.",
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(new
+                {
+                    cacheDirectory,
+                    _serviceOptions.EngineListenPort,
+                    _serviceOptions.EngineDhtPort,
+                    _serviceOptions.EngineAllowPortForwarding,
+                    _serviceOptions.EngineAllowLocalPeerDiscovery,
+                    _serviceOptions.EngineConnectionFailureLogBurstLimit,
+                    _serviceOptions.EngineConnectionFailureLogWindowSeconds,
+                }),
+            }, cancellationToken);
         }
         finally
         {
@@ -595,18 +625,34 @@ public sealed class MonoTorrentEngineAdapter(
     {
         try
         {
+            var decision = _connectionFailureLogThrottle.RegisterAttempt(
+                $"{torrentId:N}:{eventArgs.Reason}:{eventArgs.Peer.ConnectionUri?.Host}",
+                DateTimeOffset.UtcNow);
+            if (decision == ConnectionFailureLogDecision.Suppress)
+            {
+                return;
+            }
+
             await activityLogService.WriteAsync(new ActivityLogWriteRequest
             {
-                Level = ActivityLogLevel.Warning,
+                Level = decision == ConnectionFailureLogDecision.ThrottleNotice
+                    ? ActivityLogLevel.Information
+                    : ActivityLogLevel.Warning,
                 Category = "engine",
-                EventType = "torrent.engine.connection_failed",
-                Message = $"MonoTorrent connection attempt failed with reason '{eventArgs.Reason}'.",
+                EventType = decision == ConnectionFailureLogDecision.ThrottleNotice
+                    ? "torrent.engine.connection_failed.throttled"
+                    : "torrent.engine.connection_failed",
+                Message = decision == ConnectionFailureLogDecision.ThrottleNotice
+                    ? $"Repeated MonoTorrent connection failures are being throttled for reason '{eventArgs.Reason}'."
+                    : $"MonoTorrent connection attempt failed with reason '{eventArgs.Reason}'.",
                 TorrentId = torrentId,
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(new
                 {
                     Reason = eventArgs.Reason.ToString(),
                     PeerUri = eventArgs.Peer.ConnectionUri?.ToString(),
+                    WindowSeconds = _serviceOptions.EngineConnectionFailureLogWindowSeconds,
+                    BurstLimit = _serviceOptions.EngineConnectionFailureLogBurstLimit,
                 }),
             }, CancellationToken.None);
         }
