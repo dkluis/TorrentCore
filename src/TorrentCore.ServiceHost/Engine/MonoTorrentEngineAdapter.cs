@@ -380,7 +380,10 @@ public sealed class MonoTorrentEngineAdapter(
 
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
     {
-        var (_, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+        var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+        var cleanupCandidateDirectories = request.DeleteData
+            ? GetCleanupCandidateDirectories(snapshot, manager)
+            : Array.Empty<string>();
 
         if (manager.State != MonoTorrent.Client.TorrentState.Stopped)
         {
@@ -405,6 +408,11 @@ public sealed class MonoTorrentEngineAdapter(
 
         await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
 
+        if (request.DeleteData)
+        {
+            TorrentDataPathCleanup.DeleteEmptyDirectories(snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath, cleanupCandidateDirectories);
+        }
+
         return new TorrentActionResultDto
         {
             TorrentId = torrentId,
@@ -413,6 +421,44 @@ public sealed class MonoTorrentEngineAdapter(
             ProcessedAtUtc = DateTimeOffset.UtcNow,
             DataDeleted = request.DeleteData,
         };
+    }
+
+    private static IReadOnlyList<string> GetCleanupCandidateDirectories(TorrentSnapshot snapshot, TorrentManager manager)
+    {
+        var directories = new HashSet<string>(StringComparer.Ordinal);
+
+        if (!string.IsNullOrWhiteSpace(manager.ContainingDirectory))
+        {
+            directories.Add(Path.GetFullPath(manager.ContainingDirectory));
+        }
+
+        foreach (var file in manager.Files)
+        {
+            AddParentDirectory(directories, file.DownloadCompleteFullPath);
+            AddParentDirectory(directories, file.DownloadIncompleteFullPath);
+            AddParentDirectory(directories, file.FullPath);
+        }
+
+        if (!string.IsNullOrWhiteSpace(snapshot.SavePath))
+        {
+            directories.Add(Path.GetFullPath(snapshot.SavePath));
+        }
+
+        return directories.ToArray();
+    }
+
+    private static void AddParentDirectory(ISet<string> directories, string? filePath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return;
+        }
+
+        var parentDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath));
+        if (!string.IsNullOrWhiteSpace(parentDirectory))
+        {
+            directories.Add(parentDirectory);
+        }
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

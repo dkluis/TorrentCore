@@ -15,6 +15,11 @@ TorrentCore owns:
 - file finalization behavior for incomplete vs completed content
 - seeding policy and stop conditions
 
+Queueing rule:
+- TorrentCore should accept and persist incoming magnet requests even when runtime capacity is full.
+- Active-resolution and active-download limits control concurrency, not admission.
+- Torrents that cannot start immediately because capacity is full should wait in TorrentCore-managed queues until slots open.
+
 TVMaze does not own TorrentCore internals. TVMaze is only one client of TorrentCore.
 
 ## Why It Is Separate From TVMaze
@@ -91,6 +96,7 @@ TorrentCore owns:
 - metadata resolution for magnets
 - torrent state
 - queue policy
+- admission and concurrency control for bursty incoming magnet submissions
 - download paths
 - incomplete-file handling such as `.part` suffix behavior
 - completion and seeding policy
@@ -119,6 +125,7 @@ Keep v1 narrow:
 - inspect torrent detail
 - pause, resume, remove
 - simple queueing rules
+- accept-now, run-when-capacity-allows queue behavior for bursts of incoming magnets
 - configurable incomplete-file finalization behavior with `.part` compatibility
 - configurable seeding stop policy
 - survive restart

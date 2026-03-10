@@ -80,6 +80,7 @@ Note:
 - Each slice must be testable through the API and exercisable through the web UI.
 - User-facing date/time values must be rendered in the operator's local time, not UTC.
 - Incomplete content must be distinguishable from completed content through explicit TorrentCore policy, not inferred only from file size or Finder display.
+- TorrentCore should accept and persist incoming magnet submissions even when runtime concurrency limits are full; queueing controls execution, not API admission.
 
 ## Phased Execution Plan
 
@@ -222,6 +223,7 @@ Cover:
 
 Cover:
 - queue behavior
+- admission-vs-execution behavior when active metadata-resolution or download limits are reached
 - lifecycle transitions
 - recovery decisions
 - service-layer orchestration independent of transport concerns
@@ -300,6 +302,7 @@ Reviewed and accepted on March 10, 2026:
 - labels and categories are deferred from v1
 - remove remains split between remove-only and remove-with-data
 - queue position is deferred from v1
+- bursty intake from TVMaze should be handled by accepting and persisting magnets immediately, then queueing execution behind runtime limits instead of rejecting requests when capacity is full
 - initial list behavior will later support sorting by progress, status, and name
 - initial list behavior will later support filtering by name and status
 - torrent state names remain:
@@ -476,6 +479,10 @@ Completed:
 - added automatic completed-torrent cleanup policy as a TorrentCore-owned runtime setting, with the current mode set supporting timed removal from engine/DB tracking only
 - enforced the product rule that automatic cleanup never deletes downloaded data; only an explicit remove API request with `DeleteData = true` is allowed to delete files
 - added a background cleanup worker plus UI/runtime settings support so completed torrents can age out of the dashboard automatically without destructive deletion
+- added dashboard-level torrent controls for pause, resume, remove, and delete-data actions so common operator lifecycle management no longer requires Swagger
+- added basic dashboard filtering by name/status and client-side sorting by name, state, progress, and newest-added order
+- fixed delete-data removal so TorrentCore now prunes empty torrent-specific directories left behind after MonoTorrent deletes files, while preserving the configured download root and any non-empty/shared directories
+- documented the intended future concurrency model for burst intake: TorrentCore should accept/persist new magnets immediately and queue metadata/download execution behind global runtime limits
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
