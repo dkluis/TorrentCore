@@ -382,6 +382,11 @@ public sealed class MonoTorrentEngineAdapter(
     {
         var (_, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
 
+        if (manager.State != MonoTorrent.Client.TorrentState.Stopped)
+        {
+            await manager.StopAsync(TimeSpan.FromSeconds(2));
+        }
+
         await _engine!.RemoveAsync(
             manager,
             request.DeleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly);

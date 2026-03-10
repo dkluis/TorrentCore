@@ -259,6 +259,27 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_RemoveActiveTorrent_StopsThenRemoves()
+    {
+        await using var factory = CreateFactory(engineMode: TorrentEngineMode.MonoTorrent);
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(httpClient, "6767676767676767676767676767676767676767", "MonoTorrent Remove");
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var removeResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/remove", content: null);
+        var actionResult = await removeResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.Equal(HttpStatusCode.OK, removeResponse.StatusCode);
+        Assert.NotNull(actionResult);
+        Assert.Equal("remove", actionResult.Action);
+        Assert.False(actionResult.DataDeleted);
+        Assert.NotNull(torrents);
+        Assert.DoesNotContain(torrents, torrent => torrent.TorrentId == addedTorrent.TorrentId);
+    }
+
+    [Fact]
     public async Task FakeRuntime_EventuallyResolvesMetadata_AndCompletesDownload()
     {
         await using var factory = CreateFactory(

@@ -472,6 +472,7 @@ Completed:
 - added host API endpoints and client support to retrieve and update effective runtime settings without editing appsettings by hand
 - added a dedicated web settings page so operators can manage the supported live settings through the UI and have them survive restart
 - fixed the torrent remove API so callers can omit the request body and still get the default safe behavior of removing the torrent record without deleting data
+- fixed the real MonoTorrent remove path to stop an active manager before unregistering it so operator remove requests do not fail with a 500 while the torrent is still running
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
