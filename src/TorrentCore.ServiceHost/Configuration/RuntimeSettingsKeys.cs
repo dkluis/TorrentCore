@@ -9,4 +9,6 @@ public static class RuntimeSettingsKeys
     public const string CompletedTorrentCleanupMinutes = "completed_torrent_cleanup_minutes";
     public const string EngineConnectionFailureLogBurstLimit = "engine_connection_failure_log_burst_limit";
     public const string EngineConnectionFailureLogWindowSeconds = "engine_connection_failure_log_window_seconds";
+    public const string MaxActiveMetadataResolutions = "max_active_metadata_resolutions";
+    public const string MaxActiveDownloads = "max_active_downloads";
 }

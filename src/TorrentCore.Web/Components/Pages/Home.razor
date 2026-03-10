@@ -33,6 +33,12 @@ else
             <p>Engine DHT Port: @_hostStatus.EngineDhtPort</p>
             <p>Port Forwarding: @_hostStatus.EnginePortForwardingEnabled</p>
             <p>Local Peer Discovery: @_hostStatus.EngineLocalPeerDiscoveryEnabled</p>
+            <p>Max Connections: @_hostStatus.EngineMaximumConnections</p>
+            <p>Max Half-Open Connections: @_hostStatus.EngineMaximumHalfOpenConnections</p>
+            <p>Max Download Rate: @FormatRateLimit(_hostStatus.EngineMaximumDownloadRateBytesPerSecond)</p>
+            <p>Max Upload Rate: @FormatRateLimit(_hostStatus.EngineMaximumUploadRateBytesPerSecond)</p>
+            <p>Max Active Metadata Resolutions: @_hostStatus.MaxActiveMetadataResolutions</p>
+            <p>Max Active Downloads: @_hostStatus.MaxActiveDownloads</p>
             <p>Partial Files Enabled: @_hostStatus.PartialFilesEnabled</p>
             <p>Partial File Suffix: @_hostStatus.PartialFileSuffix</p>
             <p>Seeding Stop Mode: @_hostStatus.SeedingStopMode</p>
@@ -295,6 +301,9 @@ else
     {
         return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
     }
+
+    private static string FormatRateLimit(int bytesPerSecond) =>
+        bytesPerSecond <= 0 ? "Unlimited" : FormatRate(bytesPerSecond);
 
     private async Task PauseAsync(TorrentSummaryDto torrent)
     {

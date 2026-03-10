@@ -63,6 +63,26 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds must be 1 or greater.");
         }
 
+        if (options.EngineMaximumConnections < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumConnections must be 1 or greater.");
+        }
+
+        if (options.EngineMaximumHalfOpenConnections < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumHalfOpenConnections must be 1 or greater.");
+        }
+
+        if (options.EngineMaximumDownloadRateBytesPerSecond < 0)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumDownloadRateBytesPerSecond must be 0 or greater.");
+        }
+
+        if (options.EngineMaximumUploadRateBytesPerSecond < 0)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumUploadRateBytesPerSecond must be 0 or greater.");
+        }
+
         if (options.SeedingStopRatio <= 0)
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:SeedingStopRatio must be greater than 0.");
@@ -76,6 +96,11 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
         if (options.CompletedTorrentCleanupMinutes < 0)
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletedTorrentCleanupMinutes must be 0 or greater.");
+        }
+
+        if (options.MaxActiveMetadataResolutions < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActiveMetadataResolutions must be 1 or greater.");
         }
 
         if (options.MaxActiveDownloads < 1)

@@ -155,8 +155,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
 
-        var command = CreateUpsertCommand(connection, torrent);
-        command.CommandText = command.CommandText.Replace("INSERT OR REPLACE", "INSERT", StringComparison.Ordinal);
+        var command = CreateInsertCommand(connection, torrent);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -167,7 +166,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
 
-        var command = CreateUpsertCommand(connection, torrent);
+        var command = CreateUpdateCommand(connection, torrent);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -219,12 +218,12 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         return results;
     }
 
-    private static SqliteCommand CreateUpsertCommand(SqliteConnection connection, TorrentSnapshot torrent)
+    private static SqliteCommand CreateInsertCommand(SqliteConnection connection, TorrentSnapshot torrent)
     {
         var command = connection.CreateCommand();
         command.CommandText =
             """
-            INSERT OR REPLACE INTO torrents (
+            INSERT INTO torrents (
                 torrent_id,
                 name,
                 state,
@@ -270,6 +269,45 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             );
             """;
 
+        AddSnapshotParameters(command, torrent);
+        return command;
+    }
+
+    private static SqliteCommand CreateUpdateCommand(SqliteConnection connection, TorrentSnapshot torrent)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE torrents
+            SET
+                name = $name,
+                state = $state,
+                magnet_uri = $magnet_uri,
+                info_hash = $info_hash,
+                download_root_path = $download_root_path,
+                save_path = $save_path,
+                progress_percent = $progress_percent,
+                downloaded_bytes = $downloaded_bytes,
+                uploaded_bytes = $uploaded_bytes,
+                total_bytes = $total_bytes,
+                download_rate_bytes_per_second = $download_rate_bytes_per_second,
+                upload_rate_bytes_per_second = $upload_rate_bytes_per_second,
+                tracker_count = $tracker_count,
+                connected_peer_count = $connected_peer_count,
+                added_at_utc = $added_at_utc,
+                completed_at_utc = $completed_at_utc,
+                seeding_started_at_utc = $seeding_started_at_utc,
+                last_activity_at_utc = $last_activity_at_utc,
+                error_message = $error_message
+            WHERE torrent_id = $torrent_id;
+            """;
+
+        AddSnapshotParameters(command, torrent);
+        return command;
+    }
+
+    private static void AddSnapshotParameters(SqliteCommand command, TorrentSnapshot torrent)
+    {
         command.Parameters.AddWithValue("$torrent_id", torrent.TorrentId.ToString());
         command.Parameters.AddWithValue("$name", torrent.Name);
         command.Parameters.AddWithValue("$state", torrent.State.ToString());
@@ -290,7 +328,6 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue("$seeding_started_at_utc", torrent.SeedingStartedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$last_activity_at_utc", torrent.LastActivityAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$error_message", torrent.ErrorMessage ?? (object)DBNull.Value);
-        return command;
     }
 
     private SqliteConnection CreateConnection()

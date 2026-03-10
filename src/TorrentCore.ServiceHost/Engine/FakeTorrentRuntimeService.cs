@@ -69,6 +69,9 @@ public sealed class FakeTorrentRuntimeService(
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
 
+        await ReconcileMetadataResolutionQueueAsync(torrents, runtimeSettings, now, cancellationToken);
+
+        torrents = await torrentStateStore.ListAsync(cancellationToken);
         await ResolveMetadataAsync(torrents, now, cancellationToken);
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
@@ -79,13 +82,61 @@ public sealed class FakeTorrentRuntimeService(
             .ThenBy(torrent => torrent.TorrentId)
             .ToList();
 
-        await StartQueuedDownloadsAsync(torrents, activeDownloads.Count, now, cancellationToken);
+        await StartQueuedDownloadsAsync(torrents, activeDownloads.Count, runtimeSettings, now, cancellationToken);
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
         await AdvanceDownloadsAsync(torrents.Where(torrent => torrent.State == TorrentState.Downloading).ToList(), runtimeSettings, now, cancellationToken);
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
         await AdvanceSeedingAsync(torrents.Where(torrent => torrent.State == TorrentState.Seeding).ToList(), runtimeSettings, now, cancellationToken);
+    }
+
+    private async Task ReconcileMetadataResolutionQueueAsync(
+        IReadOnlyList<TorrentSnapshot> torrents,
+        RuntimeSettingsSnapshot runtimeSettings,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var activeResolutions = 0;
+        var unresolvedTorrents = torrents
+            .Where(torrent => torrent.TotalBytes is null && torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued)
+            .OrderBy(torrent => torrent.AddedAtUtc)
+            .ThenBy(torrent => torrent.TorrentId)
+            .ToList();
+
+        foreach (var torrent in unresolvedTorrents)
+        {
+            if (activeResolutions < runtimeSettings.MaxActiveMetadataResolutions)
+            {
+                activeResolutions++;
+
+                if (torrent.State == TorrentState.ResolvingMetadata)
+                {
+                    continue;
+                }
+
+                torrent.State = TorrentState.ResolvingMetadata;
+                torrent.ConnectedPeerCount = 0;
+                torrent.DownloadRateBytesPerSecond = 0;
+                torrent.UploadRateBytesPerSecond = 0;
+                torrent.LastActivityAtUtc = now;
+                torrent.ErrorMessage = null;
+                await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                continue;
+            }
+
+            if (torrent.State != TorrentState.ResolvingMetadata)
+            {
+                continue;
+            }
+
+            torrent.State = TorrentState.Queued;
+            torrent.ConnectedPeerCount = 0;
+            torrent.DownloadRateBytesPerSecond = 0;
+            torrent.UploadRateBytesPerSecond = 0;
+            torrent.LastActivityAtUtc = now;
+            await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        }
     }
 
     private async Task ResolveMetadataAsync(IReadOnlyList<TorrentSnapshot> torrents, DateTimeOffset now, CancellationToken cancellationToken)
@@ -126,17 +177,19 @@ public sealed class FakeTorrentRuntimeService(
     private async Task StartQueuedDownloadsAsync(
         IReadOnlyList<TorrentSnapshot> torrents,
         int activeDownloadCount,
+        RuntimeSettingsSnapshot runtimeSettings,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (activeDownloadCount >= _serviceOptions.MaxActiveDownloads)
+        if (activeDownloadCount >= runtimeSettings.MaxActiveDownloads)
         {
             return;
         }
 
-        var availableSlots = _serviceOptions.MaxActiveDownloads - activeDownloadCount;
+        var availableSlots = runtimeSettings.MaxActiveDownloads - activeDownloadCount;
         var queuedTorrents = torrents
             .Where(torrent => torrent.State == TorrentState.Queued)
+            .Where(torrent => torrent.TotalBytes is not null)
             .OrderBy(torrent => torrent.AddedAtUtc)
             .ThenBy(torrent => torrent.TorrentId)
             .Take(availableSlots)

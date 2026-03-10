@@ -93,6 +93,24 @@ public sealed class RuntimeSettingsService(
                 nameof(request.EngineConnectionFailureLogWindowSeconds));
         }
 
+        if (request.MaxActiveMetadataResolutions < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "MaxActiveMetadataResolutions must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.MaxActiveMetadataResolutions));
+        }
+
+        if (request.MaxActiveDownloads < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "MaxActiveDownloads must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.MaxActiveDownloads));
+        }
+
         await runtimeSettingsStore.UpsertAsync(new Dictionary<string, string>
         {
             [RuntimeSettingsKeys.SeedingStopMode] = seedingStopMode.ToString(),
@@ -102,6 +120,8 @@ public sealed class RuntimeSettingsService(
             [RuntimeSettingsKeys.CompletedTorrentCleanupMinutes] = request.CompletedTorrentCleanupMinutes.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit] = request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] = request.EngineConnectionFailureLogWindowSeconds.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.MaxActiveMetadataResolutions] = request.MaxActiveMetadataResolutions.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.MaxActiveDownloads] = request.MaxActiveDownloads.ToString(CultureInfo.InvariantCulture),
         }, cancellationToken);
 
         await activityLogService.WriteAsync(new ActivityLogWriteRequest
@@ -120,6 +140,8 @@ public sealed class RuntimeSettingsService(
                 request.CompletedTorrentCleanupMinutes,
                 request.EngineConnectionFailureLogBurstLimit,
                 request.EngineConnectionFailureLogWindowSeconds,
+                request.MaxActiveMetadataResolutions,
+                request.MaxActiveDownloads,
             }),
         }, cancellationToken);
 
@@ -186,6 +208,22 @@ public sealed class RuntimeSettingsService(
             windowSeconds = parsedWindowSeconds;
         }
 
+        var maxActiveMetadataResolutions = baseOptions.MaxActiveMetadataResolutions;
+        if (values.TryGetValue(RuntimeSettingsKeys.MaxActiveMetadataResolutions, out var maxActiveMetadataResolutionsValue) &&
+            int.TryParse(maxActiveMetadataResolutionsValue, CultureInfo.InvariantCulture, out var parsedMaxActiveMetadataResolutions) &&
+            parsedMaxActiveMetadataResolutions > 0)
+        {
+            maxActiveMetadataResolutions = parsedMaxActiveMetadataResolutions;
+        }
+
+        var maxActiveDownloads = baseOptions.MaxActiveDownloads;
+        if (values.TryGetValue(RuntimeSettingsKeys.MaxActiveDownloads, out var maxActiveDownloadsValue) &&
+            int.TryParse(maxActiveDownloadsValue, CultureInfo.InvariantCulture, out var parsedMaxActiveDownloads) &&
+            parsedMaxActiveDownloads > 0)
+        {
+            maxActiveDownloads = parsedMaxActiveDownloads;
+        }
+
         return new RuntimeSettingsSnapshot
         {
             UsesPersistedOverrides = persistedSettings.Values.Count > 0,
@@ -198,6 +236,8 @@ public sealed class RuntimeSettingsService(
             CompletedTorrentCleanupMinutes = completedTorrentCleanupMinutes,
             EngineConnectionFailureLogBurstLimit = burstLimit,
             EngineConnectionFailureLogWindowSeconds = windowSeconds,
+            MaxActiveMetadataResolutions = maxActiveMetadataResolutions,
+            MaxActiveDownloads = maxActiveDownloads,
             UpdatedAtUtc = persistedSettings.UpdatedAtUtc,
         };
     }
@@ -218,6 +258,8 @@ public sealed class RuntimeSettingsService(
             CompletedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes,
             EngineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds,
+            MaxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions,
+            MaxActiveDownloads = settings.MaxActiveDownloads,
             UpdatedAtUtc = settings.UpdatedAtUtc,
             RetrievedAtUtc = DateTimeOffset.UtcNow,
         };

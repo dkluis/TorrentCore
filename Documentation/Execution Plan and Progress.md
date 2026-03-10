@@ -35,6 +35,8 @@ Status as of March 10, 2026:
 - a first MonoTorrent-backed engine slice is implemented behind the existing adapter boundary
 - MonoTorrent host configuration, engine-ready diagnostics, and connection-failure log throttling are implemented
 - MonoTorrent partial-file handling and configurable seeding-stop policy are implemented
+- operator-managed global queue concurrency settings are implemented for active metadata resolutions and active downloads
+- startup-configured global MonoTorrent network throttling controls are implemented for overall connection count, half-open connection count, download rate, and upload rate
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
@@ -49,12 +51,17 @@ Current service configuration section:
 - `TorrentCore:EngineDhtPort`
 - `TorrentCore:EngineAllowPortForwarding`
 - `TorrentCore:EngineAllowLocalPeerDiscovery`
+- `TorrentCore:EngineMaximumConnections`
+- `TorrentCore:EngineMaximumHalfOpenConnections`
+- `TorrentCore:EngineMaximumDownloadRateBytesPerSecond`
+- `TorrentCore:EngineMaximumUploadRateBytesPerSecond`
 - `TorrentCore:EngineConnectionFailureLogBurstLimit`
 - `TorrentCore:EngineConnectionFailureLogWindowSeconds`
 - `TorrentCore:UsePartialFiles`
 - `TorrentCore:SeedingStopMode`
 - `TorrentCore:SeedingStopRatio`
 - `TorrentCore:SeedingStopMinutes`
+- `TorrentCore:MaxActiveMetadataResolutions`
 - `TorrentCore:DownloadRootPath`
 - `TorrentCore:StorageRootPath`
 - `TorrentCore:MaxActiveDownloads`
@@ -65,6 +72,8 @@ Current service configuration section:
 - project-relative runtime folders were replaced as defaults because they are not appropriate for normal operator use
 - these settings are currently config-driven and exposed through host status for diagnostics; later they should be managed through the web UI
 - MonoTorrent partial-file support currently uses the engine's native `.!mt` suffix when enabled
+- runtime settings now persist operator overrides for seeding policy, cleanup policy, log throttling, active metadata-resolution concurrency, and active download concurrency
+- engine-level MonoTorrent network throttling is currently startup-configured and exposed through diagnostics; moving those controls into live operator management should be handled in a later slice because they are engine-initialization settings
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -484,16 +493,23 @@ Completed:
 - fixed delete-data removal so TorrentCore now prunes empty torrent-specific directories left behind after MonoTorrent deletes files, while preserving the configured download root and any non-empty/shared directories
 - tightened the dashboard so `Delete Data` is only offered for in-progress/error torrent states and not for completed or seeding torrents
 - documented the intended future concurrency model for burst intake: TorrentCore should accept/persist new magnets immediately and queue metadata/download execution behind global runtime limits
+- added live-editable runtime settings for `MaxActiveMetadataResolutions` and `MaxActiveDownloads`, with host-status and web-settings visibility of the effective queue/concurrency caps
+- updated both the fake runtime and MonoTorrent runtime to treat those caps as execution limits instead of admission limits, so excess torrents wait in queue until slots open
+- fixed the MonoTorrent remove path again so explicit remove requests are atomic against the scheduler and cannot be re-started mid-remove by a background synchronization tick
+- added startup-configured MonoTorrent network throttling controls for overall connections, half-open connections, and global upload/download rate caps
+- surfaced those active MonoTorrent throttle values through host status and the dashboard so operators can verify the current engine saturation limits
+- added validation and API coverage for the new engine throttle settings
+- fixed a SQLite torrent-store persistence bug where stale background updates could recreate a torrent row after delete/remove because updates were using `INSERT OR REPLACE` semantics instead of true update-only semantics
+- added a regression test proving that delete followed by a stale later update does not recreate the torrent row
+- fixed a MonoTorrent resume regression where a paused torrent could remain stuck in the paused state under the new scheduler instead of re-entering queue/download processing
+- added a real-engine regression test proving pause/resume leaves the paused state
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
 
 Next:
-- continue toward real engine-backed state rehydration using the tracked SQLite schema foundation
-- expand persisted torrent state beyond the current fake-engine shape toward actual runtime metadata and engine-session recovery
-- replace the managed fake runtime with a real MonoTorrent-backed adapter while preserving the public contracts
-- extend the MonoTorrent-backed slice with richer runtime diagnostics, explicit configuration, and more complete restart recovery semantics
-- continue building the operator-facing path so current MonoTorrent configuration can later move from config files into the web UI
-- implement `.part` incomplete-file handling and configurable seeding stop rules as the next operational storage/runtime slice
-- extend the UI from diagnostics-only exposure of partial-file and seeding policy settings into actual operator-managed configuration
-- continue expanding the web admin surface from host status into richer operator diagnostics and controls
+- add the next operator control slice for global engine throttling: rate caps, global peer/connection limits, and burst-friendly saturation control
+- move the new MonoTorrent network throttling controls from startup config into an operator-managed experience with clear restart/apply semantics
+- continue expanding MonoTorrent diagnostics so operators can understand why torrents are queued, resolving, downloading, seeding, or blocked
+- continue building the operator-facing path so more current MonoTorrent configuration can move from config files into the web UI
+- extend the UI from basic settings and actions into richer operator diagnostics and controls

@@ -19,6 +19,8 @@ Queueing rule:
 - TorrentCore should accept and persist incoming magnet requests even when runtime capacity is full.
 - Active-resolution and active-download limits control concurrency, not admission.
 - Torrents that cannot start immediately because capacity is full should wait in TorrentCore-managed queues until slots open.
+- The first concurrency controls are global per host: active metadata resolutions and active downloads.
+- These limits should be operator-managed through TorrentCore rather than pushed down into TVMaze.
 
 TVMaze does not own TorrentCore internals. TVMaze is only one client of TorrentCore.
 
@@ -164,3 +166,4 @@ The initial scaffold is a boundary-first starter:
 4. Add SQLite persistence shape.
 5. Add first magnet workflow end to end.
 6. Add explicit incomplete-file and seeding-policy behavior rather than relying on engine defaults.
+7. Add operator-managed global concurrency controls for metadata-resolution and download queue execution.

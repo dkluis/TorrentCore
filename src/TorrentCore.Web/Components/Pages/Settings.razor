@@ -7,7 +7,7 @@
 
 <h1>Runtime Settings</h1>
 
-<p>Live operator settings for seeding policy and engine log throttling. These values are persisted and survive restart.</p>
+<p>Live operator settings for seeding policy, cleanup, queue concurrency, and engine log throttling. These values are persisted and survive restart.</p>
 
 @if (_isLoading)
 {
@@ -76,6 +76,16 @@ else
                 <label class="form-label" for="windowSeconds">Connection Failure Window Seconds</label>
                 <input id="windowSeconds" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogWindowSeconds" />
             </div>
+            <div class="col-md-6">
+                <label class="form-label" for="maxActiveMetadataResolutions">Max Active Metadata Resolutions</label>
+                <input id="maxActiveMetadataResolutions" class="form-control" type="number" min="1" step="1" @bind="_maxActiveMetadataResolutions" />
+                <div class="form-text">New magnets are still accepted immediately. Extra unresolved torrents wait in queue until a metadata slot opens.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="maxActiveDownloads">Max Active Downloads</label>
+                <input id="maxActiveDownloads" class="form-control" type="number" min="1" step="1" @bind="_maxActiveDownloads" />
+                <div class="form-text">Resolved torrents above this limit stay queued until a download slot opens.</div>
+            </div>
         </div>
 
         <div class="mt-3 d-flex gap-2">
@@ -111,6 +121,8 @@ else
     private int _completedTorrentCleanupMinutes = 60;
     private int _engineConnectionFailureLogBurstLimit = 5;
     private int _engineConnectionFailureLogWindowSeconds = 60;
+    private int _maxActiveMetadataResolutions = 4;
+    private int _maxActiveDownloads = 4;
 
     protected override async Task OnInitializedAsync()
     {
@@ -161,6 +173,8 @@ else
                 CompletedTorrentCleanupMinutes = _completedTorrentCleanupMinutes,
                 EngineConnectionFailureLogBurstLimit = _engineConnectionFailureLogBurstLimit,
                 EngineConnectionFailureLogWindowSeconds = _engineConnectionFailureLogWindowSeconds,
+                MaxActiveMetadataResolutions = _maxActiveMetadataResolutions,
+                MaxActiveDownloads = _maxActiveDownloads,
             });
 
             Apply(settings);
@@ -191,5 +205,7 @@ else
         _completedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes;
         _engineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit;
         _engineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds;
+        _maxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions;
+        _maxActiveDownloads = settings.MaxActiveDownloads;
     }
 }

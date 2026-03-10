@@ -12,5 +12,7 @@ public sealed class RuntimeSettingsSnapshot
     public required int CompletedTorrentCleanupMinutes { get; init; }
     public required int EngineConnectionFailureLogBurstLimit { get; init; }
     public required int EngineConnectionFailureLogWindowSeconds { get; init; }
+    public required int MaxActiveMetadataResolutions { get; init; }
+    public required int MaxActiveDownloads { get; init; }
     public DateTimeOffset? UpdatedAtUtc { get; init; }
 }

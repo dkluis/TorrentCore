@@ -10,8 +10,14 @@ public sealed class EngineHostStatusDto
     public required int EngineDhtPort { get; init; }
     public required bool EnginePortForwardingEnabled { get; init; }
     public required bool EngineLocalPeerDiscoveryEnabled { get; init; }
+    public required int EngineMaximumConnections { get; init; }
+    public required int EngineMaximumHalfOpenConnections { get; init; }
+    public required int EngineMaximumDownloadRateBytesPerSecond { get; init; }
+    public required int EngineMaximumUploadRateBytesPerSecond { get; init; }
     public required int EngineConnectionFailureLogBurstLimit { get; init; }
     public required int EngineConnectionFailureLogWindowSeconds { get; init; }
+    public required int MaxActiveMetadataResolutions { get; init; }
+    public required int MaxActiveDownloads { get; init; }
     public required bool PartialFilesEnabled { get; init; }
     public required string PartialFileSuffix { get; init; }
     public required string SeedingStopMode { get; init; }
