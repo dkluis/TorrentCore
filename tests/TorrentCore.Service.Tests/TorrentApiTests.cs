@@ -35,6 +35,7 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
         Assert.NotNull(torrents);
         Assert.NotEmpty(torrents);
         Assert.Contains(torrents, torrent => torrent.State is TorrentState.Downloading or TorrentState.Paused);
+        Assert.Contains(torrents, torrent => torrent.TrackerCount > 0);
     }
 
     [Fact]
@@ -54,6 +55,8 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Equal("API Test Torrent", torrent.Name);
         Assert.Equal(TorrentState.ResolvingMetadata, torrent.State);
         Assert.Equal("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", torrent.InfoHash);
+        Assert.Equal(0, torrent.TrackerCount);
+        Assert.Equal(0, torrent.ConnectedPeerCount);
     }
 
     [Fact]

@@ -239,6 +239,27 @@ Current assumptions unless superseded by later decisions:
 - authentication and authorization are required, but the exact v1 model is still pending
 - logging will be TorrentCore-owned and not coupled to TVMaze infrastructure
 
+## Phase 0 Contract Review Decisions
+
+Reviewed and accepted on March 10, 2026:
+- v1 remains torrent-level only
+- per-file torrent detail is deferred to a later version
+- labels and categories are deferred from v1
+- remove remains split between remove-only and remove-with-data
+- queue position is deferred from v1
+- initial list behavior will later support sorting by progress, status, and name
+- initial list behavior will later support filtering by name and status
+- torrent state names remain:
+  - `ResolvingMetadata`
+  - `Queued`
+  - `Downloading`
+  - `Seeding`
+  - `Paused`
+  - `Completed`
+  - `Error`
+  - `Removed`
+- tracker count and connected peer count are included in the Phase 0 contract surface
+
 ## Risks and Watch Items
 
 - leaking engine-specific concepts into contracts too early
@@ -268,6 +289,8 @@ Changes:
 - added host and torrent API endpoints backed by a thin in-memory application service
 - updated the client and web shell to use the new Phase 0 boundary
 - added API integration tests for host status, torrent listing, and magnet validation
+- completed contract review decisions for v1 scope
+- added tracker and connected-peer counts to torrent summary and detail contracts
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -275,12 +298,13 @@ Assumptions:
 - Phase 0 uses an in-memory service intentionally and does not yet imply persistence design
 - v1 detail remains torrent-level only and does not yet include per-file DTOs
 - magnet validation is intentionally limited to public-boundary checks, not engine-level parsing completeness
+- sorting and filtering are UI/API behaviors for later work, not embedded DTO concerns
 
 Progress:
 - planning completed
 - repository baseline reviewed
 - build and test baseline verified
-- initial Phase 0 implementation completed and verified by build and tests
+- Phase 0 completed and verified by build and tests
 
 ## Progress Log
 
@@ -297,9 +321,11 @@ Completed:
 - implemented an in-memory application service to exercise the contract boundary
 - updated the web home page to display host status, add magnets, and list torrents
 - added API integration tests and re-verified the solution with build and test
+- completed contract review and folded the accepted decisions into the Phase 0 boundary
+- added tracker and connected-peer counts to the torrent contract and list UI
 
 In progress:
-- awaiting review of the Phase 0 contract shape before moving deeper into startup validation and persistence
+- none
 
 Next:
 - Phase 1 configuration and startup validation

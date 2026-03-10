@@ -98,6 +98,8 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
                 TotalBytes                  = null,
                 DownloadRateBytesPerSecond  = 0,
                 UploadRateBytesPerSecond    = 0,
+                TrackerCount                = 0,
+                ConnectedPeerCount          = 0,
                 AddedAtUtc                  = now,
                 LastActivityAtUtc           = now,
             };
@@ -214,6 +216,8 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
                 TotalBytes                 = 4_293_918_720,
                 DownloadRateBytesPerSecond = 5_120_000,
                 UploadRateBytesPerSecond   = 185_000,
+                TrackerCount               = 6,
+                ConnectedPeerCount         = 18,
                 AddedAtUtc                 = now.AddMinutes(-35),
                 LastActivityAtUtc          = now.AddSeconds(-8),
             },
@@ -230,6 +234,8 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
                 TotalBytes                 = 2_251_799_813,
                 DownloadRateBytesPerSecond = 0,
                 UploadRateBytesPerSecond   = 0,
+                TrackerCount               = 4,
+                ConnectedPeerCount         = 0,
                 AddedAtUtc                 = now.AddHours(-3),
                 LastActivityAtUtc          = now.AddMinutes(-22),
             },
@@ -325,6 +331,8 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
             TotalBytes                 = record.TotalBytes,
             DownloadRateBytesPerSecond = record.DownloadRateBytesPerSecond,
             UploadRateBytesPerSecond   = record.UploadRateBytesPerSecond,
+            TrackerCount               = record.TrackerCount,
+            ConnectedPeerCount         = record.ConnectedPeerCount,
             AddedAtUtc                 = record.AddedAtUtc,
             CompletedAtUtc             = record.CompletedAtUtc,
             LastActivityAtUtc          = record.LastActivityAtUtc,
@@ -350,6 +358,8 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
             TotalBytes                 = record.TotalBytes,
             DownloadRateBytesPerSecond = record.DownloadRateBytesPerSecond,
             UploadRateBytesPerSecond   = record.UploadRateBytesPerSecond,
+            TrackerCount               = record.TrackerCount,
+            ConnectedPeerCount         = record.ConnectedPeerCount,
             AddedAtUtc                 = record.AddedAtUtc,
             CompletedAtUtc             = record.CompletedAtUtc,
             LastActivityAtUtc          = record.LastActivityAtUtc,
@@ -388,6 +398,8 @@ public sealed class InMemoryTorrentApplicationService(IHostEnvironment hostEnvir
         public required long? TotalBytes { get; init; }
         public required long DownloadRateBytesPerSecond { get; set; }
         public required long UploadRateBytesPerSecond { get; set; }
+        public required int TrackerCount { get; init; }
+        public required int ConnectedPeerCount { get; set; }
         public required DateTimeOffset AddedAtUtc { get; init; }
         public DateTimeOffset? CompletedAtUtc { get; init; }
         public DateTimeOffset? LastActivityAtUtc { get; set; }

@@ -65,6 +65,8 @@ else
                     <th>Progress</th>
                     <th>Down</th>
                     <th>Up</th>
+                    <th>Trackers</th>
+                    <th>Peers</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -76,6 +78,8 @@ else
                         <td>@torrent.ProgressPercent.ToString("0.0")%</td>
                         <td>@FormatRate(torrent.DownloadRateBytesPerSecond)</td>
                         <td>@FormatRate(torrent.UploadRateBytesPerSecond)</td>
+                        <td>@torrent.TrackerCount</td>
+                        <td>@torrent.ConnectedPeerCount</td>
                     </tr>
                 }
                 </tbody>
