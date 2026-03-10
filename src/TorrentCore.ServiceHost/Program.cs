@@ -37,6 +37,17 @@ builder.Services.AddSingleton(serviceProvider =>
 });
 builder.Services.AddSingleton<ServiceInstanceContext>();
 builder.Services.AddSingleton<StartupRecoveryState>();
+builder.Services.AddSingleton(serviceProvider =>
+{
+    var options = serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value;
+    var state = new AppliedEngineSettingsState();
+    state.Set(
+        options.EngineMaximumConnections,
+        options.EngineMaximumHalfOpenConnections,
+        options.EngineMaximumDownloadRateBytesPerSecond,
+        options.EngineMaximumUploadRateBytesPerSecond);
+    return state;
+});
 builder.Services.AddHostedService<TorrentCoreStorageInitializer>();
 builder.Services.AddSingleton<IActivityLogService>(serviceProvider =>
 {
@@ -67,6 +78,7 @@ builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider =>
         ? serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>()
         : serviceProvider.GetRequiredService<PersistedTorrentEngineAdapter>());
 builder.Services.AddHostedService<SqlitePersistenceInitializer>();
+builder.Services.AddHostedService<AppliedEngineSettingsInitializationService>();
 builder.Services.AddHostedService<TorrentStartupRecoveryService>();
 builder.Services.AddHostedService<FakeTorrentRuntimeService>();
 builder.Services.AddHostedService<CompletedTorrentCleanupService>();

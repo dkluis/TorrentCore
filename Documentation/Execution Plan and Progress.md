@@ -74,6 +74,8 @@ Current service configuration section:
 - MonoTorrent partial-file support currently uses the engine's native `.!mt` suffix when enabled
 - runtime settings now persist operator overrides for seeding policy, cleanup policy, log throttling, active metadata-resolution concurrency, and active download concurrency
 - engine-level MonoTorrent network throttling is currently startup-configured and exposed through diagnostics; moving those controls into live operator management should be handled in a later slice because they are engine-initialization settings
+- the operator settings reference now explicitly explains engine connections, half-open connections, and how global upload/download rates are measured so throttle controls are understandable to operators
+- the settings page now separates currently applied engine throttle values from saved restart-required throttle settings so operators do not see them as duplicate fields
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -503,6 +505,10 @@ Completed:
 - added a regression test proving that delete followed by a stale later update does not recreate the torrent row
 - fixed a MonoTorrent resume regression where a paused torrent could remain stuck in the paused state under the new scheduler instead of re-entering queue/download processing
 - added a real-engine regression test proving pause/resume leaves the paused state
+- extended runtime settings and the web settings page so MonoTorrent network throttle values can now be edited as persisted desired settings with explicit restart-required semantics
+- separated desired engine throttle settings from currently applied engine throttle settings so the UI can show pending restart requirements instead of implying a live engine change that has not happened yet
+- added startup initialization for applied engine settings so restart-required state clears correctly after a service restart in both fake and MonoTorrent modes
+- added an operator settings reference document explaining queue limits, connection limits, half-open connections, and global upload/download rate settings in plain language
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging

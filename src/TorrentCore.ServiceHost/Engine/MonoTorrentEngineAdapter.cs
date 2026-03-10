@@ -19,6 +19,7 @@ public sealed class MonoTorrentEngineAdapter(
     ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService,
+    AppliedEngineSettingsState appliedEngineSettingsState,
     ServiceInstanceContext serviceInstanceContext,
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
@@ -530,10 +531,10 @@ public sealed class MonoTorrentEngineAdapter(
                 AutoSaveLoadFastResume = true,
                 AutoSaveLoadMagnetLinkMetadata = true,
                 UsePartialFiles = _serviceOptions.UsePartialFiles,
-                MaximumConnections = _serviceOptions.EngineMaximumConnections,
-                MaximumHalfOpenConnections = _serviceOptions.EngineMaximumHalfOpenConnections,
-                MaximumDownloadRate = _serviceOptions.EngineMaximumDownloadRateBytesPerSecond,
-                MaximumUploadRate = _serviceOptions.EngineMaximumUploadRateBytesPerSecond,
+                MaximumConnections = runtimeSettings.EngineMaximumConnections,
+                MaximumHalfOpenConnections = runtimeSettings.EngineMaximumHalfOpenConnections,
+                MaximumDownloadRate = runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
+                MaximumUploadRate = runtimeSettings.EngineMaximumUploadRateBytesPerSecond,
                 DhtEndPoint = new IPEndPoint(IPAddress.Any, _serviceOptions.EngineDhtPort),
                 ListenEndPoints = new Dictionary<string, IPEndPoint>
                 {
@@ -542,6 +543,11 @@ public sealed class MonoTorrentEngineAdapter(
             };
 
             _engine = new ClientEngine(engineSettingsBuilder.ToSettings());
+            appliedEngineSettingsState.Set(
+                runtimeSettings.EngineMaximumConnections,
+                runtimeSettings.EngineMaximumHalfOpenConnections,
+                runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
+                runtimeSettings.EngineMaximumUploadRateBytesPerSecond);
             _initialized = true;
 
             logger.LogInformation("MonoTorrent engine initialized. CacheDirectory={CacheDirectory}", cacheDirectory);
@@ -560,10 +566,10 @@ public sealed class MonoTorrentEngineAdapter(
                     _serviceOptions.EngineDhtPort,
                     _serviceOptions.EngineAllowPortForwarding,
                     _serviceOptions.EngineAllowLocalPeerDiscovery,
-                    _serviceOptions.EngineMaximumConnections,
-                    _serviceOptions.EngineMaximumHalfOpenConnections,
-                    _serviceOptions.EngineMaximumDownloadRateBytesPerSecond,
-                    _serviceOptions.EngineMaximumUploadRateBytesPerSecond,
+                    runtimeSettings.EngineMaximumConnections,
+                    runtimeSettings.EngineMaximumHalfOpenConnections,
+                    runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
+                    runtimeSettings.EngineMaximumUploadRateBytesPerSecond,
                     runtimeSettings.EngineConnectionFailureLogBurstLimit,
                     runtimeSettings.EngineConnectionFailureLogWindowSeconds,
                     _serviceOptions.UsePartialFiles,

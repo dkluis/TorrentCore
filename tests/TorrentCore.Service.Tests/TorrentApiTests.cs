@@ -99,8 +99,17 @@ public sealed class TorrentApiTests
         Assert.Equal(60, settings.CompletedTorrentCleanupMinutes);
         Assert.Equal(5, settings.EngineConnectionFailureLogBurstLimit);
         Assert.Equal(60, settings.EngineConnectionFailureLogWindowSeconds);
+        Assert.Equal(150, settings.EngineMaximumConnections);
+        Assert.Equal(8, settings.EngineMaximumHalfOpenConnections);
+        Assert.Equal(0, settings.EngineMaximumDownloadRateBytesPerSecond);
+        Assert.Equal(0, settings.EngineMaximumUploadRateBytesPerSecond);
         Assert.Equal(4, settings.MaxActiveMetadataResolutions);
         Assert.Equal(4, settings.MaxActiveDownloads);
+        Assert.Equal(150, settings.AppliedEngineMaximumConnections);
+        Assert.Equal(8, settings.AppliedEngineMaximumHalfOpenConnections);
+        Assert.Equal(0, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
+        Assert.Equal(0, settings.AppliedEngineMaximumUploadRateBytesPerSecond);
+        Assert.False(settings.EngineSettingsRequireRestart);
     }
 
     [Fact]
@@ -123,6 +132,10 @@ public sealed class TorrentApiTests
                 CompletedTorrentCleanupMinutes = 15,
                 EngineConnectionFailureLogBurstLimit = 2,
                 EngineConnectionFailureLogWindowSeconds = 180,
+                EngineMaximumConnections = 70,
+                EngineMaximumHalfOpenConnections = 6,
+                EngineMaximumDownloadRateBytesPerSecond = 4_000_000,
+                EngineMaximumUploadRateBytesPerSecond = 1_500_000,
                 MaxActiveMetadataResolutions = 3,
                 MaxActiveDownloads = 2,
             });
@@ -140,8 +153,13 @@ public sealed class TorrentApiTests
             Assert.Equal(15, settings.CompletedTorrentCleanupMinutes);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(70, settings.EngineMaximumConnections);
+            Assert.Equal(6, settings.EngineMaximumHalfOpenConnections);
+            Assert.Equal(4_000_000, settings.EngineMaximumDownloadRateBytesPerSecond);
+            Assert.Equal(1_500_000, settings.EngineMaximumUploadRateBytesPerSecond);
             Assert.Equal(3, settings.MaxActiveMetadataResolutions);
             Assert.Equal(2, settings.MaxActiveDownloads);
+            Assert.True(settings.EngineSettingsRequireRestart);
             Assert.NotNull(settings.UpdatedAtUtc);
 
             Assert.NotNull(hostStatus);
@@ -152,6 +170,10 @@ public sealed class TorrentApiTests
             Assert.Equal(15, hostStatus.CompletedTorrentCleanupMinutes);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(150, hostStatus.EngineMaximumConnections);
+            Assert.Equal(8, hostStatus.EngineMaximumHalfOpenConnections);
+            Assert.Equal(0, hostStatus.EngineMaximumDownloadRateBytesPerSecond);
+            Assert.Equal(0, hostStatus.EngineMaximumUploadRateBytesPerSecond);
             Assert.Equal(3, hostStatus.MaxActiveMetadataResolutions);
             Assert.Equal(2, hostStatus.MaxActiveDownloads);
         }
@@ -173,14 +195,27 @@ public sealed class TorrentApiTests
             Assert.Equal(15, settings.CompletedTorrentCleanupMinutes);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(70, settings.EngineMaximumConnections);
+            Assert.Equal(6, settings.EngineMaximumHalfOpenConnections);
+            Assert.Equal(4_000_000, settings.EngineMaximumDownloadRateBytesPerSecond);
+            Assert.Equal(1_500_000, settings.EngineMaximumUploadRateBytesPerSecond);
             Assert.Equal(3, settings.MaxActiveMetadataResolutions);
             Assert.Equal(2, settings.MaxActiveDownloads);
+            Assert.Equal(70, settings.AppliedEngineMaximumConnections);
+            Assert.Equal(6, settings.AppliedEngineMaximumHalfOpenConnections);
+            Assert.Equal(4_000_000, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
+            Assert.Equal(1_500_000, settings.AppliedEngineMaximumUploadRateBytesPerSecond);
+            Assert.False(settings.EngineSettingsRequireRestart);
 
             Assert.NotNull(hostStatus);
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), hostStatus.SeedingStopMode);
             Assert.Equal(CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(), hostStatus.CompletedTorrentCleanupMode);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(70, hostStatus.EngineMaximumConnections);
+            Assert.Equal(6, hostStatus.EngineMaximumHalfOpenConnections);
+            Assert.Equal(4_000_000, hostStatus.EngineMaximumDownloadRateBytesPerSecond);
+            Assert.Equal(1_500_000, hostStatus.EngineMaximumUploadRateBytesPerSecond);
             Assert.Equal(3, hostStatus.MaxActiveMetadataResolutions);
             Assert.Equal(2, hostStatus.MaxActiveDownloads);
 
@@ -404,6 +439,10 @@ public sealed class TorrentApiTests
             CompletedTorrentCleanupMinutes = 0,
             EngineConnectionFailureLogBurstLimit = 5,
             EngineConnectionFailureLogWindowSeconds = 60,
+            EngineMaximumConnections = 150,
+            EngineMaximumHalfOpenConnections = 8,
+            EngineMaximumDownloadRateBytesPerSecond = 0,
+            EngineMaximumUploadRateBytesPerSecond = 0,
             MaxActiveMetadataResolutions = 4,
             MaxActiveDownloads = 4,
         });

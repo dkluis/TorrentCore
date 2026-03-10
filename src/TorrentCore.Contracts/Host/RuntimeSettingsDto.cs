@@ -14,8 +14,17 @@ public sealed class RuntimeSettingsDto
     public required int CompletedTorrentCleanupMinutes { get; init; }
     public required int EngineConnectionFailureLogBurstLimit { get; init; }
     public required int EngineConnectionFailureLogWindowSeconds { get; init; }
+    public required int EngineMaximumConnections { get; init; }
+    public required int EngineMaximumHalfOpenConnections { get; init; }
+    public required int EngineMaximumDownloadRateBytesPerSecond { get; init; }
+    public required int EngineMaximumUploadRateBytesPerSecond { get; init; }
     public required int MaxActiveMetadataResolutions { get; init; }
     public required int MaxActiveDownloads { get; init; }
+    public required int AppliedEngineMaximumConnections { get; init; }
+    public required int AppliedEngineMaximumHalfOpenConnections { get; init; }
+    public required int AppliedEngineMaximumDownloadRateBytesPerSecond { get; init; }
+    public required int AppliedEngineMaximumUploadRateBytesPerSecond { get; init; }
+    public required bool EngineSettingsRequireRestart { get; init; }
     public DateTimeOffset? UpdatedAtUtc { get; init; }
     public required DateTimeOffset RetrievedAtUtc { get; init; }
 }

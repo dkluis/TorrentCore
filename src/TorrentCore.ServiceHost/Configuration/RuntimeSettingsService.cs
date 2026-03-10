@@ -12,7 +12,8 @@ public sealed class RuntimeSettingsService(
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     SqliteRuntimeSettingsStore runtimeSettingsStore,
     IActivityLogService activityLogService,
-    ServiceInstanceContext serviceInstanceContext) : IRuntimeSettingsService
+    ServiceInstanceContext serviceInstanceContext,
+    AppliedEngineSettingsState appliedEngineSettingsState) : IRuntimeSettingsService
 {
     public async Task<RuntimeSettingsSnapshot> GetEffectiveSettingsAsync(CancellationToken cancellationToken)
     {
@@ -93,6 +94,42 @@ public sealed class RuntimeSettingsService(
                 nameof(request.EngineConnectionFailureLogWindowSeconds));
         }
 
+        if (request.EngineMaximumConnections < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "EngineMaximumConnections must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.EngineMaximumConnections));
+        }
+
+        if (request.EngineMaximumHalfOpenConnections < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "EngineMaximumHalfOpenConnections must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.EngineMaximumHalfOpenConnections));
+        }
+
+        if (request.EngineMaximumDownloadRateBytesPerSecond < 0)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "EngineMaximumDownloadRateBytesPerSecond must be 0 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.EngineMaximumDownloadRateBytesPerSecond));
+        }
+
+        if (request.EngineMaximumUploadRateBytesPerSecond < 0)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "EngineMaximumUploadRateBytesPerSecond must be 0 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.EngineMaximumUploadRateBytesPerSecond));
+        }
+
         if (request.MaxActiveMetadataResolutions < 1)
         {
             throw new Application.ServiceOperationException(
@@ -120,6 +157,10 @@ public sealed class RuntimeSettingsService(
             [RuntimeSettingsKeys.CompletedTorrentCleanupMinutes] = request.CompletedTorrentCleanupMinutes.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit] = request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] = request.EngineConnectionFailureLogWindowSeconds.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.EngineMaximumConnections] = request.EngineMaximumConnections.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.EngineMaximumHalfOpenConnections] = request.EngineMaximumHalfOpenConnections.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.EngineMaximumDownloadRateBytesPerSecond] = request.EngineMaximumDownloadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.EngineMaximumUploadRateBytesPerSecond] = request.EngineMaximumUploadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.MaxActiveMetadataResolutions] = request.MaxActiveMetadataResolutions.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.MaxActiveDownloads] = request.MaxActiveDownloads.ToString(CultureInfo.InvariantCulture),
         }, cancellationToken);
@@ -140,6 +181,10 @@ public sealed class RuntimeSettingsService(
                 request.CompletedTorrentCleanupMinutes,
                 request.EngineConnectionFailureLogBurstLimit,
                 request.EngineConnectionFailureLogWindowSeconds,
+                request.EngineMaximumConnections,
+                request.EngineMaximumHalfOpenConnections,
+                request.EngineMaximumDownloadRateBytesPerSecond,
+                request.EngineMaximumUploadRateBytesPerSecond,
                 request.MaxActiveMetadataResolutions,
                 request.MaxActiveDownloads,
             }),
@@ -148,7 +193,7 @@ public sealed class RuntimeSettingsService(
         return await GetRuntimeSettingsDtoAsync(cancellationToken);
     }
 
-    private static RuntimeSettingsSnapshot BuildSnapshot(TorrentCoreServiceOptions baseOptions, PersistedRuntimeSettingsRecord persistedSettings)
+    private RuntimeSettingsSnapshot BuildSnapshot(TorrentCoreServiceOptions baseOptions, PersistedRuntimeSettingsRecord persistedSettings)
     {
         var values = persistedSettings.Values;
 
@@ -208,6 +253,38 @@ public sealed class RuntimeSettingsService(
             windowSeconds = parsedWindowSeconds;
         }
 
+        var engineMaximumConnections = baseOptions.EngineMaximumConnections;
+        if (values.TryGetValue(RuntimeSettingsKeys.EngineMaximumConnections, out var engineMaximumConnectionsValue) &&
+            int.TryParse(engineMaximumConnectionsValue, CultureInfo.InvariantCulture, out var parsedEngineMaximumConnections) &&
+            parsedEngineMaximumConnections > 0)
+        {
+            engineMaximumConnections = parsedEngineMaximumConnections;
+        }
+
+        var engineMaximumHalfOpenConnections = baseOptions.EngineMaximumHalfOpenConnections;
+        if (values.TryGetValue(RuntimeSettingsKeys.EngineMaximumHalfOpenConnections, out var engineMaximumHalfOpenConnectionsValue) &&
+            int.TryParse(engineMaximumHalfOpenConnectionsValue, CultureInfo.InvariantCulture, out var parsedEngineMaximumHalfOpenConnections) &&
+            parsedEngineMaximumHalfOpenConnections > 0)
+        {
+            engineMaximumHalfOpenConnections = parsedEngineMaximumHalfOpenConnections;
+        }
+
+        var engineMaximumDownloadRateBytesPerSecond = baseOptions.EngineMaximumDownloadRateBytesPerSecond;
+        if (values.TryGetValue(RuntimeSettingsKeys.EngineMaximumDownloadRateBytesPerSecond, out var engineMaximumDownloadRateValue) &&
+            int.TryParse(engineMaximumDownloadRateValue, CultureInfo.InvariantCulture, out var parsedEngineMaximumDownloadRate) &&
+            parsedEngineMaximumDownloadRate >= 0)
+        {
+            engineMaximumDownloadRateBytesPerSecond = parsedEngineMaximumDownloadRate;
+        }
+
+        var engineMaximumUploadRateBytesPerSecond = baseOptions.EngineMaximumUploadRateBytesPerSecond;
+        if (values.TryGetValue(RuntimeSettingsKeys.EngineMaximumUploadRateBytesPerSecond, out var engineMaximumUploadRateValue) &&
+            int.TryParse(engineMaximumUploadRateValue, CultureInfo.InvariantCulture, out var parsedEngineMaximumUploadRate) &&
+            parsedEngineMaximumUploadRate >= 0)
+        {
+            engineMaximumUploadRateBytesPerSecond = parsedEngineMaximumUploadRate;
+        }
+
         var maxActiveMetadataResolutions = baseOptions.MaxActiveMetadataResolutions;
         if (values.TryGetValue(RuntimeSettingsKeys.MaxActiveMetadataResolutions, out var maxActiveMetadataResolutionsValue) &&
             int.TryParse(maxActiveMetadataResolutionsValue, CultureInfo.InvariantCulture, out var parsedMaxActiveMetadataResolutions) &&
@@ -236,13 +313,22 @@ public sealed class RuntimeSettingsService(
             CompletedTorrentCleanupMinutes = completedTorrentCleanupMinutes,
             EngineConnectionFailureLogBurstLimit = burstLimit,
             EngineConnectionFailureLogWindowSeconds = windowSeconds,
+            EngineMaximumConnections = engineMaximumConnections,
+            EngineMaximumHalfOpenConnections = engineMaximumHalfOpenConnections,
+            EngineMaximumDownloadRateBytesPerSecond = engineMaximumDownloadRateBytesPerSecond,
+            EngineMaximumUploadRateBytesPerSecond = engineMaximumUploadRateBytesPerSecond,
             MaxActiveMetadataResolutions = maxActiveMetadataResolutions,
             MaxActiveDownloads = maxActiveDownloads,
+            EngineSettingsRequireRestart =
+                engineMaximumConnections != appliedEngineSettingsState.EngineMaximumConnections ||
+                engineMaximumHalfOpenConnections != appliedEngineSettingsState.EngineMaximumHalfOpenConnections ||
+                engineMaximumDownloadRateBytesPerSecond != appliedEngineSettingsState.EngineMaximumDownloadRateBytesPerSecond ||
+                engineMaximumUploadRateBytesPerSecond != appliedEngineSettingsState.EngineMaximumUploadRateBytesPerSecond,
             UpdatedAtUtc = persistedSettings.UpdatedAtUtc,
         };
     }
 
-    private static RuntimeSettingsDto MapDto(TorrentCoreServiceOptions baseOptions, RuntimeSettingsSnapshot settings)
+    private RuntimeSettingsDto MapDto(TorrentCoreServiceOptions baseOptions, RuntimeSettingsSnapshot settings)
     {
         return new RuntimeSettingsDto
         {
@@ -258,8 +344,17 @@ public sealed class RuntimeSettingsService(
             CompletedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes,
             EngineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds,
+            EngineMaximumConnections = settings.EngineMaximumConnections,
+            EngineMaximumHalfOpenConnections = settings.EngineMaximumHalfOpenConnections,
+            EngineMaximumDownloadRateBytesPerSecond = settings.EngineMaximumDownloadRateBytesPerSecond,
+            EngineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond,
             MaxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions,
             MaxActiveDownloads = settings.MaxActiveDownloads,
+            AppliedEngineMaximumConnections = appliedEngineSettingsState.EngineMaximumConnections,
+            AppliedEngineMaximumHalfOpenConnections = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
+            AppliedEngineMaximumDownloadRateBytesPerSecond = appliedEngineSettingsState.EngineMaximumDownloadRateBytesPerSecond,
+            AppliedEngineMaximumUploadRateBytesPerSecond = appliedEngineSettingsState.EngineMaximumUploadRateBytesPerSecond,
+            EngineSettingsRequireRestart = settings.EngineSettingsRequireRestart,
             UpdatedAtUtc = settings.UpdatedAtUtc,
             RetrievedAtUtc = DateTimeOffset.UtcNow,
         };

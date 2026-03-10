@@ -7,7 +7,7 @@
 
 <h1>Runtime Settings</h1>
 
-<p>Live operator settings for seeding policy, cleanup, queue concurrency, and engine log throttling. These values are persisted and survive restart.</p>
+<p>Operator settings for seeding policy, cleanup, queue concurrency, and engine throttling. Queue and policy settings apply live. Engine throttle changes are saved and apply after the service restarts.</p>
 
 @if (_isLoading)
 {
@@ -16,6 +16,7 @@
 else
 {
     <section class="mb-4">
+        <h2 class="h5">Current Engine Runtime</h2>
         <div class="row g-3">
             <div class="col-md-3">
                 <label class="form-label" for="engineRuntime">Engine Runtime</label>
@@ -36,63 +37,119 @@ else
         </div>
     </section>
 
-    <EditForm Model="this" OnValidSubmit="SaveAsync">
+    <section class="mb-4">
+        <h2 class="h5">Currently Applied Engine Throttles</h2>
+        <p class="text-muted mb-2">These are the values the running engine is using right now.</p>
         <div class="row g-3">
-            <div class="col-md-4">
-                <label class="form-label" for="seedingStopMode">Seeding Stop Mode</label>
-                <select id="seedingStopMode" class="form-select" @bind="_seedingStopMode">
-                    <option value="Unlimited">Unlimited</option>
-                    <option value="StopImmediately">StopImmediately</option>
-                    <option value="StopAfterRatio">StopAfterRatio</option>
-                    <option value="StopAfterTime">StopAfterTime</option>
-                    <option value="StopAfterRatioOrTime">StopAfterRatioOrTime</option>
-                </select>
+            <div class="col-md-3">
+                <label class="form-label" for="appliedMaxConnections">Current Max Connections</label>
+                <input id="appliedMaxConnections" class="form-control" value="@_appliedMaxConnections.ToString(CultureInfo.InvariantCulture)" readonly />
             </div>
-            <div class="col-md-4">
-                <label class="form-label" for="seedingStopRatio">Seeding Stop Ratio</label>
-                <input id="seedingStopRatio" class="form-control" type="number" min="0.01" step="0.01" @bind="_seedingStopRatio" />
+            <div class="col-md-3">
+                <label class="form-label" for="appliedHalfOpenConnections">Current Half-Open Connections</label>
+                <input id="appliedHalfOpenConnections" class="form-control" value="@_appliedHalfOpenConnections.ToString(CultureInfo.InvariantCulture)" readonly />
             </div>
-            <div class="col-md-4">
-                <label class="form-label" for="seedingStopMinutes">Seeding Stop Minutes</label>
-                <input id="seedingStopMinutes" class="form-control" type="number" min="1" step="1" @bind="_seedingStopMinutes" />
+            <div class="col-md-3">
+                <label class="form-label" for="appliedDownloadRate">Current Max Download Rate</label>
+                <input id="appliedDownloadRate" class="form-control" value="@FormatRateLimit(_appliedDownloadRateBytesPerSecond)" readonly />
             </div>
-            <div class="col-md-6">
-                <label class="form-label" for="cleanupMode">Completed Torrent Cleanup Mode</label>
-                <select id="cleanupMode" class="form-select" @bind="_completedTorrentCleanupMode">
-                    <option value="Never">Never</option>
-                    <option value="AfterCompletedMinutes">AfterCompletedMinutes</option>
-                </select>
-                <div class="form-text">Automatic cleanup only removes TorrentCore tracking. It never deletes downloaded data.</div>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="cleanupMinutes">Completed Torrent Cleanup Minutes</label>
-                <input id="cleanupMinutes" class="form-control" type="number" min="0" step="1" @bind="_completedTorrentCleanupMinutes" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="burstLimit">Connection Failure Burst Limit</label>
-                <input id="burstLimit" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogBurstLimit" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="windowSeconds">Connection Failure Window Seconds</label>
-                <input id="windowSeconds" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogWindowSeconds" />
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="maxActiveMetadataResolutions">Max Active Metadata Resolutions</label>
-                <input id="maxActiveMetadataResolutions" class="form-control" type="number" min="1" step="1" @bind="_maxActiveMetadataResolutions" />
-                <div class="form-text">New magnets are still accepted immediately. Extra unresolved torrents wait in queue until a metadata slot opens.</div>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label" for="maxActiveDownloads">Max Active Downloads</label>
-                <input id="maxActiveDownloads" class="form-control" type="number" min="1" step="1" @bind="_maxActiveDownloads" />
-                <div class="form-text">Resolved torrents above this limit stay queued until a download slot opens.</div>
+            <div class="col-md-3">
+                <label class="form-label" for="appliedUploadRate">Current Max Upload Rate</label>
+                <input id="appliedUploadRate" class="form-control" value="@FormatRateLimit(_appliedUploadRateBytesPerSecond)" readonly />
             </div>
         </div>
+    </section>
 
+    <EditForm Model="this" OnValidSubmit="SaveAsync">
+        <section class="mb-4">
+            <h2 class="h5">Live Policy Settings</h2>
+            <p class="text-muted mb-2">These settings take effect without restarting the service.</p>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="seedingStopMode">Seeding Stop Mode</label>
+                    <select id="seedingStopMode" class="form-select" @bind="_seedingStopMode">
+                        <option value="Unlimited">Unlimited</option>
+                        <option value="StopImmediately">StopImmediately</option>
+                        <option value="StopAfterRatio">StopAfterRatio</option>
+                        <option value="StopAfterTime">StopAfterTime</option>
+                        <option value="StopAfterRatioOrTime">StopAfterRatioOrTime</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="seedingStopRatio">Seeding Stop Ratio</label>
+                    <input id="seedingStopRatio" class="form-control" type="number" min="0.01" step="0.01" @bind="_seedingStopRatio" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="seedingStopMinutes">Seeding Stop Minutes</label>
+                    <input id="seedingStopMinutes" class="form-control" type="number" min="1" step="1" @bind="_seedingStopMinutes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="cleanupMode">Completed Torrent Cleanup Mode</label>
+                    <select id="cleanupMode" class="form-select" @bind="_completedTorrentCleanupMode">
+                        <option value="Never">Never</option>
+                        <option value="AfterCompletedMinutes">AfterCompletedMinutes</option>
+                    </select>
+                    <div class="form-text">Automatic cleanup only removes TorrentCore tracking. It never deletes downloaded data.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="cleanupMinutes">Completed Torrent Cleanup Minutes</label>
+                    <input id="cleanupMinutes" class="form-control" type="number" min="0" step="1" @bind="_completedTorrentCleanupMinutes" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="burstLimit">Connection Failure Burst Limit</label>
+                    <input id="burstLimit" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogBurstLimit" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="windowSeconds">Connection Failure Window Seconds</label>
+                    <input id="windowSeconds" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogWindowSeconds" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="maxActiveMetadataResolutions">Max Active Metadata Resolutions</label>
+                    <input id="maxActiveMetadataResolutions" class="form-control" type="number" min="1" step="1" @bind="_maxActiveMetadataResolutions" />
+                    <div class="form-text">New magnets are still accepted immediately. Extra unresolved torrents wait in queue until a metadata slot opens.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="maxActiveDownloads">Max Active Downloads</label>
+                    <input id="maxActiveDownloads" class="form-control" type="number" min="1" step="1" @bind="_maxActiveDownloads" />
+                    <div class="form-text">Resolved torrents above this limit stay queued until a download slot opens.</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-4">
+            <h2 class="h5">Saved Engine Throttle Settings</h2>
+            <p class="text-muted mb-2">These values are saved immediately but only apply after `TorrentCore.Service` restarts.</p>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label" for="engineMaximumConnections">Saved Max Connections</label>
+                    <input id="engineMaximumConnections" class="form-control" type="number" min="1" step="1" @bind="_engineMaximumConnections" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="engineMaximumHalfOpenConnections">Saved Max Half-Open Connections</label>
+                    <input id="engineMaximumHalfOpenConnections" class="form-control" type="number" min="1" step="1" @bind="_engineMaximumHalfOpenConnections" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="engineMaximumDownloadRate">Saved Max Download Rate</label>
+                    <input id="engineMaximumDownloadRate" class="form-control" type="number" min="0" step="1" @bind="_engineMaximumDownloadRateBytesPerSecond" />
+                    <div class="form-text">Use `0` for unlimited.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="engineMaximumUploadRate">Saved Max Upload Rate</label>
+                    <input id="engineMaximumUploadRate" class="form-control" type="number" min="0" step="1" @bind="_engineMaximumUploadRateBytesPerSecond" />
+                    <div class="form-text">Use `0` for unlimited.</div>
+                </div>
+            </div>
+        </section>
         <div class="mt-3 d-flex gap-2">
             <button class="btn btn-primary" type="submit" disabled="@_isSaving">Save Settings</button>
             <button class="btn btn-secondary" type="button" @onclick="LoadAsync" disabled="@_isSaving">Reload</button>
         </div>
     </EditForm>
+
+    @if (_engineSettingsRequireRestart)
+    {
+        <p class="mt-3 text-warning">Saved engine throttle settings are pending. Restart `TorrentCore.Service` to apply them.</p>
+    }
 
     @if (!string.IsNullOrWhiteSpace(_message))
     {
@@ -121,8 +178,17 @@ else
     private int _completedTorrentCleanupMinutes = 60;
     private int _engineConnectionFailureLogBurstLimit = 5;
     private int _engineConnectionFailureLogWindowSeconds = 60;
+    private int _engineMaximumConnections = 150;
+    private int _engineMaximumHalfOpenConnections = 8;
+    private int _engineMaximumDownloadRateBytesPerSecond;
+    private int _engineMaximumUploadRateBytesPerSecond;
     private int _maxActiveMetadataResolutions = 4;
     private int _maxActiveDownloads = 4;
+    private int _appliedMaxConnections = 150;
+    private int _appliedHalfOpenConnections = 8;
+    private int _appliedDownloadRateBytesPerSecond;
+    private int _appliedUploadRateBytesPerSecond;
+    private bool _engineSettingsRequireRestart;
 
     protected override async Task OnInitializedAsync()
     {
@@ -173,12 +239,18 @@ else
                 CompletedTorrentCleanupMinutes = _completedTorrentCleanupMinutes,
                 EngineConnectionFailureLogBurstLimit = _engineConnectionFailureLogBurstLimit,
                 EngineConnectionFailureLogWindowSeconds = _engineConnectionFailureLogWindowSeconds,
+                EngineMaximumConnections = _engineMaximumConnections,
+                EngineMaximumHalfOpenConnections = _engineMaximumHalfOpenConnections,
+                EngineMaximumDownloadRateBytesPerSecond = _engineMaximumDownloadRateBytesPerSecond,
+                EngineMaximumUploadRateBytesPerSecond = _engineMaximumUploadRateBytesPerSecond,
                 MaxActiveMetadataResolutions = _maxActiveMetadataResolutions,
                 MaxActiveDownloads = _maxActiveDownloads,
             });
 
             Apply(settings);
-            _message = "Runtime settings saved.";
+            _message = settings.EngineSettingsRequireRestart
+                ? "Runtime settings saved. Restart TorrentCore.Service to apply the engine throttle changes."
+                : "Runtime settings saved.";
         }
         catch (Exception exception)
         {
@@ -205,7 +277,19 @@ else
         _completedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes;
         _engineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit;
         _engineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds;
+        _engineMaximumConnections = settings.EngineMaximumConnections;
+        _engineMaximumHalfOpenConnections = settings.EngineMaximumHalfOpenConnections;
+        _engineMaximumDownloadRateBytesPerSecond = settings.EngineMaximumDownloadRateBytesPerSecond;
+        _engineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond;
         _maxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions;
         _maxActiveDownloads = settings.MaxActiveDownloads;
+        _appliedMaxConnections = settings.AppliedEngineMaximumConnections;
+        _appliedHalfOpenConnections = settings.AppliedEngineMaximumHalfOpenConnections;
+        _appliedDownloadRateBytesPerSecond = settings.AppliedEngineMaximumDownloadRateBytesPerSecond;
+        _appliedUploadRateBytesPerSecond = settings.AppliedEngineMaximumUploadRateBytesPerSecond;
+        _engineSettingsRequireRestart = settings.EngineSettingsRequireRestart;
     }
+
+    private static string FormatRateLimit(int bytesPerSecond) =>
+        bytesPerSecond <= 0 ? "Unlimited" : $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
 }
