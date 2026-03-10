@@ -1,4 +1,4 @@
-namespace TorrentCore.Contracts.Health;
+namespace TorrentCore.Contracts.Diagnostics;
 
 public sealed class ServiceHealthDto
 {

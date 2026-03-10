@@ -1,5 +1,7 @@
 ﻿@page "/"
 @inject TorrentCoreClient TorrentCoreClient
+@using TorrentCore.Contracts.Host
+@using TorrentCore.Contracts.Torrents
 
 <PageTitle>TorrentCore</PageTitle>
 
@@ -9,20 +11,76 @@
 
 @if (_isLoading)
 {
-    <p>Checking service health...</p>
+    <p>Loading host status and torrent list...</p>
 }
 else if (!string.IsNullOrWhiteSpace(_error))
 {
     <p>@_error</p>
 }
-else if (_health is not null)
+else
 {
+    if (_hostStatus is not null)
+    {
+        <section>
+            <h2>Host Status</h2>
+            <p>Status: @_hostStatus.Status</p>
+            <p>Service: @_hostStatus.ServiceName</p>
+            <p>Version: @_hostStatus.ServiceVersion</p>
+            <p>Environment: @_hostStatus.EnvironmentName</p>
+            <p>Download Root: @_hostStatus.DownloadRootPath</p>
+            <p>Torrents: @_hostStatus.TorrentCount</p>
+            <p>Checked: @_hostStatus.CheckedAtUtc.ToLocalTime()</p>
+        </section>
+    }
+
     <section>
-        <h2>Service Health</h2>
-        <p>Status: @_health.Status</p>
-        <p>Service: @_health.ServiceName</p>
-        <p>Environment: @_health.EnvironmentName</p>
-        <p>Checked: @_health.CheckedAtUtc.ToLocalTime()</p>
+        <h2>Add Magnet</h2>
+
+        @if (!string.IsNullOrWhiteSpace(_submitMessage))
+        {
+            <p>@_submitMessage</p>
+        }
+
+        <div class="mb-3">
+            <label class="form-label" for="magnetUri">Magnet URI</label>
+            <input id="magnetUri" class="form-control" @bind="_magnetUri" />
+        </div>
+        <button class="btn btn-primary" @onclick="AddMagnetAsync" disabled="@_isSubmitting">Add Torrent</button>
+    </section>
+
+    <section class="mt-4">
+        <h2>Current Torrents</h2>
+
+        @if (_torrents.Count == 0)
+        {
+            <p>No torrents are currently tracked on this host.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Down</th>
+                    <th>Up</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var torrent in _torrents)
+                {
+                    <tr>
+                        <td>@torrent.Name</td>
+                        <td>@torrent.State</td>
+                        <td>@torrent.ProgressPercent.ToString("0.0")%</td>
+                        <td>@FormatRate(torrent.DownloadRateBytesPerSecond)</td>
+                        <td>@FormatRate(torrent.UploadRateBytesPerSecond)</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
     </section>
 }
 
@@ -45,19 +103,26 @@ else if (_health is not null)
 </section>
 
 @code {
-    private ServiceHealthDto? _health;
+    private EngineHostStatusDto? _hostStatus;
+    private IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
     private string? _error;
+    private string? _submitMessage;
     private bool _isLoading = true;
+    private bool _isSubmitting;
+    private string _magnetUri = "magnet:?xt=urn:btih:1234567890ABCDEF1234567890ABCDEF12345678&dn=Phase%200%20Sample";
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
         try
         {
-            _health = await TorrentCoreClient.GetHealthAsync();
-            if (_health is null)
-            {
-                _error = "TorrentCore service returned no health payload.";
-            }
+            _error = null;
+            _hostStatus = await TorrentCoreClient.GetHostStatusAsync();
+            _torrents = await TorrentCoreClient.GetTorrentsAsync();
         }
         catch (Exception ex)
         {
@@ -67,5 +132,40 @@ else if (_health is not null)
         {
             _isLoading = false;
         }
+    }
+
+    private async Task AddMagnetAsync()
+    {
+        _isSubmitting = true;
+        _submitMessage = null;
+
+        try
+        {
+            var torrent = await TorrentCoreClient.AddMagnetAsync(new AddMagnetRequest
+            {
+                MagnetUri = _magnetUri,
+            });
+
+            _submitMessage = $"Added torrent '{torrent.Name}' in state '{torrent.State}'.";
+            _magnetUri = string.Empty;
+            await LoadAsync();
+        }
+        catch (TorrentCoreClientException ex)
+        {
+            _submitMessage = ex.ServiceError?.Message ?? ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _submitMessage = $"Unable to add torrent: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private static string FormatRate(long bytesPerSecond)
+    {
+        return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
     }
 }

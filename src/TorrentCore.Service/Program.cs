@@ -1,8 +1,11 @@
+using TorrentCore.Service.Application;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton<ITorrentApplicationService, InMemoryTorrentApplicationService>();
 
 var app = builder.Build();
 
@@ -15,3 +18,7 @@ app.UseHttpsRedirection();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program
+{
+}

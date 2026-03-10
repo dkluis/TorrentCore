@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using TorrentCore.Contracts.Health;
+using TorrentCore.Contracts.Diagnostics;
 
 namespace TorrentCore.Service.Controllers;
 
