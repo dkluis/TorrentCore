@@ -37,6 +37,7 @@ Status as of March 10, 2026:
 - MonoTorrent partial-file handling and configurable seeding-stop policy are implemented
 - operator-managed global queue concurrency settings are implemented for active metadata resolutions and active downloads
 - startup-configured global MonoTorrent network throttling controls are implemented for overall connection count, half-open connection count, download rate, and upload rate
+- host status now includes a runtime-state breakdown so operators can see how many torrents are actively resolving metadata, queued for metadata, downloading, queued for download, seeding, paused, completed, or errored
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
@@ -76,6 +77,8 @@ Current service configuration section:
 - engine-level MonoTorrent network throttling is currently startup-configured and exposed through diagnostics; moving those controls into live operator management should be handled in a later slice because they are engine-initialization settings
 - the operator settings reference now explicitly explains engine connections, half-open connections, and how global upload/download rates are measured so throttle controls are understandable to operators
 - the settings page now separates currently applied engine throttle values from saved restart-required throttle settings so operators do not see them as duplicate fields
+- the dashboard host-status section now exposes queue and runtime-state counts so operators can understand whether torrents are waiting on metadata capacity, waiting on download slots, actively transferring, seeding, paused, completed, or in error
+- the dashboard host-status section is now grouped into compact related cards so service, engine, queue/activity, and policy/storage information use screen width better instead of rendering as a single long vertical list
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

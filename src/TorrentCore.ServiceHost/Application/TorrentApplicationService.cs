@@ -25,6 +25,16 @@ public sealed class TorrentApplicationService(
     public async Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken)
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var torrents = await torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
+
+        var resolvingMetadataCount = torrents.Count(torrent => torrent.State == TorrentState.ResolvingMetadata);
+        var metadataQueueCount = torrents.Count(torrent => torrent.State == TorrentState.Queued && torrent.TotalBytes is null);
+        var downloadingCount = torrents.Count(torrent => torrent.State == TorrentState.Downloading);
+        var downloadQueueCount = torrents.Count(torrent => torrent.State == TorrentState.Queued && torrent.TotalBytes is not null);
+        var seedingCount = torrents.Count(torrent => torrent.State == TorrentState.Seeding);
+        var pausedCount = torrents.Count(torrent => torrent.State == TorrentState.Paused);
+        var completedCount = torrents.Count(torrent => torrent.State == TorrentState.Completed);
+        var errorCount = torrents.Count(torrent => torrent.State == TorrentState.Error);
 
         return new EngineHostStatusDto
         {
@@ -44,6 +54,14 @@ public sealed class TorrentApplicationService(
             EngineConnectionFailureLogWindowSeconds = runtimeSettings.EngineConnectionFailureLogWindowSeconds,
             MaxActiveMetadataResolutions = runtimeSettings.MaxActiveMetadataResolutions,
             MaxActiveDownloads = runtimeSettings.MaxActiveDownloads,
+            ResolvingMetadataCount = resolvingMetadataCount,
+            MetadataQueueCount = metadataQueueCount,
+            DownloadingCount = downloadingCount,
+            DownloadQueueCount = downloadQueueCount,
+            SeedingCount = seedingCount,
+            PausedCount = pausedCount,
+            CompletedCount = completedCount,
+            ErrorCount = errorCount,
             PartialFilesEnabled        = runtimeSettings.PartialFilesEnabled,
             PartialFileSuffix          = runtimeSettings.PartialFileSuffix,
             SeedingStopMode            = runtimeSettings.SeedingStopMode.ToString(),
@@ -54,7 +72,7 @@ public sealed class TorrentApplicationService(
             Status                    = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
             EnvironmentName           = hostEnvironment.EnvironmentName,
             DownloadRootPath          = servicePaths.DownloadRootPath,
-            TorrentCount              = await torrentEngineAdapter.GetTorrentCountAsync(cancellationToken),
+            TorrentCount              = torrents.Count,
             SupportsMagnetAdds        = true,
             SupportsPause             = true,
             SupportsResume            = true,

@@ -31,6 +31,14 @@ public sealed class TorrentApiTests
         Assert.Equal(0, hostStatus.EngineMaximumUploadRateBytesPerSecond);
         Assert.Equal(4, hostStatus.MaxActiveMetadataResolutions);
         Assert.Equal(4, hostStatus.MaxActiveDownloads);
+        Assert.Equal(0, hostStatus.ResolvingMetadataCount);
+        Assert.Equal(0, hostStatus.MetadataQueueCount);
+        Assert.Equal(0, hostStatus.DownloadingCount);
+        Assert.Equal(0, hostStatus.DownloadQueueCount);
+        Assert.Equal(0, hostStatus.SeedingCount);
+        Assert.Equal(0, hostStatus.PausedCount);
+        Assert.Equal(0, hostStatus.CompletedCount);
+        Assert.Equal(0, hostStatus.ErrorCount);
         Assert.True(hostStatus.PartialFilesEnabled);
         Assert.Equal(".!mt", hostStatus.PartialFileSuffix);
         Assert.Equal(SeedingStopMode.Unlimited.ToString(), hostStatus.SeedingStopMode);
@@ -516,6 +524,40 @@ public sealed class TorrentApiTests
         Assert.NotNull(torrents);
         Assert.Contains(torrents, torrent => torrent.State == TorrentState.ResolvingMetadata);
         Assert.Contains(torrents, torrent => torrent.State == TorrentState.Queued);
+    }
+
+    [Fact]
+    public async Task GetHostStatus_ReportsQueueAndRuntimeStateBreakdown()
+    {
+        await using var factory = CreateFactory(
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 5_000,
+            maxActiveMetadataResolutions: 1);
+        using var httpClient = factory.CreateClient();
+
+        await AddMagnetAsync(httpClient, "3131313131313131313131313131313131313131", "Status One");
+        await AddMagnetAsync(httpClient, "4141414141414141414141414141414141414141", "Status Two");
+
+        var hostStatus = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status"),
+            status => status is not null &&
+                      status.TorrentCount == 2 &&
+                      status.ResolvingMetadataCount == 1 &&
+                      status.MetadataQueueCount == 1 &&
+                      status.DownloadingCount == 0 &&
+                      status.DownloadQueueCount == 0,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(hostStatus);
+        Assert.Equal(2, hostStatus.TorrentCount);
+        Assert.Equal(1, hostStatus.ResolvingMetadataCount);
+        Assert.Equal(1, hostStatus.MetadataQueueCount);
+        Assert.Equal(0, hostStatus.DownloadingCount);
+        Assert.Equal(0, hostStatus.DownloadQueueCount);
+        Assert.Equal(0, hostStatus.SeedingCount);
+        Assert.Equal(0, hostStatus.PausedCount);
+        Assert.Equal(0, hostStatus.CompletedCount);
+        Assert.Equal(0, hostStatus.ErrorCount);
     }
 
     [Fact]
