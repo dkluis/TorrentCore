@@ -61,10 +61,13 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<TorrentActionResultDto>> Remove(
         Guid torrentId,
-        [FromBody] RemoveTorrentRequest request,
+        [FromBody] RemoveTorrentRequest? request,
         CancellationToken cancellationToken)
     {
-        var result = await torrentApplicationService.RemoveAsync(torrentId, request, cancellationToken);
+        var result = await torrentApplicationService.RemoveAsync(
+            torrentId,
+            request ?? new RemoveTorrentRequest(),
+            cancellationToken);
         return Ok(result);
     }
 }

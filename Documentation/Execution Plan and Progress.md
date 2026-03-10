@@ -471,6 +471,7 @@ Completed:
 - added persisted runtime settings in SQLite for live-editable seeding policy and engine connection-failure log throttling
 - added host API endpoints and client support to retrieve and update effective runtime settings without editing appsettings by hand
 - added a dedicated web settings page so operators can manage the supported live settings through the UI and have them survive restart
+- fixed the torrent remove API so callers can omit the request body and still get the default safe behavior of removing the torrent record without deleting data
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
