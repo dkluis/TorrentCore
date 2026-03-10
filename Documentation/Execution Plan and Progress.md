@@ -465,6 +465,9 @@ Completed:
 - added configurable seeding stop policies covering unlimited seeding, immediate stop, ratio stop, time stop, and ratio-or-time stop
 - persisted upload totals and seeding-start timestamps so seeding policies can survive restart instead of resetting on each process start
 - surfaced partial-file and seeding-policy settings through host status for future UI management
+- added a dedicated web logs page with filtering, local-time rendering, and refresh support so operators can inspect diagnostics without Swagger or direct SQLite access
+- tightened the web logs page filter behavior so dropdown changes apply immediately, text filters use current typed values, and Enter/apply actions refresh deterministically
+- fixed the web admin shell render mode so route pages are actually interactive in the browser instead of static server-rendered snapshots, which unblocked logs filtering and timed refresh behavior
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -477,3 +480,4 @@ Next:
 - continue building the operator-facing path so current MonoTorrent configuration can later move from config files into the web UI
 - implement `.part` incomplete-file handling and configurable seeding stop rules as the next operational storage/runtime slice
 - extend the UI from diagnostics-only exposure of partial-file and seeding policy settings into actual operator-managed configuration
+- continue expanding the web admin surface from host status into richer operator diagnostics and controls

@@ -1,0 +1,270 @@
+@page "/logs"
+@implements IAsyncDisposable
+@inject TorrentCoreClient TorrentCoreClient
+@using System.Globalization
+
+<PageTitle>Logs</PageTitle>
+
+<h1>Logs</h1>
+
+<p>Operational and engine activity logs rendered in local time.</p>
+
+<section class="mb-4">
+    <div class="row g-3">
+        <div class="col-md-2">
+            <label class="form-label" for="take">Rows</label>
+            <select id="take" class="form-select" @bind="_take" @bind:after="ApplyFiltersAsync">
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="level">Level</label>
+            <select id="level" class="form-select" @bind="_level" @bind:after="ApplyFiltersAsync">
+                <option value="">All</option>
+                <option value="Information">Information</option>
+                <option value="Warning">Warning</option>
+                <option value="Error">Error</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="category">Category</label>
+            <select id="category" class="form-select" @bind="_category" @bind:after="ApplyFiltersAsync">
+                <option value="">All</option>
+                <option value="startup">startup</option>
+                <option value="engine">engine</option>
+                <option value="torrent">torrent</option>
+                <option value="runtime">runtime</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="eventType">Event Type</label>
+            <input id="eventType"
+                   class="form-control"
+                   placeholder="Exact event type"
+                   @bind="_eventType"
+                   @bind:event="oninput"
+                   @onkeydown="HandleFilterKeyDownAsync" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="torrentId">Torrent Id</label>
+            <input id="torrentId"
+                   class="form-control"
+                   placeholder="Exact torrent GUID"
+                   @bind="_torrentIdText"
+                   @bind:event="oninput"
+                   @onkeydown="HandleFilterKeyDownAsync" />
+        </div>
+    </div>
+
+    <div class="mt-3 d-flex gap-2">
+        <button class="btn btn-primary" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply Filters</button>
+        <button class="btn btn-secondary" @onclick="ClearFiltersAsync">Clear Filters</button>
+        <div class="form-check align-self-center">
+            <input id="autoRefresh" class="form-check-input" type="checkbox" @bind="_autoRefresh" />
+            <label class="form-check-label" for="autoRefresh">Auto refresh</label>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_filterError))
+    {
+        <p class="mt-2 text-danger">@_filterError</p>
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <p class="mt-2 text-danger">@_error</p>
+    }
+    else if (_lastRefreshedAtLocal is not null)
+    {
+        <p class="mt-2 text-muted">Last refreshed: @_lastRefreshedAtLocal.Value.ToString("g", CultureInfo.CurrentCulture)</p>
+    }
+</section>
+
+@if (_isLoading)
+{
+    <p>Loading logs...</p>
+}
+else if (_logs.Count == 0)
+{
+    <p>No log entries matched the current filters.</p>
+}
+else
+{
+    <table class="table table-sm align-middle">
+        <thead>
+        <tr>
+            <th>When</th>
+            <th>Level</th>
+            <th>Category</th>
+            <th>Event</th>
+            <th>Message</th>
+            <th>Torrent</th>
+            <th>Details</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var log in _logs)
+        {
+            <tr>
+                <td>@log.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
+                <td>@log.Level</td>
+                <td>@log.Category</td>
+                <td><code>@log.EventType</code></td>
+                <td>@log.Message</td>
+                <td>@FormatGuid(log.TorrentId)</td>
+                <td>
+                    @if (!string.IsNullOrWhiteSpace(log.DetailsJson))
+                    {
+                        <details>
+                            <summary>Show</summary>
+                            <pre class="mb-0"><code>@log.DetailsJson</code></pre>
+                        </details>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<ActivityLogEntryDto> _logs = Array.Empty<ActivityLogEntryDto>();
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private CancellationTokenSource? _refreshLoopCts;
+    private Task? _refreshLoopTask;
+    private string? _error;
+    private string? _filterError;
+    private bool _isLoading = true;
+    private bool _autoRefresh = true;
+    private int _take = 100;
+    private string _level = string.Empty;
+    private string _category = string.Empty;
+    private string _eventType = string.Empty;
+    private string _torrentIdText = string.Empty;
+    private DateTimeOffset? _lastRefreshedAtLocal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _refreshLoopCts = new CancellationTokenSource();
+        _refreshLoopTask = RunRefreshLoopAsync(_refreshLoopCts.Token);
+    }
+
+    private async Task LoadAsync()
+    {
+        Guid? torrentId = null;
+        _filterError = null;
+
+        if (!string.IsNullOrWhiteSpace(_torrentIdText))
+        {
+            if (!Guid.TryParse(_torrentIdText, out var parsedTorrentId))
+            {
+                _filterError = "Torrent Id must be a valid GUID.";
+                _logs = Array.Empty<ActivityLogEntryDto>();
+                _isLoading = false;
+                return;
+            }
+
+            torrentId = parsedTorrentId;
+        }
+
+        await _loadGate.WaitAsync();
+
+        try
+        {
+            _isLoading = true;
+            _error = null;
+            _logs = await TorrentCoreClient.GetRecentLogsAsync(
+                take: _take,
+                category: NullIfWhiteSpace(_category),
+                eventType: NullIfWhiteSpace(_eventType),
+                level: NullIfWhiteSpace(_level),
+                torrentId: torrentId);
+            _lastRefreshedAtLocal = DateTimeOffset.Now;
+        }
+        catch (Exception exception)
+        {
+            _error = $"Unable to load logs: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            _loadGate.Release();
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _take = 100;
+        _level = string.Empty;
+        _category = string.Empty;
+        _eventType = string.Empty;
+        _torrentIdText = string.Empty;
+        _filterError = null;
+        await ApplyFiltersAsync();
+    }
+
+    private async Task HandleFilterKeyDownAsync(KeyboardEventArgs eventArgs)
+    {
+        if (!string.Equals(eventArgs.Key, "Enter", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await ApplyFiltersAsync();
+    }
+
+    private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            if (!_autoRefresh)
+            {
+                continue;
+            }
+
+            await InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private static string? NullIfWhiteSpace(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string FormatGuid(Guid? value) =>
+        value?.ToString("D")[..8] ?? string.Empty;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_refreshLoopCts is not null)
+        {
+            await _refreshLoopCts.CancelAsync();
+            _refreshLoopCts.Dispose();
+        }
+
+        if (_refreshLoopTask is not null)
+        {
+            try
+            {
+                await _refreshLoopTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _loadGate.Dispose();
+    }
+}
