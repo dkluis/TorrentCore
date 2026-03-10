@@ -348,6 +348,8 @@ Changes:
 - added engine-mode selection so the host can switch between the fake runtime and a real MonoTorrent-backed runtime
 - added a first MonoTorrent-backed adapter with add/recover/pause/resume/remove and persisted state synchronization
 - added host-status visibility for the active engine runtime
+- added MonoTorrent runtime observability through persisted engine activity logs for state changes, peer discovery, and connection failures
+- corrected persisted `DownloadedBytes` in MonoTorrent mode to be derived from synchronized torrent progress instead of session-only transfer counters
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -364,6 +366,7 @@ Assumptions:
 - persisted fake-engine recovery currently normalizes `ResolvingMetadata`, `Downloading`, and `Seeding` to `Queued` on startup and clears active transfer counters
 - the current fake runtime now simulates metadata resolution and download progression using deterministic background processing and persisted snapshots
 - the current MonoTorrent integration is the first real-engine slice and currently focuses on magnet add, host recovery, lifecycle commands, and persisted state synchronization without expanding the public DTOs
+- MonoTorrent runtime events are now written to the persistent activity log under the `engine` category so operators can inspect real engine behavior through the existing logs API
 
 Progress:
 - planning completed
@@ -415,6 +418,7 @@ Completed:
 - added restart-recovery logging and recovery normalization tests for persisted torrent state
 - added managed fake-runtime processing and tests for automatic metadata resolution, queued download start, and completion
 - added MonoTorrent package integration and test coverage for the real engine mode while preserving deterministic fake-mode API tests
+- added MonoTorrent engine-event log coverage and strengthened real-engine synchronization fidelity
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -424,3 +428,4 @@ Next:
 - expand persisted torrent state beyond the current fake-engine shape toward actual runtime metadata and engine-session recovery
 - replace the managed fake runtime with a real MonoTorrent-backed adapter while preserving the public contracts
 - extend the MonoTorrent-backed slice with richer runtime diagnostics, explicit configuration, and more complete restart recovery semantics
+- add explicit MonoTorrent host configuration such as listen/DHT settings and surface those values through host diagnostics

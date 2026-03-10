@@ -1,7 +1,9 @@
 using MonoTorrent;
 using MonoTorrent.Client;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using TorrentCore.Contracts.Torrents;
+using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
 using TorrentCore.Service.Configuration;
@@ -11,12 +13,15 @@ namespace TorrentCore.Service.Engine;
 
 public sealed class MonoTorrentEngineAdapter(
     ITorrentStateStore torrentStateStore,
+    IActivityLogService activityLogService,
     ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
+    ServiceInstanceContext serviceInstanceContext,
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Dictionary<Guid, TorrentManager> _managers = new();
+    private readonly HashSet<Guid> _observedTorrentIds = [];
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
 
     private ClientEngine? _engine;
@@ -68,6 +73,7 @@ public sealed class MonoTorrentEngineAdapter(
 
             await _engine.StopAllAsync(TimeSpan.FromSeconds(2));
             _managers.Clear();
+            _observedTorrentIds.Clear();
             _recovered = false;
             _lastRecoveryResult = null;
         }
@@ -249,11 +255,13 @@ public sealed class MonoTorrentEngineAdapter(
 
         var now = DateTimeOffset.UtcNow;
         var manager = await _engine!.AddAsync(magnet, downloadRootPath);
+        var torrentId = Guid.NewGuid();
+        RegisterManager(torrentId, manager);
         await manager.StartAsync();
 
         var snapshot = new TorrentSnapshot
         {
-            TorrentId = Guid.NewGuid(),
+            TorrentId = torrentId,
             Name = string.IsNullOrWhiteSpace(magnet.Name) ? $"Magnet {infoHash[..8]}" : magnet.Name,
             State = ContractTorrentState.ResolvingMetadata,
             MagnetUri = request.MagnetUri.Trim(),
@@ -361,6 +369,7 @@ public sealed class MonoTorrentEngineAdapter(
         try
         {
             _managers.Remove(torrentId);
+            _observedTorrentIds.Remove(torrentId);
         }
         finally
         {
@@ -430,6 +439,7 @@ public sealed class MonoTorrentEngineAdapter(
 
         var magnet = MagnetLink.Parse(snapshot.MagnetUri);
         var manager = await _engine!.AddAsync(magnet, snapshot.SavePath);
+        RegisterManager(snapshot.TorrentId, manager);
         _managers[snapshot.TorrentId] = manager;
         return manager;
     }
@@ -477,6 +487,7 @@ public sealed class MonoTorrentEngineAdapter(
         var savePath = manager.HasMetadata && !string.IsNullOrWhiteSpace(manager.ContainingDirectory)
             ? manager.ContainingDirectory
             : manager.SavePath;
+        var downloadedBytes = CalculateDownloadedBytes(totalBytes, manager.Progress, existing.DownloadedBytes);
 
         if (manager.HasMetadata && state == ContractTorrentState.ResolvingMetadata)
         {
@@ -492,7 +503,7 @@ public sealed class MonoTorrentEngineAdapter(
             InfoHash = manager.InfoHashes.V1OrV2.ToHex().ToUpperInvariant(),
             SavePath = savePath,
             ProgressPercent = manager.Progress,
-            DownloadedBytes = manager.Monitor.DataBytesReceived,
+            DownloadedBytes = downloadedBytes,
             TotalBytes = totalBytes,
             DownloadRateBytesPerSecond = manager.Monitor.DownloadRate,
             UploadRateBytesPerSecond = manager.Monitor.UploadRate,
@@ -505,6 +516,115 @@ public sealed class MonoTorrentEngineAdapter(
             LastActivityAtUtc = now,
             ErrorMessage = manager.Error?.Reason.ToString() ?? existing.ErrorMessage,
         };
+    }
+
+    private void RegisterManager(Guid torrentId, TorrentManager manager)
+    {
+        if (!_observedTorrentIds.Add(torrentId))
+        {
+            return;
+        }
+
+        manager.TorrentStateChanged += (_, eventArgs) => _ = HandleTorrentStateChangedAsync(torrentId, eventArgs);
+        manager.PeersFound += (_, eventArgs) => _ = HandlePeersFoundAsync(torrentId, eventArgs);
+        manager.ConnectionAttemptFailed += (_, eventArgs) => _ = HandleConnectionAttemptFailedAsync(torrentId, eventArgs);
+    }
+
+    private async Task HandleTorrentStateChangedAsync(Guid torrentId, TorrentStateChangedEventArgs eventArgs)
+    {
+        try
+        {
+            var snapshot = await torrentStateStore.GetAsync(torrentId, CancellationToken.None);
+            if (snapshot is not null)
+            {
+                var updatedSnapshot = CreateUpdatedSnapshot(snapshot, eventArgs.TorrentManager, DateTimeOffset.UtcNow);
+                await torrentStateStore.UpdateAsync(updatedSnapshot, CancellationToken.None);
+            }
+
+            await activityLogService.WriteAsync(new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Information,
+                Category = "engine",
+                EventType = "torrent.engine.state_changed",
+                Message = $"Torrent engine state changed from '{eventArgs.OldState}' to '{eventArgs.NewState}'.",
+                TorrentId = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(new
+                {
+                    OldState = eventArgs.OldState.ToString(),
+                    NewState = eventArgs.NewState.ToString(),
+                    ContractState = MapState(eventArgs.TorrentManager, snapshot?.State ?? ContractTorrentState.Queued).ToString(),
+                    HasMetadata = eventArgs.TorrentManager.HasMetadata,
+                    ProgressPercent = eventArgs.TorrentManager.Progress,
+                }),
+            }, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(exception, "Failed handling MonoTorrent state change event for torrent {TorrentId}", torrentId);
+        }
+    }
+
+    private async Task HandlePeersFoundAsync(Guid torrentId, PeersAddedEventArgs eventArgs)
+    {
+        try
+        {
+            await activityLogService.WriteAsync(new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Information,
+                Category = "engine",
+                EventType = "torrent.engine.peers_found",
+                Message = $"MonoTorrent discovered {eventArgs.NewPeers} new peer(s).",
+                TorrentId = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(new
+                {
+                    eventArgs.NewPeers,
+                    eventArgs.ExistingPeers,
+                    OpenConnections = eventArgs.TorrentManager.OpenConnections,
+                }),
+            }, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(exception, "Failed handling MonoTorrent peers-found event for torrent {TorrentId}", torrentId);
+        }
+    }
+
+    private async Task HandleConnectionAttemptFailedAsync(Guid torrentId, ConnectionAttemptFailedEventArgs eventArgs)
+    {
+        try
+        {
+            await activityLogService.WriteAsync(new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Warning,
+                Category = "engine",
+                EventType = "torrent.engine.connection_failed",
+                Message = $"MonoTorrent connection attempt failed with reason '{eventArgs.Reason}'.",
+                TorrentId = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(new
+                {
+                    Reason = eventArgs.Reason.ToString(),
+                    PeerUri = eventArgs.Peer.ConnectionUri?.ToString(),
+                }),
+            }, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(exception, "Failed handling MonoTorrent connection-failed event for torrent {TorrentId}", torrentId);
+        }
+    }
+
+    private static long CalculateDownloadedBytes(long? totalBytes, double progressPercent, long existingDownloadedBytes)
+    {
+        if (totalBytes is null)
+        {
+            return existingDownloadedBytes;
+        }
+
+        var boundedProgress = Math.Clamp(progressPercent, 0, 100);
+        return (long)Math.Round(totalBytes.Value * (boundedProgress / 100d), MidpointRounding.AwayFromZero);
     }
 
     private static ContractTorrentState MapState(TorrentManager manager, ContractTorrentState existingState)

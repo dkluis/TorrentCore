@@ -101,6 +101,27 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_WritesEngineLifecycleLogs()
+    {
+        await using var factory = CreateFactory(engineMode: TorrentEngineMode.MonoTorrent);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(httpClient, "8888888888888888888888888888888888888888", "MonoTorrent Logs");
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var pauseResponse = await httpClient.PostAsync($"api/torrents/{torrent!.TorrentId}/pause", content: null);
+        pauseResponse.EnsureSuccessStatusCode();
+
+        var logs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={torrent.TorrentId}"),
+            entries => entries is not null && entries.Any(entry => entry.EventType == "torrent.engine.state_changed"),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.Category == "engine" && log.EventType == "torrent.engine.state_changed");
+    }
+
+    [Fact]
     public async Task FakeRuntime_EventuallyResolvesMetadata_AndCompletesDownload()
     {
         await using var factory = CreateFactory(
