@@ -1,0 +1,71 @@
+﻿@page "/"
+@inject TorrentCoreClient TorrentCoreClient
+
+<PageTitle>TorrentCore</PageTitle>
+
+<h1>TorrentCore</h1>
+
+<p>Standalone torrent engine admin surface.</p>
+
+@if (_isLoading)
+{
+    <p>Checking service health...</p>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <p>@_error</p>
+}
+else if (_health is not null)
+{
+    <section>
+        <h2>Service Health</h2>
+        <p>Status: @_health.Status</p>
+        <p>Service: @_health.ServiceName</p>
+        <p>Environment: @_health.EnvironmentName</p>
+        <p>Checked: @_health.CheckedAtUtc.ToLocalTime()</p>
+    </section>
+}
+
+<section>
+    <h2>Current Boundary</h2>
+    <ul>
+        <li>TorrentCore owns the engine, API, persistence, and full admin UI.</li>
+        <li>TVMaze stays a lightweight client and does not own TorrentCore internals.</li>
+        <li>The first rich admin UI is Web. Avalonia can be added later if still needed.</li>
+    </ul>
+</section>
+
+<section>
+    <h2>Next Work</h2>
+    <ul>
+        <li>Define the real torrent DTO and request contracts.</li>
+        <li>Add service startup validation and configuration.</li>
+        <li>Build the add-magnet and list-torrents vertical slice.</li>
+    </ul>
+</section>
+
+@code {
+    private ServiceHealthDto? _health;
+    private string? _error;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _health = await TorrentCoreClient.GetHealthAsync();
+            if (_health is null)
+            {
+                _error = "TorrentCore service returned no health payload.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Unable to reach TorrentCore service: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
