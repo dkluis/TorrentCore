@@ -1,19 +1,25 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TorrentCore.Core.Diagnostics;
+using TorrentCore.Core.Torrents;
+using TorrentCore.Persistence.Sqlite.Schema;
 
 namespace TorrentCore.Service.Configuration;
 
 public sealed class SqlitePersistenceInitializer(
     ResolvedTorrentCoreServicePaths servicePaths,
+    SqliteSchemaMigrator sqliteSchemaMigrator,
     IActivityLogService activityLogService,
+    ITorrentStateStore torrentStateStore,
     ServiceInstanceContext serviceInstanceContext,
     IHostEnvironment hostEnvironment,
     ILogger<SqlitePersistenceInitializer> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
     {
+        await sqliteSchemaMigrator.ApplyMigrationsAsync(cancellationToken);
         await activityLogService.EnsureInitializedAsync(cancellationToken);
+        await torrentStateStore.EnsureInitializedAsync(cancellationToken);
 
         logger.LogInformation(
             "TorrentCore SQLite persistence is ready. DatabaseFilePath={DatabaseFilePath}",

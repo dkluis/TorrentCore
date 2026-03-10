@@ -34,32 +34,6 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
 
             await using var connection = CreateConnection();
             await connection.OpenAsync(cancellationToken);
-
-            var command = connection.CreateCommand();
-            command.CommandText =
-                """
-                CREATE TABLE IF NOT EXISTS activity_logs (
-                    log_entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    occurred_at_utc TEXT NOT NULL,
-                    level TEXT NOT NULL,
-                    category TEXT NOT NULL,
-                    event_type TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    torrent_id TEXT NULL,
-                    service_instance_id TEXT NULL,
-                    trace_id TEXT NULL,
-                    details_json TEXT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_activity_logs_occurred_at_utc
-                    ON activity_logs (occurred_at_utc DESC);
-
-                CREATE INDEX IF NOT EXISTS idx_activity_logs_torrent_id
-                    ON activity_logs (torrent_id);
-                """;
-
-            await command.ExecuteNonQueryAsync(cancellationToken);
-            await EnsureColumnExistsAsync(connection, "service_instance_id", "TEXT NULL", cancellationToken);
             await EnforceRetentionAsync(connection, cancellationToken);
             _isInitialized = true;
         }
@@ -221,27 +195,6 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
         }
 
         return results;
-    }
-
-    private static async Task EnsureColumnExistsAsync(SqliteConnection connection, string columnName, string columnDefinition, CancellationToken cancellationToken)
-    {
-        var command = connection.CreateCommand();
-        command.CommandText = "PRAGMA table_info(activity_logs);";
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-        }
-
-        await reader.DisposeAsync();
-
-        var alterCommand = connection.CreateCommand();
-        alterCommand.CommandText = $"ALTER TABLE activity_logs ADD COLUMN {columnName} {columnDefinition};";
-        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task EnforceRetentionAsync(SqliteConnection connection, CancellationToken cancellationToken)

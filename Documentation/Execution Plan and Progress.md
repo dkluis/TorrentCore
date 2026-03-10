@@ -28,7 +28,9 @@ Status as of March 10, 2026:
 - Swagger UI is enabled for the service in development
 - Phase 1 configuration and startup validation are implemented
 - Phase 2 persistence foundation has started with SQLite-backed activity logging
-- persistence and real engine integration are not implemented yet
+- SQLite-backed torrent state persistence is implemented for the current fake engine slice
+- tracked SQLite schema migrations are implemented
+- real engine integration is not implemented yet
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
@@ -105,6 +107,7 @@ Planned outputs:
 - repository or persistence service abstractions as needed
 - torrent state rehydration rules after restart
 - persisted diagnostic and activity log foundation
+- persisted torrent-state foundation for the current fake engine slice
 
 Exit criteria:
 - state survives restart
@@ -287,9 +290,9 @@ Reviewed and accepted on March 10, 2026:
 
 1. Extend the SQLite schema from activity logging into persisted torrent state.
 2. Define the migration strategy for future schema changes.
-3. Replace the in-memory engine adapter with a persistence-backed fake-engine slice.
-4. Add API and web surfaces for log inspection and diagnostics filtering.
-5. Prepare restart rehydration rules before real engine integration.
+3. Add API and web surfaces for log inspection and diagnostics filtering.
+4. Prepare restart rehydration rules before real engine integration.
+5. Begin mapping persisted torrent state toward real engine lifecycle integration.
 
 ## Change Log
 
@@ -322,6 +325,10 @@ Changes:
 - added a logs API endpoint and client support for reading recent logs
 - wired service startup and torrent operations into the persisted activity log
 - added log filtering, service-instance correlation, and max-entry retention controls
+- replaced the in-memory torrent engine state with SQLite-backed torrent-state persistence
+- added restart-persistence coverage for torrent state and duplicate detection across restarts
+- added tracked SQLite schema migrations through a `schema_migrations` table
+- moved schema creation responsibility out of the stores and into a dedicated migrator
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -331,8 +338,10 @@ Assumptions:
 - magnet validation is intentionally limited to public-boundary checks, not engine-level parsing completeness
 - sorting and filtering are UI/API behaviors for later work, not embedded DTO concerns
 - the current engine implementation remains in-memory and is still a placeholder for later persistence and real engine work
-- the current SQLite persistence implementation covers activity logging first, not torrent-state persistence yet
+- the current SQLite persistence implementation now covers both activity logging and fake-engine torrent state
 - log timestamps continue to be stored in UTC, while future UI surfaces must render them in local time
+- the current fake-engine behavior now persists torrent state in SQLite, but it is still not a real torrent runtime
+- schema evolution is now tracked through explicit migration versions rather than ad hoc table creation
 
 Progress:
 - planning completed
@@ -375,9 +384,14 @@ Completed:
 - added filtered log queries by level, category, event type, torrent, time window, and service instance
 - added service-instance correlation for startup and torrent activity events
 - added configurable activity-log retention through `TorrentCore:MaxActivityLogEntries`
+- added a persisted torrent-state table in SQLite
+- replaced the in-memory engine adapter with a persistence-backed fake-engine adapter
+- added tests for torrent-state survival across restart and duplicate detection across restart
+- added a tracked SQLite migration runner and schema verification tests
+- added verification that legacy activity-log schema is upgraded to the current shape
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
 
 Next:
-- expand SQLite persistence from activity logging into torrent-state persistence
+- continue toward real engine-backed state rehydration using the tracked SQLite schema foundation

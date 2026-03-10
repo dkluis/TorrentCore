@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
-using TorrentCore.Contracts;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
@@ -11,19 +10,15 @@ using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Tests;
 
-public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class TorrentApiTests
 {
-    private readonly HttpClient _httpClient;
-
-    public TorrentApiTests(WebApplicationFactory<Program> factory)
-    {
-        _httpClient = factory.WithWebHostBuilder(_ => { }).CreateClient();
-    }
-
     [Fact]
     public async Task GetHostStatus_ReturnsReadyHostContract()
     {
-        var hostStatus = await _httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
 
         Assert.NotNull(hostStatus);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
@@ -34,23 +29,11 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
     [Fact]
     public async Task GetHostStatus_UsesConfiguredPaths_AndCreatesDirectories()
     {
-        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-phase1-{Guid.NewGuid():N}");
+        var rootPath = CreateTempRootPath("torrentcore-phase2-host");
         var downloadPath = Path.Combine(rootPath, "downloads");
         var storagePath = Path.Combine(rootPath, "storage");
 
-        await using var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.ConfigureAppConfiguration((_, configurationBuilder) =>
-                {
-                    configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        [$"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath"] = downloadPath,
-                        [$"{TorrentCoreServiceOptions.SectionName}:StorageRootPath"] = storagePath,
-                    });
-                });
-            });
-
+        await using var factory = CreateFactory(downloadPath, storagePath);
         using var httpClient = factory.CreateClient();
 
         var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
@@ -63,46 +46,79 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
     }
 
     [Fact]
-    public async Task GetTorrents_ReturnsSeededTorrents()
+    public async Task GetTorrents_ReturnsPersistedTorrentAfterAdd()
     {
-        var torrents = await _httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        await AddMagnetAsync(httpClient, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "Listed Torrent");
+
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
 
         Assert.NotNull(torrents);
-        Assert.NotEmpty(torrents);
-        Assert.Contains(torrents, torrent => torrent.State is TorrentState.Downloading or TorrentState.Paused);
-        Assert.Contains(torrents, torrent => torrent.TrackerCount > 0);
+        Assert.Contains(torrents, torrent => torrent.Name == "Listed Torrent");
     }
 
     [Fact]
     public async Task AddMagnet_ReturnsCreatedTorrent_ForValidMagnet()
     {
-        var response = await _httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
-        {
-            MagnetUri = "magnet:?xt=urn:btih:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&dn=API%20Test%20Torrent",
-        });
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
 
-        response.EnsureSuccessStatusCode();
-
+        var response = await AddMagnetAsync(httpClient, "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", "API Test Torrent");
         var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(torrent);
         Assert.Equal("API Test Torrent", torrent.Name);
         Assert.Equal(TorrentState.ResolvingMetadata, torrent.State);
-        Assert.Equal("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", torrent.InfoHash);
+        Assert.Equal("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", torrent.InfoHash);
         Assert.Equal(0, torrent.TrackerCount);
         Assert.Equal(0, torrent.ConnectedPeerCount);
     }
 
     [Fact]
+    public async Task TorrentState_SurvivesRestart()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-phase2-restart");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(downloadPath, storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            var addResponse = await AddMagnetAsync(httpClient, "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "Restarted Torrent");
+            var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+
+            var pauseResponse = await httpClient.PostAsync($"api/torrents/{torrentId}/pause", content: null);
+            pauseResponse.EnsureSuccessStatusCode();
+        }
+
+        await using (var factory = CreateFactory(downloadPath, storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var torrent = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}");
+            var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+            Assert.NotNull(torrent);
+            Assert.Equal(TorrentState.Paused, torrent.State);
+            Assert.Contains(torrents!, summary => summary.TorrentId == torrentId && summary.State == TorrentState.Paused);
+        }
+    }
+
+    [Fact]
     public async Task GetLogs_ReturnsStartupAndTorrentEvents()
     {
-        await _httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
-        {
-            MagnetUri = "magnet:?xt=urn:btih:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB&dn=Logged%20Torrent",
-        });
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
 
-        var logs = await _httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=20");
+        await AddMagnetAsync(httpClient, "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD", "Logged Torrent");
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=20");
 
         Assert.NotNull(logs);
         Assert.Contains(logs, log => log.EventType == "service.startup.ready");
@@ -113,12 +129,12 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
     [Fact]
     public async Task GetLogs_FiltersByCategory_AndEventType()
     {
-        await _httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
-        {
-            MagnetUri = "magnet:?xt=urn:btih:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC&dn=Filtered%20Torrent",
-        });
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
 
-        var logs = await _httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=20&category=torrent&eventType=torrent.added");
+        await AddMagnetAsync(httpClient, "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE", "Filtered Torrent");
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=20&category=torrent&eventType=torrent.added");
 
         Assert.NotNull(logs);
         Assert.NotEmpty(logs);
@@ -132,31 +148,17 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
     [Fact]
     public async Task GetLogs_RetentionEnforcesConfiguredMaximum()
     {
-        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-logs-retention-{Guid.NewGuid():N}");
+        var rootPath = CreateTempRootPath("torrentcore-logs-retention");
         var downloadPath = Path.Combine(rootPath, "downloads");
         var storagePath = Path.Combine(rootPath, "storage");
 
-        await using var factory = new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder =>
-            {
-                builder.ConfigureAppConfiguration((_, configurationBuilder) =>
-                {
-                    configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        [$"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath"] = downloadPath,
-                        [$"{TorrentCoreServiceOptions.SectionName}:StorageRootPath"] = storagePath,
-                        [$"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries"] = "100",
-                    });
-                });
-            });
-
+        await using var factory = CreateFactory(downloadPath, storagePath, maxActivityLogEntries: 100);
         using var httpClient = factory.CreateClient();
 
         for (var index = 0; index < 130; index++)
         {
             var hash = index.ToString("D40");
-            var magnetUri = $"magnet:?xt=urn:btih:{hash}&dn=Retention%20{index}";
-            var response = await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest { MagnetUri = magnetUri });
+            var response = await AddMagnetAsync(httpClient, hash, $"Retention {index}");
             response.EnsureSuccessStatusCode();
         }
 
@@ -169,7 +171,10 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
     [Fact]
     public async Task AddMagnet_ReturnsBadRequest_ForInvalidMagnet()
     {
-        var response = await _httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
         {
             MagnetUri = "https://example.com/not-a-magnet",
         });
@@ -180,5 +185,73 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
         Assert.Equal("invalid_magnet", error.GetProperty("code").GetString());
         Assert.Equal("MagnetUri must be a valid magnet URI.", error.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task AddMagnet_ReturnsConflict_ForPersistedDuplicate()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-duplicate");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using (var factory = CreateFactory(downloadPath, storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            var firstResponse = await AddMagnetAsync(httpClient, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "First Torrent");
+            firstResponse.EnsureSuccessStatusCode();
+        }
+
+        await using (var factory = CreateFactory(downloadPath, storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            var duplicateResponse = await AddMagnetAsync(httpClient, "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "Duplicate Torrent");
+            var error = await duplicateResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+            Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+            Assert.Equal("duplicate_magnet", error.GetProperty("code").GetString());
+        }
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(
+        string? downloadPath = null,
+        string? storagePath = null,
+        int? maxActivityLogEntries = null)
+    {
+        var rootPath = CreateTempRootPath("torrentcore-api");
+        var resolvedDownloadPath = downloadPath ?? Path.Combine(rootPath, "downloads");
+        var resolvedStoragePath = storagePath ?? Path.Combine(rootPath, "storage");
+
+        return new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureAppConfiguration((_, configurationBuilder) =>
+                {
+                    var settings = new Dictionary<string, string?>
+                    {
+                        [$"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath"] = resolvedDownloadPath,
+                        [$"{TorrentCoreServiceOptions.SectionName}:StorageRootPath"] = resolvedStoragePath,
+                    };
+
+                    if (maxActivityLogEntries is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries"] = maxActivityLogEntries.Value.ToString();
+                    }
+
+                    configurationBuilder.AddInMemoryCollection(settings);
+                });
+            });
+    }
+
+    private static async Task<HttpResponseMessage> AddMagnetAsync(HttpClient httpClient, string infoHash, string name)
+    {
+        return await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
+        {
+            MagnetUri = $"magnet:?xt=urn:btih:{infoHash}&dn={Uri.EscapeDataString(name)}",
+        });
+    }
+
+    private static string CreateTempRootPath(string prefix)
+    {
+        return Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
     }
 }
