@@ -8,6 +8,7 @@ public static class TorrentCoreServicePathResolver
         {
             DownloadRootPath = ResolveAbsolutePath(contentRootPath, options.DownloadRootPath),
             StorageRootPath  = ResolveAbsolutePath(contentRootPath, options.StorageRootPath),
+            DatabaseFilePath = ResolveAbsolutePath(contentRootPath, Path.Combine(options.StorageRootPath, "torrentcore.db")),
         };
     }
 

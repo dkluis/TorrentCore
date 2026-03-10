@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TorrentCore.Core\TorrentCore.Core.csproj" />
     <ProjectReference Include="..\TorrentCore.Contracts\TorrentCore.Contracts.csproj" />
   </ItemGroup>

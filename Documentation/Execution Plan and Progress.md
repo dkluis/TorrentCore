@@ -27,6 +27,7 @@ Status as of March 10, 2026:
 - service, client, and web now expose a stubbed torrent-management boundary backed by an in-memory application service
 - Swagger UI is enabled for the service in development
 - Phase 1 configuration and startup validation are implemented
+- Phase 2 persistence foundation has started with SQLite-backed activity logging
 - persistence and real engine integration are not implemented yet
 
 Verified baseline:
@@ -54,6 +55,7 @@ Note:
 - Web is the first rich admin UI.
 - v1 stays intentionally narrow and is delivered through vertical slices.
 - Each slice must be testable through the API and exercisable through the web UI.
+- User-facing date/time values must be rendered in the operator's local time, not UTC.
 
 ## Phased Execution Plan
 
@@ -95,18 +97,20 @@ Exit criteria:
 ### Phase 2: Persistence Foundation
 
 Goal:
-- establish the SQLite storage model and migration path
+- establish the SQLite storage model and migration path, including operational logging persistence
 
 Planned outputs:
 - persistence entities/schema
 - migration strategy
 - repository or persistence service abstractions as needed
 - torrent state rehydration rules after restart
+- persisted diagnostic and activity log foundation
 
 Exit criteria:
 - state survives restart
 - schema creation and upgrades are deterministic
 - persistence tests run against real SQLite files
+- operators can inspect persisted activity and error history through the service boundary
 
 ### Phase 3: First Vertical Slice with Fake Engine
 
@@ -281,10 +285,10 @@ Reviewed and accepted on March 10, 2026:
 
 ## Current Next Steps
 
-1. Begin Phase 2 persistence foundation work.
-2. Define the SQLite storage model and migration strategy.
+1. Extend the SQLite schema from activity logging into persisted torrent state.
+2. Define the migration strategy for future schema changes.
 3. Replace the in-memory engine adapter with a persistence-backed fake-engine slice.
-4. Expand API and UI coverage around torrent detail and action flows.
+4. Add API and web surfaces for log inspection and diagnostics filtering.
 5. Prepare restart rehydration rules before real engine integration.
 
 ## Change Log
@@ -313,6 +317,11 @@ Changes:
 - changed the default path strategy so downloads resolve to a user-facing location and internal storage resolves to a user app-data location
 - changed the default download path again to avoid the user's `Downloads` folder as an unsafe cleanup target
 - renamed the service project folder from `src/TorrentCore.Service` to `src/TorrentCore.ServiceHost` to avoid macOS Finder package semantics
+- updated the Phase 2 plan to include persisted logging and activity diagnostics
+- added the first SQLite-backed persistence slice for activity logging
+- added a logs API endpoint and client support for reading recent logs
+- wired service startup and torrent operations into the persisted activity log
+- added log filtering, service-instance correlation, and max-entry retention controls
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -322,6 +331,8 @@ Assumptions:
 - magnet validation is intentionally limited to public-boundary checks, not engine-level parsing completeness
 - sorting and filtering are UI/API behaviors for later work, not embedded DTO concerns
 - the current engine implementation remains in-memory and is still a placeholder for later persistence and real engine work
+- the current SQLite persistence implementation covers activity logging first, not torrent-state persistence yet
+- log timestamps continue to be stored in UTC, while future UI surfaces must render them in local time
 
 Progress:
 - planning completed
@@ -329,6 +340,7 @@ Progress:
 - build and test baseline verified
 - Phase 0 completed and verified by build and tests
 - Phase 1 completed and verified by build and tests
+- Phase 2 started with SQLite-backed logging persistence and API exposure
 
 ## Progress Log
 
@@ -357,9 +369,15 @@ Completed:
 - replaced project-relative runtime defaults with user-accessible and user-profile-based defaults
 - changed the default managed-content location from `Downloads/TorrentCore` to `~/TorrentCore/downloads`
 - renamed the service source folder to make it directly accessible through Finder without `.service` package confusion
+- started Phase 2 with a persisted activity log table in SQLite
+- added startup and torrent action activity logging
+- added an API endpoint for recent logs and test coverage for log persistence behavior
+- added filtered log queries by level, category, event type, torrent, time window, and service instance
+- added service-instance correlation for startup and torrent activity events
+- added configurable activity-log retention through `TorrentCore:MaxActivityLogEntries`
 
 In progress:
-- none
+- Phase 2 persistence foundation beyond activity logging
 
 Next:
-- Phase 2 persistence foundation
+- expand SQLite persistence from activity logging into torrent-state persistence

@@ -51,6 +51,22 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         Assert.True(result.Succeeded);
     }
 
+    [Fact]
+    public void Validate_Fails_ForLowMaxActivityLogEntries()
+    {
+        var options = new TorrentCoreServiceOptions
+        {
+            DownloadRootPath = "Runtime/downloads",
+            StorageRootPath = "Runtime/storage",
+            MaxActivityLogEntries = 99,
+        };
+
+        var result = _validator.Validate(name: null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures, failure => failure.Contains("MaxActivityLogEntries", StringComparison.Ordinal));
+    }
+
     private sealed class TestHostEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = Environments.Development;

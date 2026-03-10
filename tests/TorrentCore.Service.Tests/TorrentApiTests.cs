@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using TorrentCore.Contracts;
+using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Service.Configuration;
@@ -58,6 +59,7 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Equal(Path.GetFullPath(downloadPath), hostStatus.DownloadRootPath);
         Assert.True(Directory.Exists(downloadPath));
         Assert.True(Directory.Exists(storagePath));
+        Assert.True(File.Exists(Path.Combine(storagePath, "torrentcore.db")));
     }
 
     [Fact]
@@ -90,6 +92,78 @@ public sealed class TorrentApiTests : IClassFixture<WebApplicationFactory<Progra
         Assert.Equal("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", torrent.InfoHash);
         Assert.Equal(0, torrent.TrackerCount);
         Assert.Equal(0, torrent.ConnectedPeerCount);
+    }
+
+    [Fact]
+    public async Task GetLogs_ReturnsStartupAndTorrentEvents()
+    {
+        await _httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
+        {
+            MagnetUri = "magnet:?xt=urn:btih:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB&dn=Logged%20Torrent",
+        });
+
+        var logs = await _httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=20");
+
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "service.startup.ready");
+        Assert.Contains(logs, log => log.EventType == "torrent.added");
+        Assert.Contains(logs, log => log.ServiceInstanceId is not null);
+    }
+
+    [Fact]
+    public async Task GetLogs_FiltersByCategory_AndEventType()
+    {
+        await _httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
+        {
+            MagnetUri = "magnet:?xt=urn:btih:CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC&dn=Filtered%20Torrent",
+        });
+
+        var logs = await _httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=20&category=torrent&eventType=torrent.added");
+
+        Assert.NotNull(logs);
+        Assert.NotEmpty(logs);
+        Assert.All(logs, log =>
+        {
+            Assert.Equal("torrent", log.Category);
+            Assert.Equal("torrent.added", log.EventType);
+        });
+    }
+
+    [Fact]
+    public async Task GetLogs_RetentionEnforcesConfiguredMaximum()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-logs-retention-{Guid.NewGuid():N}");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder =>
+            {
+                builder.ConfigureAppConfiguration((_, configurationBuilder) =>
+                {
+                    configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        [$"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath"] = downloadPath,
+                        [$"{TorrentCoreServiceOptions.SectionName}:StorageRootPath"] = storagePath,
+                        [$"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries"] = "100",
+                    });
+                });
+            });
+
+        using var httpClient = factory.CreateClient();
+
+        for (var index = 0; index < 130; index++)
+        {
+            var hash = index.ToString("D40");
+            var magnetUri = $"magnet:?xt=urn:btih:{hash}&dn=Retention%20{index}";
+            var response = await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest { MagnetUri = magnetUri });
+            response.EnsureSuccessStatusCode();
+        }
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=500");
+
+        Assert.NotNull(logs);
+        Assert.True(logs.Count <= 100);
     }
 
     [Fact]

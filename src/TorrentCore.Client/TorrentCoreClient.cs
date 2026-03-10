@@ -31,6 +31,59 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
                ?? Array.Empty<TorrentSummaryDto>();
     }
 
+    public async Task<IReadOnlyList<ActivityLogEntryDto>> GetRecentLogsAsync(
+        int take = 100,
+        string? category = null,
+        string? eventType = null,
+        string? level = null,
+        Guid? torrentId = null,
+        Guid? serviceInstanceId = null,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string> {$"take={take}"};
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            query.Add($"category={Uri.EscapeDataString(category)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(eventType))
+        {
+            query.Add($"eventType={Uri.EscapeDataString(eventType)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(level))
+        {
+            query.Add($"level={Uri.EscapeDataString(level)}");
+        }
+
+        if (torrentId is not null)
+        {
+            query.Add($"torrentId={torrentId.Value:D}");
+        }
+
+        if (serviceInstanceId is not null)
+        {
+            query.Add($"serviceInstanceId={serviceInstanceId.Value:D}");
+        }
+
+        if (fromUtc is not null)
+        {
+            query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}");
+        }
+
+        if (toUtc is not null)
+        {
+            query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
+        }
+
+        using var response = await httpClient.GetAsync($"api/logs?{string.Join("&", query)}", cancellationToken);
+        return await ReadResponseAsync<IReadOnlyList<ActivityLogEntryDto>>(response, cancellationToken)
+               ?? Array.Empty<ActivityLogEntryDto>();
+    }
+
     public async Task<TorrentDetailDto?> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync($"api/torrents/{torrentId}", cancellationToken);

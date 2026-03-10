@@ -1,3 +1,5 @@
+using TorrentCore.Core.Diagnostics;
+using TorrentCore.Persistence.Sqlite.Logging;
 using TorrentCore.Service.Application;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
@@ -29,7 +31,15 @@ builder.Services.AddSingleton(serviceProvider =>
     var serviceOptions = serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value;
     return TorrentCoreServicePathResolver.Resolve(hostEnvironment.ContentRootPath, serviceOptions);
 });
+builder.Services.AddSingleton<ServiceInstanceContext>();
 builder.Services.AddHostedService<TorrentCoreStorageInitializer>();
+builder.Services.AddSingleton<IActivityLogService>(serviceProvider =>
+{
+    var servicePaths = serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>();
+    var serviceOptions = serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value;
+    return new SqliteActivityLogService(servicePaths.DatabaseFilePath, serviceOptions.MaxActivityLogEntries);
+});
+builder.Services.AddHostedService<SqlitePersistenceInitializer>();
 builder.Services.AddSingleton<ITorrentEngineAdapter, InMemoryTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentApplicationService, TorrentApplicationService>();
 

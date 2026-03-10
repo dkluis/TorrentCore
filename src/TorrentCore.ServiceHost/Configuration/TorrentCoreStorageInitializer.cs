@@ -1,6 +1,10 @@
+using Microsoft.Extensions.Logging;
+
 namespace TorrentCore.Service.Configuration;
 
-public sealed class TorrentCoreStorageInitializer(ResolvedTorrentCoreServicePaths servicePaths) : IHostedService
+public sealed class TorrentCoreStorageInitializer(
+    ResolvedTorrentCoreServicePaths servicePaths,
+    ILogger<TorrentCoreStorageInitializer> logger) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -8,6 +12,10 @@ public sealed class TorrentCoreStorageInitializer(ResolvedTorrentCoreServicePath
         {
             Directory.CreateDirectory(servicePaths.DownloadRootPath);
             Directory.CreateDirectory(servicePaths.StorageRootPath);
+            logger.LogInformation(
+                "TorrentCore storage directories are ready. DownloadRootPath={DownloadRootPath}, StorageRootPath={StorageRootPath}",
+                servicePaths.DownloadRootPath,
+                servicePaths.StorageRootPath);
             return Task.CompletedTask;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)

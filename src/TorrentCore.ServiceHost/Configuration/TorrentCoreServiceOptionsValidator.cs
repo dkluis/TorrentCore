@@ -23,6 +23,11 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             return ValidateOptionsResult.Fail(failures);
         }
 
+        if (options.MaxActivityLogEntries < 100)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActivityLogEntries must be 100 or greater.");
+        }
+
         try
         {
             var resolvedPaths = TorrentCoreServicePathResolver.Resolve(hostEnvironment.ContentRootPath, options);
