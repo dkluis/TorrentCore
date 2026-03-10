@@ -39,7 +39,7 @@ Development API documentation:
 Current service configuration section:
 - `TorrentCore:DownloadRootPath`
 - `TorrentCore:StorageRootPath`
-- if not overridden, the service now defaults downloads to a user-accessible `Downloads/TorrentCore` folder and internal storage to the user's local app-data area
+- if not overridden, the service now defaults downloads to a dedicated `~/TorrentCore/downloads` folder and internal storage to the user's local app-data area
 - project-relative runtime folders were replaced as defaults because they are not appropriate for normal operator use
 
 Note:
@@ -311,6 +311,7 @@ Changes:
 - changed invalid operation responses to predictable problem-details payloads
 - added Phase 1 tests covering configuration validation and configured path behavior
 - changed the default path strategy so downloads resolve to a user-facing location and internal storage resolves to a user app-data location
+- changed the default download path again to avoid the user's `Downloads` folder as an unsafe cleanup target
 
 Assumptions:
 - the source-of-truth boundary documents remain authoritative
@@ -353,6 +354,7 @@ Completed:
 - changed invalid torrent operation failures to RFC 7807 problem-details responses
 - added test coverage for options validation and configured service paths
 - replaced project-relative runtime defaults with user-accessible and user-profile-based defaults
+- changed the default managed-content location from `Downloads/TorrentCore` to `~/TorrentCore/downloads`
 
 In progress:
 - none

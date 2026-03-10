@@ -10,7 +10,7 @@ public static class TorrentCoreDefaultPaths
             return Path.Combine(AppContext.BaseDirectory, "downloads");
         }
 
-        return Path.Combine(userProfilePath, "Downloads", "TorrentCore");
+        return Path.Combine(userProfilePath, "TorrentCore", "downloads");
     }
 
     public static string GetDefaultStorageRootPath()
