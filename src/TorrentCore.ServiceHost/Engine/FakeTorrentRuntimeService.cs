@@ -81,6 +81,9 @@ public sealed class FakeTorrentRuntimeService(
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
         await AdvanceDownloadsAsync(torrents.Where(torrent => torrent.State == TorrentState.Downloading).ToList(), now, cancellationToken);
+
+        torrents = await torrentStateStore.ListAsync(cancellationToken);
+        await AdvanceSeedingAsync(torrents.Where(torrent => torrent.State == TorrentState.Seeding).ToList(), now, cancellationToken);
     }
 
     private async Task ResolveMetadataAsync(IReadOnlyList<TorrentSnapshot> torrents, DateTimeOffset now, CancellationToken cancellationToken)
@@ -98,6 +101,8 @@ public sealed class FakeTorrentRuntimeService(
             torrent.ConnectedPeerCount = 0;
             torrent.DownloadRateBytesPerSecond = 0;
             torrent.UploadRateBytesPerSecond = 0;
+            torrent.UploadedBytes = 0;
+            torrent.SeedingStartedAtUtc = null;
             torrent.State = TorrentState.Queued;
             torrent.LastActivityAtUtc = now;
             torrent.ErrorMessage = null;
@@ -178,11 +183,56 @@ public sealed class FakeTorrentRuntimeService(
 
             if (nextProgress >= 100)
             {
-                torrent.State = TorrentState.Completed;
                 torrent.CompletedAtUtc ??= now;
-                torrent.ConnectedPeerCount = 0;
+                torrent.SeedingStartedAtUtc ??= now;
+
+                var seedingDecision = SeedingPolicyEvaluator.Evaluate(
+                    _serviceOptions.SeedingStopMode,
+                    _serviceOptions.SeedingStopRatio,
+                    _serviceOptions.SeedingStopMinutes,
+                    torrent.UploadedBytes,
+                    torrent.TotalBytes,
+                    torrent.SeedingStartedAtUtc,
+                    now);
+
+                if (seedingDecision.ShouldStop)
+                {
+                    torrent.State = TorrentState.Completed;
+                    torrent.ConnectedPeerCount = 0;
+                    torrent.DownloadRateBytesPerSecond = 0;
+                    torrent.UploadRateBytesPerSecond = 0;
+
+                    await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                    await LogTorrentEventAsync(
+                        "torrent.download.completed",
+                        $"Completed download for torrent '{torrent.Name}'.",
+                        torrent,
+                        new
+                        {
+                            torrent.TotalBytes,
+                            torrent.CompletedAtUtc,
+                        },
+                        cancellationToken);
+
+                    await LogTorrentEventAsync(
+                        "torrent.seeding.stopped_policy",
+                        $"Stopped seeding for torrent '{torrent.Name}' because the '{seedingDecision.Reason}' policy was reached.",
+                        torrent,
+                        new
+                        {
+                            seedingDecision.Reason,
+                            seedingDecision.CurrentRatio,
+                            seedingDecision.CurrentSeedingMinutes,
+                        },
+                        cancellationToken);
+
+                    continue;
+                }
+
+                torrent.State = TorrentState.Seeding;
+                torrent.ConnectedPeerCount = CalculatePeerCount(torrent);
                 torrent.DownloadRateBytesPerSecond = 0;
-                torrent.UploadRateBytesPerSecond = 0;
+                torrent.UploadRateBytesPerSecond = CalculateUploadRate(torrent);
 
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
                 await LogTorrentEventAsync(
@@ -193,6 +243,7 @@ public sealed class FakeTorrentRuntimeService(
                     {
                         torrent.TotalBytes,
                         torrent.CompletedAtUtc,
+                        torrent.SeedingStartedAtUtc,
                     },
                     cancellationToken);
 
@@ -203,6 +254,56 @@ public sealed class FakeTorrentRuntimeService(
             torrent.ConnectedPeerCount = CalculatePeerCount(torrent);
             torrent.DownloadRateBytesPerSecond = CalculateDownloadRate(torrent);
             torrent.UploadRateBytesPerSecond = CalculateUploadRate(torrent);
+
+            await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        }
+    }
+
+    private async Task AdvanceSeedingAsync(
+        IReadOnlyList<TorrentSnapshot> torrents,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        foreach (var torrent in torrents)
+        {
+            torrent.CompletedAtUtc ??= now;
+            torrent.SeedingStartedAtUtc ??= torrent.CompletedAtUtc ?? now;
+            torrent.DownloadRateBytesPerSecond = 0;
+            torrent.UploadRateBytesPerSecond = CalculateUploadRate(torrent);
+            torrent.ConnectedPeerCount = CalculatePeerCount(torrent);
+            torrent.LastActivityAtUtc = now;
+            torrent.UploadedBytes += Math.Max(0L, torrent.UploadRateBytesPerSecond * _serviceOptions.RuntimeTickIntervalMilliseconds / 1_000L);
+
+            var seedingDecision = SeedingPolicyEvaluator.Evaluate(
+                _serviceOptions.SeedingStopMode,
+                _serviceOptions.SeedingStopRatio,
+                _serviceOptions.SeedingStopMinutes,
+                torrent.UploadedBytes,
+                torrent.TotalBytes,
+                torrent.SeedingStartedAtUtc,
+                now);
+
+            if (seedingDecision.ShouldStop)
+            {
+                torrent.State = TorrentState.Completed;
+                torrent.ConnectedPeerCount = 0;
+                torrent.UploadRateBytesPerSecond = 0;
+
+                await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                await LogTorrentEventAsync(
+                    "torrent.seeding.stopped_policy",
+                    $"Stopped seeding for torrent '{torrent.Name}' because the '{seedingDecision.Reason}' policy was reached.",
+                    torrent,
+                    new
+                    {
+                        seedingDecision.Reason,
+                        seedingDecision.CurrentRatio,
+                        seedingDecision.CurrentSeedingMinutes,
+                    },
+                    cancellationToken);
+
+                continue;
+            }
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
         }

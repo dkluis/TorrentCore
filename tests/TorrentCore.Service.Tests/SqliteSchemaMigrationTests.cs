@@ -34,7 +34,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4], versions);
+        Assert.Equal([1, 2, 3, 4, 5], versions);
     }
 
     [Fact]
@@ -149,6 +149,8 @@ public sealed class SqliteSchemaMigrationTests
         }
 
         Assert.Contains("download_root_path", columns);
+        Assert.Contains("uploaded_bytes", columns);
+        Assert.Contains("seeding_started_at_utc", columns);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string downloadPath, string storagePath)

@@ -34,6 +34,7 @@ Status as of March 10, 2026:
 - a managed fake runtime now resolves metadata, applies simple queueing, and advances persisted download state
 - a first MonoTorrent-backed engine slice is implemented behind the existing adapter boundary
 - MonoTorrent host configuration, engine-ready diagnostics, and connection-failure log throttling are implemented
+- MonoTorrent partial-file handling and configurable seeding-stop policy are implemented
 
 Verified baseline:
 - `dotnet build TorrentCore.sln`
@@ -50,6 +51,10 @@ Current service configuration section:
 - `TorrentCore:EngineAllowLocalPeerDiscovery`
 - `TorrentCore:EngineConnectionFailureLogBurstLimit`
 - `TorrentCore:EngineConnectionFailureLogWindowSeconds`
+- `TorrentCore:UsePartialFiles`
+- `TorrentCore:SeedingStopMode`
+- `TorrentCore:SeedingStopRatio`
+- `TorrentCore:SeedingStopMinutes`
 - `TorrentCore:DownloadRootPath`
 - `TorrentCore:StorageRootPath`
 - `TorrentCore:MaxActiveDownloads`
@@ -59,6 +64,7 @@ Current service configuration section:
 - if not overridden, the service now defaults downloads to a dedicated `~/TorrentCore/downloads` folder and internal storage to the user's local app-data area
 - project-relative runtime folders were replaced as defaults because they are not appropriate for normal operator use
 - these settings are currently config-driven and exposed through host status for diagnostics; later they should be managed through the web UI
+- MonoTorrent partial-file support currently uses the engine's native `.!mt` suffix when enabled
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -394,6 +400,7 @@ Assumptions:
 - MonoTorrent runtime events are now written to the persistent activity log under the `engine` category so operators can inspect real engine behavior through the existing logs API
 - current MonoTorrent runtime settings are exposed through diagnostics now so a later web UI can manage them without reshaping the underlying service contract
 - MonoTorrent restart recovery must preserve the engine save-path semantics instead of persisting a display-oriented content path, or completed downloads can regress after restart
+- MonoTorrent's native partial-file suffix is `.!mt`, and downstream consumers may rely on that naming until a later UI-managed policy layer exists
 
 Progress:
 - planning completed
@@ -454,6 +461,10 @@ Completed:
 - broadened the documented product direction from a narrowly TVMaze-oriented downloader toward a more general-purpose torrent engine with reusable operator policies
 - documented `.part`-based incomplete-file compatibility as a first-class requirement because downstream consumers already rely on that convention
 - documented explicit seeding stop policies as part of the operator-facing runtime model
+- enabled MonoTorrent native partial-file support so incomplete files use the engine's `.!mt` suffix and finished files lose that suffix automatically
+- added configurable seeding stop policies covering unlimited seeding, immediate stop, ratio stop, time stop, and ratio-or-time stop
+- persisted upload totals and seeding-start timestamps so seeding policies can survive restart instead of resetting on each process start
+- surfaced partial-file and seeding-policy settings through host status for future UI management
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging
@@ -465,3 +476,4 @@ Next:
 - extend the MonoTorrent-backed slice with richer runtime diagnostics, explicit configuration, and more complete restart recovery semantics
 - continue building the operator-facing path so current MonoTorrent configuration can later move from config files into the web UI
 - implement `.part` incomplete-file handling and configurable seeding stop rules as the next operational storage/runtime slice
+- extend the UI from diagnostics-only exposure of partial-file and seeding policy settings into actual operator-managed configuration

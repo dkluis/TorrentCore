@@ -177,6 +177,7 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                             save_path TEXT NOT NULL,
                             progress_percent REAL NOT NULL,
                             downloaded_bytes INTEGER NOT NULL,
+                            uploaded_bytes INTEGER NOT NULL,
                             total_bytes INTEGER NULL,
                             download_rate_bytes_per_second INTEGER NOT NULL,
                             upload_rate_bytes_per_second INTEGER NOT NULL,
@@ -184,6 +185,7 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                             connected_peer_count INTEGER NOT NULL,
                             added_at_utc TEXT NOT NULL,
                             completed_at_utc TEXT NULL,
+                            seeding_started_at_utc TEXT NULL,
                             last_activity_at_utc TEXT NULL,
                             error_message TEXT NULL
                         );
@@ -207,6 +209,25 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                         var alterCommand = connection.CreateCommand();
                         alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN download_root_path TEXT NULL;";
                         await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }),
+            new SqliteMigrationDefinition(
+                5,
+                "add_torrents_uploaded_and_seeding_fields",
+                async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "uploaded_bytes", cancellationToken))
+                    {
+                        var addUploadedBytesCommand = connection.CreateCommand();
+                        addUploadedBytesCommand.CommandText = "ALTER TABLE torrents ADD COLUMN uploaded_bytes INTEGER NOT NULL DEFAULT 0;";
+                        await addUploadedBytesCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "seeding_started_at_utc", cancellationToken))
+                    {
+                        var addSeedingStartedCommand = connection.CreateCommand();
+                        addSeedingStartedCommand.CommandText = "ALTER TABLE torrents ADD COLUMN seeding_started_at_utc TEXT NULL;";
+                        await addSeedingStartedCommand.ExecuteNonQueryAsync(cancellationToken);
                     }
                 }),
         ];

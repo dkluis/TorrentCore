@@ -12,6 +12,11 @@ public sealed class EngineHostStatusDto
     public required bool EngineLocalPeerDiscoveryEnabled { get; init; }
     public required int EngineConnectionFailureLogBurstLimit { get; init; }
     public required int EngineConnectionFailureLogWindowSeconds { get; init; }
+    public required bool PartialFilesEnabled { get; init; }
+    public required string PartialFileSuffix { get; init; }
+    public required string SeedingStopMode { get; init; }
+    public required double SeedingStopRatio { get; init; }
+    public required int SeedingStopMinutes { get; init; }
     public required EngineHostStatus Status { get; init; }
     public required string EnvironmentName { get; init; }
     public required string DownloadRootPath { get; init; }

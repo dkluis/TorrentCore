@@ -33,6 +33,11 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMode is invalid.");
         }
 
+        if (!Enum.IsDefined(options.SeedingStopMode))
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:SeedingStopMode is invalid.");
+        }
+
         if (options.EngineListenPort is < 0 or > 65_535)
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineListenPort must be between 0 and 65535.");
@@ -51,6 +56,16 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
         if (options.EngineConnectionFailureLogWindowSeconds < 1)
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds must be 1 or greater.");
+        }
+
+        if (options.SeedingStopRatio <= 0)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:SeedingStopRatio must be greater than 0.");
+        }
+
+        if (options.SeedingStopMinutes < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:SeedingStopMinutes must be 1 or greater.");
         }
 
         if (options.MaxActiveDownloads < 1)

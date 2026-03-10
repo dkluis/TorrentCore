@@ -13,6 +13,7 @@ public sealed class TorrentSnapshot
     public required string SavePath { get; set; }
     public required double ProgressPercent { get; set; }
     public required long DownloadedBytes { get; set; }
+    public required long UploadedBytes { get; set; }
     public long? TotalBytes { get; set; }
     public required long DownloadRateBytesPerSecond { get; set; }
     public required long UploadRateBytesPerSecond { get; set; }
@@ -20,6 +21,7 @@ public sealed class TorrentSnapshot
     public required int ConnectedPeerCount { get; set; }
     public required DateTimeOffset AddedAtUtc { get; init; }
     public DateTimeOffset? CompletedAtUtc { get; set; }
+    public DateTimeOffset? SeedingStartedAtUtc { get; set; }
     public DateTimeOffset? LastActivityAtUtc { get; set; }
     public string? ErrorMessage { get; set; }
 }

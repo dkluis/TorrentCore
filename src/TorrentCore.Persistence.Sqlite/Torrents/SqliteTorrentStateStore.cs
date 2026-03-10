@@ -89,6 +89,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 save_path,
                 progress_percent,
                 downloaded_bytes,
+                uploaded_bytes,
                 total_bytes,
                 download_rate_bytes_per_second,
                 upload_rate_bytes_per_second,
@@ -96,6 +97,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 connected_peer_count,
                 added_at_utc,
                 completed_at_utc,
+                seeding_started_at_utc,
                 last_activity_at_utc,
                 error_message
             FROM torrents
@@ -125,6 +127,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 save_path,
                 progress_percent,
                 downloaded_bytes,
+                uploaded_bytes,
                 total_bytes,
                 download_rate_bytes_per_second,
                 upload_rate_bytes_per_second,
@@ -132,6 +135,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 connected_peer_count,
                 added_at_utc,
                 completed_at_utc,
+                seeding_started_at_utc,
                 last_activity_at_utc,
                 error_message
             FROM torrents
@@ -198,15 +202,17 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 SavePath = reader.GetString(6),
                 ProgressPercent = reader.GetDouble(7),
                 DownloadedBytes = reader.GetInt64(8),
-                TotalBytes = reader.IsDBNull(9) ? null : reader.GetInt64(9),
-                DownloadRateBytesPerSecond = reader.GetInt64(10),
-                UploadRateBytesPerSecond = reader.GetInt64(11),
-                TrackerCount = reader.GetInt32(12),
-                ConnectedPeerCount = reader.GetInt32(13),
-                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(14), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                CompletedAtUtc = reader.IsDBNull(15) ? null : DateTimeOffset.Parse(reader.GetString(15), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                LastActivityAtUtc = reader.IsDBNull(16) ? null : DateTimeOffset.Parse(reader.GetString(16), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                ErrorMessage = reader.IsDBNull(17) ? null : reader.GetString(17),
+                UploadedBytes = reader.GetInt64(9),
+                TotalBytes = reader.IsDBNull(10) ? null : reader.GetInt64(10),
+                DownloadRateBytesPerSecond = reader.GetInt64(11),
+                UploadRateBytesPerSecond = reader.GetInt64(12),
+                TrackerCount = reader.GetInt32(13),
+                ConnectedPeerCount = reader.GetInt32(14),
+                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(15), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                CompletedAtUtc = reader.IsDBNull(16) ? null : DateTimeOffset.Parse(reader.GetString(16), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                SeedingStartedAtUtc = reader.IsDBNull(17) ? null : DateTimeOffset.Parse(reader.GetString(17), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                LastActivityAtUtc = reader.IsDBNull(18) ? null : DateTimeOffset.Parse(reader.GetString(18), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                ErrorMessage = reader.IsDBNull(19) ? null : reader.GetString(19),
             });
         }
 
@@ -228,6 +234,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 save_path,
                 progress_percent,
                 downloaded_bytes,
+                uploaded_bytes,
                 total_bytes,
                 download_rate_bytes_per_second,
                 upload_rate_bytes_per_second,
@@ -235,6 +242,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 connected_peer_count,
                 added_at_utc,
                 completed_at_utc,
+                seeding_started_at_utc,
                 last_activity_at_utc,
                 error_message
             )
@@ -248,6 +256,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 $save_path,
                 $progress_percent,
                 $downloaded_bytes,
+                $uploaded_bytes,
                 $total_bytes,
                 $download_rate_bytes_per_second,
                 $upload_rate_bytes_per_second,
@@ -255,6 +264,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 $connected_peer_count,
                 $added_at_utc,
                 $completed_at_utc,
+                $seeding_started_at_utc,
                 $last_activity_at_utc,
                 $error_message
             );
@@ -269,6 +279,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue("$save_path", torrent.SavePath);
         command.Parameters.AddWithValue("$progress_percent", torrent.ProgressPercent);
         command.Parameters.AddWithValue("$downloaded_bytes", torrent.DownloadedBytes);
+        command.Parameters.AddWithValue("$uploaded_bytes", torrent.UploadedBytes);
         command.Parameters.AddWithValue("$total_bytes", torrent.TotalBytes ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$download_rate_bytes_per_second", torrent.DownloadRateBytesPerSecond);
         command.Parameters.AddWithValue("$upload_rate_bytes_per_second", torrent.UploadRateBytesPerSecond);
@@ -276,6 +287,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue("$connected_peer_count", torrent.ConnectedPeerCount);
         command.Parameters.AddWithValue("$added_at_utc", torrent.AddedAtUtc.ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$completed_at_utc", torrent.CompletedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$seeding_started_at_utc", torrent.SeedingStartedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$last_activity_at_utc", torrent.LastActivityAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$error_message", torrent.ErrorMessage ?? (object)DBNull.Value);
         return command;

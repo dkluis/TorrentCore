@@ -78,6 +78,9 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             EngineDhtPort = 70_000,
             EngineConnectionFailureLogBurstLimit = 0,
             EngineConnectionFailureLogWindowSeconds = 0,
+            SeedingStopMode = (SeedingStopMode)999,
+            SeedingStopRatio = 0,
+            SeedingStopMinutes = 0,
             MaxActiveDownloads = 0,
             RuntimeTickIntervalMilliseconds = 49,
             MetadataResolutionDelayMilliseconds = -1,
@@ -91,6 +94,9 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         Assert.Contains(result.Failures, failure => failure.Contains("EngineDhtPort", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("EngineConnectionFailureLogBurstLimit", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("EngineConnectionFailureLogWindowSeconds", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("SeedingStopMode", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("SeedingStopRatio", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("SeedingStopMinutes", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MaxActiveDownloads", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("RuntimeTickIntervalMilliseconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MetadataResolutionDelayMilliseconds", StringComparison.Ordinal));

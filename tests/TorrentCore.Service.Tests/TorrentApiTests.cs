@@ -25,6 +25,9 @@ public sealed class TorrentApiTests
         Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);
         Assert.Equal(55_124, hostStatus.EngineDhtPort);
+        Assert.True(hostStatus.PartialFilesEnabled);
+        Assert.Equal(".!mt", hostStatus.PartialFileSuffix);
+        Assert.Equal(SeedingStopMode.Unlimited.ToString(), hostStatus.SeedingStopMode);
         Assert.Equal(EngineHostStatus.Ready, hostStatus.Status);
         Assert.True(hostStatus.SupportsMagnetAdds);
         Assert.True(hostStatus.SupportsPersistentStorage);
@@ -99,6 +102,9 @@ public sealed class TorrentApiTests
         Assert.Equal("MonoTorrent", hostStatus!.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);
         Assert.Equal(55_124, hostStatus.EngineDhtPort);
+        Assert.True(hostStatus.PartialFilesEnabled);
+        Assert.Equal(".!mt", hostStatus.PartialFileSuffix);
+        Assert.Equal(SeedingStopMode.Unlimited.ToString(), hostStatus.SeedingStopMode);
         Assert.True(hostStatus.StartupRecoveryCompleted);
         Assert.Equal("9999999999999999999999999999999999999999", torrent.InfoHash);
         Assert.DoesNotContain(torrent.State, new[] { TorrentState.Error, TorrentState.Removed });
@@ -149,6 +155,7 @@ public sealed class TorrentApiTests
     public async Task FakeRuntime_EventuallyResolvesMetadata_AndCompletesDownload()
     {
         await using var factory = CreateFactory(
+            seedingStopMode: SeedingStopMode.StopImmediately,
             runtimeTickIntervalMilliseconds: 50,
             metadataResolutionDelayMilliseconds: 0,
             downloadProgressPercentPerTick: 50);
@@ -175,6 +182,7 @@ public sealed class TorrentApiTests
         Assert.Contains(logs, log => log.EventType == "torrent.metadata.resolved");
         Assert.Contains(logs, log => log.EventType == "torrent.download.started");
         Assert.Contains(logs, log => log.EventType == "torrent.download.completed");
+        Assert.Contains(logs, log => log.EventType == "torrent.seeding.stopped_policy");
     }
 
     [Fact]
@@ -393,6 +401,10 @@ public sealed class TorrentApiTests
         bool? engineAllowLocalPeerDiscovery = null,
         int? engineConnectionFailureLogBurstLimit = null,
         int? engineConnectionFailureLogWindowSeconds = null,
+        bool? usePartialFiles = null,
+        SeedingStopMode? seedingStopMode = null,
+        double? seedingStopRatio = null,
+        int? seedingStopMinutes = null,
         int? maxActiveDownloads = null,
         int? runtimeTickIntervalMilliseconds = null,
         int? metadataResolutionDelayMilliseconds = null,
@@ -447,6 +459,26 @@ public sealed class TorrentApiTests
                     if (engineConnectionFailureLogWindowSeconds is not null)
                     {
                         settings[$"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds"] = engineConnectionFailureLogWindowSeconds.Value.ToString();
+                    }
+
+                    if (usePartialFiles is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:UsePartialFiles"] = usePartialFiles.Value.ToString();
+                    }
+
+                    if (seedingStopMode is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:SeedingStopMode"] = seedingStopMode.Value.ToString();
+                    }
+
+                    if (seedingStopRatio is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:SeedingStopRatio"] = seedingStopRatio.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    }
+
+                    if (seedingStopMinutes is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:SeedingStopMinutes"] = seedingStopMinutes.Value.ToString();
                     }
 
                     if (maxActiveDownloads is not null)

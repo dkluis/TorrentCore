@@ -116,6 +116,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             State = TorrentState.ResolvingMetadata,
             ProgressPercent = 0,
             DownloadedBytes = 0,
+            UploadedBytes = 0,
             TotalBytes = null,
             DownloadRateBytesPerSecond = 0,
             UploadRateBytesPerSecond = 0,
