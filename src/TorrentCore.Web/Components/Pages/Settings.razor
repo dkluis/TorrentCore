@@ -57,6 +57,18 @@ else
                 <input id="seedingStopMinutes" class="form-control" type="number" min="1" step="1" @bind="_seedingStopMinutes" />
             </div>
             <div class="col-md-6">
+                <label class="form-label" for="cleanupMode">Completed Torrent Cleanup Mode</label>
+                <select id="cleanupMode" class="form-select" @bind="_completedTorrentCleanupMode">
+                    <option value="Never">Never</option>
+                    <option value="AfterCompletedMinutes">AfterCompletedMinutes</option>
+                </select>
+                <div class="form-text">Automatic cleanup only removes TorrentCore tracking. It never deletes downloaded data.</div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="cleanupMinutes">Completed Torrent Cleanup Minutes</label>
+                <input id="cleanupMinutes" class="form-control" type="number" min="0" step="1" @bind="_completedTorrentCleanupMinutes" />
+            </div>
+            <div class="col-md-6">
                 <label class="form-label" for="burstLimit">Connection Failure Burst Limit</label>
                 <input id="burstLimit" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogBurstLimit" />
             </div>
@@ -95,6 +107,8 @@ else
     private string _seedingStopMode = "Unlimited";
     private double _seedingStopRatio = 1.0;
     private int _seedingStopMinutes = 60;
+    private string _completedTorrentCleanupMode = "Never";
+    private int _completedTorrentCleanupMinutes = 60;
     private int _engineConnectionFailureLogBurstLimit = 5;
     private int _engineConnectionFailureLogWindowSeconds = 60;
 
@@ -143,6 +157,8 @@ else
                 SeedingStopMode = _seedingStopMode,
                 SeedingStopRatio = _seedingStopRatio,
                 SeedingStopMinutes = _seedingStopMinutes,
+                CompletedTorrentCleanupMode = _completedTorrentCleanupMode,
+                CompletedTorrentCleanupMinutes = _completedTorrentCleanupMinutes,
                 EngineConnectionFailureLogBurstLimit = _engineConnectionFailureLogBurstLimit,
                 EngineConnectionFailureLogWindowSeconds = _engineConnectionFailureLogWindowSeconds,
             });
@@ -171,6 +187,8 @@ else
         _seedingStopMode = settings.SeedingStopMode;
         _seedingStopRatio = settings.SeedingStopRatio;
         _seedingStopMinutes = settings.SeedingStopMinutes;
+        _completedTorrentCleanupMode = settings.CompletedTorrentCleanupMode;
+        _completedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes;
         _engineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit;
         _engineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds;
     }

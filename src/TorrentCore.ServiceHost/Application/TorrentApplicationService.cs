@@ -42,6 +42,8 @@ public sealed class TorrentApplicationService(
             SeedingStopMode            = runtimeSettings.SeedingStopMode.ToString(),
             SeedingStopRatio           = runtimeSettings.SeedingStopRatio,
             SeedingStopMinutes         = runtimeSettings.SeedingStopMinutes,
+            CompletedTorrentCleanupMode = runtimeSettings.CompletedTorrentCleanupMode.ToString(),
+            CompletedTorrentCleanupMinutes = runtimeSettings.CompletedTorrentCleanupMinutes,
             Status                    = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
             EnvironmentName           = hostEnvironment.EnvironmentName,
             DownloadRootPath          = servicePaths.DownloadRootPath,

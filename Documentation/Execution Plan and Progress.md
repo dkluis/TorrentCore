@@ -473,6 +473,9 @@ Completed:
 - added a dedicated web settings page so operators can manage the supported live settings through the UI and have them survive restart
 - fixed the torrent remove API so callers can omit the request body and still get the default safe behavior of removing the torrent record without deleting data
 - fixed the real MonoTorrent remove path to stop an active manager before unregistering it so operator remove requests do not fail with a 500 while the torrent is still running
+- added automatic completed-torrent cleanup policy as a TorrentCore-owned runtime setting, with the current mode set supporting timed removal from engine/DB tracking only
+- enforced the product rule that automatic cleanup never deletes downloaded data; only an explicit remove API request with `DeleteData = true` is allowed to delete files
+- added a background cleanup worker plus UI/runtime settings support so completed torrents can age out of the dashboard automatically without destructive deletion
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging

@@ -38,6 +38,16 @@ public sealed class RuntimeSettingsService(
                 nameof(request.SeedingStopMode));
         }
 
+        if (!Enum.TryParse<CompletedTorrentCleanupMode>(request.CompletedTorrentCleanupMode, ignoreCase: true, out var completedTorrentCleanupMode) ||
+            !Enum.IsDefined(completedTorrentCleanupMode))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "CompletedTorrentCleanupMode is invalid.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.CompletedTorrentCleanupMode));
+        }
+
         if (request.SeedingStopRatio <= 0)
         {
             throw new Application.ServiceOperationException(
@@ -54,6 +64,15 @@ public sealed class RuntimeSettingsService(
                 "SeedingStopMinutes must be 1 or greater.",
                 StatusCodes.Status400BadRequest,
                 nameof(request.SeedingStopMinutes));
+        }
+
+        if (request.CompletedTorrentCleanupMinutes < 0)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "CompletedTorrentCleanupMinutes must be 0 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.CompletedTorrentCleanupMinutes));
         }
 
         if (request.EngineConnectionFailureLogBurstLimit < 1)
@@ -79,6 +98,8 @@ public sealed class RuntimeSettingsService(
             [RuntimeSettingsKeys.SeedingStopMode] = seedingStopMode.ToString(),
             [RuntimeSettingsKeys.SeedingStopRatio] = request.SeedingStopRatio.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.SeedingStopMinutes] = request.SeedingStopMinutes.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.CompletedTorrentCleanupMode] = completedTorrentCleanupMode.ToString(),
+            [RuntimeSettingsKeys.CompletedTorrentCleanupMinutes] = request.CompletedTorrentCleanupMinutes.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit] = request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] = request.EngineConnectionFailureLogWindowSeconds.ToString(CultureInfo.InvariantCulture),
         }, cancellationToken);
@@ -95,6 +116,8 @@ public sealed class RuntimeSettingsService(
                 seedingStopMode,
                 request.SeedingStopRatio,
                 request.SeedingStopMinutes,
+                completedTorrentCleanupMode,
+                request.CompletedTorrentCleanupMinutes,
                 request.EngineConnectionFailureLogBurstLimit,
                 request.EngineConnectionFailureLogWindowSeconds,
             }),
@@ -131,6 +154,22 @@ public sealed class RuntimeSettingsService(
             seedingStopMinutes = parsedSeedingStopMinutes;
         }
 
+        var completedTorrentCleanupMode = baseOptions.CompletedTorrentCleanupMode;
+        if (values.TryGetValue(RuntimeSettingsKeys.CompletedTorrentCleanupMode, out var completedTorrentCleanupModeValue) &&
+            Enum.TryParse<CompletedTorrentCleanupMode>(completedTorrentCleanupModeValue, ignoreCase: true, out var parsedCompletedTorrentCleanupMode) &&
+            Enum.IsDefined(parsedCompletedTorrentCleanupMode))
+        {
+            completedTorrentCleanupMode = parsedCompletedTorrentCleanupMode;
+        }
+
+        var completedTorrentCleanupMinutes = baseOptions.CompletedTorrentCleanupMinutes;
+        if (values.TryGetValue(RuntimeSettingsKeys.CompletedTorrentCleanupMinutes, out var completedTorrentCleanupMinutesValue) &&
+            int.TryParse(completedTorrentCleanupMinutesValue, CultureInfo.InvariantCulture, out var parsedCompletedTorrentCleanupMinutes) &&
+            parsedCompletedTorrentCleanupMinutes >= 0)
+        {
+            completedTorrentCleanupMinutes = parsedCompletedTorrentCleanupMinutes;
+        }
+
         var burstLimit = baseOptions.EngineConnectionFailureLogBurstLimit;
         if (values.TryGetValue(RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit, out var burstLimitValue) &&
             int.TryParse(burstLimitValue, CultureInfo.InvariantCulture, out var parsedBurstLimit) &&
@@ -155,6 +194,8 @@ public sealed class RuntimeSettingsService(
             SeedingStopMode = seedingStopMode,
             SeedingStopRatio = seedingStopRatio,
             SeedingStopMinutes = seedingStopMinutes,
+            CompletedTorrentCleanupMode = completedTorrentCleanupMode,
+            CompletedTorrentCleanupMinutes = completedTorrentCleanupMinutes,
             EngineConnectionFailureLogBurstLimit = burstLimit,
             EngineConnectionFailureLogWindowSeconds = windowSeconds,
             UpdatedAtUtc = persistedSettings.UpdatedAtUtc,
@@ -173,6 +214,8 @@ public sealed class RuntimeSettingsService(
             SeedingStopMode = settings.SeedingStopMode.ToString(),
             SeedingStopRatio = settings.SeedingStopRatio,
             SeedingStopMinutes = settings.SeedingStopMinutes,
+            CompletedTorrentCleanupMode = settings.CompletedTorrentCleanupMode.ToString(),
+            CompletedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes,
             EngineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds,
             UpdatedAtUtc = settings.UpdatedAtUtc,

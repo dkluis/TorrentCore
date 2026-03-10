@@ -70,6 +70,8 @@ public sealed class TorrentApiTests
         Assert.True(settings.PartialFilesEnabled);
         Assert.Equal(".!mt", settings.PartialFileSuffix);
         Assert.Equal(SeedingStopMode.Unlimited.ToString(), settings.SeedingStopMode);
+        Assert.Equal(CompletedTorrentCleanupMode.Never.ToString(), settings.CompletedTorrentCleanupMode);
+        Assert.Equal(60, settings.CompletedTorrentCleanupMinutes);
         Assert.Equal(5, settings.EngineConnectionFailureLogBurstLimit);
         Assert.Equal(60, settings.EngineConnectionFailureLogWindowSeconds);
     }
@@ -90,6 +92,8 @@ public sealed class TorrentApiTests
                 SeedingStopMode = SeedingStopMode.StopAfterRatioOrTime.ToString(),
                 SeedingStopRatio = 1.5,
                 SeedingStopMinutes = 90,
+                CompletedTorrentCleanupMode = CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(),
+                CompletedTorrentCleanupMinutes = 15,
                 EngineConnectionFailureLogBurstLimit = 2,
                 EngineConnectionFailureLogWindowSeconds = 180,
             });
@@ -103,6 +107,8 @@ public sealed class TorrentApiTests
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), settings.SeedingStopMode);
             Assert.Equal(1.5, settings.SeedingStopRatio);
             Assert.Equal(90, settings.SeedingStopMinutes);
+            Assert.Equal(CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(), settings.CompletedTorrentCleanupMode);
+            Assert.Equal(15, settings.CompletedTorrentCleanupMinutes);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
             Assert.NotNull(settings.UpdatedAtUtc);
@@ -111,6 +117,8 @@ public sealed class TorrentApiTests
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), hostStatus.SeedingStopMode);
             Assert.Equal(1.5, hostStatus.SeedingStopRatio);
             Assert.Equal(90, hostStatus.SeedingStopMinutes);
+            Assert.Equal(CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(), hostStatus.CompletedTorrentCleanupMode);
+            Assert.Equal(15, hostStatus.CompletedTorrentCleanupMinutes);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
         }
@@ -128,11 +136,14 @@ public sealed class TorrentApiTests
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), settings.SeedingStopMode);
             Assert.Equal(1.5, settings.SeedingStopRatio);
             Assert.Equal(90, settings.SeedingStopMinutes);
+            Assert.Equal(CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(), settings.CompletedTorrentCleanupMode);
+            Assert.Equal(15, settings.CompletedTorrentCleanupMinutes);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
 
             Assert.NotNull(hostStatus);
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), hostStatus.SeedingStopMode);
+            Assert.Equal(CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(), hostStatus.CompletedTorrentCleanupMode);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
 
@@ -311,6 +322,42 @@ public sealed class TorrentApiTests
         Assert.Contains(logs, log => log.EventType == "torrent.download.started");
         Assert.Contains(logs, log => log.EventType == "torrent.download.completed");
         Assert.Contains(logs, log => log.EventType == "torrent.seeding.stopped_policy");
+    }
+
+    [Fact]
+    public async Task FakeRuntime_AutoCleanup_RemovesCompletedTorrentWithoutDeletingData()
+    {
+        await using var factory = CreateFactory(
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        var updateResponse = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
+        {
+            SeedingStopMode = SeedingStopMode.StopImmediately.ToString(),
+            SeedingStopRatio = 1.0,
+            SeedingStopMinutes = 60,
+            CompletedTorrentCleanupMode = CompletedTorrentCleanupMode.AfterCompletedMinutes.ToString(),
+            CompletedTorrentCleanupMinutes = 0,
+            EngineConnectionFailureLogBurstLimit = 5,
+            EngineConnectionFailureLogWindowSeconds = 60,
+        });
+        updateResponse.EnsureSuccessStatusCode();
+
+        var response = await AddMagnetAsync(httpClient, "CDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCDCD", "Auto Cleanup Torrent");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var remainingTorrents = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            torrents => torrents is not null && torrents.All(torrent => torrent.TorrentId != addedTorrent!.TorrentId),
+            timeout: TimeSpan.FromSeconds(5));
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=100");
+
+        Assert.NotNull(remainingTorrents);
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.cleanup.auto_removed" && log.TorrentId == addedTorrent!.TorrentId);
     }
 
     [Fact]

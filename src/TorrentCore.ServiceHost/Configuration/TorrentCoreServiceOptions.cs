@@ -15,6 +15,8 @@ public sealed class TorrentCoreServiceOptions
     public SeedingStopMode SeedingStopMode { get; init; } = SeedingStopMode.Unlimited;
     public double SeedingStopRatio { get; init; } = 1.0;
     public int SeedingStopMinutes { get; init; } = 60;
+    public CompletedTorrentCleanupMode CompletedTorrentCleanupMode { get; init; } = CompletedTorrentCleanupMode.Never;
+    public int CompletedTorrentCleanupMinutes { get; init; } = 60;
     public string DownloadRootPath { get; init; } = TorrentCoreDefaultPaths.GetDefaultDownloadRootPath();
     public string StorageRootPath { get; init; } = TorrentCoreDefaultPaths.GetDefaultStorageRootPath();
     public int MaxActivityLogEntries { get; init; } = 20_000;
