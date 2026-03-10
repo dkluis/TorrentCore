@@ -482,6 +482,7 @@ Completed:
 - added dashboard-level torrent controls for pause, resume, remove, and delete-data actions so common operator lifecycle management no longer requires Swagger
 - added basic dashboard filtering by name/status and client-side sorting by name, state, progress, and newest-added order
 - fixed delete-data removal so TorrentCore now prunes empty torrent-specific directories left behind after MonoTorrent deletes files, while preserving the configured download root and any non-empty/shared directories
+- tightened the dashboard so `Delete Data` is only offered for in-progress/error torrent states and not for completed or seeding torrents
 - documented the intended future concurrency model for burst intake: TorrentCore should accept/persist new magnets immediately and queue metadata/download execution behind global runtime limits
 
 In progress:

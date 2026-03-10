@@ -165,11 +165,14 @@ else
                                             disabled="@IsActionBusy(torrent.TorrentId)">
                                         Remove
                                     </button>
-                                    <button class="btn btn-sm btn-danger"
-                                            @onclick="() => RemoveAsync(torrent, deleteData: true)"
-                                            disabled="@IsActionBusy(torrent.TorrentId)">
-                                        Delete Data
-                                    </button>
+                                    @if (CanDeleteData(torrent))
+                                    {
+                                        <button class="btn btn-sm btn-danger"
+                                                @onclick="() => RemoveAsync(torrent, deleteData: true)"
+                                                disabled="@IsActionBusy(torrent.TorrentId)">
+                                            Delete Data
+                                        </button>
+                                    }
                                 }
                             </div>
                         </td>
@@ -362,6 +365,15 @@ else
     }
 
     private bool IsActionBusy(Guid torrentId) => _busyTorrentIds.Contains(torrentId);
+
+    private static bool CanDeleteData(TorrentSummaryDto torrent)
+    {
+        return torrent.State is TorrentState.ResolvingMetadata
+            or TorrentState.Queued
+            or TorrentState.Downloading
+            or TorrentState.Paused
+            or TorrentState.Error;
+    }
 
     private bool MatchesNameFilter(TorrentSummaryDto torrent)
     {
