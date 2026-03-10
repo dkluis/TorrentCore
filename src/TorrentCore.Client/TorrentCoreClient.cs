@@ -24,6 +24,19 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
         return await ReadResponseAsync<EngineHostStatusDto>(response, cancellationToken);
     }
 
+    public async Task<RuntimeSettingsDto?> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync("api/host/runtime-settings", cancellationToken);
+        return await ReadResponseAsync<RuntimeSettingsDto>(response, cancellationToken);
+    }
+
+    public async Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PutAsJsonAsync("api/host/runtime-settings", request, JsonOptions, cancellationToken);
+        return await ReadResponseAsync<RuntimeSettingsDto>(response, cancellationToken)
+               ?? throw new InvalidOperationException("TorrentCore service returned no runtime settings payload.");
+    }
+
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync("api/torrents", cancellationToken);

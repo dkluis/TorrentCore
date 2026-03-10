@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
+using TorrentCore.Persistence.Sqlite.Configuration;
 using TorrentCore.Persistence.Sqlite.Schema;
 
 namespace TorrentCore.Service.Configuration;
@@ -8,6 +9,7 @@ namespace TorrentCore.Service.Configuration;
 public sealed class SqlitePersistenceInitializer(
     ResolvedTorrentCoreServicePaths servicePaths,
     SqliteSchemaMigrator sqliteSchemaMigrator,
+    SqliteRuntimeSettingsStore runtimeSettingsStore,
     IActivityLogService activityLogService,
     ITorrentStateStore torrentStateStore,
     ILogger<SqlitePersistenceInitializer> logger) : IHostedService
@@ -16,6 +18,7 @@ public sealed class SqlitePersistenceInitializer(
     {
         await sqliteSchemaMigrator.ApplyMigrationsAsync(cancellationToken);
         await activityLogService.EnsureInitializedAsync(cancellationToken);
+        await runtimeSettingsStore.EnsureInitializedAsync(cancellationToken);
         await torrentStateStore.EnsureInitializedAsync(cancellationToken);
 
         logger.LogInformation(

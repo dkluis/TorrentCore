@@ -13,6 +13,7 @@ public sealed class FakeTorrentRuntimeService(
     IActivityLogService activityLogService,
     ServiceInstanceContext serviceInstanceContext,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
+    IRuntimeSettingsService runtimeSettingsService,
     ILogger<FakeTorrentRuntimeService> logger) : BackgroundService
 {
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
@@ -65,6 +66,7 @@ public sealed class FakeTorrentRuntimeService(
     private async Task ProcessTickAsync(CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
 
         await ResolveMetadataAsync(torrents, now, cancellationToken);
@@ -80,10 +82,10 @@ public sealed class FakeTorrentRuntimeService(
         await StartQueuedDownloadsAsync(torrents, activeDownloads.Count, now, cancellationToken);
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
-        await AdvanceDownloadsAsync(torrents.Where(torrent => torrent.State == TorrentState.Downloading).ToList(), now, cancellationToken);
+        await AdvanceDownloadsAsync(torrents.Where(torrent => torrent.State == TorrentState.Downloading).ToList(), runtimeSettings, now, cancellationToken);
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
-        await AdvanceSeedingAsync(torrents.Where(torrent => torrent.State == TorrentState.Seeding).ToList(), now, cancellationToken);
+        await AdvanceSeedingAsync(torrents.Where(torrent => torrent.State == TorrentState.Seeding).ToList(), runtimeSettings, now, cancellationToken);
     }
 
     private async Task ResolveMetadataAsync(IReadOnlyList<TorrentSnapshot> torrents, DateTimeOffset now, CancellationToken cancellationToken)
@@ -168,6 +170,7 @@ public sealed class FakeTorrentRuntimeService(
 
     private async Task AdvanceDownloadsAsync(
         IReadOnlyList<TorrentSnapshot> torrents,
+        RuntimeSettingsSnapshot runtimeSettings,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -187,9 +190,9 @@ public sealed class FakeTorrentRuntimeService(
                 torrent.SeedingStartedAtUtc ??= now;
 
                 var seedingDecision = SeedingPolicyEvaluator.Evaluate(
-                    _serviceOptions.SeedingStopMode,
-                    _serviceOptions.SeedingStopRatio,
-                    _serviceOptions.SeedingStopMinutes,
+                    runtimeSettings.SeedingStopMode,
+                    runtimeSettings.SeedingStopRatio,
+                    runtimeSettings.SeedingStopMinutes,
                     torrent.UploadedBytes,
                     torrent.TotalBytes,
                     torrent.SeedingStartedAtUtc,
@@ -261,6 +264,7 @@ public sealed class FakeTorrentRuntimeService(
 
     private async Task AdvanceSeedingAsync(
         IReadOnlyList<TorrentSnapshot> torrents,
+        RuntimeSettingsSnapshot runtimeSettings,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -275,9 +279,9 @@ public sealed class FakeTorrentRuntimeService(
             torrent.UploadedBytes += Math.Max(0L, torrent.UploadRateBytesPerSecond * _serviceOptions.RuntimeTickIntervalMilliseconds / 1_000L);
 
             var seedingDecision = SeedingPolicyEvaluator.Evaluate(
-                _serviceOptions.SeedingStopMode,
-                _serviceOptions.SeedingStopRatio,
-                _serviceOptions.SeedingStopMinutes,
+                runtimeSettings.SeedingStopMode,
+                runtimeSettings.SeedingStopRatio,
+                runtimeSettings.SeedingStopMinutes,
                 torrent.UploadedBytes,
                 torrent.TotalBytes,
                 torrent.SeedingStartedAtUtc,

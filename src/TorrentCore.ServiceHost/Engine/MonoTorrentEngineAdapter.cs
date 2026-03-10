@@ -18,6 +18,7 @@ public sealed class MonoTorrentEngineAdapter(
     IActivityLogService activityLogService,
     ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
+    IRuntimeSettingsService runtimeSettingsService,
     ServiceInstanceContext serviceInstanceContext,
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
@@ -26,8 +27,7 @@ public sealed class MonoTorrentEngineAdapter(
     private readonly HashSet<Guid> _observedTorrentIds = [];
     private readonly ConcurrentDictionary<Guid, long> _observedUploadedSessionBytes = new();
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
-    private readonly ConnectionFailureLogThrottle _connectionFailureLogThrottle =
-        new(serviceOptions.Value.EngineConnectionFailureLogBurstLimit, serviceOptions.Value.EngineConnectionFailureLogWindowSeconds);
+    private readonly ConnectionFailureLogThrottle _connectionFailureLogThrottle = new();
 
     private ClientEngine? _engine;
     private bool _initialized;
@@ -132,7 +132,7 @@ public sealed class MonoTorrentEngineAdapter(
                     var manager = await AddOrGetManagerAsync(snapshot, cancellationToken);
                     var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
 
-                    if (ShouldStartOnRecovery(snapshot.State) && !ShouldStopSeeding(updatedSnapshot, now).ShouldStop)
+                    if (ShouldStartOnRecovery(snapshot.State) && !(await ShouldStopSeedingAsync(updatedSnapshot, now, cancellationToken)).ShouldStop)
                     {
                         await manager.StartAsync();
                         updatedSnapshot = CreateUpdatedSnapshot(updatedSnapshot, manager, now);
@@ -431,6 +431,7 @@ public sealed class MonoTorrentEngineAdapter(
                 return;
             }
 
+            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
             var cacheDirectory = Path.Combine(servicePaths.StorageRootPath, "monotorrent-cache");
             Directory.CreateDirectory(cacheDirectory);
 
@@ -468,13 +469,13 @@ public sealed class MonoTorrentEngineAdapter(
                     _serviceOptions.EngineDhtPort,
                     _serviceOptions.EngineAllowPortForwarding,
                     _serviceOptions.EngineAllowLocalPeerDiscovery,
-                    _serviceOptions.EngineConnectionFailureLogBurstLimit,
-                    _serviceOptions.EngineConnectionFailureLogWindowSeconds,
+                    runtimeSettings.EngineConnectionFailureLogBurstLimit,
+                    runtimeSettings.EngineConnectionFailureLogWindowSeconds,
                     _serviceOptions.UsePartialFiles,
                     PartialFileSuffix = _serviceOptions.UsePartialFiles ? ".!mt" : string.Empty,
-                    _serviceOptions.SeedingStopMode,
-                    _serviceOptions.SeedingStopRatio,
-                    _serviceOptions.SeedingStopMinutes,
+                    SeedingStopMode = runtimeSettings.SeedingStopMode,
+                    SeedingStopRatio = runtimeSettings.SeedingStopRatio,
+                    SeedingStopMinutes = runtimeSettings.SeedingStopMinutes,
                 }),
             }, cancellationToken);
         }
@@ -656,9 +657,12 @@ public sealed class MonoTorrentEngineAdapter(
     {
         try
         {
+            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(CancellationToken.None);
             var decision = _connectionFailureLogThrottle.RegisterAttempt(
                 $"{torrentId:N}:{eventArgs.Reason}",
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                runtimeSettings.EngineConnectionFailureLogBurstLimit,
+                runtimeSettings.EngineConnectionFailureLogWindowSeconds);
             if (decision == ConnectionFailureLogDecision.Suppress)
             {
                 return;
@@ -682,8 +686,8 @@ public sealed class MonoTorrentEngineAdapter(
                 {
                     Reason = eventArgs.Reason.ToString(),
                     PeerUri = eventArgs.Peer.ConnectionUri?.ToString(),
-                    WindowSeconds = _serviceOptions.EngineConnectionFailureLogWindowSeconds,
-                    BurstLimit = _serviceOptions.EngineConnectionFailureLogBurstLimit,
+                    WindowSeconds = runtimeSettings.EngineConnectionFailureLogWindowSeconds,
+                    BurstLimit = runtimeSettings.EngineConnectionFailureLogBurstLimit,
                 }),
             }, CancellationToken.None);
         }
@@ -744,12 +748,14 @@ public sealed class MonoTorrentEngineAdapter(
             : existingSeedingStartedAtUtc;
     }
 
-    private SeedingPolicyDecision ShouldStopSeeding(TorrentSnapshot snapshot, DateTimeOffset now)
+    private async Task<SeedingPolicyDecision> ShouldStopSeedingAsync(TorrentSnapshot snapshot, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+
         return SeedingPolicyEvaluator.Evaluate(
-            _serviceOptions.SeedingStopMode,
-            _serviceOptions.SeedingStopRatio,
-            _serviceOptions.SeedingStopMinutes,
+            runtimeSettings.SeedingStopMode,
+            runtimeSettings.SeedingStopRatio,
+            runtimeSettings.SeedingStopMinutes,
             snapshot.UploadedBytes,
             snapshot.TotalBytes,
             snapshot.SeedingStartedAtUtc,
@@ -762,7 +768,15 @@ public sealed class MonoTorrentEngineAdapter(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var seedingDecision = ShouldStopSeeding(snapshot, now);
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var seedingDecision = SeedingPolicyEvaluator.Evaluate(
+            runtimeSettings.SeedingStopMode,
+            runtimeSettings.SeedingStopRatio,
+            runtimeSettings.SeedingStopMinutes,
+            snapshot.UploadedBytes,
+            snapshot.TotalBytes,
+            snapshot.SeedingStartedAtUtc,
+            now);
         if (!seedingDecision.ShouldStop)
         {
             return snapshot;
@@ -810,9 +824,9 @@ public sealed class MonoTorrentEngineAdapter(
                 seedingDecision.Reason,
                 seedingDecision.CurrentRatio,
                 seedingDecision.CurrentSeedingMinutes,
-                _serviceOptions.SeedingStopMode,
-                _serviceOptions.SeedingStopRatio,
-                _serviceOptions.SeedingStopMinutes,
+                SeedingStopMode = runtimeSettings.SeedingStopMode,
+                SeedingStopRatio = runtimeSettings.SeedingStopRatio,
+                SeedingStopMinutes = runtimeSettings.SeedingStopMinutes,
             }),
         }, cancellationToken);
 

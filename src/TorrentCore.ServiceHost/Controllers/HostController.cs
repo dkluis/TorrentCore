@@ -16,4 +16,22 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
         var status = await torrentApplicationService.GetHostStatusAsync(cancellationToken);
         return Ok(status);
     }
+
+    [HttpGet("runtime-settings")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RuntimeSettingsDto))]
+    public async Task<ActionResult<RuntimeSettingsDto>> GetRuntimeSettings(CancellationToken cancellationToken)
+    {
+        var settings = await torrentApplicationService.GetRuntimeSettingsAsync(cancellationToken);
+        return Ok(settings);
+    }
+
+    [HttpPut("runtime-settings")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RuntimeSettingsDto))]
+    public async Task<ActionResult<RuntimeSettingsDto>> UpdateRuntimeSettings(
+        [FromBody] UpdateRuntimeSettingsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var settings = await torrentApplicationService.UpdateRuntimeSettingsAsync(request, cancellationToken);
+        return Ok(settings);
+    }
 }

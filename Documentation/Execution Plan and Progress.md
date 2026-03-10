@@ -468,6 +468,9 @@ Completed:
 - added a dedicated web logs page with filtering, local-time rendering, and refresh support so operators can inspect diagnostics without Swagger or direct SQLite access
 - tightened the web logs page filter behavior so dropdown changes apply immediately, text filters use current typed values, and Enter/apply actions refresh deterministically
 - fixed the web admin shell render mode so route pages are actually interactive in the browser instead of static server-rendered snapshots, which unblocked logs filtering and timed refresh behavior
+- added persisted runtime settings in SQLite for live-editable seeding policy and engine connection-failure log throttling
+- added host API endpoints and client support to retrieve and update effective runtime settings without editing appsettings by hand
+- added a dedicated web settings page so operators can manage the supported live settings through the UI and have them survive restart
 
 In progress:
 - Phase 2 persistence foundation beyond activity logging

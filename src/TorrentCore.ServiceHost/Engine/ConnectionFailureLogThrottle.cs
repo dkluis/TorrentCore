@@ -2,11 +2,11 @@ using System.Collections.Concurrent;
 
 namespace TorrentCore.Service.Engine;
 
-public sealed class ConnectionFailureLogThrottle(int burstLimit, int windowSeconds)
+public sealed class ConnectionFailureLogThrottle
 {
     private readonly ConcurrentDictionary<string, ConnectionFailureLogWindow> _windows = new();
 
-    public ConnectionFailureLogDecision RegisterAttempt(string key, DateTimeOffset now)
+    public ConnectionFailureLogDecision RegisterAttempt(string key, DateTimeOffset now, int burstLimit, int windowSeconds)
     {
         var window = _windows.GetOrAdd(key, _ => new ConnectionFailureLogWindow(now));
 

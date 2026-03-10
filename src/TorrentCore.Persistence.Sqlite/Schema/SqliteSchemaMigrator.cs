@@ -230,6 +230,22 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                         await addSeedingStartedCommand.ExecuteNonQueryAsync(cancellationToken);
                     }
                 }),
+            new SqliteMigrationDefinition(
+                6,
+                "create_runtime_settings",
+                async (connection, cancellationToken) =>
+                {
+                    var command = connection.CreateCommand();
+                    command.CommandText =
+                        """
+                        CREATE TABLE IF NOT EXISTS runtime_settings (
+                            setting_key TEXT PRIMARY KEY,
+                            setting_value TEXT NOT NULL,
+                            updated_at_utc TEXT NOT NULL
+                        );
+                        """;
+                    await command.ExecuteNonQueryAsync(cancellationToken);
+                }),
         ];
     }
 

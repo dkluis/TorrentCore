@@ -16,12 +16,15 @@ public sealed class TorrentApplicationService(
     ITorrentEngineAdapter torrentEngineAdapter,
     IActivityLogService activityLogService,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
+    IRuntimeSettingsService runtimeSettingsService,
     ServiceInstanceContext serviceInstanceContext,
     StartupRecoveryState startupRecoveryState,
     ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
 {
     public async Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken)
     {
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+
         return new EngineHostStatusDto
         {
             ServiceName               = "TorrentCore.Service",
@@ -32,13 +35,13 @@ public sealed class TorrentApplicationService(
             EngineDhtPort             = serviceOptions.Value.EngineDhtPort,
             EnginePortForwardingEnabled = serviceOptions.Value.EngineAllowPortForwarding,
             EngineLocalPeerDiscoveryEnabled = serviceOptions.Value.EngineAllowLocalPeerDiscovery,
-            EngineConnectionFailureLogBurstLimit = serviceOptions.Value.EngineConnectionFailureLogBurstLimit,
-            EngineConnectionFailureLogWindowSeconds = serviceOptions.Value.EngineConnectionFailureLogWindowSeconds,
-            PartialFilesEnabled        = serviceOptions.Value.UsePartialFiles,
-            PartialFileSuffix          = serviceOptions.Value.UsePartialFiles ? ".!mt" : string.Empty,
-            SeedingStopMode            = serviceOptions.Value.SeedingStopMode.ToString(),
-            SeedingStopRatio           = serviceOptions.Value.SeedingStopRatio,
-            SeedingStopMinutes         = serviceOptions.Value.SeedingStopMinutes,
+            EngineConnectionFailureLogBurstLimit = runtimeSettings.EngineConnectionFailureLogBurstLimit,
+            EngineConnectionFailureLogWindowSeconds = runtimeSettings.EngineConnectionFailureLogWindowSeconds,
+            PartialFilesEnabled        = runtimeSettings.PartialFilesEnabled,
+            PartialFileSuffix          = runtimeSettings.PartialFileSuffix,
+            SeedingStopMode            = runtimeSettings.SeedingStopMode.ToString(),
+            SeedingStopRatio           = runtimeSettings.SeedingStopRatio,
+            SeedingStopMinutes         = runtimeSettings.SeedingStopMinutes,
             Status                    = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
             EnvironmentName           = hostEnvironment.EnvironmentName,
             DownloadRootPath          = servicePaths.DownloadRootPath,
@@ -56,6 +59,12 @@ public sealed class TorrentApplicationService(
             CheckedAtUtc              = DateTimeOffset.UtcNow,
         };
     }
+
+    public Task<RuntimeSettingsDto> GetRuntimeSettingsAsync(CancellationToken cancellationToken) =>
+        runtimeSettingsService.GetRuntimeSettingsDtoAsync(cancellationToken);
+
+    public Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken) =>
+        runtimeSettingsService.UpdateAsync(request, cancellationToken);
 
     public Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken) =>
         torrentEngineAdapter.GetTorrentsAsync(cancellationToken);

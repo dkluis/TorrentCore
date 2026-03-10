@@ -34,7 +34,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6], versions);
     }
 
     [Fact]
@@ -151,6 +151,30 @@ public sealed class SqliteSchemaMigrationTests
         Assert.Contains("download_root_path", columns);
         Assert.Contains("uploaded_bytes", columns);
         Assert.Contains("seeding_started_at_utc", columns);
+    }
+
+    [Fact]
+    public async Task Startup_CreatesRuntimeSettingsTable()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-runtime-settings");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath, storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.GetAsync("api/host/status");
+        response.EnsureSuccessStatusCode();
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+
+        var command = verifyConnection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'runtime_settings';";
+        var tableName = await command.ExecuteScalarAsync();
+
+        Assert.Equal("runtime_settings", tableName);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string downloadPath, string storagePath)

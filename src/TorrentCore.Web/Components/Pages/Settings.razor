@@ -1,0 +1,177 @@
+@page "/settings"
+@inject TorrentCoreClient TorrentCoreClient
+@using System.Globalization
+@using TorrentCore.Contracts.Host
+
+<PageTitle>Settings</PageTitle>
+
+<h1>Runtime Settings</h1>
+
+<p>Live operator settings for seeding policy and engine log throttling. These values are persisted and survive restart.</p>
+
+@if (_isLoading)
+{
+    <p>Loading runtime settings...</p>
+}
+else
+{
+    <section class="mb-4">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label" for="engineRuntime">Engine Runtime</label>
+                <input id="engineRuntime" class="form-control" value="@_engineRuntime" readonly />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="partialFiles">Partial Files</label>
+                <input id="partialFiles" class="form-control" value="@_partialFilesSummary" readonly />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="persistedOverrides">Persisted Overrides</label>
+                <input id="persistedOverrides" class="form-control" value="@_persistedOverridesSummary" readonly />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="updatedAt">Last Updated</label>
+                <input id="updatedAt" class="form-control" value="@_updatedAtSummary" readonly />
+            </div>
+        </div>
+    </section>
+
+    <EditForm Model="this" OnValidSubmit="SaveAsync">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="seedingStopMode">Seeding Stop Mode</label>
+                <select id="seedingStopMode" class="form-select" @bind="_seedingStopMode">
+                    <option value="Unlimited">Unlimited</option>
+                    <option value="StopImmediately">StopImmediately</option>
+                    <option value="StopAfterRatio">StopAfterRatio</option>
+                    <option value="StopAfterTime">StopAfterTime</option>
+                    <option value="StopAfterRatioOrTime">StopAfterRatioOrTime</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="seedingStopRatio">Seeding Stop Ratio</label>
+                <input id="seedingStopRatio" class="form-control" type="number" min="0.01" step="0.01" @bind="_seedingStopRatio" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="seedingStopMinutes">Seeding Stop Minutes</label>
+                <input id="seedingStopMinutes" class="form-control" type="number" min="1" step="1" @bind="_seedingStopMinutes" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="burstLimit">Connection Failure Burst Limit</label>
+                <input id="burstLimit" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogBurstLimit" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="windowSeconds">Connection Failure Window Seconds</label>
+                <input id="windowSeconds" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogWindowSeconds" />
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" type="submit" disabled="@_isSaving">Save Settings</button>
+            <button class="btn btn-secondary" type="button" @onclick="LoadAsync" disabled="@_isSaving">Reload</button>
+        </div>
+    </EditForm>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <p class="mt-3 text-success">@_message</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <p class="mt-3 text-danger">@_error</p>
+    }
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _message;
+    private string? _error;
+    private string _engineRuntime = string.Empty;
+    private string _partialFilesSummary = string.Empty;
+    private string _persistedOverridesSummary = string.Empty;
+    private string _updatedAtSummary = string.Empty;
+    private string _seedingStopMode = "Unlimited";
+    private double _seedingStopRatio = 1.0;
+    private int _seedingStopMinutes = 60;
+    private int _engineConnectionFailureLogBurstLimit = 5;
+    private int _engineConnectionFailureLogWindowSeconds = 60;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var settings = await TorrentCoreClient.GetRuntimeSettingsAsync();
+            if (settings is null)
+            {
+                _error = "Runtime settings endpoint returned no payload.";
+                return;
+            }
+
+            Apply(settings);
+        }
+        catch (Exception exception)
+        {
+            _error = $"Unable to load runtime settings: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var settings = await TorrentCoreClient.UpdateRuntimeSettingsAsync(new UpdateRuntimeSettingsRequest
+            {
+                SeedingStopMode = _seedingStopMode,
+                SeedingStopRatio = _seedingStopRatio,
+                SeedingStopMinutes = _seedingStopMinutes,
+                EngineConnectionFailureLogBurstLimit = _engineConnectionFailureLogBurstLimit,
+                EngineConnectionFailureLogWindowSeconds = _engineConnectionFailureLogWindowSeconds,
+            });
+
+            Apply(settings);
+            _message = "Runtime settings saved.";
+        }
+        catch (Exception exception)
+        {
+            _error = $"Unable to save runtime settings: {exception.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void Apply(RuntimeSettingsDto settings)
+    {
+        _engineRuntime = settings.EngineRuntime;
+        _partialFilesSummary = settings.PartialFilesEnabled
+            ? $"Enabled ({settings.PartialFileSuffix})"
+            : "Disabled";
+        _persistedOverridesSummary = settings.UsesPersistedOverrides ? "Yes" : "No";
+        _updatedAtSummary = settings.UpdatedAtUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "Not yet changed";
+        _seedingStopMode = settings.SeedingStopMode;
+        _seedingStopRatio = settings.SeedingStopRatio;
+        _seedingStopMinutes = settings.SeedingStopMinutes;
+        _engineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit;
+        _engineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds;
+    }
+}

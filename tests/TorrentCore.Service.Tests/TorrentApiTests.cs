@@ -56,6 +56,92 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task GetRuntimeSettings_ReturnsEffectiveDefaults()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var settings = await httpClient.GetFromJsonAsync<RuntimeSettingsDto>("api/host/runtime-settings");
+
+        Assert.NotNull(settings);
+        Assert.Equal("Fake", settings.EngineRuntime);
+        Assert.True(settings.SupportsLiveUpdates);
+        Assert.False(settings.UsesPersistedOverrides);
+        Assert.True(settings.PartialFilesEnabled);
+        Assert.Equal(".!mt", settings.PartialFileSuffix);
+        Assert.Equal(SeedingStopMode.Unlimited.ToString(), settings.SeedingStopMode);
+        Assert.Equal(5, settings.EngineConnectionFailureLogBurstLimit);
+        Assert.Equal(60, settings.EngineConnectionFailureLogWindowSeconds);
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeSettings_PersistsAcrossRestart_AndUpdatesHostStatus()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-runtime-update");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var updateResponse = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
+            {
+                SeedingStopMode = SeedingStopMode.StopAfterRatioOrTime.ToString(),
+                SeedingStopRatio = 1.5,
+                SeedingStopMinutes = 90,
+                EngineConnectionFailureLogBurstLimit = 2,
+                EngineConnectionFailureLogWindowSeconds = 180,
+            });
+            updateResponse.EnsureSuccessStatusCode();
+
+            var settings = await updateResponse.Content.ReadFromJsonAsync<RuntimeSettingsDto>();
+            var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+
+            Assert.NotNull(settings);
+            Assert.True(settings.UsesPersistedOverrides);
+            Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), settings.SeedingStopMode);
+            Assert.Equal(1.5, settings.SeedingStopRatio);
+            Assert.Equal(90, settings.SeedingStopMinutes);
+            Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
+            Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+            Assert.NotNull(settings.UpdatedAtUtc);
+
+            Assert.NotNull(hostStatus);
+            Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), hostStatus.SeedingStopMode);
+            Assert.Equal(1.5, hostStatus.SeedingStopRatio);
+            Assert.Equal(90, hostStatus.SeedingStopMinutes);
+            Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
+            Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+        }
+
+        await using (var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var settings = await httpClient.GetFromJsonAsync<RuntimeSettingsDto>("api/host/runtime-settings");
+            var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+            var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=50&eventType=service.runtime_settings.updated");
+
+            Assert.NotNull(settings);
+            Assert.True(settings.UsesPersistedOverrides);
+            Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), settings.SeedingStopMode);
+            Assert.Equal(1.5, settings.SeedingStopRatio);
+            Assert.Equal(90, settings.SeedingStopMinutes);
+            Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
+            Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+
+            Assert.NotNull(hostStatus);
+            Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), hostStatus.SeedingStopMode);
+            Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
+            Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+
+            Assert.NotNull(logs);
+            Assert.Contains(logs, log => log.EventType == "service.runtime_settings.updated");
+        }
+    }
+
+    [Fact]
     public async Task GetTorrents_ReturnsPersistedTorrentAfterAdd()
     {
         await using var factory = CreateFactory();
