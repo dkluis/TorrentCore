@@ -79,6 +79,7 @@ Current service configuration section:
 - the settings page now separates currently applied engine throttle values from saved restart-required throttle settings so operators do not see them as duplicate fields
 - the dashboard host-status section now exposes queue and runtime-state counts so operators can understand whether torrents are waiting on metadata capacity, waiting on download slots, actively transferring, seeding, paused, completed, or in error
 - the dashboard host-status section is now grouped into compact related cards so service, engine, queue/activity, and policy/storage information use screen width better instead of rendering as a single long vertical list
+- the repo now includes an explicit Intel Mac deployment target document covering the target folder layout, mounted-share deployment path, and required `zsh` start/stop/restart/deploy scripts for the service and web UI
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -522,3 +523,4 @@ Next:
 - continue expanding MonoTorrent diagnostics so operators can understand why torrents are queued, resolving, downloading, seeding, or blocked
 - continue building the operator-facing path so more current MonoTorrent configuration can move from config files into the web UI
 - extend the UI from basic settings and actions into richer operator diagnostics and controls
+- add Intel Mac deployment packaging and `zsh` operational scripts for service/web publish, deploy, start, stop, and restart

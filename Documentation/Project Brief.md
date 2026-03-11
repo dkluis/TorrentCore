@@ -167,3 +167,4 @@ The initial scaffold is a boundary-first starter:
 5. Add first magnet workflow end to end.
 6. Add explicit incomplete-file and seeding-policy behavior rather than relying on engine defaults.
 7. Add operator-managed global concurrency controls for metadata-resolution and download queue execution.
+8. Add Intel Mac deployment packaging and operational scripts for service/web start, stop, restart, and publish/copy deployment.

@@ -19,6 +19,7 @@ Start with these docs:
 - `Documentation/Initial Scaffold Status.md`
 - `Documentation/New Chat Starter.md`
 - `Documentation/Operator Settings Reference.md`
+- `Documentation/Intel Mac Deployment Target.md`
 
 Repository legal documents:
 - `LICENSE.md`
