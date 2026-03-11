@@ -32,6 +32,12 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
     private string _updatedAtSummary = string.Empty;
 
     [ObservableProperty]
+    private string _retrievedAtSummary = string.Empty;
+
+    [ObservableProperty]
+    private bool _supportsLiveUpdates;
+
+    [ObservableProperty]
     private string _seedingStopMode = "Unlimited";
 
     [ObservableProperty]
@@ -195,7 +201,9 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
             ? $"Enabled ({settings.PartialFileSuffix})"
             : "Disabled";
         PersistedOverridesSummary = settings.UsesPersistedOverrides ? "Yes" : "No";
+        SupportsLiveUpdates = settings.SupportsLiveUpdates;
         UpdatedAtSummary = settings.UpdatedAtUtc?.ToLocalTime().ToString("g") ?? "Not yet changed";
+        RetrievedAtSummary = settings.RetrievedAtUtc.ToLocalTime().ToString("g");
         SeedingStopMode = settings.SeedingStopMode;
         SeedingStopRatio = settings.SeedingStopRatio;
         SeedingStopMinutes = settings.SeedingStopMinutes;

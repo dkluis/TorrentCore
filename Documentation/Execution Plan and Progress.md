@@ -105,6 +105,7 @@ Current service configuration section:
 - the web UI now has an explicit mobile-responsive pass for iPhone-sized browsers: core pages use wrapped toolbars, long values break safely, and torrents/logs render as stacked cards on small screens instead of forcing dense wide tables
 - the repo now includes a first Avalonia desktop operator client under `src/TorrentCore.Avalonia`, using a TVMaze-inspired shell/theme and the existing `TorrentCore.Client` boundary for Dashboard, Torrents, Logs, Settings, and Torrent Detail flows
 - the Avalonia project is now integrated into `TorrentCore.sln`, reads its service endpoint from `src/TorrentCore.Avalonia/Config/appsettings.json`, and currently coexists with the existing web UI rather than replacing it
+- the Avalonia Settings screen has been regrouped into smaller desktop cards for runtime summary, applied throttles, seeding policy, cleanup policy, queue limits, log throttling, and saved engine throttle settings so the full current runtime surface is visible without oversized horizontal grids
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
