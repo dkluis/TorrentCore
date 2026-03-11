@@ -29,21 +29,21 @@ else if (_torrent is not null)
                 <p class="text-muted mb-0">Torrent id: @_torrent.TorrentId</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
-                <button class="btn btn-secondary" @onclick="RefreshAsync" disabled="@_isBusy">Refresh</button>
+                <button class="btn btn-secondary" type="button" @onclick="RefreshAsync" disabled="@_isBusy">Refresh</button>
                 @if (_torrent.CanPause)
                 {
-                    <button class="btn btn-outline-secondary" @onclick="PauseAsync" disabled="@_isBusy">Pause</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="PauseAsync" disabled="@_isBusy">Pause</button>
                 }
                 @if (_torrent.CanResume)
                 {
-                    <button class="btn btn-outline-secondary" @onclick="ResumeAsync" disabled="@_isBusy">Resume</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ResumeAsync" disabled="@_isBusy">Resume</button>
                 }
                 @if (_torrent.CanRemove)
                 {
-                    <button class="btn btn-outline-danger" @onclick="RemoveAsync" disabled="@_isBusy">Remove</button>
+                    <button class="btn btn-outline-danger" type="button" @onclick="RemoveAsync" disabled="@_isBusy">Remove</button>
                     @if (CanDeleteData(_torrent))
                     {
-                        <button class="btn btn-danger" @onclick="DeleteDataAsync" disabled="@_isBusy">Delete Data</button>
+                        <button class="btn btn-danger" type="button" @onclick="DeleteDataAsync" disabled="@_isBusy">Delete Data</button>
                     }
                 }
             </div>
@@ -325,6 +325,11 @@ else if (_torrent is not null)
 
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
+            if (_isBusy)
+            {
+                continue;
+            }
+
             await InvokeAsync(async () =>
             {
                 await LoadAsync();

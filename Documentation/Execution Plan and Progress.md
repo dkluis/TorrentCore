@@ -85,6 +85,12 @@ Current service configuration section:
 - the web UI is now split so the Dashboard is host-status focused while magnet submission and torrent lifecycle management live on a dedicated Torrents page
 - the web UI now includes a dedicated torrent detail page with deeper runtime diagnostics, local-time timestamps, action controls, and recent per-torrent log history
 - pausing a MonoTorrent torrent during metadata resolution now explicitly stops the manager so later sync passes do not project it back to `ResolvingMetadata`, and regression coverage now verifies paused state is preserved in both detail and list views
+- the Torrents page now supports multi-select bulk actions for pause and remove using the existing torrent lifecycle API calls
+- the earlier host-wide `Pause All` and `Resume All` controls were intentionally backed back out of the Torrents page after operator testing showed inconsistent behavior and poor responsiveness under real MonoTorrent load; row-level and selected-row lifecycle actions remain in place
+- paused MonoTorrent torrents are now treated as operator-sticky during sync and queue reconciliation, so background metadata/download scheduling cannot project them back into `ResolvingMetadata` or other active states until the operator explicitly resumes them
+- MonoTorrent stop handling now treats the engine's intermediate `Stopping` state as an in-progress stop instead of throwing through the background synchronization service during pause and synchronization flows
+- MonoTorrent resume handling now waits for a paused manager to leave the engine's intermediate `Stopping` state before restarting, preventing rapid pause/resume flows from failing with a 500 while the manager is still winding down
+- MonoTorrent queue reconciliation now re-reads current persisted torrent state before starting or reprojecting a manager, which prevents a fresh operator pause from being overwritten by a stale pre-pause scheduling snapshot
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

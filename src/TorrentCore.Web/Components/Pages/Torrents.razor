@@ -31,13 +31,15 @@ else
             <label class="form-label" for="magnetUri">Magnet URI</label>
             <input id="magnetUri" class="form-control" @bind="_magnetUri" />
         </div>
-        <button class="btn btn-primary" @onclick="AddMagnetAsync" disabled="@_isSubmitting">Add Torrent</button>
+        <button class="btn btn-primary" type="button" @onclick="AddMagnetAsync" disabled="@_isSubmitting">Add Torrent</button>
     </section>
 
     <section>
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="mb-0">Current Torrents</h2>
-            <button class="btn btn-secondary" @onclick="RefreshAsync" disabled="@_isLoading || _isSubmitting">Refresh</button>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-secondary" type="button" @onclick="RefreshAsync" disabled="@(_isLoading || _isSubmitting || _isBulkRunning)">Refresh</button>
+            </div>
         </div>
 
         <div class="row g-3 mb-3">
@@ -75,6 +77,28 @@ else
             <p>@_actionMessage</p>
         }
 
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <button class="btn btn-outline-secondary"
+                    type="button"
+                    @onclick="PauseSelectedAsync"
+                    disabled="@(_isLoading || _isSubmitting || _isBulkRunning || SelectedTorrentCount == 0)">
+                Pause Selected
+            </button>
+            <button class="btn btn-outline-danger"
+                    type="button"
+                    @onclick="RemoveSelectedAsync"
+                    disabled="@(_isLoading || _isSubmitting || _isBulkRunning || SelectedTorrentCount == 0)">
+                Remove Selected
+            </button>
+            <button class="btn btn-outline-secondary"
+                    type="button"
+                    @onclick="ClearSelection"
+                    disabled="@(SelectedTorrentCount == 0 || _isBulkRunning)">
+                Clear Selection
+            </button>
+            <span class="align-self-center text-muted">Selected: @SelectedTorrentCount</span>
+        </div>
+
         @if (VisibleTorrents.Count == 0)
         {
             <p>No torrents matched the current filters.</p>
@@ -84,6 +108,11 @@ else
             <table class="table">
                 <thead>
                 <tr>
+                    <th>
+                        <input type="checkbox"
+                               checked="@AreAllVisibleSelected"
+                               @onchange="ToggleSelectAllVisible" />
+                    </th>
                     <th>Name</th>
                     <th>Status</th>
                     <th>Wait</th>
@@ -99,6 +128,11 @@ else
                 @foreach (var torrent in VisibleTorrents)
                 {
                     <tr>
+                        <td>
+                            <input type="checkbox"
+                                   checked="@IsSelected(torrent.TorrentId)"
+                                   @onchange="args => ToggleSelection(torrent.TorrentId, args.Value)" />
+                        </td>
                         <td><a href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a></td>
                         <td>@torrent.State</td>
                         <td>@FormatWaitReason(torrent)</td>
@@ -112,6 +146,7 @@ else
                                 @if (torrent.CanPause)
                                 {
                                     <button class="btn btn-sm btn-outline-secondary"
+                                            type="button"
                                             @onclick="() => PauseAsync(torrent)"
                                             disabled="@IsActionBusy(torrent.TorrentId)">
                                         Pause
@@ -120,6 +155,7 @@ else
                                 @if (torrent.CanResume)
                                 {
                                     <button class="btn btn-sm btn-outline-secondary"
+                                            type="button"
                                             @onclick="() => ResumeAsync(torrent)"
                                             disabled="@IsActionBusy(torrent.TorrentId)">
                                         Resume
@@ -132,6 +168,7 @@ else
                                         Details
                                     </a>
                                     <button class="btn btn-sm btn-outline-danger"
+                                            type="button"
                                             @onclick="() => RemoveAsync(torrent, deleteData: false)"
                                             disabled="@IsActionBusy(torrent.TorrentId)">
                                         Remove
@@ -139,6 +176,7 @@ else
                                     @if (CanDeleteData(torrent))
                                     {
                                         <button class="btn btn-sm btn-danger"
+                                                type="button"
                                                 @onclick="() => RemoveAsync(torrent, deleteData: true)"
                                                 disabled="@IsActionBusy(torrent.TorrentId)">
                                             Delete Data
@@ -162,11 +200,13 @@ else
     private string? _actionMessage;
     private bool _isLoading = true;
     private bool _isSubmitting;
+    private bool _isBulkRunning;
     private string _magnetUri = "magnet:?xt=urn:btih:1234567890ABCDEF1234567890ABCDEF12345678&dn=Phase%200%20Sample";
     private string _nameFilter = string.Empty;
     private string _statusFilter = string.Empty;
     private TorrentSortOption _sortOption = TorrentSortOption.AddedNewest;
     private readonly HashSet<Guid> _busyTorrentIds = [];
+    private readonly HashSet<Guid> _selectedTorrentIds = [];
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private CancellationTokenSource? _refreshLoopCts;
     private Task? _refreshLoopTask;
@@ -178,6 +218,11 @@ else
                 .Where(MatchesStatusFilter)
                 .ToArray())
         .ToArray();
+
+    private int SelectedTorrentCount => _selectedTorrentIds.Count;
+
+    private bool AreAllVisibleSelected =>
+        VisibleTorrents.Count > 0 && VisibleTorrents.All(torrent => _selectedTorrentIds.Contains(torrent.TorrentId));
 
     protected override async Task OnInitializedAsync()
     {
@@ -194,6 +239,7 @@ else
         {
             _error = null;
             _torrents = await TorrentCoreClient.GetTorrentsAsync();
+            _selectedTorrentIds.RemoveWhere(torrentId => _torrents.All(torrent => torrent.TorrentId != torrentId));
         }
         catch (Exception exception)
         {
@@ -332,6 +378,43 @@ else
 
     private bool IsActionBusy(Guid torrentId) => _busyTorrentIds.Contains(torrentId);
 
+    private bool IsSelected(Guid torrentId) => _selectedTorrentIds.Contains(torrentId);
+
+    private void ToggleSelection(Guid torrentId, object? value)
+    {
+        var isSelected = ParseCheckboxValue(value);
+        if (isSelected)
+        {
+            _selectedTorrentIds.Add(torrentId);
+        }
+        else
+        {
+            _selectedTorrentIds.Remove(torrentId);
+        }
+    }
+
+    private void ToggleSelectAllVisible(ChangeEventArgs args)
+    {
+        var isSelected = ParseCheckboxValue(args.Value);
+
+        foreach (var torrent in VisibleTorrents)
+        {
+            if (isSelected)
+            {
+                _selectedTorrentIds.Add(torrent.TorrentId);
+            }
+            else
+            {
+                _selectedTorrentIds.Remove(torrent.TorrentId);
+            }
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _selectedTorrentIds.Clear();
+    }
+
     private bool MatchesNameFilter(TorrentSummaryDto torrent) =>
         string.IsNullOrWhiteSpace(_nameFilter) ||
         torrent.Name.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase);
@@ -357,12 +440,105 @@ else
     private static bool CanDeleteData(TorrentSummaryDto torrent) =>
         torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or TorrentState.Error or TorrentState.Paused;
 
+    private async Task PauseSelectedAsync()
+    {
+        var selectedTorrents = _torrents.Where(torrent => _selectedTorrentIds.Contains(torrent.TorrentId)).ToArray();
+        await RunBulkActionAsync(
+            selectedTorrents,
+            torrent => torrent.CanPause,
+            torrent => TorrentCoreClient.PauseAsync(torrent.TorrentId),
+            "Pause selected");
+    }
+
+    private async Task RemoveSelectedAsync()
+    {
+        var selectedTorrents = _torrents.Where(torrent => _selectedTorrentIds.Contains(torrent.TorrentId)).ToArray();
+        await RunBulkActionAsync(
+            selectedTorrents,
+            torrent => torrent.CanRemove,
+            torrent => TorrentCoreClient.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest { DeleteData = false }),
+            "Remove selected");
+    }
+
+    private async Task RunBulkActionAsync(
+        IEnumerable<TorrentSummaryDto> torrents,
+        Func<TorrentSummaryDto, bool> predicate,
+        Func<TorrentSummaryDto, Task<TorrentActionResultDto>> action,
+        string label)
+    {
+        var candidates = torrents.Where(predicate).ToArray();
+        if (candidates.Length == 0)
+        {
+            _actionMessage = $"{label}: no eligible torrents.";
+            return;
+        }
+
+        _isBulkRunning = true;
+        _submitMessage = null;
+        _actionMessage = null;
+
+        var successCount = 0;
+        var failureCount = 0;
+        var failureMessages = new List<string>();
+
+        foreach (var torrent in candidates)
+        {
+            if (!_busyTorrentIds.Add(torrent.TorrentId))
+            {
+                continue;
+            }
+
+            try
+            {
+                await action(torrent);
+                successCount++;
+            }
+            catch (TorrentCoreClientException exception)
+            {
+                failureCount++;
+                failureMessages.Add($"{torrent.Name}: {exception.ServiceError?.Message ?? exception.Message}");
+            }
+            catch (Exception exception)
+            {
+                failureCount++;
+                failureMessages.Add($"{torrent.Name}: {exception.Message}");
+            }
+            finally
+            {
+                _busyTorrentIds.Remove(torrent.TorrentId);
+            }
+        }
+
+        await LoadAsync();
+        _selectedTorrentIds.RemoveWhere(torrentId => _torrents.All(torrent => torrent.TorrentId != torrentId));
+
+        _actionMessage = failureCount == 0
+            ? $"{label}: {successCount} torrent(s) processed."
+            : $"{label}: {successCount} succeeded, {failureCount} failed. {string.Join(" | ", failureMessages.Take(3))}";
+
+        _isBulkRunning = false;
+    }
+
+    private static bool ParseCheckboxValue(object? value) =>
+        value switch
+        {
+            bool boolValue => boolValue,
+            string stringValue when bool.TryParse(stringValue, out var parsed) => parsed,
+            string stringValue when string.Equals(stringValue, "on", StringComparison.OrdinalIgnoreCase) => true,
+            _ => false,
+        };
+
     private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
 
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
+            if (_isSubmitting || _isBulkRunning || _busyTorrentIds.Count > 0)
+            {
+                continue;
+            }
+
             await InvokeAsync(async () =>
             {
                 await LoadAsync();

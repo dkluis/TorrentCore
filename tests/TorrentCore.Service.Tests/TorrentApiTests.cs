@@ -426,6 +426,16 @@ public sealed class TorrentApiTests
         Assert.Equal(TorrentState.Paused, pausedTorrent.State);
         Assert.NotNull(torrents);
         Assert.Contains(torrents, torrent => torrent.TorrentId == addedTorrent.TorrentId && torrent.State == TorrentState.Paused);
+
+        await Task.Delay(750);
+
+        var pausedTorrentAfterDelay = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+        var torrentsAfterDelay = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.NotNull(pausedTorrentAfterDelay);
+        Assert.Equal(TorrentState.Paused, pausedTorrentAfterDelay.State);
+        Assert.NotNull(torrentsAfterDelay);
+        Assert.Contains(torrentsAfterDelay, torrent => torrent.TorrentId == addedTorrent.TorrentId && torrent.State == TorrentState.Paused);
     }
 
     [Fact]
