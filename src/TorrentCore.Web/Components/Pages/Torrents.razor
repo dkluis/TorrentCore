@@ -99,7 +99,7 @@ else
                 @foreach (var torrent in VisibleTorrents)
                 {
                     <tr>
-                        <td>@torrent.Name</td>
+                        <td><a href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a></td>
                         <td>@torrent.State</td>
                         <td>@FormatWaitReason(torrent)</td>
                         <td>@torrent.ProgressPercent.ToString("0.0")%</td>
@@ -127,6 +127,10 @@ else
                                 }
                                 @if (torrent.CanRemove)
                                 {
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       href="@($"/torrents/{torrent.TorrentId:D}")">
+                                        Details
+                                    </a>
                                     <button class="btn btn-sm btn-outline-danger"
                                             @onclick="() => RemoveAsync(torrent, deleteData: false)"
                                             disabled="@IsActionBusy(torrent.TorrentId)">

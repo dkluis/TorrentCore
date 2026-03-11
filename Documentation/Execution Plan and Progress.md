@@ -83,6 +83,7 @@ Current service configuration section:
 - torrent DTOs now expose per-torrent wait reason and queue position so the UI can explain whether an item is waiting for metadata capacity, download capacity, paused by an operator, or blocked by error
 - host status now exposes available metadata/download slots plus aggregated current peer count and transfer rates so queue pressure and engine saturation are easier to understand
 - the web UI is now split so the Dashboard is host-status focused while magnet submission and torrent lifecycle management live on a dedicated Torrents page
+- the web UI now includes a dedicated torrent detail page with deeper runtime diagnostics, local-time timestamps, action controls, and recent per-torrent log history
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
