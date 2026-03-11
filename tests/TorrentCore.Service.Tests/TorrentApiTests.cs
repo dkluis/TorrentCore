@@ -551,6 +551,140 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_MultiplePausedQueuedTorrents_ReenterMetadataQueueInOrder_OnResume()
+    {
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            maxActiveMetadataResolutions: 1);
+        using var httpClient = factory.CreateClient();
+
+        var firstResponse = await AddMagnetAsync(httpClient, "6D6D6D6D6D6D6D6D6D6D6D6D6D6D6D6D6D6D6D6D", "MonoTorrent Multi One");
+        var firstTorrent = await firstResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var secondResponse = await AddMagnetAsync(httpClient, "6E6E6E6E6E6E6E6E6E6E6E6E6E6E6E6E6E6E6E6E", "MonoTorrent Multi Two");
+        var secondTorrent = await secondResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var thirdResponse = await AddMagnetAsync(httpClient, "6F6F6F6F6F6F6F6F6F6F6F6F6F6F6F6F6F6F6F6F", "MonoTorrent Multi Three");
+        var thirdTorrent = await thirdResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            torrents => torrents is not null &&
+                        torrents.Any(torrent => torrent.TorrentId == firstTorrent!.TorrentId && torrent.State == TorrentState.ResolvingMetadata) &&
+                        torrents.Any(torrent => torrent.TorrentId == secondTorrent!.TorrentId &&
+                                               torrent.State == TorrentState.Queued &&
+                                               torrent.WaitReason == TorrentWaitReason.WaitingForMetadataSlot &&
+                                               torrent.QueuePosition == 1) &&
+                        torrents.Any(torrent => torrent.TorrentId == thirdTorrent!.TorrentId &&
+                                               torrent.State == TorrentState.Queued &&
+                                               torrent.WaitReason == TorrentWaitReason.WaitingForMetadataSlot &&
+                                               torrent.QueuePosition == 2),
+            timeout: TimeSpan.FromSeconds(5));
+
+        (await httpClient.PostAsync($"api/torrents/{secondTorrent!.TorrentId}/pause", content: null)).EnsureSuccessStatusCode();
+        (await httpClient.PostAsync($"api/torrents/{thirdTorrent!.TorrentId}/pause", content: null)).EnsureSuccessStatusCode();
+
+        var pausedTorrents = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            torrents => torrents is not null &&
+                        torrents.Any(torrent => torrent.TorrentId == firstTorrent!.TorrentId && torrent.State == TorrentState.ResolvingMetadata) &&
+                        torrents.Any(torrent => torrent.TorrentId == secondTorrent.TorrentId &&
+                                               torrent.State == TorrentState.Paused &&
+                                               torrent.WaitReason == TorrentWaitReason.PausedByOperator) &&
+                        torrents.Any(torrent => torrent.TorrentId == thirdTorrent.TorrentId &&
+                                               torrent.State == TorrentState.Paused &&
+                                               torrent.WaitReason == TorrentWaitReason.PausedByOperator),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(pausedTorrents);
+
+        (await httpClient.PostAsync($"api/torrents/{secondTorrent.TorrentId}/resume", content: null)).EnsureSuccessStatusCode();
+        (await httpClient.PostAsync($"api/torrents/{thirdTorrent.TorrentId}/resume", content: null)).EnsureSuccessStatusCode();
+
+        var resumedTorrents = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            torrents => torrents is not null &&
+                        torrents.Any(torrent => torrent.TorrentId == firstTorrent!.TorrentId && torrent.State == TorrentState.ResolvingMetadata) &&
+                        torrents.Any(torrent => torrent.TorrentId == secondTorrent.TorrentId &&
+                                               torrent.State == TorrentState.Queued &&
+                                               torrent.WaitReason == TorrentWaitReason.WaitingForMetadataSlot &&
+                                               torrent.QueuePosition == 1) &&
+                        torrents.Any(torrent => torrent.TorrentId == thirdTorrent.TorrentId &&
+                                               torrent.State == TorrentState.Queued &&
+                                               torrent.WaitReason == TorrentWaitReason.WaitingForMetadataSlot &&
+                                               torrent.QueuePosition == 2),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(resumedTorrents);
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_PausedTorrent_StaysPausedAcrossRestart()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-pause-restart");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var addResponse = await AddMagnetAsync(httpClient, "7070707070707070707070707070707070707070", "MonoTorrent Restart Pause");
+            var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+
+            var pauseResponse = await httpClient.PostAsync($"api/torrents/{torrentId}/pause", content: null);
+            pauseResponse.EnsureSuccessStatusCode();
+
+            await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.State == TorrentState.Paused,
+                timeout: TimeSpan.FromSeconds(5));
+        }
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var pausedTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null &&
+                           torrent.State == TorrentState.Paused &&
+                           torrent.WaitReason == TorrentWaitReason.PausedByOperator,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+            Assert.NotNull(pausedTorrent);
+            Assert.Equal(TorrentState.Paused, pausedTorrent.State);
+            Assert.Equal(TorrentWaitReason.PausedByOperator, pausedTorrent.WaitReason);
+
+            Assert.NotNull(torrents);
+            Assert.Contains(
+                torrents,
+                torrent => torrent.TorrentId == torrentId &&
+                           torrent.State == TorrentState.Paused &&
+                           torrent.WaitReason == TorrentWaitReason.PausedByOperator);
+
+            await Task.Delay(750);
+
+            var pausedTorrentAfterDelay = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}");
+
+            Assert.NotNull(pausedTorrentAfterDelay);
+            Assert.Equal(TorrentState.Paused, pausedTorrentAfterDelay.State);
+            Assert.Equal(TorrentWaitReason.PausedByOperator, pausedTorrentAfterDelay.WaitReason);
+        }
+    }
+
+    [Fact]
     public async Task FakeRuntime_EventuallyResolvesMetadata_AndCompletesDownload()
     {
         await using var factory = CreateFactory(

@@ -94,6 +94,7 @@ Current service configuration section:
 - MonoTorrent queue reconciliation now re-reads current persisted torrent state before starting or reprojecting a manager, which prevents a fresh operator pause from being overwritten by a stale pre-pause scheduling snapshot
 - pause/resume refactoring has started around a TorrentCore-owned desired-state model: torrent snapshots now persist `Runnable` vs `Paused` intent, read endpoints no longer trigger synchronization, MonoTorrent state-change events no longer write torrent state directly, and scheduler-owned synchronization now serializes pause/resume intent changes with manager start/stop decisions
 - service/API regression coverage now explicitly verifies that repeated list/detail reads do not mutate a paused MonoTorrent torrent and that resuming a paused queued torrent under metadata-slot pressure leaves it queued with the correct wait reason instead of starting immediately
+- MonoTorrent hardening coverage now also verifies selected-style multi-torrent pause/resume under metadata-slot pressure and confirms a paused MonoTorrent torrent stays paused across full service restart and recovery
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
