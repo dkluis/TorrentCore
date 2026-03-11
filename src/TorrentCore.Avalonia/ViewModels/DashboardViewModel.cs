@@ -26,6 +26,12 @@ public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBas
     public string MaxDownloadRateText => FormatRateLimit(HostStatus?.EngineMaximumDownloadRateBytesPerSecond ?? 0);
     public string MaxUploadRateText => FormatRateLimit(HostStatus?.EngineMaximumUploadRateBytesPerSecond ?? 0);
     public string RecoveryCompletedText => HostStatus?.StartupRecoveryCompletedAtUtc?.ToLocalTime().ToString("g") ?? "Not yet completed";
+    public string SupportsLiveControlText => HostStatus is null
+        ? string.Empty
+        : $"Magnet Adds={HostStatus.SupportsMagnetAdds}, Pause={HostStatus.SupportsPause}, Resume={HostStatus.SupportsResume}, Remove={HostStatus.SupportsRemove}";
+    public string HostModelText => HostStatus is null
+        ? string.Empty
+        : $"Persistent Storage={HostStatus.SupportsPersistentStorage}, Multi Host={HostStatus.SupportsMultiHost}";
 
     [RelayCommand]
     public async Task RefreshAsync() => await LoadAsync();
@@ -50,6 +56,8 @@ public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBas
             OnPropertyChanged(nameof(MaxDownloadRateText));
             OnPropertyChanged(nameof(MaxUploadRateText));
             OnPropertyChanged(nameof(RecoveryCompletedText));
+            OnPropertyChanged(nameof(SupportsLiveControlText));
+            OnPropertyChanged(nameof(HostModelText));
         }
         catch (Exception exception)
         {

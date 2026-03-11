@@ -55,8 +55,12 @@
             <TextBlock Text="{Binding HostStatus.EngineRuntime, StringFormat='Runtime: {0}'}" />
             <TextBlock Text="{Binding HostStatus.EngineListenPort, StringFormat='Listen Port: {0}'}" />
             <TextBlock Text="{Binding HostStatus.EngineDhtPort, StringFormat='DHT Port: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EnginePortForwardingEnabled, StringFormat='Port Forwarding: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineLocalPeerDiscoveryEnabled, StringFormat='Local Peer Discovery: {0}'}" />
             <TextBlock Text="{Binding HostStatus.EngineMaximumConnections, StringFormat='Max Connections: {0}'}" />
             <TextBlock Text="{Binding HostStatus.EngineMaximumHalfOpenConnections, StringFormat='Max Half-Open: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineConnectionFailureLogBurstLimit, StringFormat='Failure Burst Limit: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineConnectionFailureLogWindowSeconds, StringFormat='Failure Window Seconds: {0}'}" />
             <TextBlock Text="{Binding HostStatus.CurrentConnectedPeerCount, StringFormat='Connected Peers: {0}'}" />
             <TextBlock Text="{Binding CurrentDownloadRateText, StringFormat='Current Download: {0}'}" />
             <TextBlock Text="{Binding CurrentUploadRateText, StringFormat='Current Upload: {0}'}" />
@@ -94,7 +98,10 @@
             <TextBlock Text="{Binding HostStatus.PartialFilesEnabled, StringFormat='Partial Files: {0}'}" />
             <TextBlock Text="{Binding HostStatus.PartialFileSuffix, StringFormat='Partial Suffix: {0}'}" />
             <TextBlock Text="{Binding HostStatus.SeedingStopMode, StringFormat='Seeding Mode: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.SeedingStopRatio, StringFormat='Seeding Ratio: {0:0.00}'}" />
+            <TextBlock Text="{Binding HostStatus.SeedingStopMinutes, StringFormat='Seeding Minutes: {0}'}" />
             <TextBlock Text="{Binding HostStatus.CompletedTorrentCleanupMode, StringFormat='Cleanup Mode: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.CompletedTorrentCleanupMinutes, StringFormat='Cleanup Minutes: {0}'}" />
             <TextBlock Text="{Binding HostStatus.SupportsPersistentStorage, StringFormat='Persistent Storage: {0}'}" />
             <TextBlock Text="{Binding HostStatus.StartupRecoveryCompleted, StringFormat='Startup Recovery: {0}'}" />
             <TextBlock Text="{Binding HostStatus.StartupRecoveredTorrentCount, StringFormat='Recovered At Startup: {0}'}" />
@@ -105,6 +112,14 @@
             <SelectableTextBlock Text="{Binding HostStatus.DownloadRootPath, StringFormat='Download Root: {0}'}"
                                  Classes="text-body-small"
                                  TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Capabilities" Classes="text-section-title" />
+            <TextBlock Text="{Binding SupportsLiveControlText}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding HostModelText}" TextWrapping="Wrap" />
           </StackPanel>
         </Border>
       </WrapPanel>

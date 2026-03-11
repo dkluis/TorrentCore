@@ -21,6 +21,9 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
     private string _selectedStatus = "All";
 
     [ObservableProperty]
+    private string _selectedSort = "Added (Newest)";
+
+    [ObservableProperty]
     private bool _isLoading;
 
     [ObservableProperty]
@@ -41,8 +44,19 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
         "All",
         ..Enum.GetNames<TorrentState>(),
     ]);
+    public ObservableCollection<string> SortOptions { get; } = new(
+    [
+        "Added (Newest)",
+        "Name",
+        "State",
+        "Progress (High to Low)",
+    ]);
 
     public int SelectedTorrentCount => _allTorrents.Count(item => item.IsSelected);
+    public int TotalTorrentCount => _allTorrents.Count;
+    public int VisibleTorrentCount => VisibleTorrents.Count;
+    public bool HasVisibleTorrents => VisibleTorrentCount > 0;
+    public bool HasNoVisibleTorrents => !IsLoading && !HasVisibleTorrents;
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
@@ -54,6 +68,7 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
 
     partial void OnNameFilterChanged(string value) => RebuildVisibleTorrents();
     partial void OnSelectedStatusChanged(string value) => RebuildVisibleTorrents();
+    partial void OnSelectedSortChanged(string value) => RebuildVisibleTorrents();
 
     [RelayCommand]
     public async Task RefreshAsync() => await LoadAsync();
@@ -346,8 +361,15 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
             .Where(item => string.IsNullOrWhiteSpace(NameFilter) || item.Name.Contains(NameFilter, StringComparison.OrdinalIgnoreCase))
             .Where(item => string.Equals(SelectedStatus, "All", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(item.State.ToString(), SelectedStatus, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(item => item.AddedAtUtc)
             .ToArray();
+
+        filtered = SelectedSort switch
+        {
+            "Name" => filtered.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
+            "State" => filtered.OrderBy(item => item.State.ToString(), StringComparer.OrdinalIgnoreCase).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
+            "Progress (High to Low)" => filtered.OrderByDescending(item => item.ProgressPercent).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
+            _ => filtered.OrderByDescending(item => item.AddedAtUtc).ToArray(),
+        };
 
         VisibleTorrents.Clear();
         foreach (var torrent in filtered)
@@ -369,6 +391,10 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
     private void RaiseComputedState()
     {
         OnPropertyChanged(nameof(SelectedTorrentCount));
+        OnPropertyChanged(nameof(TotalTorrentCount));
+        OnPropertyChanged(nameof(VisibleTorrentCount));
+        OnPropertyChanged(nameof(HasVisibleTorrents));
+        OnPropertyChanged(nameof(HasNoVisibleTorrents));
         OnPropertyChanged(nameof(CanRunBulkActions));
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(HasActionMessage));

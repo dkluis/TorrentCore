@@ -90,6 +90,10 @@ public partial class TorrentListItemViewModel : ViewModelBase
     public string ProgressText => $"{ProgressPercent:0.0}%";
     public string DownloadRateText => $"{DownloadRateBytesPerSecond / 1_000_000.0:0.00} MB/s";
     public string UploadRateText => $"{UploadRateBytesPerSecond / 1_000_000.0:0.00} MB/s";
+    public string AddedAtLocalText => AddedAtUtc.ToLocalTime().ToString("g");
+    public string CompletedAtLocalText => CompletedAtUtc?.ToLocalTime().ToString("g") ?? "Not completed";
+    public string LastActivityAtLocalText => LastActivityAtUtc?.ToLocalTime().ToString("g") ?? "No recent activity";
+    public bool HasErrorMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public string WaitReasonText => WaitReason switch
     {
@@ -132,5 +136,9 @@ public partial class TorrentListItemViewModel : ViewModelBase
         OnPropertyChanged(nameof(UploadRateText));
         OnPropertyChanged(nameof(WaitReasonText));
         OnPropertyChanged(nameof(WaitAndQueueText));
+        OnPropertyChanged(nameof(AddedAtLocalText));
+        OnPropertyChanged(nameof(CompletedAtLocalText));
+        OnPropertyChanged(nameof(LastActivityAtLocalText));
+        OnPropertyChanged(nameof(HasErrorMessage));
     }
 }

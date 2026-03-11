@@ -2,7 +2,6 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
-using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.Avalonia.ViewModels;
@@ -24,7 +23,7 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
     [ObservableProperty]
     private string? _actionMessage;
 
-    public ObservableCollection<ActivityLogEntryDto> Logs { get; } = [];
+    public ObservableCollection<ActivityLogEntryItemViewModel> Logs { get; } = [];
 
     public bool HasTorrent => Torrent is not null;
 
@@ -37,6 +36,10 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
     public string UploadRateText => FormatRate(Torrent?.UploadRateBytesPerSecond ?? 0);
     public string DownloadedText => FormatBytes(Torrent?.DownloadedBytes ?? 0);
     public string TotalSizeText => Torrent?.TotalBytes is null ? "Pending metadata" : FormatBytes(Torrent.TotalBytes.Value);
+    public string MetadataResolvedText => Torrent?.TotalBytes is null ? "No" : "Yes";
+    public string ErrorText => string.IsNullOrWhiteSpace(Torrent?.ErrorMessage) ? "None" : Torrent!.ErrorMessage!;
+    public string InfoHashText => string.IsNullOrWhiteSpace(Torrent?.InfoHash) ? "Pending metadata" : Torrent!.InfoHash!;
+    public string MagnetUriText => Torrent?.MagnetUri ?? string.Empty;
     public string AddedAtLocalText => Torrent?.AddedAtUtc.ToLocalTime().ToString("g") ?? string.Empty;
     public string CompletedAtLocalText => Torrent?.CompletedAtUtc?.ToLocalTime().ToString("g") ?? "Not completed";
     public string LastActivityAtLocalText => Torrent?.LastActivityAtUtc?.ToLocalTime().ToString("g") ?? "No recent activity";
@@ -138,7 +141,7 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
             var entries = await client.GetRecentLogsAsync(take: 20, torrentId: torrentId);
             foreach (var entry in entries)
             {
-                Logs.Add(entry);
+                Logs.Add(new ActivityLogEntryItemViewModel(entry));
             }
 
             RaiseComputedState();
@@ -194,6 +197,10 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
         OnPropertyChanged(nameof(UploadRateText));
         OnPropertyChanged(nameof(DownloadedText));
         OnPropertyChanged(nameof(TotalSizeText));
+        OnPropertyChanged(nameof(MetadataResolvedText));
+        OnPropertyChanged(nameof(ErrorText));
+        OnPropertyChanged(nameof(InfoHashText));
+        OnPropertyChanged(nameof(MagnetUriText));
         OnPropertyChanged(nameof(AddedAtLocalText));
         OnPropertyChanged(nameof(CompletedAtLocalText));
         OnPropertyChanged(nameof(LastActivityAtLocalText));

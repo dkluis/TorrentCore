@@ -106,6 +106,7 @@ Current service configuration section:
 - the repo now includes a first Avalonia desktop operator client under `src/TorrentCore.Avalonia`, using a TVMaze-inspired shell/theme and the existing `TorrentCore.Client` boundary for Dashboard, Torrents, Logs, Settings, and Torrent Detail flows
 - the Avalonia project is now integrated into `TorrentCore.sln`, reads its service endpoint from `src/TorrentCore.Avalonia/Config/appsettings.json`, and currently coexists with the existing web UI rather than replacing it
 - the Avalonia Settings screen has been regrouped into smaller desktop cards for runtime summary, applied throttles, seeding policy, cleanup policy, queue limits, log throttling, and saved engine throttle settings so the full current runtime surface is visible without oversized horizontal grids
+- the Avalonia Dashboard, Torrents, Torrent Detail, and Logs screens have now started the same panel-completeness pass: Dashboard exposes more engine/policy/capability fields, Torrents includes sort plus more timing/error fields, Torrent Detail surfaces richer transfer/identity/log metadata, and Logs now exposes fuller filter choices plus more per-entry diagnostics
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

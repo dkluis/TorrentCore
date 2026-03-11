@@ -39,36 +39,45 @@
       <Border Classes="panel-card">
         <StackPanel Spacing="12">
           <TextBlock Text="Filters And Bulk Actions" Classes="text-section-title" />
-          <Grid ColumnDefinitions="2*,180,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+          <Grid ColumnDefinitions="2*,180,180,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
             <TextBox Text="{Binding NameFilter}"
                      Watermark="Filter by name" />
             <ComboBox Grid.Column="1"
                       ItemsSource="{Binding StatusOptions}"
                       SelectedItem="{Binding SelectedStatus}" />
-            <Button Grid.Column="2"
+            <ComboBox Grid.Column="2"
+                      ItemsSource="{Binding SortOptions}"
+                      SelectedItem="{Binding SelectedSort}" />
+            <Button Grid.Column="3"
                     Classes="toolbar-action"
                     Content="Pause Selected"
                     Command="{Binding PauseSelectedCommand}"
                     IsEnabled="{Binding CanRunBulkActions}" />
-            <Button Grid.Column="3"
+            <Button Grid.Column="4"
                     Classes="toolbar-action"
                     Content="Resume Selected"
                     Command="{Binding ResumeSelectedCommand}"
                     IsEnabled="{Binding CanRunBulkActions}" />
-            <Button Grid.Column="4"
+            <Button Grid.Column="5"
                     Classes="toolbar-action danger"
                     Content="Remove Selected"
                     Command="{Binding RemoveSelectedCommand}"
                     IsEnabled="{Binding CanRunBulkActions}" />
-            <Button Grid.Column="5"
+            <Button Grid.Column="6"
                     Classes="toolbar-action"
                     Content="Select Visible"
                     Command="{Binding SelectVisibleCommand}" />
-            <Button Grid.Column="6"
+            <Button Grid.Column="7"
                     Classes="toolbar-action"
                     Content="Clear Selection"
                     Command="{Binding ClearSelectionCommand}" />
           </Grid>
+          <TextBlock Text="{Binding TotalTorrentCount, StringFormat='Total: {0}'}"
+                     Classes="text-body-small"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+          <TextBlock Text="{Binding VisibleTorrentCount, StringFormat='Visible: {0}'}"
+                     Classes="text-body-small"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
           <TextBlock Text="{Binding SelectedTorrentCount, StringFormat='Selected: {0}'}"
                      Classes="text-body-small"
                      Foreground="{DynamicResource TextSecondaryBrush}" />
@@ -87,7 +96,8 @@
         <TextBlock Text="Loading torrents..." />
       </Border>
 
-      <ItemsControl ItemsSource="{Binding VisibleTorrents}">
+      <ItemsControl ItemsSource="{Binding VisibleTorrents}"
+                    IsVisible="{Binding HasVisibleTorrents}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:TorrentListItemViewModel">
             <Border Classes="panel-card" Margin="0,0,0,14">
@@ -130,6 +140,21 @@
                   </StackPanel>
                 </Grid>
 
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="Added" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding AddedAtLocalText}" Classes="text-body-small" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="3">
+                    <TextBlock Text="Last Activity" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding LastActivityAtLocalText}" Classes="text-body-small" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="3">
+                    <TextBlock Text="Completed" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding CompletedAtLocalText}" Classes="text-body-small" />
+                  </StackPanel>
+                </Grid>
+
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Button Classes="toolbar-action"
                           Content="Details"
@@ -154,6 +179,7 @@
                 </StackPanel>
 
                 <TextBlock Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding HasErrorMessage}"
                            Foreground="{DynamicResource ErrorTextBrush}"
                            TextWrapping="Wrap" />
               </StackPanel>
@@ -161,6 +187,10 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+
+      <TextBlock Text="No torrents matched the current filters."
+                 IsVisible="{Binding HasNoVisibleTorrents}"
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
     </StackPanel>
   </ScrollViewer>
 </UserControl>

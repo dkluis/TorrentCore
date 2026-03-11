@@ -2,12 +2,13 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
-using TorrentCore.Contracts.Diagnostics;
-
 namespace TorrentCore.Avalonia.ViewModels;
 
 public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
 {
+    [ObservableProperty]
+    private bool _autoRefresh;
+
     [ObservableProperty]
     private int _take = 100;
 
@@ -29,9 +30,18 @@ public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
     [ObservableProperty]
     private string? _errorMessage;
 
-    public ObservableCollection<ActivityLogEntryDto> Entries { get; } = [];
+    [ObservableProperty]
+    private string _lastRefreshedText = string.Empty;
+
+    public ObservableCollection<ActivityLogEntryItemViewModel> Entries { get; } = [];
+    public IReadOnlyList<int> TakeOptions { get; } = [20, 50, 100, 200];
+    public IReadOnlyList<string> LevelOptions { get; } = ["", "Information", "Warning", "Error"];
+    public IReadOnlyList<string> CategoryOptions { get; } = ["", "startup", "engine", "torrent", "runtime"];
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public bool HasEntries => Entries.Count > 0;
+    public bool HasNoEntries => !IsLoading && !HasEntries && !HasError;
+    public bool HasLastRefreshed => !string.IsNullOrWhiteSpace(LastRefreshedText);
 
     [RelayCommand]
     public async Task RefreshAsync() => await LoadAsync();
@@ -81,8 +91,10 @@ public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
             Entries.Clear();
             foreach (var entry in logs)
             {
-                Entries.Add(entry);
+                Entries.Add(new ActivityLogEntryItemViewModel(entry));
             }
+
+            LastRefreshedText = DateTimeOffset.Now.ToString("g");
         }
         catch (Exception exception)
         {
@@ -92,6 +104,9 @@ public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
         {
             IsLoading = false;
             OnPropertyChanged(nameof(HasError));
+            OnPropertyChanged(nameof(HasEntries));
+            OnPropertyChanged(nameof(HasNoEntries));
+            OnPropertyChanged(nameof(HasLastRefreshed));
         }
     }
 }
