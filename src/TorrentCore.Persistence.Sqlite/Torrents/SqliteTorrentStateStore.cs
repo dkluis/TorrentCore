@@ -83,6 +83,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 torrent_id,
                 name,
                 state,
+                desired_state,
                 magnet_uri,
                 info_hash,
                 download_root_path,
@@ -121,6 +122,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 torrent_id,
                 name,
                 state,
+                desired_state,
                 magnet_uri,
                 info_hash,
                 download_root_path,
@@ -195,23 +197,24 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 TorrentId = Guid.Parse(reader.GetString(0)),
                 Name = reader.GetString(1),
                 State = Enum.Parse<TorrentState>(reader.GetString(2), ignoreCase: true),
-                MagnetUri = reader.GetString(3),
-                InfoHash = reader.IsDBNull(4) ? null : reader.GetString(4),
-                DownloadRootPath = reader.IsDBNull(5) ? null : reader.GetString(5),
-                SavePath = reader.GetString(6),
-                ProgressPercent = reader.GetDouble(7),
-                DownloadedBytes = reader.GetInt64(8),
-                UploadedBytes = reader.GetInt64(9),
-                TotalBytes = reader.IsDBNull(10) ? null : reader.GetInt64(10),
-                DownloadRateBytesPerSecond = reader.GetInt64(11),
-                UploadRateBytesPerSecond = reader.GetInt64(12),
-                TrackerCount = reader.GetInt32(13),
-                ConnectedPeerCount = reader.GetInt32(14),
-                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(15), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                CompletedAtUtc = reader.IsDBNull(16) ? null : DateTimeOffset.Parse(reader.GetString(16), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                SeedingStartedAtUtc = reader.IsDBNull(17) ? null : DateTimeOffset.Parse(reader.GetString(17), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                LastActivityAtUtc = reader.IsDBNull(18) ? null : DateTimeOffset.Parse(reader.GetString(18), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                ErrorMessage = reader.IsDBNull(19) ? null : reader.GetString(19),
+                DesiredState = Enum.Parse<TorrentDesiredState>(reader.GetString(3), ignoreCase: true),
+                MagnetUri = reader.GetString(4),
+                InfoHash = reader.IsDBNull(5) ? null : reader.GetString(5),
+                DownloadRootPath = reader.IsDBNull(6) ? null : reader.GetString(6),
+                SavePath = reader.GetString(7),
+                ProgressPercent = reader.GetDouble(8),
+                DownloadedBytes = reader.GetInt64(9),
+                UploadedBytes = reader.GetInt64(10),
+                TotalBytes = reader.IsDBNull(11) ? null : reader.GetInt64(11),
+                DownloadRateBytesPerSecond = reader.GetInt64(12),
+                UploadRateBytesPerSecond = reader.GetInt64(13),
+                TrackerCount = reader.GetInt32(14),
+                ConnectedPeerCount = reader.GetInt32(15),
+                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(16), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                CompletedAtUtc = reader.IsDBNull(17) ? null : DateTimeOffset.Parse(reader.GetString(17), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                SeedingStartedAtUtc = reader.IsDBNull(18) ? null : DateTimeOffset.Parse(reader.GetString(18), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                LastActivityAtUtc = reader.IsDBNull(19) ? null : DateTimeOffset.Parse(reader.GetString(19), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                ErrorMessage = reader.IsDBNull(20) ? null : reader.GetString(20),
             });
         }
 
@@ -227,6 +230,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 torrent_id,
                 name,
                 state,
+                desired_state,
                 magnet_uri,
                 info_hash,
                 download_root_path,
@@ -249,6 +253,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 $torrent_id,
                 $name,
                 $state,
+                $desired_state,
                 $magnet_uri,
                 $info_hash,
                 $download_root_path,
@@ -282,6 +287,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             SET
                 name = $name,
                 state = $state,
+                desired_state = $desired_state,
                 magnet_uri = $magnet_uri,
                 info_hash = $info_hash,
                 download_root_path = $download_root_path,
@@ -311,6 +317,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue("$torrent_id", torrent.TorrentId.ToString());
         command.Parameters.AddWithValue("$name", torrent.Name);
         command.Parameters.AddWithValue("$state", torrent.State.ToString());
+        command.Parameters.AddWithValue("$desired_state", torrent.DesiredState.ToString());
         command.Parameters.AddWithValue("$magnet_uri", torrent.MagnetUri);
         command.Parameters.AddWithValue("$info_hash", torrent.InfoHash ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$download_root_path", torrent.DownloadRootPath ?? (object)DBNull.Value);

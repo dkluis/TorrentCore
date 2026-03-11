@@ -87,10 +87,13 @@ Current service configuration section:
 - pausing a MonoTorrent torrent during metadata resolution now explicitly stops the manager so later sync passes do not project it back to `ResolvingMetadata`, and regression coverage now verifies paused state is preserved in both detail and list views
 - the Torrents page now supports multi-select bulk actions for pause and remove using the existing torrent lifecycle API calls
 - the earlier host-wide `Pause All` and `Resume All` controls were intentionally backed back out of the Torrents page after operator testing showed inconsistent behavior and poor responsiveness under real MonoTorrent load; row-level and selected-row lifecycle actions remain in place
+- the Torrents page bulk toolbar now includes `Resume Selected` so multi-select pause/resume can be exercised and hardened without reintroducing host-wide pause-all/resume-all controls
 - paused MonoTorrent torrents are now treated as operator-sticky during sync and queue reconciliation, so background metadata/download scheduling cannot project them back into `ResolvingMetadata` or other active states until the operator explicitly resumes them
 - MonoTorrent stop handling now treats the engine's intermediate `Stopping` state as an in-progress stop instead of throwing through the background synchronization service during pause and synchronization flows
 - MonoTorrent resume handling now waits for a paused manager to leave the engine's intermediate `Stopping` state before restarting, preventing rapid pause/resume flows from failing with a 500 while the manager is still winding down
 - MonoTorrent queue reconciliation now re-reads current persisted torrent state before starting or reprojecting a manager, which prevents a fresh operator pause from being overwritten by a stale pre-pause scheduling snapshot
+- pause/resume refactoring has started around a TorrentCore-owned desired-state model: torrent snapshots now persist `Runnable` vs `Paused` intent, read endpoints no longer trigger synchronization, MonoTorrent state-change events no longer write torrent state directly, and scheduler-owned synchronization now serializes pause/resume intent changes with manager start/stop decisions
+- service/API regression coverage now explicitly verifies that repeated list/detail reads do not mutate a paused MonoTorrent torrent and that resuming a paused queued torrent under metadata-slot pressure leaves it queued with the correct wait reason instead of starting immediately
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

@@ -124,6 +124,7 @@ public sealed class PersistedTorrentEngineAdapter(
             DownloadRootPath = downloadRootPath,
             SavePath = Path.Combine(downloadRootPath, SanitizePathSegment(magnet.DisplayName)),
             State = TorrentState.ResolvingMetadata,
+            DesiredState = TorrentDesiredState.Runnable,
             ProgressPercent = 0,
             DownloadedBytes = 0,
             UploadedBytes = 0,
@@ -153,6 +154,7 @@ public sealed class PersistedTorrentEngineAdapter(
                 nameof(torrentId));
         }
 
+        torrent.DesiredState = TorrentDesiredState.Paused;
         torrent.State = TorrentState.Paused;
         torrent.DownloadRateBytesPerSecond = 0;
         torrent.UploadRateBytesPerSecond = 0;
@@ -183,6 +185,7 @@ public sealed class PersistedTorrentEngineAdapter(
                 nameof(torrentId));
         }
 
+        torrent.DesiredState = TorrentDesiredState.Runnable;
         torrent.State = torrent.ProgressPercent >= 100 ? TorrentState.Completed : TorrentState.Queued;
         torrent.DownloadRateBytesPerSecond = 0;
         torrent.UploadRateBytesPerSecond = 0;

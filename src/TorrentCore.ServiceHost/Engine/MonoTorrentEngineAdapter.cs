@@ -24,6 +24,7 @@ public sealed class MonoTorrentEngineAdapter(
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _synchronizationGate = new(1, 1);
     private readonly Dictionary<Guid, TorrentManager> _managers = new();
     private readonly HashSet<Guid> _observedTorrentIds = [];
     private readonly ConcurrentDictionary<Guid, long> _observedUploadedSessionBytes = new();
@@ -104,6 +105,7 @@ public sealed class MonoTorrentEngineAdapter(
         }
 
         _gate.Dispose();
+        _synchronizationGate.Dispose();
     }
 
     public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken) =>
@@ -137,7 +139,7 @@ public sealed class MonoTorrentEngineAdapter(
                     var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
                     var previousState = snapshot.State;
 
-                    if (ShouldStartOnRecovery(snapshot.State))
+                    if (ShouldStartOnRecovery(snapshot))
                     {
                         if (updatedSnapshot.State != ContractTorrentState.Completed &&
                             updatedSnapshot.State != ContractTorrentState.Paused &&
@@ -200,61 +202,25 @@ public sealed class MonoTorrentEngineAdapter(
             _gate.Release();
         }
 
-        await ReconcileRuntimeQueueAsync(cancellationToken);
+        await SynchronizeAsync(cancellationToken);
         return recoveryResult!;
     }
 
     public async Task SynchronizeAsync(CancellationToken cancellationToken)
     {
-        await EnsureInitializedAsync(cancellationToken);
-
-        List<KeyValuePair<Guid, TorrentManager>> managers;
-
-        await _gate.WaitAsync(cancellationToken);
+        await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
-            if (!_recovered)
-            {
-                return;
-            }
-
-            managers = _managers.ToList();
+            await SynchronizeCoreAsync(cancellationToken);
         }
         finally
         {
-            _gate.Release();
+            _synchronizationGate.Release();
         }
-
-        var now = DateTimeOffset.UtcNow;
-
-        foreach (var entry in managers)
-        {
-            var snapshot = await torrentStateStore.GetAsync(entry.Key, cancellationToken);
-            if (snapshot is null)
-            {
-                continue;
-            }
-
-            if (snapshot.State == ContractTorrentState.Paused && IsManagerRunning(entry.Value))
-            {
-                await EnsureManagerStoppedAsync(entry.Value, cancellationToken);
-            }
-
-            var updatedSnapshot = CreateUpdatedSnapshot(snapshot, entry.Value, now);
-            if (updatedSnapshot.State == ContractTorrentState.Seeding)
-            {
-                updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(updatedSnapshot, entry.Value, now, cancellationToken);
-            }
-
-            await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
-        }
-
-        await ReconcileRuntimeQueueAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken)
     {
-        await SynchronizeAsync(cancellationToken);
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         var diagnostics = TorrentQueueDiagnostics.Create(torrents, runtimeSettings);
@@ -263,7 +229,6 @@ public sealed class MonoTorrentEngineAdapter(
 
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
-        await SynchronizeAsync(cancellationToken);
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
         var torrent = torrents.SingleOrDefault(snapshot => snapshot.TorrentId == torrentId);
         return torrent is null
@@ -323,6 +288,7 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentId = torrentId,
             Name = string.IsNullOrWhiteSpace(magnet.Name) ? $"Magnet {infoHash[..8]}" : magnet.Name,
             State = ContractTorrentState.Queued,
+            DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = infoHash,
             DownloadRootPath = downloadRootPath,
@@ -352,7 +318,7 @@ public sealed class MonoTorrentEngineAdapter(
             _gate.Release();
         }
 
-        await ReconcileRuntimeQueueAsync(cancellationToken);
+        await SynchronizeAsync(cancellationToken);
 
         var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
         return MapDetail(persistedSnapshot, new TorrentQueueDiagnostic(null, null));
@@ -371,28 +337,29 @@ public sealed class MonoTorrentEngineAdapter(
                 nameof(torrentId));
         }
 
-        await manager.PauseAsync();
-        await EnsureManagerStoppedAsync(manager, cancellationToken);
-
-        var now = DateTimeOffset.UtcNow;
-        var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
-        updatedSnapshot.State = ContractTorrentState.Paused;
-        updatedSnapshot.DownloadRateBytesPerSecond = 0;
-        updatedSnapshot.UploadRateBytesPerSecond = 0;
-        updatedSnapshot.ConnectedPeerCount = 0;
-        updatedSnapshot.LastActivityAtUtc = now;
-        await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
-
-        await ReconcileRuntimeQueueAsync(cancellationToken);
-
-        return new TorrentActionResultDto
+        await _synchronizationGate.WaitAsync(cancellationToken);
+        try
         {
-            TorrentId = torrentId,
-            Action = "pause",
-            State = updatedSnapshot.State,
-            ProcessedAtUtc = now,
-            DataDeleted = false,
-        };
+            var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
+            var now = DateTimeOffset.UtcNow;
+            var updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+
+            await SynchronizeCoreAsync(cancellationToken);
+
+            return new TorrentActionResultDto
+            {
+                TorrentId = torrentId,
+                Action = "pause",
+                State = updatedSnapshot.State,
+                ProcessedAtUtc = now,
+                DataDeleted = false,
+            };
+        }
+        finally
+        {
+            _synchronizationGate.Release();
+        }
     }
 
     public async Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -408,26 +375,32 @@ public sealed class MonoTorrentEngineAdapter(
                 nameof(torrentId));
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var queuedSnapshot = CreateQueuedSnapshot(CreateUpdatedSnapshot(snapshot, manager, now), now);
-        queuedSnapshot.ErrorMessage = null;
-        await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
-
-        await WaitForManagerToBecomeRestartableAsync(manager, cancellationToken);
-        await manager.StartAsync();
-
-        await ReconcileRuntimeQueueAsync(cancellationToken);
-
-        var updatedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? queuedSnapshot;
-
-        return new TorrentActionResultDto
+        await _synchronizationGate.WaitAsync(cancellationToken);
+        try
         {
-            TorrentId = torrentId,
-            Action = "resume",
-            State = updatedSnapshot.State,
-            ProcessedAtUtc = now,
-            DataDeleted = false,
-        };
+            var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
+            var now = DateTimeOffset.UtcNow;
+            var queuedSnapshot = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            queuedSnapshot.ErrorMessage = null;
+            await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
+
+            await SynchronizeCoreAsync(cancellationToken);
+
+            var updatedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? queuedSnapshot;
+
+            return new TorrentActionResultDto
+            {
+                TorrentId = torrentId,
+                Action = "resume",
+                State = updatedSnapshot.State,
+                ProcessedAtUtc = now,
+                DataDeleted = false,
+            };
+        }
+        finally
+        {
+            _synchronizationGate.Release();
+        }
     }
 
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
@@ -462,7 +435,7 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentDataPathCleanup.DeleteEmptyDirectories(snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath, cleanupCandidateDirectories);
         }
 
-        await ReconcileRuntimeQueueAsync(cancellationToken);
+        await SynchronizeAsync(cancellationToken);
 
         return new TorrentActionResultDto
         {
@@ -658,6 +631,9 @@ public sealed class MonoTorrentEngineAdapter(
         await ReconcileMetadataResolutionQueueAsync(managedTorrents, runtimeSettings.MaxActiveMetadataResolutions, now, cancellationToken);
 
         managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
+        await ReconcileSeedingQueueAsync(managedTorrents, now, cancellationToken);
+
+        managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
         await ReconcileDownloadQueueAsync(managedTorrents, runtimeSettings.MaxActiveDownloads, now, cancellationToken);
     }
 
@@ -688,6 +664,63 @@ public sealed class MonoTorrentEngineAdapter(
         return managedTorrents;
     }
 
+    private async Task SynchronizeCoreAsync(CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        List<KeyValuePair<Guid, TorrentManager>> managers;
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_recovered)
+            {
+                return;
+            }
+
+            managers = _managers.ToList();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+
+        foreach (var entry in managers)
+        {
+            var snapshot = await torrentStateStore.GetAsync(entry.Key, cancellationToken);
+            if (snapshot is null)
+            {
+                continue;
+            }
+
+            TorrentSnapshot updatedSnapshot;
+
+            if (snapshot.DesiredState == TorrentDesiredState.Paused)
+            {
+                if (IsManagerRunning(entry.Value))
+                {
+                    await EnsureManagerStoppedAsync(entry.Value, cancellationToken);
+                }
+
+                updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(snapshot, entry.Value, now), now);
+            }
+            else
+            {
+                updatedSnapshot = CreateUpdatedSnapshot(snapshot, entry.Value, now);
+                if (updatedSnapshot.State == ContractTorrentState.Seeding)
+                {
+                    updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(updatedSnapshot, entry.Value, now, cancellationToken);
+                }
+            }
+
+            await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+        }
+
+        await ReconcileRuntimeQueueAsync(cancellationToken);
+    }
+
     private async Task ReconcileMetadataResolutionQueueAsync(
         IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents,
         int maxActiveMetadataResolutions,
@@ -695,7 +728,8 @@ public sealed class MonoTorrentEngineAdapter(
         CancellationToken cancellationToken)
     {
         var candidates = managedTorrents
-            .Where(entry => entry.Snapshot.State is not ContractTorrentState.Paused and not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed)
+            .Where(entry => entry.Snapshot.DesiredState == TorrentDesiredState.Runnable)
+            .Where(entry => entry.Snapshot.State is not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed)
             .Where(entry => !entry.Manager.HasMetadata && !entry.Manager.Complete)
             .OrderBy(entry => entry.Snapshot.AddedAtUtc)
             .ThenBy(entry => entry.Snapshot.TorrentId)
@@ -706,17 +740,15 @@ public sealed class MonoTorrentEngineAdapter(
             var (snapshot, manager) = candidates[index];
             var currentSnapshot = await torrentStateStore.GetAsync(snapshot.TorrentId, cancellationToken);
             if (currentSnapshot is null ||
-                currentSnapshot.State is ContractTorrentState.Paused or ContractTorrentState.Completed or ContractTorrentState.Error or ContractTorrentState.Removed)
+                currentSnapshot.DesiredState == TorrentDesiredState.Paused ||
+                currentSnapshot.State is ContractTorrentState.Completed or ContractTorrentState.Error or ContractTorrentState.Removed)
             {
                 continue;
             }
 
             if (index < maxActiveMetadataResolutions)
             {
-                if (!IsManagerRunning(manager))
-                {
-                    await manager.StartAsync();
-                }
+                await EnsureManagerStartedAsync(manager, cancellationToken);
 
                 var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
                 updatedSnapshot.State = ContractTorrentState.ResolvingMetadata;
@@ -728,10 +760,42 @@ public sealed class MonoTorrentEngineAdapter(
 
             if (IsManagerRunning(manager))
             {
-                await manager.StopAsync(TimeSpan.FromSeconds(2));
+                await EnsureManagerStoppedAsync(manager, cancellationToken);
             }
 
             await torrentStateStore.UpdateAsync(CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now), cancellationToken);
+        }
+    }
+
+    private async Task ReconcileSeedingQueueAsync(
+        IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var candidates = managedTorrents
+            .Where(entry => entry.Snapshot.DesiredState == TorrentDesiredState.Runnable)
+            .Where(entry => entry.Snapshot.State is not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed)
+            .Where(entry => entry.Manager.HasMetadata && entry.Manager.Complete)
+            .OrderBy(entry => entry.Snapshot.AddedAtUtc)
+            .ThenBy(entry => entry.Snapshot.TorrentId)
+            .ToList();
+
+        foreach (var (snapshot, manager) in candidates)
+        {
+            var currentSnapshot = await torrentStateStore.GetAsync(snapshot.TorrentId, cancellationToken);
+            if (currentSnapshot is null ||
+                currentSnapshot.DesiredState == TorrentDesiredState.Paused ||
+                currentSnapshot.State is ContractTorrentState.Completed or ContractTorrentState.Error or ContractTorrentState.Removed)
+            {
+                continue;
+            }
+
+            await EnsureManagerStartedAsync(manager, cancellationToken);
+
+            var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
+            updatedSnapshot.State = ContractTorrentState.Seeding;
+            updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(updatedSnapshot, manager, now, cancellationToken);
+            await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
         }
     }
 
@@ -742,7 +806,8 @@ public sealed class MonoTorrentEngineAdapter(
         CancellationToken cancellationToken)
     {
         var candidates = managedTorrents
-            .Where(entry => entry.Snapshot.State is not ContractTorrentState.Paused and not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed)
+            .Where(entry => entry.Snapshot.DesiredState == TorrentDesiredState.Runnable)
+            .Where(entry => entry.Snapshot.State is not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed)
             .Where(entry => entry.Manager.HasMetadata && !entry.Manager.Complete)
             .OrderBy(entry => entry.Snapshot.AddedAtUtc)
             .ThenBy(entry => entry.Snapshot.TorrentId)
@@ -753,17 +818,15 @@ public sealed class MonoTorrentEngineAdapter(
             var (snapshot, manager) = candidates[index];
             var currentSnapshot = await torrentStateStore.GetAsync(snapshot.TorrentId, cancellationToken);
             if (currentSnapshot is null ||
-                currentSnapshot.State is ContractTorrentState.Paused or ContractTorrentState.Completed or ContractTorrentState.Error or ContractTorrentState.Removed)
+                currentSnapshot.DesiredState == TorrentDesiredState.Paused ||
+                currentSnapshot.State is ContractTorrentState.Completed or ContractTorrentState.Error or ContractTorrentState.Removed)
             {
                 continue;
             }
 
             if (index < maxActiveDownloads)
             {
-                if (!IsManagerRunning(manager))
-                {
-                    await manager.StartAsync();
-                }
+                await EnsureManagerStartedAsync(manager, cancellationToken);
 
                 var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
                 if (updatedSnapshot.State == ContractTorrentState.Queued && IsManagerRunning(manager))
@@ -777,7 +840,7 @@ public sealed class MonoTorrentEngineAdapter(
 
             if (IsManagerRunning(manager))
             {
-                await manager.StopAsync(TimeSpan.FromSeconds(2));
+                await EnsureManagerStoppedAsync(manager, cancellationToken);
             }
 
             await torrentStateStore.UpdateAsync(CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now), cancellationToken);
@@ -786,7 +849,7 @@ public sealed class MonoTorrentEngineAdapter(
 
     private TorrentSnapshot CreateUpdatedSnapshot(TorrentSnapshot existing, TorrentManager manager, DateTimeOffset now)
     {
-        var state = MapState(manager, existing.State);
+        var state = MapState(manager, existing.State, existing.DesiredState);
         var totalBytes = manager.HasMetadata
             ? manager.Torrent?.Size ?? existing.TotalBytes
             : existing.TotalBytes ?? manager.MagnetLink?.Size;
@@ -804,6 +867,7 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentId = existing.TorrentId,
             Name = string.IsNullOrWhiteSpace(manager.Name) ? existing.Name : manager.Name,
             State = state,
+            DesiredState = existing.DesiredState,
             MagnetUri = existing.MagnetUri,
             InfoHash = manager.InfoHashes.V1OrV2.ToHex().ToUpperInvariant(),
             DownloadRootPath = existing.DownloadRootPath,
@@ -826,6 +890,7 @@ public sealed class MonoTorrentEngineAdapter(
 
     private static TorrentSnapshot CreateQueuedSnapshot(TorrentSnapshot snapshot, DateTimeOffset now)
     {
+        snapshot.DesiredState = TorrentDesiredState.Runnable;
         snapshot.State = ContractTorrentState.Queued;
         snapshot.ConnectedPeerCount = 0;
         snapshot.DownloadRateBytesPerSecond = 0;
@@ -851,17 +916,6 @@ public sealed class MonoTorrentEngineAdapter(
         try
         {
             var snapshot = await torrentStateStore.GetAsync(torrentId, CancellationToken.None);
-            if (snapshot is not null)
-            {
-                var now = DateTimeOffset.UtcNow;
-                var updatedSnapshot = CreateUpdatedSnapshot(snapshot, eventArgs.TorrentManager, now);
-                if (updatedSnapshot.State == ContractTorrentState.Seeding)
-                {
-                    updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(updatedSnapshot, eventArgs.TorrentManager, now, CancellationToken.None);
-                }
-
-                await torrentStateStore.UpdateAsync(updatedSnapshot, CancellationToken.None);
-            }
 
             await activityLogService.WriteAsync(new ActivityLogWriteRequest
             {
@@ -875,7 +929,10 @@ public sealed class MonoTorrentEngineAdapter(
                 {
                     OldState = eventArgs.OldState.ToString(),
                     NewState = eventArgs.NewState.ToString(),
-                    ContractState = MapState(eventArgs.TorrentManager, snapshot?.State ?? ContractTorrentState.Queued).ToString(),
+                    ContractState = MapState(
+                        eventArgs.TorrentManager,
+                        snapshot?.State ?? ContractTorrentState.Queued,
+                        snapshot?.DesiredState ?? TorrentDesiredState.Runnable).ToString(),
                     HasMetadata = eventArgs.TorrentManager.HasMetadata,
                     ProgressPercent = eventArgs.TorrentManager.Progress,
                 }),
@@ -1052,6 +1109,7 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
             State = ContractTorrentState.Completed,
+            DesiredState = snapshot.DesiredState,
             MagnetUri = snapshot.MagnetUri,
             InfoHash = snapshot.InfoHash,
             DownloadRootPath = snapshot.DownloadRootPath,
@@ -1093,9 +1151,9 @@ public sealed class MonoTorrentEngineAdapter(
         return completedSnapshot;
     }
 
-    private static ContractTorrentState MapState(TorrentManager manager, ContractTorrentState existingState)
+    private static ContractTorrentState MapState(TorrentManager manager, ContractTorrentState existingState, TorrentDesiredState desiredState)
     {
-        if (existingState == ContractTorrentState.Paused && manager.State is not MonoTorrent.Client.TorrentState.Error)
+        if (desiredState == TorrentDesiredState.Paused && manager.State is not MonoTorrent.Client.TorrentState.Error)
         {
             return ContractTorrentState.Paused;
         }
@@ -1106,24 +1164,23 @@ public sealed class MonoTorrentEngineAdapter(
             MonoTorrent.Client.TorrentState.Downloading => ContractTorrentState.Downloading,
             MonoTorrent.Client.TorrentState.Seeding => ContractTorrentState.Seeding,
             MonoTorrent.Client.TorrentState.Error => ContractTorrentState.Error,
-            MonoTorrent.Client.TorrentState.Paused => ContractTorrentState.Paused,
+            MonoTorrent.Client.TorrentState.Paused => desiredState == TorrentDesiredState.Paused ? ContractTorrentState.Paused : ContractTorrentState.Queued,
             MonoTorrent.Client.TorrentState.Hashing or MonoTorrent.Client.TorrentState.HashingPaused or MonoTorrent.Client.TorrentState.FetchingHashes => ContractTorrentState.Queued,
             MonoTorrent.Client.TorrentState.Starting => ContractTorrentState.Queued,
-            MonoTorrent.Client.TorrentState.Stopping => existingState,
+            MonoTorrent.Client.TorrentState.Stopping => desiredState == TorrentDesiredState.Paused ? ContractTorrentState.Paused : existingState == ContractTorrentState.Completed ? ContractTorrentState.Completed : ContractTorrentState.Queued,
             MonoTorrent.Client.TorrentState.Stopped => existingState switch
             {
-                ContractTorrentState.Paused => ContractTorrentState.Paused,
                 ContractTorrentState.Completed => ContractTorrentState.Completed,
-                ContractTorrentState.Seeding => ContractTorrentState.Seeding,
-                _ when manager.Complete => ContractTorrentState.Completed,
+                _ when manager.Complete => ContractTorrentState.Queued,
                 _ => ContractTorrentState.Queued,
             },
             _ => existingState,
         };
     }
 
-    private static bool ShouldStartOnRecovery(ContractTorrentState state) =>
-        state is not ContractTorrentState.Paused and not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed;
+    private static bool ShouldStartOnRecovery(TorrentSnapshot snapshot) =>
+        snapshot.DesiredState == TorrentDesiredState.Runnable &&
+        snapshot.State is not ContractTorrentState.Completed and not ContractTorrentState.Error and not ContractTorrentState.Removed;
 
     private static int CountTrackers(TorrentManager manager) =>
         manager.TrackerManager?.Tiers.Sum(tier => tier.Trackers.Count) ?? manager.MagnetLink?.AnnounceUrls?.Count ?? 0;
@@ -1146,6 +1203,16 @@ public sealed class MonoTorrentEngineAdapter(
 
         cancellationToken.ThrowIfCancellationRequested();
         await manager.StopAsync();
+    }
+
+    private static async Task EnsureManagerStartedAsync(TorrentManager manager, CancellationToken cancellationToken)
+    {
+        await WaitForManagerToBecomeRestartableAsync(manager, cancellationToken);
+
+        if (!IsManagerRunning(manager))
+        {
+            await manager.StartAsync();
+        }
     }
 
     private static async Task WaitForManagerToBecomeRestartableAsync(TorrentManager manager, CancellationToken cancellationToken)
@@ -1171,6 +1238,17 @@ public sealed class MonoTorrentEngineAdapter(
 
             await Task.Delay(50, cancellationToken);
         }
+    }
+
+    private static TorrentSnapshot CreatePausedSnapshot(TorrentSnapshot snapshot, DateTimeOffset now)
+    {
+        snapshot.DesiredState = TorrentDesiredState.Paused;
+        snapshot.State = ContractTorrentState.Paused;
+        snapshot.ConnectedPeerCount = 0;
+        snapshot.DownloadRateBytesPerSecond = 0;
+        snapshot.UploadRateBytesPerSecond = 0;
+        snapshot.LastActivityAtUtc = now;
+        return snapshot;
     }
 
     private static TorrentSummaryDto MapSummary(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)

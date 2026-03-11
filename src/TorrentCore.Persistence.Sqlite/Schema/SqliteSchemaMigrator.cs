@@ -171,6 +171,7 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                             torrent_id TEXT PRIMARY KEY,
                             name TEXT NOT NULL,
                             state TEXT NOT NULL,
+                            desired_state TEXT NOT NULL DEFAULT 'Runnable',
                             magnet_uri TEXT NOT NULL,
                             info_hash TEXT NULL,
                             download_root_path TEXT NULL,
@@ -245,6 +246,30 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                         );
                         """;
                     await command.ExecuteNonQueryAsync(cancellationToken);
+                }),
+            new SqliteMigrationDefinition(
+                7,
+                "add_torrents_desired_state",
+                async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "desired_state", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN desired_state TEXT NOT NULL DEFAULT 'Runnable';";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    var normalizeCommand = connection.CreateCommand();
+                    normalizeCommand.CommandText =
+                        """
+                        UPDATE torrents
+                        SET desired_state = CASE
+                            WHEN state = 'Paused' THEN 'Paused'
+                            ELSE 'Runnable'
+                        END
+                        WHERE desired_state IS NULL OR desired_state = '' OR state = 'Paused';
+                        """;
+                    await normalizeCommand.ExecuteNonQueryAsync(cancellationToken);
                 }),
         ];
     }

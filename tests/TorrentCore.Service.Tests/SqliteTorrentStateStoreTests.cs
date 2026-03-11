@@ -53,6 +53,7 @@ public sealed class SqliteTorrentStateStoreTests
             TorrentId = Guid.NewGuid(),
             Name = "Store Regression Torrent",
             State = TorrentState.Queued,
+            DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=Store%20Regression",
             InfoHash = "1111111111111111111111111111111111111111",
             DownloadRootPath = "/tmp/torrentcore-tests/downloads",

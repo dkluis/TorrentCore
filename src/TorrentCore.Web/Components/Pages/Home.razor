@@ -133,6 +133,7 @@ else if (_hostStatus is not null)
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private CancellationTokenSource? _refreshLoopCts;
     private Task? _refreshLoopTask;
+    private bool _isDisposed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -143,10 +144,20 @@ else if (_hostStatus is not null)
 
     private async Task LoadAsync()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         await _loadGate.WaitAsync();
 
         try
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             _error = null;
             _hostStatus = await TorrentCoreClient.GetHostStatusAsync();
         }
@@ -174,6 +185,11 @@ else if (_hostStatus is not null)
         {
             await InvokeAsync(async () =>
             {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
                 await LoadAsync();
                 StateHasChanged();
             });
@@ -188,6 +204,8 @@ else if (_hostStatus is not null)
 
     public async ValueTask DisposeAsync()
     {
+        _isDisposed = true;
+
         if (_refreshLoopCts is not null)
         {
             await _refreshLoopCts.CancelAsync();
@@ -204,7 +222,5 @@ else if (_hostStatus is not null)
             {
             }
         }
-
-        _loadGate.Dispose();
     }
 }

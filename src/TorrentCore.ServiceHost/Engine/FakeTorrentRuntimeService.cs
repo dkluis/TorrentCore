@@ -99,6 +99,7 @@ public sealed class FakeTorrentRuntimeService(
     {
         var activeResolutions = 0;
         var unresolvedTorrents = torrents
+            .Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable)
             .Where(torrent => torrent.TotalBytes is null && torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued)
             .OrderBy(torrent => torrent.AddedAtUtc)
             .ThenBy(torrent => torrent.TorrentId)
@@ -106,6 +107,11 @@ public sealed class FakeTorrentRuntimeService(
 
         foreach (var torrent in unresolvedTorrents)
         {
+            if (torrent.DesiredState == TorrentDesiredState.Paused)
+            {
+                continue;
+            }
+
             if (activeResolutions < runtimeSettings.MaxActiveMetadataResolutions)
             {
                 activeResolutions++;
@@ -188,6 +194,7 @@ public sealed class FakeTorrentRuntimeService(
 
         var availableSlots = runtimeSettings.MaxActiveDownloads - activeDownloadCount;
         var queuedTorrents = torrents
+            .Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable)
             .Where(torrent => torrent.State == TorrentState.Queued)
             .Where(torrent => torrent.TotalBytes is not null)
             .OrderBy(torrent => torrent.AddedAtUtc)
@@ -227,7 +234,7 @@ public sealed class FakeTorrentRuntimeService(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        foreach (var torrent in torrents)
+        foreach (var torrent in torrents.Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable))
         {
             torrent.TotalBytes ??= CalculateTotalBytes(torrent);
 
@@ -321,7 +328,7 @@ public sealed class FakeTorrentRuntimeService(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        foreach (var torrent in torrents)
+        foreach (var torrent in torrents.Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable))
         {
             torrent.CompletedAtUtc ??= now;
             torrent.SeedingStartedAtUtc ??= torrent.CompletedAtUtc ?? now;

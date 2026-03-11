@@ -84,6 +84,12 @@ else
                     disabled="@(_isLoading || _isSubmitting || _isBulkRunning || SelectedTorrentCount == 0)">
                 Pause Selected
             </button>
+            <button class="btn btn-outline-secondary"
+                    type="button"
+                    @onclick="ResumeSelectedAsync"
+                    disabled="@(_isLoading || _isSubmitting || _isBulkRunning || SelectedTorrentCount == 0)">
+                Resume Selected
+            </button>
             <button class="btn btn-outline-danger"
                     type="button"
                     @onclick="RemoveSelectedAsync"
@@ -210,6 +216,7 @@ else
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private CancellationTokenSource? _refreshLoopCts;
     private Task? _refreshLoopTask;
+    private bool _isDisposed;
 
     private IReadOnlyList<TorrentSummaryDto> VisibleTorrents =>
         ApplySort(
@@ -233,10 +240,20 @@ else
 
     private async Task LoadAsync()
     {
+        if (_isDisposed)
+        {
+            return;
+        }
+
         await _loadGate.WaitAsync();
 
         try
         {
+            if (_isDisposed)
+            {
+                return;
+            }
+
             _error = null;
             _torrents = await TorrentCoreClient.GetTorrentsAsync();
             _selectedTorrentIds.RemoveWhere(torrentId => _torrents.All(torrent => torrent.TorrentId != torrentId));
@@ -450,6 +467,16 @@ else
             "Pause selected");
     }
 
+    private async Task ResumeSelectedAsync()
+    {
+        var selectedTorrents = _torrents.Where(torrent => _selectedTorrentIds.Contains(torrent.TorrentId)).ToArray();
+        await RunBulkActionAsync(
+            selectedTorrents,
+            torrent => torrent.CanResume,
+            torrent => TorrentCoreClient.ResumeAsync(torrent.TorrentId),
+            "Resume selected");
+    }
+
     private async Task RemoveSelectedAsync()
     {
         var selectedTorrents = _torrents.Where(torrent => _selectedTorrentIds.Contains(torrent.TorrentId)).ToArray();
@@ -541,6 +568,11 @@ else
 
             await InvokeAsync(async () =>
             {
+                if (_isDisposed)
+                {
+                    return;
+                }
+
                 await LoadAsync();
                 StateHasChanged();
             });
@@ -549,6 +581,8 @@ else
 
     public async ValueTask DisposeAsync()
     {
+        _isDisposed = true;
+
         if (_refreshLoopCts is not null)
         {
             await _refreshLoopCts.CancelAsync();
@@ -565,8 +599,6 @@ else
             {
             }
         }
-
-        _loadGate.Dispose();
     }
 
     private enum TorrentSortOption
