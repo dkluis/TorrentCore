@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
+             x:Class="TorrentCore.Avalonia.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Dashboard" Classes="text-page-title" />
+          <TextBlock Text="Host health, engine saturation, and runtime policy summary."
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Classes="toolbar-action"
+                Content="Refresh"
+                Command="{Binding RefreshCommand}" />
+      </Grid>
+
+      <Border Classes="panel-card"
+              IsVisible="{Binding IsLoading}">
+        <TextBlock Text="Loading host status..." />
+      </Border>
+
+      <Border Classes="panel-card"
+              IsVisible="{Binding HasError}">
+        <TextBlock Text="{Binding ErrorMessage}"
+                   Foreground="{DynamicResource ErrorTextBrush}"
+                   TextWrapping="Wrap" />
+      </Border>
+
+      <WrapPanel Orientation="Horizontal"
+                 ItemWidth="310"
+                 IsVisible="{Binding HasHostStatus}">
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Service" Classes="text-section-title" />
+            <TextBlock Text="{Binding HostStatus.Status, StringFormat='Status: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.ServiceName, StringFormat='Service: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.ServiceVersion, StringFormat='Version: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EnvironmentName, StringFormat='Environment: {0}'}" />
+            <SelectableTextBlock Text="{Binding HostStatus.ServiceInstanceId, StringFormat='Instance: {0}'}"
+                                 Classes="text-body-small"
+                                 TextWrapping="Wrap" />
+            <TextBlock Text="{Binding CheckedAtLocalText, StringFormat='Checked: {0}'}"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Engine" Classes="text-section-title" />
+            <TextBlock Text="{Binding HostStatus.EngineRuntime, StringFormat='Runtime: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineListenPort, StringFormat='Listen Port: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineDhtPort, StringFormat='DHT Port: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineMaximumConnections, StringFormat='Max Connections: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.EngineMaximumHalfOpenConnections, StringFormat='Max Half-Open: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.CurrentConnectedPeerCount, StringFormat='Connected Peers: {0}'}" />
+            <TextBlock Text="{Binding CurrentDownloadRateText, StringFormat='Current Download: {0}'}" />
+            <TextBlock Text="{Binding CurrentUploadRateText, StringFormat='Current Upload: {0}'}" />
+            <TextBlock Text="{Binding MaxDownloadRateText, StringFormat='Max Download: {0}'}"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <TextBlock Text="{Binding MaxUploadRateText, StringFormat='Max Upload: {0}'}"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Queue And Activity" Classes="text-section-title" />
+            <TextBlock Text="{Binding HostStatus.TorrentCount, StringFormat='Total Torrents: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.MaxActiveMetadataResolutions, StringFormat='Max Metadata Slots: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.MaxActiveDownloads, StringFormat='Max Download Slots: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.AvailableMetadataResolutionSlots, StringFormat='Open Metadata Slots: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.AvailableDownloadSlots, StringFormat='Open Download Slots: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.ResolvingMetadataCount, StringFormat='Resolving Metadata: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.MetadataQueueCount, StringFormat='Queued For Metadata: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.DownloadingCount, StringFormat='Downloading: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.DownloadQueueCount, StringFormat='Queued For Download: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.SeedingCount, StringFormat='Seeding: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.PausedCount, StringFormat='Paused: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.CompletedCount, StringFormat='Completed: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.ErrorCount, StringFormat='Error: {0}'}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Policies And Storage" Classes="text-section-title" />
+            <TextBlock Text="{Binding HostStatus.PartialFilesEnabled, StringFormat='Partial Files: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.PartialFileSuffix, StringFormat='Partial Suffix: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.SeedingStopMode, StringFormat='Seeding Mode: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.CompletedTorrentCleanupMode, StringFormat='Cleanup Mode: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.SupportsPersistentStorage, StringFormat='Persistent Storage: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.StartupRecoveryCompleted, StringFormat='Startup Recovery: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.StartupRecoveredTorrentCount, StringFormat='Recovered At Startup: {0}'}" />
+            <TextBlock Text="{Binding HostStatus.StartupNormalizedTorrentCount, StringFormat='Normalized At Startup: {0}'}" />
+            <TextBlock Text="{Binding RecoveryCompletedText, StringFormat='Recovery Completed: {0}'}"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+            <SelectableTextBlock Text="{Binding HostStatus.DownloadRootPath, StringFormat='Download Root: {0}'}"
+                                 Classes="text-body-small"
+                                 TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

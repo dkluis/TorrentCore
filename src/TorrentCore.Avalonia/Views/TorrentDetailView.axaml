@@ -1,0 +1,150 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
+             xmlns:diag="using:TorrentCore.Contracts.Diagnostics"
+             x:Class="TorrentCore.Avalonia.Views.TorrentDetailView"
+             x:DataType="vm:TorrentDetailViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+        <Button Classes="toolbar-action"
+                Content="Back"
+                Command="{Binding BackCommand}" />
+        <StackPanel Grid.Column="1" Spacing="4">
+          <TextBlock Text="{Binding Torrent.Name, FallbackValue='Torrent Detail'}"
+                     Classes="text-page-title"
+                     TextWrapping="Wrap" />
+          <SelectableTextBlock Text="{Binding Torrent.TorrentId, StringFormat='Torrent Id: {0}'}"
+                               Classes="text-body-small"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" />
+        </StackPanel>
+        <Button Grid.Column="2"
+                Classes="toolbar-action"
+                Content="Refresh"
+                Command="{Binding RefreshCommand}" />
+        <Button Grid.Column="3"
+                Classes="toolbar-action"
+                Content="Pause"
+                Command="{Binding PauseCommand}"
+                IsEnabled="{Binding Torrent.CanPause}" />
+        <Button Grid.Column="4"
+                Classes="toolbar-action success"
+                Content="Resume"
+                Command="{Binding ResumeCommand}"
+                IsEnabled="{Binding Torrent.CanResume}" />
+        <Button Grid.Column="5"
+                Classes="toolbar-action danger"
+                Content="Remove"
+                Command="{Binding RemoveCommand}"
+                IsEnabled="{Binding Torrent.CanRemove}" />
+        <Button Grid.Column="6"
+                Classes="toolbar-action danger"
+                Content="Delete Data"
+                Command="{Binding DeleteDataCommand}"
+                IsEnabled="{Binding CanDeleteData}"
+                IsVisible="{Binding CanDeleteData}" />
+      </Grid>
+
+      <TextBlock Text="{Binding ActionMessage}"
+                 IsVisible="{Binding HasActionMessage}"
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
+
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding HasError}"
+                 Foreground="{DynamicResource ErrorTextBrush}"
+                 TextWrapping="Wrap" />
+
+      <Border Classes="panel-card"
+              IsVisible="{Binding IsLoading}">
+        <TextBlock Text="Loading torrent detail..." />
+      </Border>
+
+      <WrapPanel Orientation="Horizontal"
+                 ItemWidth="310"
+                 IsVisible="{Binding HasTorrent}">
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Runtime" Classes="text-section-title" />
+            <TextBlock Text="{Binding Torrent.State, StringFormat='Status: {0}'}" />
+            <TextBlock Text="{Binding WaitText, StringFormat='Wait: {0}'}" />
+            <TextBlock Text="{Binding Torrent.ProgressPercent, StringFormat='Progress: {0:0.0}%'}" />
+            <TextBlock Text="{Binding DownloadRateText, StringFormat='Download Rate: {0}'}" />
+            <TextBlock Text="{Binding UploadRateText, StringFormat='Upload Rate: {0}'}" />
+            <TextBlock Text="{Binding Torrent.ConnectedPeerCount, StringFormat='Peers: {0}'}" />
+            <TextBlock Text="{Binding Torrent.TrackerCount, StringFormat='Trackers: {0}'}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Transfer" Classes="text-section-title" />
+            <TextBlock Text="{Binding DownloadedText, StringFormat='Downloaded: {0}'}" />
+            <TextBlock Text="{Binding TotalSizeText, StringFormat='Total Size: {0}'}" />
+            <TextBlock Text="{Binding Torrent.TotalBytes, StringFormat='Metadata Resolved: {0}'}" />
+            <TextBlock Text="{Binding Torrent.ErrorMessage, StringFormat='Error: {0}', FallbackValue='Error: None'}"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Identity" Classes="text-section-title" />
+            <SelectableTextBlock Text="{Binding Torrent.InfoHash, StringFormat='Info Hash: {0}'}"
+                                 Classes="text-body-small"
+                                 TextWrapping="Wrap" />
+            <TextBlock Text="{Binding AddedAtLocalText, StringFormat='Added: {0}'}" />
+            <TextBlock Text="{Binding CompletedAtLocalText, StringFormat='Completed: {0}'}" />
+            <TextBlock Text="{Binding LastActivityAtLocalText, StringFormat='Last Activity: {0}'}" />
+            <SelectableTextBlock Text="{Binding Torrent.SavePath, StringFormat='Save Path: {0}'}"
+                                 Classes="text-body-small"
+                                 TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Magnet" Classes="text-section-title" />
+            <SelectableTextBlock Text="{Binding Torrent.MagnetUri}"
+                                 Classes="text-body-small"
+                                 TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+
+      <Border Classes="panel-card"
+              IsVisible="{Binding HasTorrent}">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Recent Torrent Logs" Classes="text-section-title" />
+          <ItemsControl ItemsSource="{Binding Logs}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="diag:ActivityLogEntryDto">
+                <Border BorderBrush="{DynamicResource RowDividerBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="0,0,0,10"
+                        Margin="0,0,0,10">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="{Binding OccurredAtUtc, StringFormat='When: {0:g}'}"
+                               Classes="text-body-small"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding EventType}"
+                               Classes="text-panel-title" />
+                    <TextBlock Text="{Binding Message}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Level, StringFormat='Level: {0}'}"
+                               Classes="text-body-small"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <SelectableTextBlock Text="{Binding DetailsJson}"
+                                         Classes="text-body-small"
+                                         TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -1,0 +1,97 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using TorrentCore.Client;
+using TorrentCore.Contracts.Diagnostics;
+
+namespace TorrentCore.Avalonia.ViewModels;
+
+public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
+{
+    [ObservableProperty]
+    private int _take = 100;
+
+    [ObservableProperty]
+    private string _category = string.Empty;
+
+    [ObservableProperty]
+    private string _eventType = string.Empty;
+
+    [ObservableProperty]
+    private string _level = string.Empty;
+
+    [ObservableProperty]
+    private string _torrentIdText = string.Empty;
+
+    [ObservableProperty]
+    private bool _isLoading;
+
+    [ObservableProperty]
+    private string? _errorMessage;
+
+    public ObservableCollection<ActivityLogEntryDto> Entries { get; } = [];
+
+    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    [RelayCommand]
+    public async Task RefreshAsync() => await LoadAsync();
+
+    [RelayCommand]
+    public async Task ClearFiltersAsync()
+    {
+        Category = string.Empty;
+        EventType = string.Empty;
+        Level = string.Empty;
+        TorrentIdText = string.Empty;
+        Take = 100;
+        await LoadAsync();
+    }
+
+    public async Task LoadAsync()
+    {
+        if (IsLoading)
+        {
+            return;
+        }
+
+        IsLoading = true;
+        ErrorMessage = null;
+
+        try
+        {
+            Guid? torrentId = null;
+            if (!string.IsNullOrWhiteSpace(TorrentIdText))
+            {
+                if (!Guid.TryParse(TorrentIdText, out var parsed))
+                {
+                    ErrorMessage = "Torrent Id filter must be a valid GUID.";
+                    return;
+                }
+
+                torrentId = parsed;
+            }
+
+            var logs = await client.GetRecentLogsAsync(
+                take: Math.Max(Take, 1),
+                category: string.IsNullOrWhiteSpace(Category) ? null : Category,
+                eventType: string.IsNullOrWhiteSpace(EventType) ? null : EventType,
+                level: string.IsNullOrWhiteSpace(Level) ? null : Level,
+                torrentId: torrentId);
+
+            Entries.Clear();
+            foreach (var entry in logs)
+            {
+                Entries.Add(entry);
+            }
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"Unable to load logs: {exception.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+            OnPropertyChanged(nameof(HasError));
+        }
+    }
+}

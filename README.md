@@ -5,6 +5,7 @@ TorrentCore is a standalone torrent engine product kept separate from TVMaze.
 Current repo scope:
 - standalone service host
 - standalone web admin UI
+- standalone Avalonia desktop admin UI
 - shared contracts and client library
 - SQLite persistence layer
 - explicit handoff docs for continuation in Rider

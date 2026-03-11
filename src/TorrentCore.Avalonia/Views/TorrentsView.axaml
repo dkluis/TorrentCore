@@ -1,0 +1,166 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
+             x:Class="TorrentCore.Avalonia.Views.TorrentsView"
+             x:DataType="vm:TorrentsViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Torrents" Classes="text-page-title" />
+          <TextBlock Text="Add magnets and manage active, queued, paused, completed, and errored torrents."
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Classes="toolbar-action"
+                Content="Refresh"
+                Command="{Binding RefreshCommand}" />
+      </Grid>
+
+      <Border Classes="panel-card">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Add Magnet" Classes="text-section-title" />
+          <TextBox Text="{Binding MagnetUri}"
+                   Watermark="magnet:?xt=urn:btih:..."
+                   TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="toolbar-action accent"
+                    Content="Add Torrent"
+                    Command="{Binding AddMagnetCommand}" />
+            <TextBlock Text="{Binding SubmitMessage}"
+                       IsVisible="{Binding HasSubmitMessage}"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="panel-card">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Filters And Bulk Actions" Classes="text-section-title" />
+          <Grid ColumnDefinitions="2*,180,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+            <TextBox Text="{Binding NameFilter}"
+                     Watermark="Filter by name" />
+            <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding StatusOptions}"
+                      SelectedItem="{Binding SelectedStatus}" />
+            <Button Grid.Column="2"
+                    Classes="toolbar-action"
+                    Content="Pause Selected"
+                    Command="{Binding PauseSelectedCommand}"
+                    IsEnabled="{Binding CanRunBulkActions}" />
+            <Button Grid.Column="3"
+                    Classes="toolbar-action"
+                    Content="Resume Selected"
+                    Command="{Binding ResumeSelectedCommand}"
+                    IsEnabled="{Binding CanRunBulkActions}" />
+            <Button Grid.Column="4"
+                    Classes="toolbar-action danger"
+                    Content="Remove Selected"
+                    Command="{Binding RemoveSelectedCommand}"
+                    IsEnabled="{Binding CanRunBulkActions}" />
+            <Button Grid.Column="5"
+                    Classes="toolbar-action"
+                    Content="Select Visible"
+                    Command="{Binding SelectVisibleCommand}" />
+            <Button Grid.Column="6"
+                    Classes="toolbar-action"
+                    Content="Clear Selection"
+                    Command="{Binding ClearSelectionCommand}" />
+          </Grid>
+          <TextBlock Text="{Binding SelectedTorrentCount, StringFormat='Selected: {0}'}"
+                     Classes="text-body-small"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+          <TextBlock Text="{Binding ActionMessage}"
+                     IsVisible="{Binding HasActionMessage}"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+          <TextBlock Text="{Binding ErrorMessage}"
+                     IsVisible="{Binding HasError}"
+                     Foreground="{DynamicResource ErrorTextBrush}"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="panel-card"
+              IsVisible="{Binding IsLoading}">
+        <TextBlock Text="Loading torrents..." />
+      </Border>
+
+      <ItemsControl ItemsSource="{Binding VisibleTorrents}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:TorrentListItemViewModel">
+            <Border Classes="panel-card" Margin="0,0,0,14">
+              <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                  <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top" />
+                  <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="{Binding Name}"
+                               Classes="text-panel-title"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding State, StringFormat='State: {0}'}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2"
+                             Text="{Binding ProgressText}"
+                             Classes="text-section-title"
+                             VerticalAlignment="Top" />
+                </Grid>
+
+                <Grid ColumnDefinitions="2*,*,*,Auto,Auto" ColumnSpacing="12">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="Wait" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding WaitAndQueueText}" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="3">
+                    <TextBlock Text="Down" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding DownloadRateText}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="3">
+                    <TextBlock Text="Up" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding UploadRateText}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="3" Spacing="3">
+                    <TextBlock Text="Trackers" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding TrackerCount}" HorizontalAlignment="Center" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="4" Spacing="3">
+                    <TextBlock Text="Peers" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                    <TextBlock Text="{Binding ConnectedPeerCount}" HorizontalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="toolbar-action"
+                          Content="Details"
+                          Command="{Binding OpenDetailCommand}" />
+                  <Button Classes="toolbar-action"
+                          Content="Pause"
+                          Command="{Binding PauseCommand}"
+                          IsEnabled="{Binding CanPause}" />
+                  <Button Classes="toolbar-action success"
+                          Content="Resume"
+                          Command="{Binding ResumeCommand}"
+                          IsEnabled="{Binding CanResume}" />
+                  <Button Classes="toolbar-action danger"
+                          Content="Remove"
+                          Command="{Binding RemoveCommand}"
+                          IsEnabled="{Binding CanRemove}" />
+                  <Button Classes="toolbar-action danger"
+                          Content="Delete Data"
+                          Command="{Binding DeleteDataCommand}"
+                          IsEnabled="{Binding CanDeleteData}" 
+                          IsVisible="{Binding CanDeleteData}" />
+                </StackPanel>
+
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="{DynamicResource ErrorTextBrush}"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

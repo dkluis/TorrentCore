@@ -103,6 +103,8 @@ Current service configuration section:
 - deployment docs now explicitly separate repo-side deploy from host-local runtime control and call out that `--restart` should only be used when deploy is executed on the actual target host, not from another machine against a mounted share
 - deploy wrappers are now kept repo-side only; target `~/TorrentCore/Scripts` directories receive only the shared runtime-control scripts, support files, and local operator overrides
 - the web UI now has an explicit mobile-responsive pass for iPhone-sized browsers: core pages use wrapped toolbars, long values break safely, and torrents/logs render as stacked cards on small screens instead of forcing dense wide tables
+- the repo now includes a first Avalonia desktop operator client under `src/TorrentCore.Avalonia`, using a TVMaze-inspired shell/theme and the existing `TorrentCore.Client` boundary for Dashboard, Torrents, Logs, Settings, and Torrent Detail flows
+- the Avalonia project is now integrated into `TorrentCore.sln`, reads its service endpoint from `src/TorrentCore.Avalonia/Config/appsettings.json`, and currently coexists with the existing web UI rather than replacing it
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

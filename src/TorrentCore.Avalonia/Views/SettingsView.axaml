@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
+             x:Class="TorrentCore.Avalonia.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+        <StackPanel Spacing="4">
+          <TextBlock Text="Runtime Settings" Classes="text-page-title" />
+          <TextBlock Text="Queue and policy settings apply live. Engine throttle changes are saved and apply after the service restarts."
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+        </StackPanel>
+        <Button Grid.Column="1"
+                Classes="toolbar-action"
+                Content="Reload"
+                Command="{Binding RefreshCommand}" />
+        <Button Grid.Column="2"
+                Classes="toolbar-action accent"
+                Content="Save Settings"
+                Command="{Binding SaveCommand}" />
+      </Grid>
+
+      <TextBlock Text="{Binding Message}"
+                 IsVisible="{Binding HasMessage}"
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding HasError}"
+                 Foreground="{DynamicResource ErrorTextBrush}"
+                 TextWrapping="Wrap" />
+
+      <WrapPanel Orientation="Horizontal" ItemWidth="310">
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Current Engine Runtime" Classes="text-section-title" />
+            <TextBlock Text="{Binding EngineRuntime, StringFormat='Engine Runtime: {0}'}" />
+            <TextBlock Text="{Binding PartialFilesSummary, StringFormat='Partial Files: {0}'}" />
+            <TextBlock Text="{Binding PersistedOverridesSummary, StringFormat='Persisted Overrides: {0}'}" />
+            <TextBlock Text="{Binding UpdatedAtSummary, StringFormat='Last Updated: {0}'}" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Applied Engine Throttles" Classes="text-section-title" />
+            <TextBlock Text="{Binding AppliedMaxConnections, StringFormat='Current Max Connections: {0}'}" />
+            <TextBlock Text="{Binding AppliedHalfOpenConnections, StringFormat='Current Half-Open Connections: {0}'}" />
+            <TextBlock Text="{Binding AppliedDownloadRateText, StringFormat='Current Max Download: {0}'}" />
+            <TextBlock Text="{Binding AppliedUploadRateText, StringFormat='Current Max Upload: {0}'}" />
+          </StackPanel>
+        </Border>
+      </WrapPanel>
+
+      <Border Classes="panel-card">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Live Policy Settings" Classes="text-section-title" />
+          <Grid ColumnDefinitions="200,120,160,220,120,120,120,160,160" ColumnSpacing="10" RowDefinitions="Auto,Auto">
+            <StackPanel Spacing="4">
+              <TextBlock Text="Seeding Stop Mode" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <ComboBox ItemsSource="{Binding SeedingModes}" SelectedItem="{Binding SeedingStopMode}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Text="Ratio" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding SeedingStopRatio}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="4">
+              <TextBlock Text="Minutes" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding SeedingStopMinutes}" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Spacing="4">
+              <TextBlock Text="Cleanup Mode" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <ComboBox ItemsSource="{Binding CleanupModes}" SelectedItem="{Binding CompletedTorrentCleanupMode}" />
+            </StackPanel>
+            <StackPanel Grid.Column="4" Spacing="4">
+              <TextBlock Text="Cleanup Minutes" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding CompletedTorrentCleanupMinutes}" />
+            </StackPanel>
+            <StackPanel Grid.Column="5" Spacing="4">
+              <TextBlock Text="Burst Limit" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding EngineConnectionFailureLogBurstLimit}" />
+            </StackPanel>
+            <StackPanel Grid.Column="6" Spacing="4">
+              <TextBlock Text="Window Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding EngineConnectionFailureLogWindowSeconds}" />
+            </StackPanel>
+            <StackPanel Grid.Column="7" Spacing="4">
+              <TextBlock Text="Max Metadata Slots" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding MaxActiveMetadataResolutions}" />
+            </StackPanel>
+            <StackPanel Grid.Column="8" Spacing="4">
+              <TextBlock Text="Max Download Slots" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding MaxActiveDownloads}" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="panel-card">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Saved Engine Throttle Settings" Classes="text-section-title" />
+          <Grid ColumnDefinitions="200,220,220,220" ColumnSpacing="10">
+            <StackPanel Spacing="4">
+              <TextBlock Text="Saved Max Connections" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding EngineMaximumConnections}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock Text="Saved Max Half-Open Connections" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding EngineMaximumHalfOpenConnections}" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Spacing="4">
+              <TextBlock Text="Saved Max Download Rate" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding EngineMaximumDownloadRateBytesPerSecond}" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Spacing="4">
+              <TextBlock Text="Saved Max Upload Rate" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+              <TextBox Text="{Binding EngineMaximumUploadRateBytesPerSecond}" />
+            </StackPanel>
+          </Grid>
+          <TextBlock Text="Saved engine throttle settings are pending. Restart TorrentCore.Service to apply them."
+                     IsVisible="{Binding EngineSettingsRequireRestart}"
+                     Foreground="{DynamicResource WarningTextBrush}" />
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

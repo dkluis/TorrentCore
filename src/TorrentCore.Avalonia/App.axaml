@@ -1,0 +1,184 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:TorrentCore.Avalonia"
+             x:Class="TorrentCore.Avalonia.App"
+             Name="TorrentCore Control Center"
+             RequestedThemeVariant="Default">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F5F2ED" />
+          <SolidColorBrush x:Key="ContentBackgroundBrush" Color="#FDFCF9" />
+          <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#1C2B33" />
+          <SolidColorBrush x:Key="SidebarDividerBrush" Color="#2F424C" />
+          <SolidColorBrush x:Key="SidebarHoverBrush" Color="#263841" />
+          <SolidColorBrush x:Key="SidebarSelectedBrush" Color="#2F424C" />
+          <SolidColorBrush x:Key="SidebarTextPrimaryBrush" Color="#F5F7FA" />
+          <SolidColorBrush x:Key="SidebarTextSecondaryBrush" Color="#A9B6BF" />
+          <SolidColorBrush x:Key="InspectorBackgroundBrush" Color="#FAF7F2" />
+          <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="PanelBorderBrush" Color="#D8D2C7" />
+          <SolidColorBrush x:Key="PanelBorderSoftBrush" Color="#E2DED7" />
+          <SolidColorBrush x:Key="RowDividerBrush" Color="#EFE9DD" />
+          <SolidColorBrush x:Key="RowHoverBrush" Color="#F3EFE8" />
+          <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1C2B33" />
+          <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5A5A5A" />
+          <SolidColorBrush x:Key="TextMutedBrush" Color="#7A766F" />
+          <SolidColorBrush x:Key="ToolbarButtonBackgroundBrush" Color="#FFFFFF" />
+          <SolidColorBrush x:Key="ToolbarButtonBorderBrush" Color="#D8D2C7" />
+          <SolidColorBrush x:Key="ToolbarButtonHoverBackgroundBrush" Color="#E7E1D7" />
+          <SolidColorBrush x:Key="ToolbarButtonHoverBorderBrush" Color="#CFC8BB" />
+          <SolidColorBrush x:Key="ToolbarButtonPressedBackgroundBrush" Color="#DCD5C9" />
+          <SolidColorBrush x:Key="ToolbarButtonPressedBorderBrush" Color="#C2BAAC" />
+          <SolidColorBrush x:Key="AccentActionBackgroundBrush" Color="#DCEEFF" />
+          <SolidColorBrush x:Key="AccentActionBorderBrush" Color="#B9D7F4" />
+          <SolidColorBrush x:Key="AccentActionHoverBackgroundBrush" Color="#CDE4FB" />
+          <SolidColorBrush x:Key="AccentActionHoverBorderBrush" Color="#A9CAE9" />
+          <SolidColorBrush x:Key="SuccessActionBackgroundBrush" Color="#E2F6E4" />
+          <SolidColorBrush x:Key="SuccessActionBorderBrush" Color="#B5DBBA" />
+          <SolidColorBrush x:Key="SuccessActionHoverBackgroundBrush" Color="#D2EED5" />
+          <SolidColorBrush x:Key="SuccessActionHoverBorderBrush" Color="#A6CDAE" />
+          <SolidColorBrush x:Key="DeleteActionBackgroundBrush" Color="#F7DFDF" />
+          <SolidColorBrush x:Key="DeleteActionBorderBrush" Color="#E2B8B8" />
+          <SolidColorBrush x:Key="DeleteActionHoverBackgroundBrush" Color="#F0D0D0" />
+          <SolidColorBrush x:Key="DeleteActionHoverBorderBrush" Color="#D69A9A" />
+          <SolidColorBrush x:Key="OverlayBrush" Color="#66000000" />
+          <SolidColorBrush x:Key="ErrorTextBrush" Color="#B33A2C" />
+          <SolidColorBrush x:Key="WarningTextBrush" Color="#8D5C12" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="AppBackgroundBrush" Color="#10181D" />
+          <SolidColorBrush x:Key="ContentBackgroundBrush" Color="#162128" />
+          <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#0B1217" />
+          <SolidColorBrush x:Key="SidebarDividerBrush" Color="#24323B" />
+          <SolidColorBrush x:Key="SidebarHoverBrush" Color="#1A2730" />
+          <SolidColorBrush x:Key="SidebarSelectedBrush" Color="#23343E" />
+          <SolidColorBrush x:Key="SidebarTextPrimaryBrush" Color="#F5F7FA" />
+          <SolidColorBrush x:Key="SidebarTextSecondaryBrush" Color="#A9B6BF" />
+          <SolidColorBrush x:Key="InspectorBackgroundBrush" Color="#111A20" />
+          <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#1B252C" />
+          <SolidColorBrush x:Key="PanelBorderBrush" Color="#34434E" />
+          <SolidColorBrush x:Key="PanelBorderSoftBrush" Color="#2A3842" />
+          <SolidColorBrush x:Key="RowDividerBrush" Color="#25323A" />
+          <SolidColorBrush x:Key="RowHoverBrush" Color="#22303A" />
+          <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F3F2EF" />
+          <SolidColorBrush x:Key="TextSecondaryBrush" Color="#C2CACF" />
+          <SolidColorBrush x:Key="TextMutedBrush" Color="#A0A9AE" />
+          <SolidColorBrush x:Key="ToolbarButtonBackgroundBrush" Color="#22303A" />
+          <SolidColorBrush x:Key="ToolbarButtonBorderBrush" Color="#2F3E49" />
+          <SolidColorBrush x:Key="ToolbarButtonHoverBackgroundBrush" Color="#2B3A45" />
+          <SolidColorBrush x:Key="ToolbarButtonHoverBorderBrush" Color="#3A4A55" />
+          <SolidColorBrush x:Key="ToolbarButtonPressedBackgroundBrush" Color="#344654" />
+          <SolidColorBrush x:Key="ToolbarButtonPressedBorderBrush" Color="#435866" />
+          <SolidColorBrush x:Key="AccentActionBackgroundBrush" Color="#24384A" />
+          <SolidColorBrush x:Key="AccentActionBorderBrush" Color="#35536B" />
+          <SolidColorBrush x:Key="AccentActionHoverBackgroundBrush" Color="#2A4560" />
+          <SolidColorBrush x:Key="AccentActionHoverBorderBrush" Color="#426983" />
+          <SolidColorBrush x:Key="SuccessActionBackgroundBrush" Color="#20392B" />
+          <SolidColorBrush x:Key="SuccessActionBorderBrush" Color="#335640" />
+          <SolidColorBrush x:Key="SuccessActionHoverBackgroundBrush" Color="#294334" />
+          <SolidColorBrush x:Key="SuccessActionHoverBorderBrush" Color="#3D5E49" />
+          <SolidColorBrush x:Key="DeleteActionBackgroundBrush" Color="#4F2424" />
+          <SolidColorBrush x:Key="DeleteActionBorderBrush" Color="#6E3030" />
+          <SolidColorBrush x:Key="DeleteActionHoverBackgroundBrush" Color="#5A2A2A" />
+          <SolidColorBrush x:Key="DeleteActionHoverBorderBrush" Color="#7A3A3A" />
+          <SolidColorBrush x:Key="OverlayBrush" Color="#80000000" />
+          <SolidColorBrush x:Key="ErrorTextBrush" Color="#FF9286" />
+          <SolidColorBrush x:Key="WarningTextBrush" Color="#F5C471" />
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+
+      <x:Double x:Key="FontSizeDefault">14</x:Double>
+      <x:Double x:Key="FontSizePageTitle">23</x:Double>
+      <x:Double x:Key="FontSizeBrandTitle">19</x:Double>
+      <x:Double x:Key="FontSizeSectionTitle">16</x:Double>
+      <x:Double x:Key="FontSizePanelTitle">15</x:Double>
+      <x:Double x:Key="FontSizeBodySmall">12</x:Double>
+      <x:Double x:Key="SidebarExpandedWidth">220</x:Double>
+      <Thickness x:Key="PagePadding">20</Thickness>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.DataTemplates>
+    <local:ViewLocator />
+  </Application.DataTemplates>
+
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{DynamicResource AppBackgroundBrush}" />
+      <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="{DynamicResource FontSizeDefault}" />
+    </Style>
+    <Style Selector="TextBlock.text-page-title">
+      <Setter Property="FontSize" Value="{DynamicResource FontSizePageTitle}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.text-brand-title">
+      <Setter Property="FontSize" Value="{DynamicResource FontSizeBrandTitle}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.text-section-title">
+      <Setter Property="FontSize" Value="{DynamicResource FontSizeSectionTitle}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.text-panel-title">
+      <Setter Property="FontSize" Value="{DynamicResource FontSizePanelTitle}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.text-body-small">
+      <Setter Property="FontSize" Value="{DynamicResource FontSizeBodySmall}" />
+    </Style>
+    <Style Selector="Border.panel-card">
+      <Setter Property="Background" Value="{DynamicResource PanelBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderSoftBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="Button.toolbar-action">
+      <Setter Property="Background" Value="{DynamicResource ToolbarButtonBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ToolbarButtonBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ToolbarButtonHoverBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ToolbarButtonHoverBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action:pressed">
+      <Setter Property="Background" Value="{DynamicResource ToolbarButtonPressedBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ToolbarButtonPressedBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action.accent">
+      <Setter Property="Background" Value="{DynamicResource AccentActionBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentActionBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action.accent:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentActionHoverBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentActionHoverBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action.success">
+      <Setter Property="Background" Value="{DynamicResource SuccessActionBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SuccessActionBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action.success:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SuccessActionHoverBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SuccessActionHoverBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action.danger">
+      <Setter Property="Background" Value="{DynamicResource DeleteActionBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DeleteActionBorderBrush}" />
+    </Style>
+    <Style Selector="Button.toolbar-action.danger:pointerover">
+      <Setter Property="Background" Value="{DynamicResource DeleteActionHoverBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DeleteActionHoverBorderBrush}" />
+    </Style>
+  </Application.Styles>
+</Application>
