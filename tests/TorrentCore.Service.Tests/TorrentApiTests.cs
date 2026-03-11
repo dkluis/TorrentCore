@@ -719,6 +719,128 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_PauseAndResumeWhileDownloading_PreservesPausedStateUntilResumed()
+    {
+        await using var factory = CreateFactory(
+            runtimeTickIntervalMilliseconds: 100,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 0.5,
+            maxActiveDownloads: 1);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(httpClient, "7171717171717171717171717171717171717171", "Fake Active Pause");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var downloadingTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.Downloading,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(downloadingTorrent);
+
+        var pauseResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/pause", content: null);
+        pauseResponse.EnsureSuccessStatusCode();
+
+        var pausedTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent is not null &&
+                       torrent.State == TorrentState.Paused &&
+                       torrent.WaitReason == TorrentWaitReason.PausedByOperator,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(pausedTorrent);
+        var pausedProgress = pausedTorrent.ProgressPercent;
+
+        await Task.Delay(500);
+
+        var pausedAfterDelay = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+
+        Assert.NotNull(pausedAfterDelay);
+        Assert.Equal(TorrentState.Paused, pausedAfterDelay.State);
+        Assert.Equal(TorrentWaitReason.PausedByOperator, pausedAfterDelay.WaitReason);
+        Assert.Equal(pausedProgress, pausedAfterDelay.ProgressPercent);
+
+        var resumeResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent.TorrentId}/resume", content: null);
+        resumeResponse.EnsureSuccessStatusCode();
+
+        var resumedTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.Downloading,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(resumedTorrent);
+        Assert.Equal(TorrentState.Downloading, resumedTorrent.State);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_PausedDownloadingTorrent_StaysPausedAcrossRestart()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-fake-active-pause-restart");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         runtimeTickIntervalMilliseconds: 100,
+                         metadataResolutionDelayMilliseconds: 0,
+                         downloadProgressPercentPerTick: 0.5,
+                         maxActiveDownloads: 1))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var response = await AddMagnetAsync(httpClient, "7272727272727272727272727272727272727272", "Fake Active Restart Pause");
+            var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+
+            await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.State == TorrentState.Downloading,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var pauseResponse = await httpClient.PostAsync($"api/torrents/{torrentId}/pause", content: null);
+            pauseResponse.EnsureSuccessStatusCode();
+
+            await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null &&
+                           torrent.State == TorrentState.Paused &&
+                           torrent.WaitReason == TorrentWaitReason.PausedByOperator,
+                timeout: TimeSpan.FromSeconds(5));
+        }
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         runtimeTickIntervalMilliseconds: 100,
+                         metadataResolutionDelayMilliseconds: 0,
+                         downloadProgressPercentPerTick: 0.5,
+                         maxActiveDownloads: 1))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var pausedTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null &&
+                           torrent.State == TorrentState.Paused &&
+                           torrent.WaitReason == TorrentWaitReason.PausedByOperator,
+                timeout: TimeSpan.FromSeconds(5));
+
+            Assert.NotNull(pausedTorrent);
+
+            await Task.Delay(500);
+
+            var pausedAfterDelay = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}");
+
+            Assert.NotNull(pausedAfterDelay);
+            Assert.Equal(TorrentState.Paused, pausedAfterDelay.State);
+            Assert.Equal(TorrentWaitReason.PausedByOperator, pausedAfterDelay.WaitReason);
+        }
+    }
+
+    [Fact]
     public async Task FakeRuntime_AutoCleanup_RemovesCompletedTorrentWithoutDeletingData()
     {
         await using var factory = CreateFactory(
