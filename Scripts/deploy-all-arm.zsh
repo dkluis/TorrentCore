@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export TORRENTCORE_SCRIPT_DIR="${SCRIPT_DIR}"
 source "${SCRIPT_DIR}/lib/torrentcore-common.zsh"
 tc_load_env_file
-tc_select_deploy_target intel
+tc_select_deploy_target arm
 
 RESTART_AFTER_DEPLOY=false
 
@@ -59,4 +59,4 @@ if [[ "${RESTART_AFTER_DEPLOY}" == true ]]; then
   "${TARGET_SCRIPT_DIR}/start-webui.zsh"
 fi
 
-tc_log_info "Combined Intel deployment complete."
+tc_log_info "Combined Arm deployment complete."

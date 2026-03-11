@@ -2,7 +2,22 @@
 
 This folder contains:
 - runtime control scripts intended to live on the deployed host under `~/TorrentCore/Scripts`
-- deploy scripts intended to run from the repo on the development machine and sync to the mounted Intel Mac share
+- deploy scripts intended to run from the repo on the development machine and sync to either the Intel or Arm deployment target
+
+## Execution Model
+
+These scripts have two roles:
+- `deploy-*.zsh` scripts are publish-and-copy scripts
+- `start/stop/restart-*.zsh` scripts are host-local runtime control scripts
+
+Important rule:
+- deploy scripts can be run from any machine that has the repo, `dotnet`, `rsync`, and write access to the target path
+- runtime start/stop/restart scripts should be run on the machine that is actually running TorrentCore
+- deploy scripts are intentionally not copied into the target host `~/TorrentCore/Scripts` directory
+
+Current limitation:
+- if you run a deploy script from one machine against another machine's mounted share, the `--restart` flag is not a true remote restart
+- in that case the deploy should be run without `--restart`, and the target host should run its own local restart scripts afterward
 
 ## Runtime Script Layout
 
@@ -12,6 +27,20 @@ Expected sibling layout on the target host:
 - `~/TorrentCore/Scripts`
 
 The runtime scripts infer those sibling paths automatically from their own location.
+
+What is copied to the target host `Scripts` directory:
+- `start-service.zsh`
+- `stop-service.zsh`
+- `restart-service.zsh`
+- `start-webui.zsh`
+- `stop-webui.zsh`
+- `restart-webui.zsh`
+- `lib/torrentcore-common.zsh`
+- `torrentcore.env.example`
+- `README.md`
+
+What is not copied to the target host:
+- `deploy-*.zsh`
 
 ## Runtime Files
 
@@ -43,6 +72,10 @@ From the repo root on the development machine:
 ./Scripts/deploy-service-intel.zsh
 ./Scripts/deploy-webui-intel.zsh
 ./Scripts/deploy-all-intel.zsh
+
+./Scripts/deploy-service-arm.zsh
+./Scripts/deploy-webui-arm.zsh
+./Scripts/deploy-all-arm.zsh
 ```
 
 Optional restart during deploy:
@@ -51,18 +84,37 @@ Optional restart during deploy:
 ./Scripts/deploy-all-intel.zsh --restart
 ```
 
+Use `--restart` only when the deploy script is being run on the same host that will run TorrentCore.
+
+For cross-machine deploy over a mounted share:
+1. run the deploy script without `--restart`
+2. log onto the target host
+3. run the target host's local restart scripts
+
+Example on the target host:
+
+```bash
+cd ~/TorrentCore/Scripts
+./restart-service.zsh
+./restart-webui.zsh
+```
+
 ## Environment Overrides
 
 Copy [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example) to `Scripts/torrentcore.env` and edit the values you need.
 
 Useful overrides:
 - `TORRENTCORE_DEPLOY_BASE`
+- `TORRENTCORE_DEPLOY_BASE_INTEL`
+- `TORRENTCORE_DEPLOY_BASE_ARM`
 - `TORRENTCORE_ASPNETCORE_ENVIRONMENT`
 - `TORRENTCORE_SERVICE_URLS`
 - `TORRENTCORE_WEBUI_URLS`
 - `TORRENTCORE_WEBUI_SERVICE_BASE_URL`
 - `TORRENTCORE_PUBLISH_CONFIGURATION`
 - `TORRENTCORE_PUBLISH_RUNTIME`
+- `TORRENTCORE_PUBLISH_RUNTIME_INTEL`
+- `TORRENTCORE_PUBLISH_RUNTIME_ARM`
 
 ## Remote Web Access
 

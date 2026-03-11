@@ -11,13 +11,18 @@ fi
 : "${TORRENTCORE_RUN_DIR:=${TORRENTCORE_SCRIPT_DIR}/run}"
 : "${TORRENTCORE_LOG_DIR:=${TORRENTCORE_SCRIPT_DIR}/logs}"
 : "${TORRENTCORE_DEPLOY_BASE:=/Volumes/HD-Boot-CA-Server/Users/dick/TorrentCore}"
+: "${TORRENTCORE_DEPLOY_BASE_INTEL:=/Volumes/HD-Boot-CA-Server/Users/dick/TorrentCore}"
+: "${TORRENTCORE_DEPLOY_BASE_ARM:=${HOME}/TorrentCore}"
 : "${TORRENTCORE_PUBLISH_CONFIGURATION:=Release}"
 : "${TORRENTCORE_PUBLISH_RUNTIME:=osx-x64}"
+: "${TORRENTCORE_PUBLISH_RUNTIME_INTEL:=osx-x64}"
+: "${TORRENTCORE_PUBLISH_RUNTIME_ARM:=osx-arm64}"
 : "${TORRENTCORE_PUBLISH_SELF_CONTAINED:=false}"
 : "${TORRENTCORE_ASPNETCORE_ENVIRONMENT:=Production}"
 : "${TORRENTCORE_SERVICE_URLS:=http://127.0.0.1:7033}"
 : "${TORRENTCORE_WEBUI_URLS:=http://127.0.0.1:7053}"
 : "${TORRENTCORE_WEBUI_SERVICE_BASE_URL:=http://127.0.0.1:7033/}"
+: "${TORRENTCORE_ARTIFACT_SEGMENT:=intel}"
 
 tc_timestamp() {
   date '+%Y-%m-%d %H:%M:%S'
@@ -222,17 +227,41 @@ tc_sync_directory() {
 }
 
 tc_sync_scripts_to_target() {
+  setopt local_options null_glob
   local repo_root
 
   repo_root="$(tc_resolve_repo_root)"
   tc_require_command rsync
   mkdir -p "${TORRENTCORE_DEPLOY_BASE}/Scripts"
+  rm -f "${TORRENTCORE_DEPLOY_BASE}/Scripts"/deploy-*.zsh
   rsync \
     -a \
     --delete \
     --exclude 'logs/' \
     --exclude 'run/' \
     --exclude 'torrentcore.env' \
+    --exclude 'deploy-*.zsh' \
     "${repo_root}/Scripts/" \
     "${TORRENTCORE_DEPLOY_BASE}/Scripts/"
+}
+
+tc_select_deploy_target() {
+  local target="$1"
+
+  case "${target}" in
+    intel)
+      export TORRENTCORE_DEPLOY_BASE="${TORRENTCORE_DEPLOY_BASE_INTEL}"
+      export TORRENTCORE_PUBLISH_RUNTIME="${TORRENTCORE_PUBLISH_RUNTIME_INTEL}"
+      export TORRENTCORE_ARTIFACT_SEGMENT="intel"
+      ;;
+    arm)
+      export TORRENTCORE_DEPLOY_BASE="${TORRENTCORE_DEPLOY_BASE_ARM}"
+      export TORRENTCORE_PUBLISH_RUNTIME="${TORRENTCORE_PUBLISH_RUNTIME_ARM}"
+      export TORRENTCORE_ARTIFACT_SEGMENT="arm"
+      ;;
+    *)
+      tc_log_error "Unknown deploy target '${target}'."
+      return 1
+      ;;
+  esac
 }

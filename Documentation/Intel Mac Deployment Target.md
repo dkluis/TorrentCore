@@ -72,6 +72,11 @@ These now live in:
 Important split:
 - `start/stop/restart` scripts are target-host runtime scripts
 - `deploy` scripts are repo-side scripts that publish from the current machine and sync to the mounted Intel Mac share
+- deploy scripts are intentionally not copied into the target host `~/TorrentCore/Scripts` directory
+
+Important execution rule:
+- deploy can be initiated from any machine with the repo, `dotnet`, `rsync`, and write access to the Intel target path
+- runtime control should be performed on the Intel host itself
 
 ## Script Responsibilities
 
@@ -122,7 +127,7 @@ Should:
 Should:
 - publish `TorrentCore.ServiceHost` and `TorrentCore.Web` for `osx-x64`
 - copy only the published runtime output to the target host share
-- copy scripts into the target `Scripts` directory
+- copy only the shared runtime-control subset of `Scripts` into the target `Scripts` directory
 - create target directories if they do not already exist
 - avoid copying source, test output, and local development artifacts
 
@@ -205,10 +210,11 @@ Remote access note:
 Current deploy behavior:
 - publish service and/or web to `artifacts/publish/intel/...` in the repo
 - sync publish output to the target share using `rsync --delete`
-- sync the `Scripts` folder to the target share while preserving:
+- sync only the runtime-control subset of the `Scripts` folder to the target share while preserving:
   - `Scripts/run`
   - `Scripts/logs`
   - `Scripts/torrentcore.env`
+- do not copy `deploy-*.zsh` into the target host `Scripts` directory
 
 Deploy commands:
 - `./Scripts/deploy-service-intel.zsh`
@@ -217,7 +223,15 @@ Deploy commands:
 
 Optional restart behavior:
 - each deploy script supports `--restart`
-- `deploy-all-intel.zsh --restart` stops web, stops service, syncs both runtimes plus scripts, then starts service and web again
+- `deploy-all-intel.zsh --restart` is only valid when the deploy is being run on the Intel host itself
+- when deploy is run from another machine against the Intel Mac's mounted share, use deploy without `--restart`, then run the Intel host's local restart scripts
+
+Cross-machine mounted-share workflow:
+1. from the development machine, run:
+   - `./Scripts/deploy-all-intel.zsh`
+2. on the Intel host, run:
+   - `~/TorrentCore/Scripts/restart-service.zsh`
+   - `~/TorrentCore/Scripts/restart-webui.zsh`
 
 ## Validation Notes
 

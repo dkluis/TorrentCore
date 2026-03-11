@@ -99,6 +99,9 @@ Current service configuration section:
 - the repo now includes a first complete Intel Mac deployment script bundle under `Scripts/`, including service/web start-stop-restart scripts, service/web/combined deploy scripts, a shared `zsh` helper library, and an environment override template
 - the deployment script bundle is validated in-repo by syntax checking, an Intel (`osx-x64`) publish-and-sync dry run, and a full local start/stop smoke test using an `osx-arm64` override because the current development machine cannot execute the Intel publish directly
 - deployment docs and the environment template now explicitly call out that the default script bindings are loopback-only and show the exact `TORRENTCORE_WEBUI_URLS` / `TORRENTCORE_SERVICE_URLS` overrides needed for remote access from another machine
+- the deployment bundle now supports both Intel (`osx-x64`) and Arm (`osx-arm64`) targets through dedicated deploy wrappers, separate publish artifact folders, and target-specific environment defaults while keeping the runtime start/stop/restart scripts shared
+- deployment docs now explicitly separate repo-side deploy from host-local runtime control and call out that `--restart` should only be used when deploy is executed on the actual target host, not from another machine against a mounted share
+- deploy wrappers are now kept repo-side only; target `~/TorrentCore/Scripts` directories receive only the shared runtime-control scripts, support files, and local operator overrides
 - the web UI now has an explicit mobile-responsive pass for iPhone-sized browsers: core pages use wrapped toolbars, long values break safely, and torrents/logs render as stacked cards on small screens instead of forcing dense wide tables
 
 Note:
