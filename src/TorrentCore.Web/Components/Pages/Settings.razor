@@ -18,19 +18,19 @@ else
     <section class="mb-4">
         <h2 class="h5">Current Engine Runtime</h2>
         <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="engineRuntime">Engine Runtime</label>
                 <input id="engineRuntime" class="form-control" value="@_engineRuntime" readonly />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="partialFiles">Partial Files</label>
                 <input id="partialFiles" class="form-control" value="@_partialFilesSummary" readonly />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="persistedOverrides">Persisted Overrides</label>
                 <input id="persistedOverrides" class="form-control" value="@_persistedOverridesSummary" readonly />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="updatedAt">Last Updated</label>
                 <input id="updatedAt" class="form-control" value="@_updatedAtSummary" readonly />
             </div>
@@ -41,19 +41,19 @@ else
         <h2 class="h5">Currently Applied Engine Throttles</h2>
         <p class="text-muted mb-2">These are the values the running engine is using right now.</p>
         <div class="row g-3">
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="appliedMaxConnections">Current Max Connections</label>
                 <input id="appliedMaxConnections" class="form-control" value="@_appliedMaxConnections.ToString(CultureInfo.InvariantCulture)" readonly />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="appliedHalfOpenConnections">Current Half-Open Connections</label>
                 <input id="appliedHalfOpenConnections" class="form-control" value="@_appliedHalfOpenConnections.ToString(CultureInfo.InvariantCulture)" readonly />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="appliedDownloadRate">Current Max Download Rate</label>
                 <input id="appliedDownloadRate" class="form-control" value="@FormatRateLimit(_appliedDownloadRateBytesPerSecond)" readonly />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-xl-3">
                 <label class="form-label" for="appliedUploadRate">Current Max Upload Rate</label>
                 <input id="appliedUploadRate" class="form-control" value="@FormatRateLimit(_appliedUploadRateBytesPerSecond)" readonly />
             </div>
@@ -65,7 +65,7 @@ else
             <h2 class="h5">Live Policy Settings</h2>
             <p class="text-muted mb-2">These settings take effect without restarting the service.</p>
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="seedingStopMode">Seeding Stop Mode</label>
                     <select id="seedingStopMode" class="form-select" @bind="_seedingStopMode">
                         <option value="Unlimited">Unlimited</option>
@@ -75,15 +75,15 @@ else
                         <option value="StopAfterRatioOrTime">StopAfterRatioOrTime</option>
                     </select>
                 </div>
-                <div class="col-md-4">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="seedingStopRatio">Seeding Stop Ratio</label>
                     <input id="seedingStopRatio" class="form-control" type="number" min="0.01" step="0.01" @bind="_seedingStopRatio" />
                 </div>
-                <div class="col-md-4">
+                <div class="col-12 col-md-4">
                     <label class="form-label" for="seedingStopMinutes">Seeding Stop Minutes</label>
                     <input id="seedingStopMinutes" class="form-control" type="number" min="1" step="1" @bind="_seedingStopMinutes" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="cleanupMode">Completed Torrent Cleanup Mode</label>
                     <select id="cleanupMode" class="form-select" @bind="_completedTorrentCleanupMode">
                         <option value="Never">Never</option>
@@ -91,24 +91,24 @@ else
                     </select>
                     <div class="form-text">Automatic cleanup only removes TorrentCore tracking. It never deletes downloaded data.</div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="cleanupMinutes">Completed Torrent Cleanup Minutes</label>
                     <input id="cleanupMinutes" class="form-control" type="number" min="0" step="1" @bind="_completedTorrentCleanupMinutes" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="burstLimit">Connection Failure Burst Limit</label>
                     <input id="burstLimit" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogBurstLimit" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="windowSeconds">Connection Failure Window Seconds</label>
                     <input id="windowSeconds" class="form-control" type="number" min="1" step="1" @bind="_engineConnectionFailureLogWindowSeconds" />
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="maxActiveMetadataResolutions">Max Active Metadata Resolutions</label>
                     <input id="maxActiveMetadataResolutions" class="form-control" type="number" min="1" step="1" @bind="_maxActiveMetadataResolutions" />
                     <div class="form-text">New magnets are still accepted immediately. Extra unresolved torrents wait in queue until a metadata slot opens.</div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-12 col-md-6">
                     <label class="form-label" for="maxActiveDownloads">Max Active Downloads</label>
                     <input id="maxActiveDownloads" class="form-control" type="number" min="1" step="1" @bind="_maxActiveDownloads" />
                     <div class="form-text">Resolved torrents above this limit stay queued until a download slot opens.</div>
@@ -120,27 +120,27 @@ else
             <h2 class="h5">Saved Engine Throttle Settings</h2>
             <p class="text-muted mb-2">These values are saved immediately but only apply after `TorrentCore.Service` restarts.</p>
             <div class="row g-3">
-                <div class="col-md-3">
+                <div class="col-12 col-sm-6 col-xl-3">
                     <label class="form-label" for="engineMaximumConnections">Saved Max Connections</label>
                     <input id="engineMaximumConnections" class="form-control" type="number" min="1" step="1" @bind="_engineMaximumConnections" />
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-sm-6 col-xl-3">
                     <label class="form-label" for="engineMaximumHalfOpenConnections">Saved Max Half-Open Connections</label>
                     <input id="engineMaximumHalfOpenConnections" class="form-control" type="number" min="1" step="1" @bind="_engineMaximumHalfOpenConnections" />
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-sm-6 col-xl-3">
                     <label class="form-label" for="engineMaximumDownloadRate">Saved Max Download Rate</label>
                     <input id="engineMaximumDownloadRate" class="form-control" type="number" min="0" step="1" @bind="_engineMaximumDownloadRateBytesPerSecond" />
                     <div class="form-text">Use `0` for unlimited.</div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-12 col-sm-6 col-xl-3">
                     <label class="form-label" for="engineMaximumUploadRate">Saved Max Upload Rate</label>
                     <input id="engineMaximumUploadRate" class="form-control" type="number" min="0" step="1" @bind="_engineMaximumUploadRateBytesPerSecond" />
                     <div class="form-text">Use `0` for unlimited.</div>
                 </div>
             </div>
         </section>
-        <div class="mt-3 d-flex gap-2">
+        <div class="mt-3 tc-toolbar">
             <button class="btn btn-primary" type="submit" disabled="@_isSaving">Save Settings</button>
             <button class="btn btn-secondary" type="button" @onclick="LoadAsync" disabled="@_isSaving">Reload</button>
         </div>

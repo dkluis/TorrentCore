@@ -29,21 +29,21 @@ else
 
         <div class="mb-3">
             <label class="form-label" for="magnetUri">Magnet URI</label>
-            <input id="magnetUri" class="form-control" @bind="_magnetUri" />
+            <input id="magnetUri" class="form-control tc-break" @bind="_magnetUri" />
         </div>
         <button class="btn btn-primary" type="button" @onclick="AddMagnetAsync" disabled="@_isSubmitting">Add Torrent</button>
     </section>
 
     <section>
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="tc-section-header mb-3">
             <h2 class="mb-0">Current Torrents</h2>
-            <div class="d-flex gap-2 flex-wrap">
+            <div class="tc-toolbar">
                 <button class="btn btn-secondary" type="button" @onclick="RefreshAsync" disabled="@(_isLoading || _isSubmitting || _isBulkRunning)">Refresh</button>
             </div>
         </div>
 
         <div class="row g-3 mb-3">
-            <div class="col-md-4">
+            <div class="col-12 col-md-4">
                 <label class="form-label" for="torrentNameFilter">Name Filter</label>
                 <input id="torrentNameFilter"
                        class="form-control"
@@ -51,7 +51,7 @@ else
                        @bind="_nameFilter"
                        @bind:event="oninput" />
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <label class="form-label" for="torrentStatusFilter">Status Filter</label>
                 <select id="torrentStatusFilter" class="form-select" @bind="_statusFilter">
                     <option value="">All</option>
@@ -61,7 +61,7 @@ else
                     }
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-12 col-sm-6 col-md-3">
                 <label class="form-label" for="torrentSort">Sort</label>
                 <select id="torrentSort" class="form-select" @bind="_sortOption">
                     <option value="@TorrentSortOption.Name">Name</option>
@@ -77,7 +77,7 @@ else
             <p>@_actionMessage</p>
         }
 
-        <div class="d-flex gap-2 flex-wrap mb-3">
+        <div class="tc-toolbar mb-3">
             <button class="btn btn-outline-secondary"
                     type="button"
                     @onclick="PauseSelectedAsync"
@@ -98,6 +98,12 @@ else
             </button>
             <button class="btn btn-outline-secondary"
                     type="button"
+                    @onclick="ToggleVisibleSelection"
+                    disabled="@(_isLoading || _isBulkRunning || VisibleTorrents.Count == 0)">
+                @(AreAllVisibleSelected ? "Clear Visible" : "Select Visible")
+            </button>
+            <button class="btn btn-outline-secondary"
+                    type="button"
                     @onclick="ClearSelection"
                     disabled="@(SelectedTorrentCount == 0 || _isBulkRunning)">
                 Clear Selection
@@ -111,90 +117,88 @@ else
         }
         else
         {
-            <table class="table">
-                <thead>
-                <tr>
-                    <th>
-                        <input type="checkbox"
-                               checked="@AreAllVisibleSelected"
-                               @onchange="ToggleSelectAllVisible" />
-                    </th>
-                    <th>Name</th>
-                    <th>Status</th>
-                    <th>Wait</th>
-                    <th>Progress</th>
-                    <th>Down</th>
-                    <th>Up</th>
-                    <th>Trackers</th>
-                    <th>Peers</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody>
+            <div class="tc-table-wrap d-none d-md-block">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox"
+                                   checked="@AreAllVisibleSelected"
+                                   @onchange="ToggleSelectAllVisible" />
+                        </th>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Wait</th>
+                        <th>Progress</th>
+                        <th>Down</th>
+                        <th>Up</th>
+                        <th>Trackers</th>
+                        <th>Peers</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var torrent in VisibleTorrents)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox"
+                                       checked="@IsSelected(torrent.TorrentId)"
+                                       @onchange="args => ToggleSelection(torrent.TorrentId, args.Value)" />
+                            </td>
+                            <td><a class="tc-break" href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a></td>
+                            <td>@torrent.State</td>
+                            <td>@FormatWaitReason(torrent)</td>
+                            <td>@torrent.ProgressPercent.ToString("0.0")%</td>
+                            <td>@FormatRate(torrent.DownloadRateBytesPerSecond)</td>
+                            <td>@FormatRate(torrent.UploadRateBytesPerSecond)</td>
+                            <td>@torrent.TrackerCount</td>
+                            <td>@torrent.ConnectedPeerCount</td>
+                            <td>
+                                @RenderTorrentActions(torrent)
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-md-none tc-card-list">
                 @foreach (var torrent in VisibleTorrents)
                 {
-                    <tr>
-                        <td>
-                            <input type="checkbox"
-                                   checked="@IsSelected(torrent.TorrentId)"
-                                   @onchange="args => ToggleSelection(torrent.TorrentId, args.Value)" />
-                        </td>
-                        <td><a href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a></td>
-                        <td>@torrent.State</td>
-                        <td>@FormatWaitReason(torrent)</td>
-                        <td>@torrent.ProgressPercent.ToString("0.0")%</td>
-                        <td>@FormatRate(torrent.DownloadRateBytesPerSecond)</td>
-                        <td>@FormatRate(torrent.UploadRateBytesPerSecond)</td>
-                        <td>@torrent.TrackerCount</td>
-                        <td>@torrent.ConnectedPeerCount</td>
-                        <td>
-                            <div class="d-flex gap-2 flex-wrap">
-                                @if (torrent.CanPause)
-                                {
-                                    <button class="btn btn-sm btn-outline-secondary"
-                                            type="button"
-                                            @onclick="() => PauseAsync(torrent)"
-                                            disabled="@IsActionBusy(torrent.TorrentId)">
-                                        Pause
-                                    </button>
-                                }
-                                @if (torrent.CanResume)
-                                {
-                                    <button class="btn btn-sm btn-outline-secondary"
-                                            type="button"
-                                            @onclick="() => ResumeAsync(torrent)"
-                                            disabled="@IsActionBusy(torrent.TorrentId)">
-                                        Resume
-                                    </button>
-                                }
-                                @if (torrent.CanRemove)
-                                {
-                                    <a class="btn btn-sm btn-outline-primary"
-                                       href="@($"/torrents/{torrent.TorrentId:D}")">
-                                        Details
-                                    </a>
-                                    <button class="btn btn-sm btn-outline-danger"
-                                            type="button"
-                                            @onclick="() => RemoveAsync(torrent, deleteData: false)"
-                                            disabled="@IsActionBusy(torrent.TorrentId)">
-                                        Remove
-                                    </button>
-                                    @if (CanDeleteData(torrent))
-                                    {
-                                        <button class="btn btn-sm btn-danger"
-                                                type="button"
-                                                @onclick="() => RemoveAsync(torrent, deleteData: true)"
-                                                disabled="@IsActionBusy(torrent.TorrentId)">
-                                            Delete Data
-                                        </button>
-                                    }
-                                }
-                            </div>
-                        </td>
-                    </tr>
+                    <article class="tc-mobile-card">
+                        <div class="tc-mobile-card-header">
+                            <label class="d-flex align-items-start gap-2 mb-0">
+                                <input type="checkbox"
+                                       class="mt-1"
+                                       checked="@IsSelected(torrent.TorrentId)"
+                                       @onchange="args => ToggleSelection(torrent.TorrentId, args.Value)" />
+                                <span>
+                                    <a class="fw-semibold tc-break d-block" href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a>
+                                    <small class="text-muted">@torrent.State</small>
+                                </span>
+                            </label>
+                        </div>
+
+                        <dl class="tc-mobile-definition-list mb-3">
+                            <dt>Wait</dt>
+                            <dd>@FormatWaitReason(torrent)</dd>
+                            <dt>Progress</dt>
+                            <dd>@torrent.ProgressPercent.ToString("0.0")%</dd>
+                            <dt>Download</dt>
+                            <dd>@FormatRate(torrent.DownloadRateBytesPerSecond)</dd>
+                            <dt>Upload</dt>
+                            <dd>@FormatRate(torrent.UploadRateBytesPerSecond)</dd>
+                            <dt>Trackers</dt>
+                            <dd>@torrent.TrackerCount</dd>
+                            <dt>Peers</dt>
+                            <dd>@torrent.ConnectedPeerCount</dd>
+                        </dl>
+
+                        @RenderTorrentActions(torrent)
+                    </article>
                 }
-                </tbody>
-            </table>
+            </div>
         }
     </section>
 }
@@ -427,6 +431,23 @@ else
         }
     }
 
+    private void ToggleVisibleSelection()
+    {
+        var clearVisible = AreAllVisibleSelected;
+
+        foreach (var torrent in VisibleTorrents)
+        {
+            if (clearVisible)
+            {
+                _selectedTorrentIds.Remove(torrent.TorrentId);
+            }
+            else
+            {
+                _selectedTorrentIds.Add(torrent.TorrentId);
+            }
+        }
+    }
+
     private void ClearSelection()
     {
         _selectedTorrentIds.Clear();
@@ -608,4 +629,47 @@ else
         ProgressDescending,
         AddedNewest,
     }
+
+    private RenderFragment RenderTorrentActions(TorrentSummaryDto torrent) => @<div class="tc-toolbar">
+        @if (torrent.CanPause)
+        {
+            <button class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    @onclick="() => PauseAsync(torrent)"
+                    disabled="@IsActionBusy(torrent.TorrentId)">
+                Pause
+            </button>
+        }
+        @if (torrent.CanResume)
+        {
+            <button class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    @onclick="() => ResumeAsync(torrent)"
+                    disabled="@IsActionBusy(torrent.TorrentId)">
+                Resume
+            </button>
+        }
+        @if (torrent.CanRemove)
+        {
+            <a class="btn btn-sm btn-outline-primary"
+               href="@($"/torrents/{torrent.TorrentId:D}")">
+                Details
+            </a>
+            <button class="btn btn-sm btn-outline-danger"
+                    type="button"
+                    @onclick="() => RemoveAsync(torrent, deleteData: false)"
+                    disabled="@IsActionBusy(torrent.TorrentId)">
+                Remove
+            </button>
+            @if (CanDeleteData(torrent))
+            {
+                <button class="btn btn-sm btn-danger"
+                        type="button"
+                        @onclick="() => RemoveAsync(torrent, deleteData: true)"
+                        disabled="@IsActionBusy(torrent.TorrentId)">
+                    Delete Data
+                </button>
+            }
+        }
+    </div>;
 }

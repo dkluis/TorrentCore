@@ -20,7 +20,7 @@ else if (!string.IsNullOrWhiteSpace(_error))
 else if (_hostStatus is not null)
 {
     <section class="mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="tc-section-header mb-3">
             <h2 class="mb-0">Host Status</h2>
             <button class="btn btn-secondary" @onclick="RefreshAsync" disabled="@_isLoading">Refresh</button>
         </div>
@@ -34,7 +34,7 @@ else if (_hostStatus is not null)
                         <p class="mb-1"><strong>Service:</strong> @_hostStatus.ServiceName</p>
                         <p class="mb-1"><strong>Version:</strong> @_hostStatus.ServiceVersion</p>
                         <p class="mb-1"><strong>Environment:</strong> @_hostStatus.EnvironmentName</p>
-                        <p class="mb-1"><strong>Service Instance:</strong> @_hostStatus.ServiceInstanceId</p>
+                        <p class="mb-1"><strong>Service Instance:</strong> <span class="tc-break">@_hostStatus.ServiceInstanceId</span></p>
                         <p class="mb-0"><strong>Checked:</strong> @_hostStatus.CheckedAtUtc.ToLocalTime()</p>
                     </div>
                 </div>
@@ -100,7 +100,7 @@ else if (_hostStatus is not null)
                         {
                             <p class="mb-1"><strong>Recovery Completed:</strong> @_hostStatus.StartupRecoveryCompletedAtUtc.Value.ToLocalTime()</p>
                         }
-                        <p class="mb-0"><strong>Download Root:</strong> @_hostStatus.DownloadRootPath</p>
+                        <p class="mb-0"><strong>Download Root:</strong> <span class="tc-break">@_hostStatus.DownloadRootPath</span></p>
                     </div>
                 </div>
             </div>
@@ -120,9 +120,9 @@ else if (_hostStatus is not null)
 <section>
     <h2>Next Work</h2>
     <ul>
-        <li>Add a proper torrent detail page with deeper runtime, file, and scheduling diagnostics.</li>
-        <li>Add Intel Mac deployment scripts for publish, deploy, start, stop, and restart.</li>
-        <li>Continue expanding operator-managed runtime and saturation controls beyond the current queue and engine-throttle settings.</li>
+        <li>Continue hardening pause, resume, queueing, and recovery behavior under real MonoTorrent load.</li>
+        <li>Expand the Torrents and detail views with deeper scheduling and file-level diagnostics.</li>
+        <li>Keep improving operator-managed runtime controls and deployment validation on the Intel Mac host.</li>
     </ul>
 </section>
 

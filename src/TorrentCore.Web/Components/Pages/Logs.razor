@@ -11,7 +11,7 @@
 
 <section class="mb-4">
     <div class="row g-3">
-        <div class="col-md-2">
+        <div class="col-6 col-md-2">
             <label class="form-label" for="take">Rows</label>
             <select id="take" class="form-select" @bind="_take" @bind:after="ApplyFiltersAsync">
                 <option value="20">20</option>
@@ -20,7 +20,7 @@
                 <option value="200">200</option>
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-6 col-md-2">
             <label class="form-label" for="level">Level</label>
             <select id="level" class="form-select" @bind="_level" @bind:after="ApplyFiltersAsync">
                 <option value="">All</option>
@@ -29,7 +29,7 @@
                 <option value="Error">Error</option>
             </select>
         </div>
-        <div class="col-md-2">
+        <div class="col-12 col-sm-6 col-md-2">
             <label class="form-label" for="category">Category</label>
             <select id="category" class="form-select" @bind="_category" @bind:after="ApplyFiltersAsync">
                 <option value="">All</option>
@@ -39,7 +39,7 @@
                 <option value="runtime">runtime</option>
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-12 col-md-3">
             <label class="form-label" for="eventType">Event Type</label>
             <input id="eventType"
                    class="form-control"
@@ -48,10 +48,10 @@
                    @bind:event="oninput"
                    @onkeydown="HandleFilterKeyDownAsync" />
         </div>
-        <div class="col-md-3">
+        <div class="col-12 col-md-3">
             <label class="form-label" for="torrentId">Torrent Id</label>
             <input id="torrentId"
-                   class="form-control"
+                   class="form-control tc-break"
                    placeholder="Exact torrent GUID"
                    @bind="_torrentIdText"
                    @bind:event="oninput"
@@ -59,7 +59,7 @@
         </div>
     </div>
 
-    <div class="mt-3 d-flex gap-2">
+    <div class="mt-3 tc-toolbar">
         <button class="btn btn-primary" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply Filters</button>
         <button class="btn btn-secondary" @onclick="ClearFiltersAsync">Clear Filters</button>
         <div class="form-check align-self-center">
@@ -92,41 +92,73 @@ else if (_logs.Count == 0)
 }
 else
 {
-    <table class="table table-sm align-middle">
-        <thead>
-        <tr>
-            <th>When</th>
-            <th>Level</th>
-            <th>Category</th>
-            <th>Event</th>
-            <th>Message</th>
-            <th>Torrent</th>
-            <th>Details</th>
-        </tr>
-        </thead>
-        <tbody>
+    <div class="tc-table-wrap d-none d-md-block">
+        <table class="table table-sm align-middle">
+            <thead>
+            <tr>
+                <th>When</th>
+                <th>Level</th>
+                <th>Category</th>
+                <th>Event</th>
+                <th>Message</th>
+                <th>Torrent</th>
+                <th>Details</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var log in _logs)
+            {
+                <tr>
+                    <td>@log.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
+                    <td>@log.Level</td>
+                    <td>@log.Category</td>
+                    <td><code>@log.EventType</code></td>
+                    <td class="tc-break">@log.Message</td>
+                    <td>@FormatGuid(log.TorrentId)</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(log.DetailsJson))
+                        {
+                            <details>
+                                <summary>Show</summary>
+                                <pre class="mb-0 tc-code-wrap"><code>@log.DetailsJson</code></pre>
+                            </details>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="d-md-none tc-card-list">
         @foreach (var log in _logs)
         {
-            <tr>
-                <td>@log.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</td>
-                <td>@log.Level</td>
-                <td>@log.Category</td>
-                <td><code>@log.EventType</code></td>
-                <td>@log.Message</td>
-                <td>@FormatGuid(log.TorrentId)</td>
-                <td>
-                    @if (!string.IsNullOrWhiteSpace(log.DetailsJson))
-                    {
-                        <details>
-                            <summary>Show</summary>
-                            <pre class="mb-0"><code>@log.DetailsJson</code></pre>
-                        </details>
-                    }
-                </td>
-            </tr>
+            <article class="tc-mobile-card">
+                <dl class="tc-mobile-definition-list mb-2">
+                    <dt>When</dt>
+                    <dd>@log.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</dd>
+                    <dt>Level</dt>
+                    <dd>@log.Level</dd>
+                    <dt>Category</dt>
+                    <dd>@log.Category</dd>
+                    <dt>Event</dt>
+                    <dd class="tc-code-wrap"><code>@log.EventType</code></dd>
+                    <dt>Message</dt>
+                    <dd class="tc-break">@log.Message</dd>
+                    <dt>Torrent</dt>
+                    <dd>@FormatGuid(log.TorrentId)</dd>
+                </dl>
+
+                @if (!string.IsNullOrWhiteSpace(log.DetailsJson))
+                {
+                    <details>
+                        <summary>Details</summary>
+                        <pre class="mb-0 tc-code-wrap"><code>@log.DetailsJson</code></pre>
+                    </details>
+                }
+            </article>
         }
-        </tbody>
-    </table>
+    </div>
 }
 
 @code {
