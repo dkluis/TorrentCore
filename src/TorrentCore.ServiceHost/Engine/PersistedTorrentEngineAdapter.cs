@@ -3,10 +3,13 @@ using Microsoft.Extensions.Primitives;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
+using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Engine;
 
-public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStateStore) : ITorrentEngineAdapter
+public sealed class PersistedTorrentEngineAdapter(
+    ITorrentStateStore torrentStateStore,
+    IRuntimeSettingsService runtimeSettingsService) : ITorrentEngineAdapter
 {
     public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken) =>
         torrentStateStore.CountAsync(cancellationToken);
@@ -76,19 +79,26 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken)
     {
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
-        return torrents.Select(MapSummary).ToArray();
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var diagnostics = TorrentQueueDiagnostics.Create(torrents, runtimeSettings);
+        return torrents.Select(snapshot => MapSummary(snapshot, diagnostics[snapshot.TorrentId])).ToArray();
     }
 
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
-        var torrent = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+        var torrents = await torrentStateStore.ListAsync(cancellationToken);
+        var torrent = torrents.SingleOrDefault(snapshot => snapshot.TorrentId == torrentId);
         return torrent is null
             ? throw new ServiceOperationException(
                 "torrent_not_found",
                 $"Torrent '{torrentId}' was not found.",
                 StatusCodes.Status404NotFound,
                 nameof(torrentId))
-            : MapDetail(torrent);
+            : MapDetail(
+                torrent,
+                TorrentQueueDiagnostics.Create(
+                    torrents,
+                    await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId]);
     }
 
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken)
@@ -127,7 +137,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         };
 
         await torrentStateStore.InsertAsync(torrent, cancellationToken);
-        return MapDetail(torrent);
+        return MapDetail(torrent, new TorrentQueueDiagnostic(null, null));
     }
 
     public async Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -290,7 +300,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         };
     }
 
-    private static TorrentSummaryDto MapSummary(TorrentSnapshot snapshot)
+    private static TorrentSummaryDto MapSummary(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)
     {
         return new TorrentSummaryDto
         {
@@ -304,6 +314,8 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             UploadRateBytesPerSecond = snapshot.UploadRateBytesPerSecond,
             TrackerCount = snapshot.TrackerCount,
             ConnectedPeerCount = snapshot.ConnectedPeerCount,
+            WaitReason = diagnostic.WaitReason,
+            QueuePosition = diagnostic.QueuePosition,
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
@@ -314,7 +326,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         };
     }
 
-    private static TorrentDetailDto MapDetail(TorrentSnapshot snapshot)
+    private static TorrentDetailDto MapDetail(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)
     {
         return new TorrentDetailDto
         {
@@ -331,6 +343,8 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             UploadRateBytesPerSecond = snapshot.UploadRateBytesPerSecond,
             TrackerCount = snapshot.TrackerCount,
             ConnectedPeerCount = snapshot.ConnectedPeerCount,
+            WaitReason = diagnostic.WaitReason,
+            QueuePosition = diagnostic.QueuePosition,
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,

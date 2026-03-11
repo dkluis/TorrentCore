@@ -35,6 +35,11 @@ public sealed class TorrentApplicationService(
         var pausedCount = torrents.Count(torrent => torrent.State == TorrentState.Paused);
         var completedCount = torrents.Count(torrent => torrent.State == TorrentState.Completed);
         var errorCount = torrents.Count(torrent => torrent.State == TorrentState.Error);
+        var availableMetadataSlots = Math.Max(0, runtimeSettings.MaxActiveMetadataResolutions - resolvingMetadataCount);
+        var availableDownloadSlots = Math.Max(0, runtimeSettings.MaxActiveDownloads - downloadingCount);
+        var currentConnectedPeerCount = torrents.Sum(torrent => torrent.ConnectedPeerCount);
+        var currentDownloadRateBytesPerSecond = torrents.Sum(torrent => torrent.DownloadRateBytesPerSecond);
+        var currentUploadRateBytesPerSecond = torrents.Sum(torrent => torrent.UploadRateBytesPerSecond);
 
         return new EngineHostStatusDto
         {
@@ -54,6 +59,8 @@ public sealed class TorrentApplicationService(
             EngineConnectionFailureLogWindowSeconds = runtimeSettings.EngineConnectionFailureLogWindowSeconds,
             MaxActiveMetadataResolutions = runtimeSettings.MaxActiveMetadataResolutions,
             MaxActiveDownloads = runtimeSettings.MaxActiveDownloads,
+            AvailableMetadataResolutionSlots = availableMetadataSlots,
+            AvailableDownloadSlots = availableDownloadSlots,
             ResolvingMetadataCount = resolvingMetadataCount,
             MetadataQueueCount = metadataQueueCount,
             DownloadingCount = downloadingCount,
@@ -62,6 +69,9 @@ public sealed class TorrentApplicationService(
             PausedCount = pausedCount,
             CompletedCount = completedCount,
             ErrorCount = errorCount,
+            CurrentConnectedPeerCount = currentConnectedPeerCount,
+            CurrentDownloadRateBytesPerSecond = currentDownloadRateBytesPerSecond,
+            CurrentUploadRateBytesPerSecond = currentUploadRateBytesPerSecond,
             PartialFilesEnabled        = runtimeSettings.PartialFilesEnabled,
             PartialFileSuffix          = runtimeSettings.PartialFileSuffix,
             SeedingStopMode            = runtimeSettings.SeedingStopMode.ToString(),

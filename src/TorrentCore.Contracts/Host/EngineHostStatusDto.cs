@@ -18,6 +18,8 @@ public sealed class EngineHostStatusDto
     public required int EngineConnectionFailureLogWindowSeconds { get; init; }
     public required int MaxActiveMetadataResolutions { get; init; }
     public required int MaxActiveDownloads { get; init; }
+    public required int AvailableMetadataResolutionSlots { get; init; }
+    public required int AvailableDownloadSlots { get; init; }
     public required int ResolvingMetadataCount { get; init; }
     public required int MetadataQueueCount { get; init; }
     public required int DownloadingCount { get; init; }
@@ -26,6 +28,9 @@ public sealed class EngineHostStatusDto
     public required int PausedCount { get; init; }
     public required int CompletedCount { get; init; }
     public required int ErrorCount { get; init; }
+    public required int CurrentConnectedPeerCount { get; init; }
+    public required long CurrentDownloadRateBytesPerSecond { get; init; }
+    public required long CurrentUploadRateBytesPerSecond { get; init; }
     public required bool PartialFilesEnabled { get; init; }
     public required string PartialFileSuffix { get; init; }
     public required string SeedingStopMode { get; init; }

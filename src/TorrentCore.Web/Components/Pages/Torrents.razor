@@ -1,0 +1,399 @@
+@page "/torrents"
+@implements IAsyncDisposable
+@inject TorrentCoreClient TorrentCoreClient
+@using TorrentCore.Contracts.Torrents
+
+<PageTitle>Torrents</PageTitle>
+
+<h1>Torrents</h1>
+
+<p>Add magnets and manage active, queued, paused, completed, and errored torrents.</p>
+
+@if (_isLoading)
+{
+    <p>Loading torrents...</p>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <p>@_error</p>
+}
+else
+{
+    <section class="mb-4">
+        <h2>Add Magnet</h2>
+
+        @if (!string.IsNullOrWhiteSpace(_submitMessage))
+        {
+            <p>@_submitMessage</p>
+        }
+
+        <div class="mb-3">
+            <label class="form-label" for="magnetUri">Magnet URI</label>
+            <input id="magnetUri" class="form-control" @bind="_magnetUri" />
+        </div>
+        <button class="btn btn-primary" @onclick="AddMagnetAsync" disabled="@_isSubmitting">Add Torrent</button>
+    </section>
+
+    <section>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="mb-0">Current Torrents</h2>
+            <button class="btn btn-secondary" @onclick="RefreshAsync" disabled="@_isLoading || _isSubmitting">Refresh</button>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-4">
+                <label class="form-label" for="torrentNameFilter">Name Filter</label>
+                <input id="torrentNameFilter"
+                       class="form-control"
+                       placeholder="Filter by name"
+                       @bind="_nameFilter"
+                       @bind:event="oninput" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="torrentStatusFilter">Status Filter</label>
+                <select id="torrentStatusFilter" class="form-select" @bind="_statusFilter">
+                    <option value="">All</option>
+                    @foreach (var state in Enum.GetValues<TorrentState>())
+                    {
+                        <option value="@state.ToString()">@state</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="torrentSort">Sort</label>
+                <select id="torrentSort" class="form-select" @bind="_sortOption">
+                    <option value="@TorrentSortOption.Name">Name</option>
+                    <option value="@TorrentSortOption.State">State</option>
+                    <option value="@TorrentSortOption.ProgressDescending">Progress (High to Low)</option>
+                    <option value="@TorrentSortOption.AddedNewest">Added (Newest)</option>
+                </select>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_actionMessage))
+        {
+            <p>@_actionMessage</p>
+        }
+
+        @if (VisibleTorrents.Count == 0)
+        {
+            <p>No torrents matched the current filters.</p>
+        }
+        else
+        {
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Wait</th>
+                    <th>Progress</th>
+                    <th>Down</th>
+                    <th>Up</th>
+                    <th>Trackers</th>
+                    <th>Peers</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var torrent in VisibleTorrents)
+                {
+                    <tr>
+                        <td>@torrent.Name</td>
+                        <td>@torrent.State</td>
+                        <td>@FormatWaitReason(torrent)</td>
+                        <td>@torrent.ProgressPercent.ToString("0.0")%</td>
+                        <td>@FormatRate(torrent.DownloadRateBytesPerSecond)</td>
+                        <td>@FormatRate(torrent.UploadRateBytesPerSecond)</td>
+                        <td>@torrent.TrackerCount</td>
+                        <td>@torrent.ConnectedPeerCount</td>
+                        <td>
+                            <div class="d-flex gap-2 flex-wrap">
+                                @if (torrent.CanPause)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            @onclick="() => PauseAsync(torrent)"
+                                            disabled="@IsActionBusy(torrent.TorrentId)">
+                                        Pause
+                                    </button>
+                                }
+                                @if (torrent.CanResume)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            @onclick="() => ResumeAsync(torrent)"
+                                            disabled="@IsActionBusy(torrent.TorrentId)">
+                                        Resume
+                                    </button>
+                                }
+                                @if (torrent.CanRemove)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => RemoveAsync(torrent, deleteData: false)"
+                                            disabled="@IsActionBusy(torrent.TorrentId)">
+                                        Remove
+                                    </button>
+                                    @if (CanDeleteData(torrent))
+                                    {
+                                        <button class="btn btn-sm btn-danger"
+                                                @onclick="() => RemoveAsync(torrent, deleteData: true)"
+                                                disabled="@IsActionBusy(torrent.TorrentId)">
+                                            Delete Data
+                                        </button>
+                                    }
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        }
+    </section>
+}
+
+@code {
+    private IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
+    private string? _error;
+    private string? _submitMessage;
+    private string? _actionMessage;
+    private bool _isLoading = true;
+    private bool _isSubmitting;
+    private string _magnetUri = "magnet:?xt=urn:btih:1234567890ABCDEF1234567890ABCDEF12345678&dn=Phase%200%20Sample";
+    private string _nameFilter = string.Empty;
+    private string _statusFilter = string.Empty;
+    private TorrentSortOption _sortOption = TorrentSortOption.AddedNewest;
+    private readonly HashSet<Guid> _busyTorrentIds = [];
+    private readonly SemaphoreSlim _loadGate = new(1, 1);
+    private CancellationTokenSource? _refreshLoopCts;
+    private Task? _refreshLoopTask;
+
+    private IReadOnlyList<TorrentSummaryDto> VisibleTorrents =>
+        ApplySort(
+            _torrents
+                .Where(MatchesNameFilter)
+                .Where(MatchesStatusFilter)
+                .ToArray())
+        .ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _refreshLoopCts = new CancellationTokenSource();
+        _refreshLoopTask = RunRefreshLoopAsync(_refreshLoopCts.Token);
+    }
+
+    private async Task LoadAsync()
+    {
+        await _loadGate.WaitAsync();
+
+        try
+        {
+            _error = null;
+            _torrents = await TorrentCoreClient.GetTorrentsAsync();
+        }
+        catch (Exception exception)
+        {
+            _error = $"Unable to reach TorrentCore service: {exception.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            _loadGate.Release();
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task AddMagnetAsync()
+    {
+        _isSubmitting = true;
+        _submitMessage = null;
+        _actionMessage = null;
+
+        try
+        {
+            var torrent = await TorrentCoreClient.AddMagnetAsync(new AddMagnetRequest
+            {
+                MagnetUri = _magnetUri,
+            });
+
+            _submitMessage = $"Added torrent '{torrent.Name}' in state '{torrent.State}'.";
+            _magnetUri = string.Empty;
+            await LoadAsync();
+        }
+        catch (TorrentCoreClientException exception)
+        {
+            _submitMessage = exception.ServiceError?.Message ?? exception.Message;
+        }
+        catch (Exception exception)
+        {
+            _submitMessage = $"Unable to add torrent: {exception.Message}";
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private static string FormatRate(long bytesPerSecond) =>
+        $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+
+    private static string FormatWaitReason(TorrentSummaryDto torrent)
+    {
+        var waitReason = torrent.WaitReason switch
+        {
+            TorrentWaitReason.PendingMetadataDispatch => "Pending metadata dispatch",
+            TorrentWaitReason.WaitingForMetadataSlot => "Waiting for metadata slot",
+            TorrentWaitReason.PendingDownloadDispatch => "Pending download dispatch",
+            TorrentWaitReason.WaitingForDownloadSlot => "Waiting for download slot",
+            TorrentWaitReason.PausedByOperator => "Paused by operator",
+            TorrentWaitReason.BlockedByError => "Blocked by error",
+            _ => string.Empty,
+        };
+
+        return torrent.QueuePosition is null || string.IsNullOrWhiteSpace(waitReason)
+            ? waitReason
+            : $"{waitReason} (#{torrent.QueuePosition.Value})";
+    }
+
+    private async Task PauseAsync(TorrentSummaryDto torrent)
+    {
+        await RunTorrentActionAsync(
+            torrent.TorrentId,
+            async () =>
+            {
+                var result = await TorrentCoreClient.PauseAsync(torrent.TorrentId);
+                _actionMessage = $"Paused torrent '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
+    private async Task ResumeAsync(TorrentSummaryDto torrent)
+    {
+        await RunTorrentActionAsync(
+            torrent.TorrentId,
+            async () =>
+            {
+                var result = await TorrentCoreClient.ResumeAsync(torrent.TorrentId);
+                _actionMessage = $"Resumed torrent '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
+    private async Task RemoveAsync(TorrentSummaryDto torrent, bool deleteData)
+    {
+        await RunTorrentActionAsync(
+            torrent.TorrentId,
+            async () =>
+            {
+                var result = await TorrentCoreClient.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest
+                {
+                    DeleteData = deleteData,
+                });
+
+                _actionMessage = deleteData
+                    ? $"Removed torrent '{torrent.Name}' and requested data deletion at {result.ProcessedAtUtc.ToLocalTime():g}."
+                    : $"Removed torrent '{torrent.Name}' from TorrentCore tracking at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
+    private async Task RunTorrentActionAsync(Guid torrentId, Func<Task> action)
+    {
+        if (!_busyTorrentIds.Add(torrentId))
+        {
+            return;
+        }
+
+        _submitMessage = null;
+
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        catch (TorrentCoreClientException exception)
+        {
+            _actionMessage = exception.ServiceError?.Message ?? exception.Message;
+        }
+        catch (Exception exception)
+        {
+            _actionMessage = $"Torrent action failed: {exception.Message}";
+        }
+        finally
+        {
+            _busyTorrentIds.Remove(torrentId);
+        }
+    }
+
+    private bool IsActionBusy(Guid torrentId) => _busyTorrentIds.Contains(torrentId);
+
+    private bool MatchesNameFilter(TorrentSummaryDto torrent) =>
+        string.IsNullOrWhiteSpace(_nameFilter) ||
+        torrent.Name.Contains(_nameFilter, StringComparison.OrdinalIgnoreCase);
+
+    private bool MatchesStatusFilter(TorrentSummaryDto torrent) =>
+        string.IsNullOrWhiteSpace(_statusFilter) ||
+        string.Equals(torrent.State.ToString(), _statusFilter, StringComparison.OrdinalIgnoreCase);
+
+    private IEnumerable<TorrentSummaryDto> ApplySort(IEnumerable<TorrentSummaryDto> torrents)
+    {
+        return _sortOption switch
+        {
+            TorrentSortOption.Name => torrents.OrderBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+            TorrentSortOption.State => torrents.OrderBy(torrent => torrent.State.ToString(), StringComparer.OrdinalIgnoreCase)
+                .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+            TorrentSortOption.ProgressDescending => torrents.OrderByDescending(torrent => torrent.ProgressPercent)
+                .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+            _ => torrents.OrderByDescending(torrent => torrent.AddedAtUtc)
+                .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+        };
+    }
+
+    private static bool CanDeleteData(TorrentSummaryDto torrent) =>
+        torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or TorrentState.Error or TorrentState.Paused;
+
+    private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            await InvokeAsync(async () =>
+            {
+                await LoadAsync();
+                StateHasChanged();
+            });
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_refreshLoopCts is not null)
+        {
+            await _refreshLoopCts.CancelAsync();
+            _refreshLoopCts.Dispose();
+        }
+
+        if (_refreshLoopTask is not null)
+        {
+            try
+            {
+                await _refreshLoopTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        _loadGate.Dispose();
+    }
+
+    private enum TorrentSortOption
+    {
+        Name,
+        State,
+        ProgressDescending,
+        AddedNewest,
+    }
+}

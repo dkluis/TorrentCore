@@ -31,6 +31,8 @@ public sealed class TorrentApiTests
         Assert.Equal(0, hostStatus.EngineMaximumUploadRateBytesPerSecond);
         Assert.Equal(4, hostStatus.MaxActiveMetadataResolutions);
         Assert.Equal(4, hostStatus.MaxActiveDownloads);
+        Assert.Equal(4, hostStatus.AvailableMetadataResolutionSlots);
+        Assert.Equal(4, hostStatus.AvailableDownloadSlots);
         Assert.Equal(0, hostStatus.ResolvingMetadataCount);
         Assert.Equal(0, hostStatus.MetadataQueueCount);
         Assert.Equal(0, hostStatus.DownloadingCount);
@@ -39,6 +41,9 @@ public sealed class TorrentApiTests
         Assert.Equal(0, hostStatus.PausedCount);
         Assert.Equal(0, hostStatus.CompletedCount);
         Assert.Equal(0, hostStatus.ErrorCount);
+        Assert.Equal(0, hostStatus.CurrentConnectedPeerCount);
+        Assert.Equal(0, hostStatus.CurrentDownloadRateBytesPerSecond);
+        Assert.Equal(0, hostStatus.CurrentUploadRateBytesPerSecond);
         Assert.True(hostStatus.PartialFilesEnabled);
         Assert.Equal(".!mt", hostStatus.PartialFileSuffix);
         Assert.Equal(SeedingStopMode.Unlimited.ToString(), hostStatus.SeedingStopMode);
@@ -523,7 +528,9 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(torrents);
         Assert.Contains(torrents, torrent => torrent.State == TorrentState.ResolvingMetadata);
-        Assert.Contains(torrents, torrent => torrent.State == TorrentState.Queued);
+        var queuedTorrent = Assert.Single(torrents, torrent => torrent.State == TorrentState.Queued);
+        Assert.Equal(TorrentWaitReason.WaitingForMetadataSlot, queuedTorrent.WaitReason);
+        Assert.Equal(1, queuedTorrent.QueuePosition);
     }
 
     [Fact]
@@ -550,6 +557,8 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal(2, hostStatus.TorrentCount);
+        Assert.Equal(0, hostStatus.AvailableMetadataResolutionSlots);
+        Assert.Equal(4, hostStatus.AvailableDownloadSlots);
         Assert.Equal(1, hostStatus.ResolvingMetadataCount);
         Assert.Equal(1, hostStatus.MetadataQueueCount);
         Assert.Equal(0, hostStatus.DownloadingCount);
@@ -558,6 +567,35 @@ public sealed class TorrentApiTests
         Assert.Equal(0, hostStatus.PausedCount);
         Assert.Equal(0, hostStatus.CompletedCount);
         Assert.Equal(0, hostStatus.ErrorCount);
+        Assert.Equal(0, hostStatus.CurrentConnectedPeerCount);
+        Assert.Equal(0, hostStatus.CurrentDownloadRateBytesPerSecond);
+        Assert.Equal(0, hostStatus.CurrentUploadRateBytesPerSecond);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_ReportsDownloadQueueWaitReason_AndQueuePosition()
+    {
+        await using var factory = CreateFactory(
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 5,
+            maxActiveDownloads: 1);
+        using var httpClient = factory.CreateClient();
+
+        await AddMagnetAsync(httpClient, "5151515151515151515151515151515151515151", "Download Slot One");
+        await AddMagnetAsync(httpClient, "6161616161616161616161616161616161616161", "Download Slot Two");
+
+        var torrents = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            items => items is not null &&
+                     items.Count == 2 &&
+                     items.Count(torrent => torrent.State == TorrentState.Downloading) == 1 &&
+                     items.Count(torrent => torrent.State == TorrentState.Queued) == 1 &&
+                     items.Any(torrent => torrent.WaitReason == TorrentWaitReason.WaitingForDownloadSlot && torrent.QueuePosition == 1),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(torrents);
+        Assert.Contains(torrents, torrent => torrent.WaitReason == TorrentWaitReason.WaitingForDownloadSlot && torrent.QueuePosition == 1);
     }
 
     [Fact]

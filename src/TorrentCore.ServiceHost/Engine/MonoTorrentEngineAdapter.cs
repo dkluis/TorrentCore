@@ -251,20 +251,27 @@ public sealed class MonoTorrentEngineAdapter(
     {
         await SynchronizeAsync(cancellationToken);
         var torrents = await torrentStateStore.ListAsync(cancellationToken);
-        return torrents.Select(MapSummary).ToArray();
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var diagnostics = TorrentQueueDiagnostics.Create(torrents, runtimeSettings);
+        return torrents.Select(snapshot => MapSummary(snapshot, diagnostics[snapshot.TorrentId])).ToArray();
     }
 
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         await SynchronizeAsync(cancellationToken);
-        var torrent = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+        var torrents = await torrentStateStore.ListAsync(cancellationToken);
+        var torrent = torrents.SingleOrDefault(snapshot => snapshot.TorrentId == torrentId);
         return torrent is null
             ? throw new ServiceOperationException(
                 "torrent_not_found",
                 $"Torrent '{torrentId}' was not found.",
                 StatusCodes.Status404NotFound,
                 nameof(torrentId))
-            : MapDetail(torrent);
+            : MapDetail(
+                torrent,
+                TorrentQueueDiagnostics.Create(
+                    torrents,
+                    await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId]);
     }
 
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken)
@@ -343,7 +350,7 @@ public sealed class MonoTorrentEngineAdapter(
         await ReconcileRuntimeQueueAsync(cancellationToken);
 
         var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
-        return MapDetail(persistedSnapshot);
+        return MapDetail(persistedSnapshot, new TorrentQueueDiagnostic(null, null));
     }
 
     public async Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -1115,7 +1122,7 @@ public sealed class MonoTorrentEngineAdapter(
         await manager.StopAsync();
     }
 
-    private static TorrentSummaryDto MapSummary(TorrentSnapshot snapshot)
+    private static TorrentSummaryDto MapSummary(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)
     {
         return new TorrentSummaryDto
         {
@@ -1129,6 +1136,8 @@ public sealed class MonoTorrentEngineAdapter(
             UploadRateBytesPerSecond = snapshot.UploadRateBytesPerSecond,
             TrackerCount = snapshot.TrackerCount,
             ConnectedPeerCount = snapshot.ConnectedPeerCount,
+            WaitReason = diagnostic.WaitReason,
+            QueuePosition = diagnostic.QueuePosition,
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
@@ -1139,7 +1148,7 @@ public sealed class MonoTorrentEngineAdapter(
         };
     }
 
-    private static TorrentDetailDto MapDetail(TorrentSnapshot snapshot)
+    private static TorrentDetailDto MapDetail(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)
     {
         return new TorrentDetailDto
         {
@@ -1156,6 +1165,8 @@ public sealed class MonoTorrentEngineAdapter(
             UploadRateBytesPerSecond = snapshot.UploadRateBytesPerSecond,
             TrackerCount = snapshot.TrackerCount,
             ConnectedPeerCount = snapshot.ConnectedPeerCount,
+            WaitReason = diagnostic.WaitReason,
+            QueuePosition = diagnostic.QueuePosition,
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,

@@ -80,6 +80,9 @@ Current service configuration section:
 - the dashboard host-status section now exposes queue and runtime-state counts so operators can understand whether torrents are waiting on metadata capacity, waiting on download slots, actively transferring, seeding, paused, completed, or in error
 - the dashboard host-status section is now grouped into compact related cards so service, engine, queue/activity, and policy/storage information use screen width better instead of rendering as a single long vertical list
 - the repo now includes an explicit Intel Mac deployment target document covering the target folder layout, mounted-share deployment path, and required `zsh` start/stop/restart/deploy scripts for the service and web UI
+- torrent DTOs now expose per-torrent wait reason and queue position so the UI can explain whether an item is waiting for metadata capacity, download capacity, paused by an operator, or blocked by error
+- host status now exposes available metadata/download slots plus aggregated current peer count and transfer rates so queue pressure and engine saturation are easier to understand
+- the web UI is now split so the Dashboard is host-status focused while magnet submission and torrent lifecycle management live on a dedicated Torrents page
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -524,3 +527,4 @@ Next:
 - continue building the operator-facing path so more current MonoTorrent configuration can move from config files into the web UI
 - extend the UI from basic settings and actions into richer operator diagnostics and controls
 - add Intel Mac deployment packaging and `zsh` operational scripts for service/web publish, deploy, start, stop, and restart
+- add a proper torrent detail page with deeper diagnostics now that per-torrent wait reason and queue context are in the public contract

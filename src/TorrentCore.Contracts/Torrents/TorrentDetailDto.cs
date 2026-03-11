@@ -15,6 +15,8 @@ public sealed class TorrentDetailDto
     public required long UploadRateBytesPerSecond { get; init; }
     public required int TrackerCount { get; init; }
     public required int ConnectedPeerCount { get; init; }
+    public TorrentWaitReason? WaitReason { get; init; }
+    public int? QueuePosition { get; init; }
     public required DateTimeOffset AddedAtUtc { get; init; }
     public DateTimeOffset? CompletedAtUtc { get; init; }
     public DateTimeOffset? LastActivityAtUtc { get; init; }

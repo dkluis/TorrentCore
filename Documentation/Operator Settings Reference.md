@@ -12,6 +12,29 @@ It is intentionally practical:
 
 ## Queue And Concurrency Settings
 
+## Queue Diagnostics
+
+TorrentCore now exposes queue diagnostics at two levels:
+- host-level queue counts and available slots
+- per-torrent wait reason and queue position
+
+Per-torrent wait reason currently means:
+- `PendingMetadataDispatch`: the torrent is queued and should be picked up for metadata work as soon as the scheduler dispatches it
+- `WaitingForMetadataSlot`: the torrent is queued behind the current metadata-resolution capacity
+- `PendingDownloadDispatch`: the torrent is queued and should be picked up for download work as soon as the scheduler dispatches it
+- `WaitingForDownloadSlot`: the torrent is queued behind the current active-download capacity
+- `PausedByOperator`: the torrent is not running because it was explicitly paused
+- `BlockedByError`: the torrent is not progressing because it is currently in an error state
+
+Queue position:
+- is only populated when a torrent is in one of the queue states
+- is ordered by TorrentCore's current queue rule: oldest added first, then torrent id as a stable tie-breaker
+
+Host-level queue diagnostics currently include:
+- open metadata slots
+- open download slots
+- counts for resolving, metadata-queued, downloading, download-queued, seeding, paused, completed, and errored torrents
+
 ### Max Active Metadata Resolutions
 
 Meaning:
