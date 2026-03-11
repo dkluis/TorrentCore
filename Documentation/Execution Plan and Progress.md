@@ -96,6 +96,9 @@ Current service configuration section:
 - service/API regression coverage now explicitly verifies that repeated list/detail reads do not mutate a paused MonoTorrent torrent and that resuming a paused queued torrent under metadata-slot pressure leaves it queued with the correct wait reason instead of starting immediately
 - MonoTorrent hardening coverage now also verifies selected-style multi-torrent pause/resume under metadata-slot pressure and confirms a paused MonoTorrent torrent stays paused across full service restart and recovery
 - deterministic active-download pause/resume coverage now exists in the fake runtime path as well, including restart persistence for a torrent paused mid-download, so the desired-state model is exercised under active transfer instead of only queued/metadata states
+- the repo now includes a first complete Intel Mac deployment script bundle under `Scripts/`, including service/web start-stop-restart scripts, service/web/combined deploy scripts, a shared `zsh` helper library, and an environment override template
+- the deployment script bundle is validated in-repo by syntax checking, an Intel (`osx-x64`) publish-and-sync dry run, and a full local start/stop smoke test using an `osx-arm64` override because the current development machine cannot execute the Intel publish directly
+- deployment docs and the environment template now explicitly call out that the default script bindings are loopback-only and show the exact `TORRENTCORE_WEBUI_URLS` / `TORRENTCORE_SERVICE_URLS` overrides needed for remote access from another machine
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

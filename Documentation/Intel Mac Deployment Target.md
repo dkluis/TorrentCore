@@ -64,7 +64,14 @@ Web UI scripts:
 Deployment scripts:
 - `deploy-service-intel.zsh`
 - `deploy-webui-intel.zsh`
-- optionally a combined `deploy-all-intel.zsh`
+- `deploy-all-intel.zsh`
+
+These now live in:
+- [Scripts](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts)
+
+Important split:
+- `start/stop/restart` scripts are target-host runtime scripts
+- `deploy` scripts are repo-side scripts that publish from the current machine and sync to the mounted Intel Mac share
 
 ## Script Responsibilities
 
@@ -131,7 +138,19 @@ Web UI runtime directory:
 
 Scripts directory:
 - contains all operational scripts
-- may also contain PID files and local script logs if that proves simplest
+- now also contains:
+  - `run/` for PID files
+  - `logs/` for shell-level start/stop logs
+  - optional `torrentcore.env` for operator overrides
+
+Current script-created state files:
+- `~/TorrentCore/Scripts/run/service.pid`
+- `~/TorrentCore/Scripts/run/webui.pid`
+- `~/TorrentCore/Scripts/logs/service.log`
+- `~/TorrentCore/Scripts/logs/webui.log`
+
+Current environment template:
+- [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example)
 
 ## Logging Expectations
 
@@ -144,6 +163,10 @@ The script layer should log enough to troubleshoot:
 
 This is separate from TorrentCore's own application/activity logs.
 
+Current decision:
+- script-layer stdout/stderr is written to `Scripts/logs`
+- TorrentCore application logs continue to be managed by the application itself
+
 ## Process Management Expectations
 
 The first script-based deployment should:
@@ -152,14 +175,61 @@ The first script-based deployment should:
 - avoid requiring Rider or manual `dotnet run`
 - avoid broad `pkill dotnet`-style process management
 
-## Open Decisions
+Current implementation:
+- start scripts use `dotnet <published-dll>` from the published app directory
+- PID files are checked before startup so duplicate starts are avoided
+- stop scripts use the PID file first and verify the PID still matches the expected DLL before sending signals
+- stop uses `TERM` first, then escalates to `KILL` only if the process does not exit
 
-Still to decide:
-- exact log file locations for the script layer
-- exact PID file locations
-- whether deploy scripts should stop/start automatically or only publish/copy
-- whether old published output should be removed before copy or replaced in place
-- whether later deployment should become self-contained instead of framework-dependent
+## Current Defaults
+
+Current runtime defaults implemented in the scripts:
+- service URL binding: `http://127.0.0.1:7033`
+- web URL binding: `http://127.0.0.1:7053`
+- web-to-service base URL: `http://127.0.0.1:7033/`
+- ASP.NET Core environment: `Production`
+- deploy target base: `/Volumes/HD-Boot-CA-Server/Users/dick/TorrentCore`
+- publish runtime: `osx-x64`
+- publish mode: framework-dependent
+
+These can be overridden through `Scripts/torrentcore.env`.
+
+Remote access note:
+- the defaults are intentionally loopback-only
+- to open the Web UI from another machine on the LAN, set `TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053`
+- if remote Swagger/API access is also desired, set `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
+- the web UI can still keep `TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/` because the service is local to the Intel Mac
+
+## Deploy Behavior
+
+Current deploy behavior:
+- publish service and/or web to `artifacts/publish/intel/...` in the repo
+- sync publish output to the target share using `rsync --delete`
+- sync the `Scripts` folder to the target share while preserving:
+  - `Scripts/run`
+  - `Scripts/logs`
+  - `Scripts/torrentcore.env`
+
+Deploy commands:
+- `./Scripts/deploy-service-intel.zsh`
+- `./Scripts/deploy-webui-intel.zsh`
+- `./Scripts/deploy-all-intel.zsh`
+
+Optional restart behavior:
+- each deploy script supports `--restart`
+- `deploy-all-intel.zsh --restart` stops web, stops service, syncs both runtimes plus scripts, then starts service and web again
+
+## Validation Notes
+
+What is already validated in-repo:
+- the `zsh` scripts pass syntax validation with `zsh -n`
+- Intel (`osx-x64`) publish and sync to a temp target directory works
+- local start/stop validation was executed successfully using an `osx-arm64` override on the development machine because the Apple Silicon host cannot execute the Intel publish directly
+
+Still to validate on the actual Intel Mac:
+- running the published `osx-x64` service and web from the mounted-share deployment
+- login-item boot/startup behavior
+- restart behavior on the real host after deployment
 
 ## Recommended Delivery Order
 

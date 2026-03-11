@@ -20,6 +20,7 @@ Start with these docs:
 - `Documentation/New Chat Starter.md`
 - `Documentation/Operator Settings Reference.md`
 - `Documentation/Intel Mac Deployment Target.md`
+- `Scripts/README.md`
 
 Repository legal documents:
 - `LICENSE.md`
