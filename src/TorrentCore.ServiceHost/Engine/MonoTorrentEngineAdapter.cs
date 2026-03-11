@@ -367,6 +367,7 @@ public sealed class MonoTorrentEngineAdapter(
         }
 
         await manager.PauseAsync();
+        await EnsureManagerStoppedAsync(manager, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
         var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
