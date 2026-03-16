@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
+using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Tests;
@@ -480,6 +482,55 @@ public sealed class TorrentApiTests
         Assert.NotNull(finalDetail);
         Assert.Equal(TorrentState.Paused, finalDetail.State);
         Assert.Equal(TorrentWaitReason.PausedByOperator, finalDetail.WaitReason);
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_GetEndpoints_ProjectLiveStateOverStalePersistedSnapshot()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-live-projection");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            downloadPath: downloadPath,
+            storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(httpClient, "7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A", "MonoTorrent Live Projection");
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var initialDetail = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.State is not TorrentState.Error and not TorrentState.Removed,
+            timeout: TimeSpan.FromSeconds(5));
+
+        await ForcePersistedTorrentSnapshotAsync(
+            storagePath,
+            addedTorrent!.TorrentId,
+            TorrentState.Error,
+            TorrentDesiredState.Runnable,
+            errorMessage: "stale persisted error");
+
+        var projectedDetail = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent is not null &&
+                       torrent.State is not TorrentState.Error and not TorrentState.Removed &&
+                       torrent.ErrorMessage is null,
+            timeout: TimeSpan.FromSeconds(5));
+
+        var projectedList = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.NotNull(initialDetail);
+        Assert.NotNull(projectedDetail);
+        Assert.NotNull(projectedList);
+        Assert.DoesNotContain(projectedDetail.State, new[] { TorrentState.Error, TorrentState.Removed });
+        Assert.Null(projectedDetail.ErrorMessage);
+        Assert.Contains(
+            projectedList,
+            torrent => torrent.TorrentId == addedTorrent.TorrentId &&
+                       torrent.State == projectedDetail.State &&
+                       torrent.ErrorMessage is null);
     }
 
     [Fact]
@@ -1331,6 +1382,39 @@ public sealed class TorrentApiTests
         {
             MagnetUri = $"magnet:?xt=urn:btih:{infoHash}&dn={Uri.EscapeDataString(name)}",
         });
+    }
+
+    private static async Task ForcePersistedTorrentSnapshotAsync(
+        string storagePath,
+        Guid torrentId,
+        TorrentState state,
+        TorrentDesiredState desiredState,
+        string? errorMessage)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE torrents
+            SET
+                state = $state,
+                desired_state = $desired_state,
+                progress_percent = 0,
+                downloaded_bytes = 0,
+                download_rate_bytes_per_second = 0,
+                upload_rate_bytes_per_second = 0,
+                connected_peer_count = 0,
+                error_message = $error_message
+            WHERE torrent_id = $torrent_id;
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$state", state.ToString());
+        command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
+        command.Parameters.AddWithValue("$error_message", (object?)errorMessage ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
     }
 
     private static string CreateTempRootPath(string prefix)
