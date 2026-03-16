@@ -17,6 +17,7 @@ This document follows:
 - [Project Brief.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Project%20Brief.md)
 - [TVMaze Integration Boundary.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/TVMaze%20Integration%20Boundary.md)
 - [Initial Scaffold Status.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Initial%20Scaffold%20Status.md)
+- [Torrent Category Routing And Callback Plan.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Torrent%20Category%20Routing%20And%20Callback%20Plan.md)
 
 ## Current Baseline
 
@@ -108,6 +109,7 @@ Current service configuration section:
 - the Avalonia project is now integrated into `TorrentCore.sln`, reads its service endpoint from `src/TorrentCore.Avalonia/Config/appsettings.json`, and currently coexists with the existing web UI rather than replacing it
 - the Avalonia Settings screen has been regrouped into smaller desktop cards for runtime summary, applied throttles, seeding policy, cleanup policy, queue limits, log throttling, and saved engine throttle settings so the full current runtime surface is visible without oversized horizontal grids
 - the Avalonia Dashboard, Torrents, Torrent Detail, and Logs screens have now started the same panel-completeness pass: Dashboard exposes more engine/policy/capability fields, Torrents includes sort plus more timing/error fields, Torrent Detail surfaces richer transfer/identity/log metadata, and Logs now exposes fuller filter choices plus more per-entry diagnostics
+- the next planned workstream is category-aware routing plus shared completion-callback compatibility, with TorrentCore owning category definitions and directory routing while reusing the existing TVMaze callback app through Transmission-compatible environment variables
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -124,6 +126,8 @@ Note:
 - User-facing date/time values must be rendered in the operator's local time, not UTC.
 - Incomplete content must be distinguishable from completed content through explicit TorrentCore policy, not inferred only from file size or Finder display.
 - TorrentCore should accept and persist incoming magnet submissions even when runtime concurrency limits are full; queueing controls execution, not API admission.
+- TorrentCore should own category definitions and routing; clients such as TVMaze should send stable category keys, not raw download paths.
+- TorrentCore should reuse the existing shared TVMaze completion callback entrypoint instead of inventing a second callback stack.
 
 ## Phased Execution Plan
 
@@ -242,6 +246,25 @@ Planned outputs:
 
 Exit criteria:
 - TVMaze remains a shallow consumer of TorrentCore
+
+### Phase 7: Category Routing and Shared Callback Compatibility
+
+Goal:
+- add TorrentCore-owned category definitions, category-aware routing, and completion-callback compatibility with the existing shared TVMaze callback app
+
+Planned outputs:
+- category persistence schema and seeded defaults
+- `CategoryKey` on torrent contracts
+- category-aware add-magnet routing
+- host-level callback invocation settings
+- Transmission-compatible callback environment generation for completed torrents
+- Web UI category and callback administration
+
+Exit criteria:
+- torrents can be submitted with `TV`, `Movie`, `Audiobook`, or `Music` category keys
+- TorrentCore resolves the correct download root internally
+- completed torrents can invoke the existing shared callback entrypoint once using Transmission-style environment variables
+- operators can manage categories and callback settings through TorrentCore UI
 
 ## Phase Gates
 

@@ -12,6 +12,7 @@ TorrentCore owns:
 - persistence
 - management API
 - dedicated management UI
+- category definitions and category-aware download routing
 - file finalization behavior for incomplete vs completed content
 - seeding policy and stop conditions
 
@@ -100,6 +101,7 @@ TorrentCore owns:
 - queue policy
 - admission and concurrency control for bursty incoming magnet submissions
 - download paths
+- category routing and callback integration
 - incomplete-file handling such as `.part` suffix behavior
 - completion and seeding policy
 - host capabilities
@@ -130,6 +132,8 @@ Keep v1 narrow:
 - accept-now, run-when-capacity-allows queue behavior for bursts of incoming magnets
 - configurable incomplete-file finalization behavior with `.part` compatibility
 - configurable seeding stop policy
+- category-aware torrent routing for `TV`, `Movie`, `Audiobook`, and `Music`
+- shared callback invocation compatibility with the existing TVMaze completion callback app
 - survive restart
 - host-local SQLite persistence
 - basic health and diagnostics
@@ -168,3 +172,4 @@ The initial scaffold is a boundary-first starter:
 6. Add explicit incomplete-file and seeding-policy behavior rather than relying on engine defaults.
 7. Add operator-managed global concurrency controls for metadata-resolution and download queue execution.
 8. Add Intel Mac deployment packaging and operational scripts for service/web start, stop, restart, and publish/copy deployment.
+9. Add category-aware routing and shared completion-callback compatibility without coupling TorrentCore to TVMaze paths or engine internals.

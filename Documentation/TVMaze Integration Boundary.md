@@ -23,7 +23,7 @@
 ## TVMaze Is Allowed To Do
 
 - select a TorrentCore host
-- add a magnet
+- add a magnet with a stable category key
 - show progress and simple state
 - pause, resume, remove
 - display completion or error state
@@ -36,11 +36,33 @@
 - engine configuration
 - deep queue policy
 - storage policy
+- category administration and download-root routing
+- completion callback command configuration
 - incomplete-file lifecycle policy
 - seeding policy
 - host administration
 - engine persistence
 - engine diagnostics
+
+## Category Rule
+
+TVMaze should submit stable category keys such as:
+
+- `TV`
+- `Movie`
+- `Audiobook`
+- `Music`
+
+TorrentCore should resolve category download roots and callback labels internally.
+
+TVMaze should not submit raw download directories or callback command details.
+
+## Shared Callback Rule
+
+TorrentCore and Transmission should be able to call the same existing TVMaze completion callback entrypoint.
+
+TorrentCore should emulate the expected Transmission-style environment variables when invoking that shared callback,
+instead of requiring a second callback application or a TorrentCore-specific callback protocol.
 
 ## API Boundary Rule
 

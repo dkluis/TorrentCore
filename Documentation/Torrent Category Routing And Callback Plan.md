@@ -1,0 +1,294 @@
+# Torrent Category Routing And Callback Plan
+
+## Status
+
+Planned and accepted as the next major TorrentCore workstream.
+
+Not implemented yet.
+
+## Goal
+
+Add TorrentCore-owned category management so torrents can be submitted and operated with category-aware behavior for:
+
+- `TV`
+- `Movie`
+- `Audiobook`
+- `Music`
+
+This category model must support:
+
+- category-specific download roots
+- category selection at torrent submission time
+- operator management through TorrentCore UI
+- completion callback invocation through the existing shared TVMaze callback app
+
+TorrentCore should not invent a second callback stack. It should call the same callback entrypoint that Transmission
+already uses so multiple torrent clients can share one operational callback setup.
+
+## Product Decisions
+
+- TorrentCore owns category definitions, routing, and category administration.
+- TVMaze should pass a stable category key, not a filesystem path.
+- TorrentCore should resolve the effective download directory from the category configuration.
+- TorrentCore should invoke the existing shared callback app/script using Transmission-compatible environment variables.
+- TorrentCore should not persist callback attempt state or build a callback worker model for this slice.
+- Callback firing must be edge-based:
+  - invoke once when a torrent first transitions into completed/finalized state
+  - do not re-invoke on every later synchronization pass
+- Callback executable management is external to TorrentCore. TorrentCore only needs enough configuration to call the
+  already-installed callback entrypoint.
+
+## Category Model
+
+TorrentCore should persist a category definition table with stable keys.
+
+Recommended fields:
+
+- `Key`
+- `DisplayName`
+- `CallbackLabel`
+- `DownloadRootPath`
+- `Enabled`
+- `InvokeCompletionCallback`
+- `SortOrder`
+
+Design rules:
+
+- `Key` is the stable service/API identifier used by TVMaze and TorrentCore.
+- `CallbackLabel` is the label sent to the shared callback app through `TR_TORRENT_LABELS`.
+- `DownloadRootPath` is resolved by TorrentCore at add time and stored on the torrent.
+- Editing a category later affects future torrents only. Existing torrents keep their resolved routing data.
+
+Example defaults:
+
+- `TV`
+- `Movie`
+- `Audiobook`
+- `Music`
+
+The label can differ from the key if needed for compatibility. For example:
+
+- key: `Audiobook`
+- label: `Audio Book`
+
+## Torrent Model Changes
+
+Torrent submission should become category-aware.
+
+Required changes:
+
+- add `CategoryKey` to `AddMagnetRequest`
+- persist `CategoryKey` on the torrent
+- resolve and persist the effective `DownloadRootPath`/save routing at add time
+- expose category in torrent list/detail contracts and UI surfaces
+
+TorrentCore should continue to own the durable routing decision after submission.
+TVMaze should not send raw download paths.
+
+## Callback Contract
+
+TorrentCore should invoke the existing callback entrypoint with the same environment shape that Transmission uses today.
+
+Primary environment variables:
+
+- `TR_TORRENT_ID`
+- `TR_TORRENT_HASH`
+- `TR_TORRENT_NAME`
+- `TR_TORRENT_DIR`
+- `TR_TORRENT_LABELS`
+
+Recommended TorrentCore mapping:
+
+- `TR_TORRENT_ID`
+  - optional compatibility value such as `0`
+- `TR_TORRENT_HASH`
+  - torrent info hash
+- `TR_TORRENT_NAME`
+  - torrent display name
+- `TR_TORRENT_DIR`
+  - resolved category download root
+- `TR_TORRENT_LABELS`
+  - category `CallbackLabel`
+
+Optional override environment variables should also be supported when configured:
+
+- `TVMAZE_API_COMPLETE_URL`
+- `TVMAZE_API_COMPLETE_API_KEY`
+
+Those align with the existing shared callback app behavior in `TransmissionDoneCallback`.
+
+## Host-Level Callback Settings
+
+TorrentCore should not manage the callback app itself, but it does need host-local settings describing how to invoke it.
+
+Recommended host settings:
+
+- `CompletionCallbackEnabled`
+- `CompletionCallbackCommandPath`
+- `CompletionCallbackArguments`
+- `CompletionCallbackWorkingDirectory`
+- `CompletionCallbackTimeoutSeconds`
+- `CompletionCallbackApiBaseUrlOverride`
+- `CompletionCallbackApiKeyOverride`
+
+Scope rule:
+
+- these are host settings, not per-category settings
+- per-category control is only whether a category invokes the callback and which callback label it sends
+
+## UI Scope
+
+TorrentCore Web UI should be the first admin surface for this functionality.
+
+Required Web UI capability:
+
+- category list/editor under settings/admin
+- enable/disable category
+- edit display name
+- edit callback label
+- edit download root path
+- choose whether completion callback is enabled for the category
+- configure host-level callback command/path settings
+- select category during Add Magnet
+- show category in torrent list, detail, and filters
+
+Avalonia can follow after the Web UI slice is stable.
+
+## API Surface
+
+Recommended additions:
+
+- `GET /api/categories`
+- `GET /api/categories/{key}`
+- `PUT /api/categories/{key}`
+- optional later:
+  - `POST /api/categories`
+  - `POST /api/categories/{key}/validate`
+  - `POST /api/host/completion-callback/test`
+
+Torrent endpoints should gain category support through the existing add/list/detail contracts.
+
+## Delivery Order
+
+### Phase 1 - Contracts and schema
+
+Goal:
+
+- add category and callback configuration shape to TorrentCore contracts and persistence
+
+Scope:
+
+- category persistence schema
+- host callback settings persistence/config shape
+- `CategoryKey` on add/list/detail contracts
+- seeded default categories
+
+Exit criteria:
+
+- category definitions are persisted and queryable
+- torrents can store a category key and resolved routing data
+
+### Phase 2 - Category-aware submission and routing
+
+Goal:
+
+- make torrent submission resolve category routing inside TorrentCore
+
+Scope:
+
+- validate submitted `CategoryKey`
+- resolve category `DownloadRootPath`
+- persist category and effective path on the torrent
+- expose category in list/detail
+
+Exit criteria:
+
+- adding a torrent with a category routes it to the configured category directory
+- future category edits do not silently rewrite existing torrent routing
+
+### Phase 3 - Completion callback invocation
+
+Goal:
+
+- call the existing shared callback app when a torrent first completes
+
+Scope:
+
+- detect first completion/finalization transition
+- invoke configured callback command
+- populate Transmission-compatible environment variables
+- apply optional API override environment variables when configured
+- log callback invocation success/failure for diagnostics
+
+Out of scope:
+
+- callback worker infrastructure
+- callback retry/state persistence ledger
+- replacing the existing TVMaze callback app
+
+Exit criteria:
+
+- completed torrents invoke the shared callback entrypoint once
+- the existing callback app can consume TorrentCore-originated completions without modification
+
+### Phase 4 - Operator UI
+
+Goal:
+
+- make categories and callback settings manageable without editing files
+
+Scope:
+
+- category settings UI
+- host callback settings UI
+- category-aware magnet submission UI
+- category list/detail/filter presentation in torrent views
+
+Exit criteria:
+
+- operators can manage categories and callback behavior from TorrentCore UI
+
+## Test Expectations
+
+Required tests:
+
+- category validation and lookup
+- default category seeding
+- add-torrent request with valid and invalid category keys
+- category-aware download-root resolution
+- category shown correctly in list/detail DTOs
+- completion edge detection triggers callback once
+- callback invocation populates the expected Transmission-style environment values
+- callback-disabled categories do not invoke the callback
+
+Manual validation should also confirm that the shared callback app behaves the same when called by:
+
+- Transmission
+- TorrentCore
+
+## Integration Boundary With TVMaze
+
+TVMaze should remain a shallow client.
+
+TVMaze may:
+
+- choose a TorrentCore category key
+- submit a magnet with that key
+- show category in lightweight summaries if useful
+
+TVMaze should not own:
+
+- category download-root paths
+- callback command configuration
+- callback environment construction
+- category administration
+
+## Success Criteria
+
+This workstream is complete when:
+
+1. TorrentCore operators can manage the four initial categories through UI.
+2. Torrent submission accepts a stable category key and resolves download routing inside TorrentCore.
+3. Completed torrents invoke the existing shared callback app using Transmission-compatible environment variables.
+4. TVMaze can target TorrentCore categories without sending raw filesystem paths.
+5. No second callback stack or duplicated per-client callback setup is introduced.
