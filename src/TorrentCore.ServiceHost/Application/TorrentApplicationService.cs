@@ -108,6 +108,9 @@ public sealed class TorrentApplicationService(
     public Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken) =>
         torrentCategoryService.GetCategoriesAsync(cancellationToken);
 
+    public Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request, CancellationToken cancellationToken) =>
+        torrentCategoryService.UpdateCategoryAsync(key, request, cancellationToken);
+
     public Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken) =>
         torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
 

@@ -1,13 +1,14 @@
 @page "/settings"
 @inject TorrentCoreClient TorrentCoreClient
 @using System.Globalization
+@using TorrentCore.Contracts.Categories
 @using TorrentCore.Contracts.Host
 
 <PageTitle>Settings</PageTitle>
 
 <h1>Runtime Settings</h1>
 
-<p>Operator settings for seeding policy, cleanup, queue concurrency, and engine throttling. Queue and policy settings apply live. Engine throttle changes are saved and apply after the service restarts.</p>
+<p>Operator settings for seeding policy, cleanup, queue concurrency, engine throttling, shared callback configuration, and category routing. Queue and policy settings apply live. Engine throttle changes are saved and apply after the service restarts.</p>
 
 @if (_isLoading)
 {
@@ -140,6 +141,90 @@ else
                 </div>
             </div>
         </section>
+
+        <section class="mb-4">
+            <h2 class="h5">Shared Callback Settings</h2>
+            <p class="text-muted mb-2">These settings describe the existing shared TVMaze callback entrypoint. They are persisted now so the callback slice can be enabled without going back to file edits.</p>
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="form-check">
+                        <input id="completionCallbackEnabled" class="form-check-input" type="checkbox" @bind="_completionCallbackEnabled" />
+                        <label class="form-check-label" for="completionCallbackEnabled">Enable completion callback invocation</label>
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label" for="completionCallbackCommandPath">Command Path</label>
+                    <input id="completionCallbackCommandPath" class="form-control tc-break" @bind="_completionCallbackCommandPath" />
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label" for="completionCallbackArguments">Arguments</label>
+                    <input id="completionCallbackArguments" class="form-control tc-break" @bind="_completionCallbackArguments" />
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label" for="completionCallbackWorkingDirectory">Working Directory</label>
+                    <input id="completionCallbackWorkingDirectory" class="form-control tc-break" @bind="_completionCallbackWorkingDirectory" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label" for="completionCallbackTimeoutSeconds">Timeout Seconds</label>
+                    <input id="completionCallbackTimeoutSeconds" class="form-control" type="number" min="1" step="1" @bind="_completionCallbackTimeoutSeconds" />
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label" for="completionCallbackApiBaseUrlOverride">API Base URL Override</label>
+                    <input id="completionCallbackApiBaseUrlOverride" class="form-control tc-break" @bind="_completionCallbackApiBaseUrlOverride" />
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label" for="completionCallbackApiKeyOverride">API Key Override</label>
+                    <input id="completionCallbackApiKeyOverride" class="form-control tc-break" @bind="_completionCallbackApiKeyOverride" />
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-4">
+            <h2 class="h5">Categories</h2>
+            <p class="text-muted mb-2">These definitions route future torrent adds. Editing a category does not move existing torrents that were already added.</p>
+            <div class="row g-3">
+                @foreach (var category in _categories.OrderBy(category => category.SortOrder).ThenBy(category => category.Key, StringComparer.OrdinalIgnoreCase))
+                {
+                    <div class="col-12" @key="category.Key">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3 class="h6 mb-0">@category.Key</h3>
+                                    <div class="tc-toolbar">
+                                        <div class="form-check">
+                                            <input id="@($"category-enabled-{category.Key}")" class="form-check-input" type="checkbox" @bind="category.Enabled" />
+                                            <label class="form-check-label" for="@($"category-enabled-{category.Key}")">Enabled</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input id="@($"category-callback-{category.Key}")" class="form-check-input" type="checkbox" @bind="category.InvokeCompletionCallback" />
+                                            <label class="form-check-label" for="@($"category-callback-{category.Key}")">Invoke Callback</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-12 col-lg-3">
+                                        <label class="form-label" for="@($"category-display-{category.Key}")">Display Name</label>
+                                        <input id="@($"category-display-{category.Key}")" class="form-control" @bind="category.DisplayName" />
+                                    </div>
+                                    <div class="col-12 col-lg-3">
+                                        <label class="form-label" for="@($"category-label-{category.Key}")">Callback Label</label>
+                                        <input id="@($"category-label-{category.Key}")" class="form-control" @bind="category.CallbackLabel" />
+                                    </div>
+                                    <div class="col-12 col-lg-4">
+                                        <label class="form-label" for="@($"category-root-{category.Key}")">Download Root</label>
+                                        <input id="@($"category-root-{category.Key}")" class="form-control tc-break" @bind="category.DownloadRootPath" />
+                                    </div>
+                                    <div class="col-12 col-lg-2">
+                                        <label class="form-label" for="@($"category-sort-{category.Key}")">Sort Order</label>
+                                        <input id="@($"category-sort-{category.Key}")" class="form-control" type="number" min="0" step="1" @bind="category.SortOrder" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
         <div class="mt-3 tc-toolbar">
             <button class="btn btn-primary" type="submit" disabled="@_isSaving">Save Settings</button>
             <button class="btn btn-secondary" type="button" @onclick="LoadAsync" disabled="@_isSaving">Reload</button>
@@ -184,11 +269,19 @@ else
     private int _engineMaximumUploadRateBytesPerSecond;
     private int _maxActiveMetadataResolutions = 4;
     private int _maxActiveDownloads = 4;
+    private bool _completionCallbackEnabled;
+    private string _completionCallbackCommandPath = string.Empty;
+    private string _completionCallbackArguments = string.Empty;
+    private string _completionCallbackWorkingDirectory = string.Empty;
+    private int _completionCallbackTimeoutSeconds = 30;
+    private string _completionCallbackApiBaseUrlOverride = string.Empty;
+    private string _completionCallbackApiKeyOverride = string.Empty;
     private int _appliedMaxConnections = 150;
     private int _appliedHalfOpenConnections = 8;
     private int _appliedDownloadRateBytesPerSecond;
     private int _appliedUploadRateBytesPerSecond;
     private bool _engineSettingsRequireRestart;
+    private List<EditableCategoryModel> _categories = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -203,7 +296,11 @@ else
 
         try
         {
-            var settings = await TorrentCoreClient.GetRuntimeSettingsAsync();
+            var settingsTask = TorrentCoreClient.GetRuntimeSettingsAsync();
+            var categoriesTask = TorrentCoreClient.GetCategoriesAsync();
+            await Task.WhenAll(settingsTask, categoriesTask);
+
+            var settings = settingsTask.Result;
             if (settings is null)
             {
                 _error = "Runtime settings endpoint returned no payload.";
@@ -211,6 +308,7 @@ else
             }
 
             Apply(settings);
+            ApplyCategories(categoriesTask.Result);
         }
         catch (Exception exception)
         {
@@ -245,12 +343,34 @@ else
                 EngineMaximumUploadRateBytesPerSecond = _engineMaximumUploadRateBytesPerSecond,
                 MaxActiveMetadataResolutions = _maxActiveMetadataResolutions,
                 MaxActiveDownloads = _maxActiveDownloads,
+                CompletionCallbackEnabled = _completionCallbackEnabled,
+                CompletionCallbackCommandPath = _completionCallbackCommandPath,
+                CompletionCallbackArguments = _completionCallbackArguments,
+                CompletionCallbackWorkingDirectory = _completionCallbackWorkingDirectory,
+                CompletionCallbackTimeoutSeconds = _completionCallbackTimeoutSeconds,
+                CompletionCallbackApiBaseUrlOverride = _completionCallbackApiBaseUrlOverride,
+                CompletionCallbackApiKeyOverride = _completionCallbackApiKeyOverride,
             });
 
+            var updatedCategories = new List<TorrentCategoryDto>(_categories.Count);
+            foreach (var category in _categories.OrderBy(category => category.SortOrder).ThenBy(category => category.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                updatedCategories.Add(await TorrentCoreClient.UpdateCategoryAsync(category.Key, new UpdateTorrentCategoryRequest
+                {
+                    DisplayName = category.DisplayName,
+                    CallbackLabel = category.CallbackLabel,
+                    DownloadRootPath = category.DownloadRootPath,
+                    Enabled = category.Enabled,
+                    InvokeCompletionCallback = category.InvokeCompletionCallback,
+                    SortOrder = category.SortOrder,
+                }));
+            }
+
             Apply(settings);
+            ApplyCategories(updatedCategories);
             _message = settings.EngineSettingsRequireRestart
-                ? "Runtime settings saved. Restart TorrentCore.Service to apply the engine throttle changes."
-                : "Runtime settings saved.";
+                ? "Runtime settings and categories saved. Restart TorrentCore.Service to apply the engine throttle changes."
+                : "Runtime settings and categories saved.";
         }
         catch (Exception exception)
         {
@@ -283,6 +403,13 @@ else
         _engineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond;
         _maxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions;
         _maxActiveDownloads = settings.MaxActiveDownloads;
+        _completionCallbackEnabled = settings.CompletionCallbackEnabled;
+        _completionCallbackCommandPath = settings.CompletionCallbackCommandPath ?? string.Empty;
+        _completionCallbackArguments = settings.CompletionCallbackArguments ?? string.Empty;
+        _completionCallbackWorkingDirectory = settings.CompletionCallbackWorkingDirectory ?? string.Empty;
+        _completionCallbackTimeoutSeconds = settings.CompletionCallbackTimeoutSeconds;
+        _completionCallbackApiBaseUrlOverride = settings.CompletionCallbackApiBaseUrlOverride ?? string.Empty;
+        _completionCallbackApiKeyOverride = settings.CompletionCallbackApiKeyOverride ?? string.Empty;
         _appliedMaxConnections = settings.AppliedEngineMaximumConnections;
         _appliedHalfOpenConnections = settings.AppliedEngineMaximumHalfOpenConnections;
         _appliedDownloadRateBytesPerSecond = settings.AppliedEngineMaximumDownloadRateBytesPerSecond;
@@ -290,6 +417,35 @@ else
         _engineSettingsRequireRestart = settings.EngineSettingsRequireRestart;
     }
 
+    private void ApplyCategories(IReadOnlyList<TorrentCategoryDto> categories)
+    {
+        _categories = categories
+            .OrderBy(category => category.SortOrder)
+            .ThenBy(category => category.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(category => new EditableCategoryModel
+            {
+                Key = category.Key,
+                DisplayName = category.DisplayName,
+                CallbackLabel = category.CallbackLabel,
+                DownloadRootPath = category.DownloadRootPath,
+                Enabled = category.Enabled,
+                InvokeCompletionCallback = category.InvokeCompletionCallback,
+                SortOrder = category.SortOrder,
+            })
+            .ToList();
+    }
+
     private static string FormatRateLimit(int bytesPerSecond) =>
         bytesPerSecond <= 0 ? "Unlimited" : $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+
+    private sealed class EditableCategoryModel
+    {
+        public required string Key { get; init; }
+        public required string DisplayName { get; set; }
+        public required string CallbackLabel { get; set; }
+        public required string DownloadRootPath { get; set; }
+        public required bool Enabled { get; set; }
+        public required bool InvokeCompletionCallback { get; set; }
+        public required int SortOrder { get; set; }
+    }
 }

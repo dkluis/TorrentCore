@@ -118,6 +118,7 @@ Current service configuration section:
 - the Avalonia Dashboard, Torrents, Torrent Detail, and Logs screens have now started the same panel-completeness pass: Dashboard exposes more engine/policy/capability fields, Torrents includes sort plus more timing/error fields, Torrent Detail surfaces richer transfer/identity/log metadata, and Logs now exposes fuller filter choices plus more per-entry diagnostics
 - category-aware routing work has started: TorrentCore now persists seeded default categories, exposes a read-only categories API, accepts an optional `CategoryKey` on torrent add requests, and resolves category-specific download roots during add while keeping omitted-category adds on the host's current global download root for compatibility
 - host-level callback invocation settings now exist in the runtime settings contract and persistence model so the shared TVMaze callback entrypoint can be wired in a later slice without inventing a second callback configuration system
+- the Web UI now exposes category administration and shared callback settings under `Settings`, and the `Torrents` page now supports category selection on add plus category filtering/display for current torrents
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -278,10 +279,12 @@ Exit criteria:
 Current progress:
 - default category schema and startup seeding are implemented
 - `GET /api/categories` is implemented
+- `PUT /api/categories/{key}` is implemented
 - torrent add/list/detail contracts now carry `CategoryKey`
 - add-magnet routing now resolves the category-specific download root when a valid category key is supplied
 - host-level callback settings are now part of runtime settings persistence and contracts
-- callback execution and operator UI management are still pending
+- Web UI category/callback management is implemented
+- callback execution is still pending
 
 ## Phase Gates
 

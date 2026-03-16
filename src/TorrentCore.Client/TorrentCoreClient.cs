@@ -45,6 +45,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
                ?? Array.Empty<TorrentCategoryDto>();
     }
 
+    public async Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PutAsJsonAsync($"api/categories/{Uri.EscapeDataString(key)}", request, JsonOptions, cancellationToken);
+        return await ReadResponseAsync<TorrentCategoryDto>(response, cancellationToken)
+               ?? throw new InvalidOperationException("TorrentCore service returned no category payload.");
+    }
+
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync("api/torrents", cancellationToken);

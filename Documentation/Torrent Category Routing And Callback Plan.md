@@ -16,12 +16,13 @@ Implemented in this slice:
 - `CategoryKey` on add/list/detail torrent contracts
 - category-aware add routing to the category download root
 - host-level callback invocation settings added to runtime settings
+- Web UI category administration in `Settings`
+- Web UI callback settings administration in `Settings`
+- Web UI category selection and filtering on the `Torrents` page
 
 Not implemented yet:
 
 - completion callback invocation
-- Web UI category management
-- Web UI callback settings management
 - Avalonia category/callback management
 
 ## Goal
@@ -274,6 +275,16 @@ Scope:
 Exit criteria:
 
 - operators can manage categories and callback behavior from TorrentCore UI
+
+Status:
+
+- partially complete
+- Web UI now supports:
+  - category editing
+  - callback settings editing
+  - category selection during magnet add
+  - category filtering/display in the torrent list
+- Avalonia catch-up is still pending
 
 ## Test Expectations
 

@@ -291,6 +291,43 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task UpdateCategory_ChangesFutureRoutingWithoutChangingCategoryKey()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-category-update");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var updatedMoviePath = Path.Combine(rootPath, "media", "movies");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var updateResponse = await httpClient.PutAsJsonAsync("api/categories/Movie", new UpdateTorrentCategoryRequest
+        {
+            DisplayName = "Movies",
+            CallbackLabel = "Movie",
+            DownloadRootPath = updatedMoviePath,
+            Enabled = true,
+            InvokeCompletionCallback = true,
+            SortOrder = 12,
+        });
+        updateResponse.EnsureSuccessStatusCode();
+
+        var updatedCategory = await updateResponse.Content.ReadFromJsonAsync<TorrentCategoryDto>();
+        var addResponse = await AddMagnetAsync(httpClient, "C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1C1", "Updated Category Torrent", "Movie");
+        var torrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        Assert.NotNull(updatedCategory);
+        Assert.Equal("Movie", updatedCategory.Key);
+        Assert.Equal("Movies", updatedCategory.DisplayName);
+        Assert.Equal(Path.GetFullPath(updatedMoviePath), updatedCategory.DownloadRootPath);
+        Assert.Equal(12, updatedCategory.SortOrder);
+
+        Assert.NotNull(torrent);
+        Assert.Equal("Movie", torrent.CategoryKey);
+        Assert.StartsWith(Path.GetFullPath(updatedMoviePath), torrent.SavePath, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetTorrents_ReturnsPersistedTorrentAfterAdd()
     {
         await using var factory = CreateFactory();

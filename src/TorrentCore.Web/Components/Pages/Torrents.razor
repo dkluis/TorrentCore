@@ -1,6 +1,7 @@
 @page "/torrents"
 @implements IAsyncDisposable
 @inject TorrentCoreClient TorrentCoreClient
+@using TorrentCore.Contracts.Categories
 @using TorrentCore.Contracts.Torrents
 
 <PageTitle>Torrents</PageTitle>
@@ -31,6 +32,18 @@ else
             <label class="form-label" for="magnetUri">Magnet URI</label>
             <input id="magnetUri" class="form-control tc-break" @bind="_magnetUri" />
         </div>
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="magnetCategory">Category</label>
+                <select id="magnetCategory" class="form-select" @bind="_selectedCategoryKey">
+                    <option value="">Uncategorized</option>
+                    @foreach (var category in _categories.Where(category => category.Enabled).OrderBy(category => category.SortOrder).ThenBy(category => category.DisplayName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <option value="@category.Key">@category.DisplayName</option>
+                    }
+                </select>
+            </div>
+        </div>
         <button class="btn btn-primary" type="button" @onclick="AddMagnetAsync" disabled="@_isSubmitting">Add Torrent</button>
     </section>
 
@@ -58,6 +71,17 @@ else
                     @foreach (var state in Enum.GetValues<TorrentState>())
                     {
                         <option value="@state.ToString()">@state</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label" for="torrentCategoryFilter">Category Filter</label>
+                <select id="torrentCategoryFilter" class="form-select" @bind="_categoryFilter">
+                    <option value="">All</option>
+                    <option value="@UncategorizedFilterValue">Uncategorized</option>
+                    @foreach (var category in _categories.OrderBy(category => category.SortOrder).ThenBy(category => category.DisplayName, StringComparer.OrdinalIgnoreCase))
+                    {
+                        <option value="@category.Key">@category.DisplayName</option>
                     }
                 </select>
             </div>
@@ -127,6 +151,7 @@ else
                                    @onchange="ToggleSelectAllVisible" />
                         </th>
                         <th>Name</th>
+                        <th>Category</th>
                         <th>Status</th>
                         <th>Wait</th>
                         <th>Progress</th>
@@ -147,6 +172,7 @@ else
                                        @onchange="args => ToggleSelection(torrent.TorrentId, args.Value)" />
                             </td>
                             <td><a class="tc-break" href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a></td>
+                            <td>@FormatCategory(torrent.CategoryKey)</td>
                             <td>@torrent.State</td>
                             <td>@FormatWaitReason(torrent)</td>
                             <td>@torrent.ProgressPercent.ToString("0.0")%</td>
@@ -175,7 +201,7 @@ else
                                        @onchange="args => ToggleSelection(torrent.TorrentId, args.Value)" />
                                 <span>
                                     <a class="fw-semibold tc-break d-block" href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a>
-                                    <small class="text-muted">@torrent.State</small>
+                                    <small class="text-muted">@FormatCategory(torrent.CategoryKey) · @torrent.State</small>
                                 </span>
                             </label>
                         </div>
@@ -205,6 +231,7 @@ else
 
 @code {
     private IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
+    private IReadOnlyList<TorrentCategoryDto> _categories = Array.Empty<TorrentCategoryDto>();
     private string? _error;
     private string? _submitMessage;
     private string? _actionMessage;
@@ -212,8 +239,10 @@ else
     private bool _isSubmitting;
     private bool _isBulkRunning;
     private string _magnetUri = "magnet:?xt=urn:btih:1234567890ABCDEF1234567890ABCDEF12345678&dn=Phase%200%20Sample";
+    private string _selectedCategoryKey = string.Empty;
     private string _nameFilter = string.Empty;
     private string _statusFilter = string.Empty;
+    private string _categoryFilter = string.Empty;
     private TorrentSortOption _sortOption = TorrentSortOption.AddedNewest;
     private readonly HashSet<Guid> _busyTorrentIds = [];
     private readonly HashSet<Guid> _selectedTorrentIds = [];
@@ -227,6 +256,7 @@ else
             _torrents
                 .Where(MatchesNameFilter)
                 .Where(MatchesStatusFilter)
+                .Where(MatchesCategoryFilter)
                 .ToArray())
         .ToArray();
 
@@ -234,6 +264,8 @@ else
 
     private bool AreAllVisibleSelected =>
         VisibleTorrents.Count > 0 && VisibleTorrents.All(torrent => _selectedTorrentIds.Contains(torrent.TorrentId));
+
+    private const string UncategorizedFilterValue = "__uncategorized";
 
     protected override async Task OnInitializedAsync()
     {
@@ -259,7 +291,11 @@ else
             }
 
             _error = null;
-            _torrents = await TorrentCoreClient.GetTorrentsAsync();
+            var categoriesTask = TorrentCoreClient.GetCategoriesAsync();
+            var torrentsTask = TorrentCoreClient.GetTorrentsAsync();
+            await Task.WhenAll(categoriesTask, torrentsTask);
+            _categories = categoriesTask.Result;
+            _torrents = torrentsTask.Result;
             _selectedTorrentIds.RemoveWhere(torrentId => _torrents.All(torrent => torrent.TorrentId != torrentId));
         }
         catch (Exception exception)
@@ -289,10 +325,12 @@ else
             var torrent = await TorrentCoreClient.AddMagnetAsync(new AddMagnetRequest
             {
                 MagnetUri = _magnetUri,
+                CategoryKey = string.IsNullOrWhiteSpace(_selectedCategoryKey) ? null : _selectedCategoryKey,
             });
 
             _submitMessage = $"Added torrent '{torrent.Name}' in state '{torrent.State}'.";
             _magnetUri = string.Empty;
+            _selectedCategoryKey = string.Empty;
             await LoadAsync();
         }
         catch (TorrentCoreClientException exception)
@@ -460,6 +498,12 @@ else
     private bool MatchesStatusFilter(TorrentSummaryDto torrent) =>
         string.IsNullOrWhiteSpace(_statusFilter) ||
         string.Equals(torrent.State.ToString(), _statusFilter, StringComparison.OrdinalIgnoreCase);
+
+    private bool MatchesCategoryFilter(TorrentSummaryDto torrent) =>
+        string.IsNullOrWhiteSpace(_categoryFilter) ||
+        (_categoryFilter == UncategorizedFilterValue
+            ? string.IsNullOrWhiteSpace(torrent.CategoryKey)
+            : string.Equals(torrent.CategoryKey, _categoryFilter, StringComparison.OrdinalIgnoreCase));
 
     private IEnumerable<TorrentSummaryDto> ApplySort(IEnumerable<TorrentSummaryDto> torrents)
     {
@@ -629,6 +673,9 @@ else
         ProgressDescending,
         AddedNewest,
     }
+
+    private static string FormatCategory(string? categoryKey) =>
+        string.IsNullOrWhiteSpace(categoryKey) ? "Uncategorized" : categoryKey;
 
     private RenderFragment RenderTorrentActions(TorrentSummaryDto torrent) => @<div class="tc-toolbar">
         @if (torrent.CanPause)

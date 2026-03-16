@@ -150,12 +150,22 @@ public sealed class RuntimeSettingsService(
 
         var currentSettings = await GetEffectiveSettingsAsync(cancellationToken);
         var completionCallbackEnabled = request.CompletionCallbackEnabled ?? currentSettings.CompletionCallbackEnabled;
-        var completionCallbackCommandPath = NormalizeOptionalText(request.CompletionCallbackCommandPath) ?? currentSettings.CompletionCallbackCommandPath;
-        var completionCallbackArguments = NormalizeOptionalText(request.CompletionCallbackArguments) ?? currentSettings.CompletionCallbackArguments;
-        var completionCallbackWorkingDirectory = NormalizeOptionalText(request.CompletionCallbackWorkingDirectory) ?? currentSettings.CompletionCallbackWorkingDirectory;
+        var completionCallbackCommandPath = request.CompletionCallbackCommandPath is null
+            ? currentSettings.CompletionCallbackCommandPath
+            : NormalizeOptionalText(request.CompletionCallbackCommandPath);
+        var completionCallbackArguments = request.CompletionCallbackArguments is null
+            ? currentSettings.CompletionCallbackArguments
+            : NormalizeOptionalText(request.CompletionCallbackArguments);
+        var completionCallbackWorkingDirectory = request.CompletionCallbackWorkingDirectory is null
+            ? currentSettings.CompletionCallbackWorkingDirectory
+            : NormalizeOptionalText(request.CompletionCallbackWorkingDirectory);
         var completionCallbackTimeoutSeconds = request.CompletionCallbackTimeoutSeconds ?? currentSettings.CompletionCallbackTimeoutSeconds;
-        var completionCallbackApiBaseUrlOverride = NormalizeOptionalText(request.CompletionCallbackApiBaseUrlOverride) ?? currentSettings.CompletionCallbackApiBaseUrlOverride;
-        var completionCallbackApiKeyOverride = NormalizeOptionalText(request.CompletionCallbackApiKeyOverride) ?? currentSettings.CompletionCallbackApiKeyOverride;
+        var completionCallbackApiBaseUrlOverride = request.CompletionCallbackApiBaseUrlOverride is null
+            ? currentSettings.CompletionCallbackApiBaseUrlOverride
+            : NormalizeOptionalText(request.CompletionCallbackApiBaseUrlOverride);
+        var completionCallbackApiKeyOverride = request.CompletionCallbackApiKeyOverride is null
+            ? currentSettings.CompletionCallbackApiKeyOverride
+            : NormalizeOptionalText(request.CompletionCallbackApiKeyOverride);
 
         if (completionCallbackTimeoutSeconds < 1)
         {
