@@ -5,12 +5,14 @@ using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Callbacks;
 
 namespace TorrentCore.Service.Engine;
 
 public sealed class FakeTorrentRuntimeService(
     ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService,
+    ITorrentCompletionCallbackInvoker completionCallbackInvoker,
     ServiceInstanceContext serviceInstanceContext,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService,
@@ -236,6 +238,7 @@ public sealed class FakeTorrentRuntimeService(
     {
         foreach (var torrent in torrents.Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable))
         {
+            var previousCompletedAtUtc = torrent.CompletedAtUtc;
             torrent.TotalBytes ??= CalculateTotalBytes(torrent);
 
             var nextProgress = Math.Min(100, torrent.ProgressPercent + _serviceOptions.DownloadProgressPercentPerTick);
@@ -289,6 +292,7 @@ public sealed class FakeTorrentRuntimeService(
                         },
                         cancellationToken);
 
+                    await completionCallbackInvoker.InvokeIfTriggeredAsync(previousCompletedAtUtc, torrent, cancellationToken);
                     continue;
                 }
 
@@ -310,6 +314,7 @@ public sealed class FakeTorrentRuntimeService(
                     },
                     cancellationToken);
 
+                await completionCallbackInvoker.InvokeIfTriggeredAsync(previousCompletedAtUtc, torrent, cancellationToken);
                 continue;
             }
 

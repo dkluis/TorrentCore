@@ -7,6 +7,7 @@ using TorrentCore.Persistence.Sqlite.Logging;
 using TorrentCore.Persistence.Sqlite.Schema;
 using TorrentCore.Persistence.Sqlite.Torrents;
 using TorrentCore.Service.Application;
+using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
@@ -79,6 +80,7 @@ builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
 });
 builder.Services.AddSingleton<IRuntimeSettingsService, RuntimeSettingsService>();
 builder.Services.AddSingleton<ITorrentCategoryService, TorrentCategoryService>();
+builder.Services.AddSingleton<ITorrentCompletionCallbackInvoker, TorrentCompletionCallbackInvoker>();
 builder.Services.AddSingleton<PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<MonoTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider =>

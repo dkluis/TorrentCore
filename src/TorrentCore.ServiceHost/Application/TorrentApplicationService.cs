@@ -138,7 +138,7 @@ public sealed class TorrentApplicationService(
                 CategoryKey = categorySelection.CategoryKey,
             };
 
-            var torrent = await torrentEngineAdapter.AddMagnetAsync(normalizedRequest, categorySelection.DownloadRootPath, cancellationToken);
+            var torrent = await torrentEngineAdapter.AddMagnetAsync(normalizedRequest, categorySelection, cancellationToken);
 
             logger.LogInformation("Added torrent {TorrentId} named {TorrentName}", torrent.TorrentId, torrent.Name);
 

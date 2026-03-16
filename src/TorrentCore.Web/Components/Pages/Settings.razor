@@ -144,7 +144,7 @@ else
 
         <section class="mb-4">
             <h2 class="h5">Shared Callback Settings</h2>
-            <p class="text-muted mb-2">These settings describe the existing shared TVMaze callback entrypoint. They are persisted now so the callback slice can be enabled without going back to file edits.</p>
+            <p class="text-muted mb-2">These settings describe the existing shared TVMaze callback entrypoint. In the normal centrally managed TVMaze setup, operators should only need to enable the callback, set the full launcher script path, and keep a timeout value.</p>
             <div class="row g-3">
                 <div class="col-12">
                     <div class="form-check">
@@ -156,25 +156,33 @@ else
                     <label class="form-label" for="completionCallbackCommandPath">Command Path</label>
                     <input id="completionCallbackCommandPath" class="form-control tc-break" @bind="_completionCallbackCommandPath" />
                 </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label" for="completionCallbackArguments">Arguments</label>
-                    <input id="completionCallbackArguments" class="form-control tc-break" @bind="_completionCallbackArguments" />
-                </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label" for="completionCallbackWorkingDirectory">Working Directory</label>
-                    <input id="completionCallbackWorkingDirectory" class="form-control tc-break" @bind="_completionCallbackWorkingDirectory" />
-                </div>
                 <div class="col-12 col-sm-6 col-lg-3">
                     <label class="form-label" for="completionCallbackTimeoutSeconds">Timeout Seconds</label>
                     <input id="completionCallbackTimeoutSeconds" class="form-control" type="number" min="1" step="1" @bind="_completionCallbackTimeoutSeconds" />
                 </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label" for="completionCallbackApiBaseUrlOverride">API Base URL Override</label>
-                    <input id="completionCallbackApiBaseUrlOverride" class="form-control tc-break" @bind="_completionCallbackApiBaseUrlOverride" />
-                </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label" for="completionCallbackApiKeyOverride">API Key Override</label>
-                    <input id="completionCallbackApiKeyOverride" class="form-control tc-break" @bind="_completionCallbackApiKeyOverride" />
+                <div class="col-12">
+                    <details class="border rounded p-3">
+                        <summary class="fw-semibold">Advanced Callback Overrides</summary>
+                        <p class="text-muted mt-2 mb-3">Leave these blank for the normal shared TVMaze callback setup. They only exist for unusual launcher or override scenarios.</p>
+                        <div class="row g-3">
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="completionCallbackArguments">Arguments</label>
+                                <input id="completionCallbackArguments" class="form-control tc-break" @bind="_completionCallbackArguments" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="completionCallbackWorkingDirectory">Working Directory</label>
+                                <input id="completionCallbackWorkingDirectory" class="form-control tc-break" @bind="_completionCallbackWorkingDirectory" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="completionCallbackApiBaseUrlOverride">API Base URL Override</label>
+                                <input id="completionCallbackApiBaseUrlOverride" class="form-control tc-break" @bind="_completionCallbackApiBaseUrlOverride" />
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label" for="completionCallbackApiKeyOverride">API Key Override</label>
+                                <input id="completionCallbackApiKeyOverride" class="form-control tc-break" @bind="_completionCallbackApiKeyOverride" />
+                            </div>
+                        </div>
+                    </details>
                 </div>
             </div>
         </section>

@@ -1,4 +1,5 @@
 using TorrentCore.Contracts.Torrents;
+using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Engine;
 
@@ -9,7 +10,10 @@ public interface ITorrentEngineAdapter
     Task SynchronizeAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken);
     Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken);
-    Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken);
+    Task<TorrentDetailDto> AddMagnetAsync(
+        AddMagnetRequest request,
+        ResolvedTorrentCategorySelection categorySelection,
+        CancellationToken cancellationToken);
     Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken);

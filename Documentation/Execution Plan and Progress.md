@@ -119,6 +119,11 @@ Current service configuration section:
 - category-aware routing work has started: TorrentCore now persists seeded default categories, exposes a read-only categories API, accepts an optional `CategoryKey` on torrent add requests, and resolves category-specific download roots during add while keeping omitted-category adds on the host's current global download root for compatibility
 - host-level callback invocation settings now exist in the runtime settings contract and persistence model so the shared TVMaze callback entrypoint can be wired in a later slice without inventing a second callback configuration system
 - the Web UI now exposes category administration and shared callback settings under `Settings`, and the `Torrents` page now supports category selection on add plus category filtering/display for current torrents
+- resolved callback routing data is now persisted per torrent at add time, so later category edits affect future torrents without silently changing callback labels or invoke behavior for existing torrents
+- completed torrents now invoke the shared TVMaze callback entrypoint once using Transmission-compatible environment variables, and callback diagnostics are written to the activity log
+- service-level regression coverage now verifies the callback environment contract and that restart/recovery does not re-fire the completion callback for an already-completed torrent
+- the Web UI callback settings now place the TVMaze API override fields under an explicit advanced area so the main operator flow matches the normal centrally managed TVMaze deployment model
+- the Web UI callback settings now treat `Arguments` and `WorkingDirectory` as advanced-only too, leaving the normal operator flow centered on enable, full script path, and timeout
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
@@ -284,7 +289,8 @@ Current progress:
 - add-magnet routing now resolves the category-specific download root when a valid category key is supplied
 - host-level callback settings are now part of runtime settings persistence and contracts
 - Web UI category/callback management is implemented
-- callback execution is still pending
+- resolved callback label/invoke settings are now persisted on the torrent at add time
+- completed torrents now invoke the configured shared callback entrypoint once using Transmission-style environment variables
 
 ## Phase Gates
 

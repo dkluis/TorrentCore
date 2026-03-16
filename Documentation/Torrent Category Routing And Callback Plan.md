@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 1 is implemented.
+Phases 1 through 3 are implemented.
 
 Implemented in this slice:
 
@@ -19,10 +19,14 @@ Implemented in this slice:
 - Web UI category administration in `Settings`
 - Web UI callback settings administration in `Settings`
 - Web UI category selection and filtering on the `Torrents` page
+- per-torrent callback routing data persisted at add time
+- completion callback invocation using the existing shared TVMaze callback entrypoint
+- Transmission-compatible callback environment generation on first completion edge
+- callback invocation diagnostics in the activity log
+- regression coverage for callback environment values and restart-no-duplicate behavior
 
 Not implemented yet:
 
-- completion callback invocation
 - Avalonia category/callback management
 
 ## Goal
@@ -157,6 +161,11 @@ Scope rule:
 
 - these are host settings, not per-category settings
 - per-category control is only whether a category invokes the callback and which callback label it sends
+- normal operator setup should usually only require:
+  - enabling callback invocation
+  - setting the full callback launcher script path
+  - keeping a timeout value
+- `CompletionCallbackArguments`, `CompletionCallbackWorkingDirectory`, and the TVMaze API override fields are advanced-only fields for unusual launcher scenarios, not the normal operational path
 
 ## UI Scope
 
@@ -243,6 +252,7 @@ Goal:
 Scope:
 
 - detect first completion/finalization transition
+- persist resolved callback label/invoke decision on the torrent at add time so later category edits affect only future torrents
 - invoke configured callback command
 - populate Transmission-compatible environment variables
 - apply optional API override environment variables when configured
@@ -258,6 +268,12 @@ Exit criteria:
 
 - completed torrents invoke the shared callback entrypoint once
 - the existing callback app can consume TorrentCore-originated completions without modification
+
+Status:
+
+- complete
+- invocation is edge-based from the torrent completion transition, not a callback ledger or retry worker
+- restart coverage verifies the callback is not fired again for an already-completed torrent
 
 ### Phase 4 - Operator UI
 

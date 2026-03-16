@@ -114,6 +114,8 @@ public sealed class TorrentCategoryService(
             {
                 CategoryKey = null,
                 DownloadRootPath = servicePaths.DownloadRootPath,
+                CompletionCallbackLabel = null,
+                InvokeCompletionCallback = false,
             };
         }
 
@@ -143,6 +145,8 @@ public sealed class TorrentCategoryService(
         {
             CategoryKey = category.Key,
             DownloadRootPath = category.DownloadRootPath,
+            CompletionCallbackLabel = category.CallbackLabel,
+            InvokeCompletionCallback = category.InvokeCompletionCallback,
         };
     }
 

@@ -314,6 +314,25 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                         """;
                     await indexCommand.ExecuteNonQueryAsync(cancellationToken);
                 }),
+            new SqliteMigrationDefinition(
+                9,
+                "add_torrent_callback_fields",
+                async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_label", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN completion_callback_label TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "invoke_completion_callback", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN invoke_completion_callback INTEGER NOT NULL DEFAULT 0;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }),
         ];
     }
 

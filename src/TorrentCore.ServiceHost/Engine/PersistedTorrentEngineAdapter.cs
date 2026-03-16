@@ -101,7 +101,10 @@ public sealed class PersistedTorrentEngineAdapter(
                     await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId]);
     }
 
-    public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken)
+    public async Task<TorrentDetailDto> AddMagnetAsync(
+        AddMagnetRequest request,
+        ResolvedTorrentCategorySelection categorySelection,
+        CancellationToken cancellationToken)
     {
         var magnet = ParseMagnet(request.MagnetUri);
 
@@ -119,11 +122,13 @@ public sealed class PersistedTorrentEngineAdapter(
         {
             TorrentId = Guid.NewGuid(),
             Name = magnet.DisplayName,
-            CategoryKey = request.CategoryKey,
+            CategoryKey = categorySelection.CategoryKey,
+            CompletionCallbackLabel = categorySelection.CompletionCallbackLabel,
+            InvokeCompletionCallback = categorySelection.InvokeCompletionCallback,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = magnet.InfoHash,
-            DownloadRootPath = downloadRootPath,
-            SavePath = Path.Combine(downloadRootPath, SanitizePathSegment(magnet.DisplayName)),
+            DownloadRootPath = categorySelection.DownloadRootPath,
+            SavePath = Path.Combine(categorySelection.DownloadRootPath, SanitizePathSegment(magnet.DisplayName)),
             State = TorrentState.ResolvingMetadata,
             DesiredState = TorrentDesiredState.Runnable,
             ProgressPercent = 0,

@@ -8,6 +8,7 @@ using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
+using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
 using ContractTorrentState = TorrentCore.Contracts.Torrents.TorrentState;
 
@@ -16,6 +17,7 @@ namespace TorrentCore.Service.Engine;
 public sealed class MonoTorrentEngineAdapter(
     ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService,
+    ITorrentCompletionCallbackInvoker completionCallbackInvoker,
     ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService,
@@ -275,7 +277,10 @@ public sealed class MonoTorrentEngineAdapter(
                     await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId]);
     }
 
-    public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, string downloadRootPath, CancellationToken cancellationToken)
+    public async Task<TorrentDetailDto> AddMagnetAsync(
+        AddMagnetRequest request,
+        ResolvedTorrentCategorySelection categorySelection,
+        CancellationToken cancellationToken)
     {
         await EnsureInitializedAsync(cancellationToken);
 
@@ -309,7 +314,7 @@ public sealed class MonoTorrentEngineAdapter(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var manager = await _engine!.AddAsync(magnet, downloadRootPath);
+        var manager = await _engine!.AddAsync(magnet, categorySelection.DownloadRootPath);
         var torrentId = Guid.NewGuid();
         RegisterManager(torrentId, manager);
         var persistedSavePath = MonoTorrentSavePathNormalizer.Normalize(manager.SavePath, string.IsNullOrWhiteSpace(magnet.Name) ? null : magnet.Name);
@@ -318,12 +323,14 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = torrentId,
             Name = string.IsNullOrWhiteSpace(magnet.Name) ? $"Magnet {infoHash[..8]}" : magnet.Name,
-            CategoryKey = request.CategoryKey,
+            CategoryKey = categorySelection.CategoryKey,
+            CompletionCallbackLabel = categorySelection.CompletionCallbackLabel,
+            InvokeCompletionCallback = categorySelection.InvokeCompletionCallback,
             State = ContractTorrentState.Queued,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = infoHash,
-            DownloadRootPath = downloadRootPath,
+            DownloadRootPath = categorySelection.DownloadRootPath,
             SavePath = persistedSavePath,
             ProgressPercent = 0,
             DownloadedBytes = 0,
@@ -718,6 +725,7 @@ public sealed class MonoTorrentEngineAdapter(
         }
 
         var now = DateTimeOffset.UtcNow;
+        var callbackSnapshots = new List<TorrentSnapshot>();
 
         foreach (var entry in managers)
         {
@@ -747,10 +755,21 @@ public sealed class MonoTorrentEngineAdapter(
                 }
             }
 
+            var previousCompletedAtUtc = snapshot.CompletedAtUtc;
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+
+            if (previousCompletedAtUtc is null && updatedSnapshot.CompletedAtUtc is not null)
+            {
+                callbackSnapshots.Add(updatedSnapshot);
+            }
         }
 
         await ReconcileRuntimeQueueAsync(cancellationToken);
+
+        foreach (var callbackSnapshot in callbackSnapshots)
+        {
+            await completionCallbackInvoker.InvokeIfTriggeredAsync(null, callbackSnapshot, cancellationToken);
+        }
     }
 
     private async Task ReconcileMetadataResolutionQueueAsync(
@@ -899,6 +918,8 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentId = existing.TorrentId,
             Name = string.IsNullOrWhiteSpace(manager.Name) ? existing.Name : manager.Name,
             CategoryKey = existing.CategoryKey,
+            CompletionCallbackLabel = existing.CompletionCallbackLabel,
+            InvokeCompletionCallback = existing.InvokeCompletionCallback,
             State = state,
             DesiredState = existing.DesiredState,
             MagnetUri = existing.MagnetUri,
@@ -938,6 +959,8 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentId = existing.TorrentId,
             Name = string.IsNullOrWhiteSpace(manager.Name) ? existing.Name : manager.Name,
             CategoryKey = existing.CategoryKey,
+            CompletionCallbackLabel = existing.CompletionCallbackLabel,
+            InvokeCompletionCallback = existing.InvokeCompletionCallback,
             State = state,
             DesiredState = existing.DesiredState,
             MagnetUri = existing.MagnetUri,
@@ -1192,6 +1215,8 @@ public sealed class MonoTorrentEngineAdapter(
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
             CategoryKey = snapshot.CategoryKey,
+            CompletionCallbackLabel = snapshot.CompletionCallbackLabel,
+            InvokeCompletionCallback = snapshot.InvokeCompletionCallback,
             State = ContractTorrentState.Completed,
             DesiredState = snapshot.DesiredState,
             MagnetUri = snapshot.MagnetUri,
