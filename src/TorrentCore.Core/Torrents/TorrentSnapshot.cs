@@ -6,6 +6,7 @@ public sealed class TorrentSnapshot
 {
     public required Guid TorrentId { get; init; }
     public required string Name { get; set; }
+    public string? CategoryKey { get; set; }
     public required TorrentState State { get; set; }
     public required TorrentDesiredState DesiredState { get; set; }
     public required string MagnetUri { get; init; }

@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json;
 using TorrentCore.Contracts;
+using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
@@ -35,6 +36,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
         using var response = await httpClient.PutAsJsonAsync("api/host/runtime-settings", request, JsonOptions, cancellationToken);
         return await ReadResponseAsync<RuntimeSettingsDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no runtime settings payload.");
+    }
+
+    public async Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync("api/categories", cancellationToken);
+        return await ReadResponseAsync<IReadOnlyList<TorrentCategoryDto>>(response, cancellationToken)
+               ?? Array.Empty<TorrentCategoryDto>();
     }
 
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken = default)

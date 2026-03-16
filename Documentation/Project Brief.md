@@ -13,6 +13,7 @@ TorrentCore owns:
 - management API
 - dedicated management UI
 - category definitions and category-aware download routing
+- host-level completion callback invocation settings for the shared TVMaze callback entrypoint
 - file finalization behavior for incomplete vs completed content
 - seeding policy and stop conditions
 

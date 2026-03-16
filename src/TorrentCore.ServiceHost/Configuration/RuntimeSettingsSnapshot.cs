@@ -18,6 +18,13 @@ public sealed class RuntimeSettingsSnapshot
     public required int EngineMaximumUploadRateBytesPerSecond { get; init; }
     public required int MaxActiveMetadataResolutions { get; init; }
     public required int MaxActiveDownloads { get; init; }
+    public required bool CompletionCallbackEnabled { get; init; }
+    public string? CompletionCallbackCommandPath { get; init; }
+    public string? CompletionCallbackArguments { get; init; }
+    public string? CompletionCallbackWorkingDirectory { get; init; }
+    public required int CompletionCallbackTimeoutSeconds { get; init; }
+    public string? CompletionCallbackApiBaseUrlOverride { get; init; }
+    public string? CompletionCallbackApiKeyOverride { get; init; }
     public required bool EngineSettingsRequireRestart { get; init; }
     public DateTimeOffset? UpdatedAtUtc { get; init; }
 }

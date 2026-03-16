@@ -148,6 +148,33 @@ public sealed class RuntimeSettingsService(
                 nameof(request.MaxActiveDownloads));
         }
 
+        var currentSettings = await GetEffectiveSettingsAsync(cancellationToken);
+        var completionCallbackEnabled = request.CompletionCallbackEnabled ?? currentSettings.CompletionCallbackEnabled;
+        var completionCallbackCommandPath = NormalizeOptionalText(request.CompletionCallbackCommandPath) ?? currentSettings.CompletionCallbackCommandPath;
+        var completionCallbackArguments = NormalizeOptionalText(request.CompletionCallbackArguments) ?? currentSettings.CompletionCallbackArguments;
+        var completionCallbackWorkingDirectory = NormalizeOptionalText(request.CompletionCallbackWorkingDirectory) ?? currentSettings.CompletionCallbackWorkingDirectory;
+        var completionCallbackTimeoutSeconds = request.CompletionCallbackTimeoutSeconds ?? currentSettings.CompletionCallbackTimeoutSeconds;
+        var completionCallbackApiBaseUrlOverride = NormalizeOptionalText(request.CompletionCallbackApiBaseUrlOverride) ?? currentSettings.CompletionCallbackApiBaseUrlOverride;
+        var completionCallbackApiKeyOverride = NormalizeOptionalText(request.CompletionCallbackApiKeyOverride) ?? currentSettings.CompletionCallbackApiKeyOverride;
+
+        if (completionCallbackTimeoutSeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "CompletionCallbackTimeoutSeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.CompletionCallbackTimeoutSeconds));
+        }
+
+        if (completionCallbackEnabled && string.IsNullOrWhiteSpace(completionCallbackCommandPath))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "CompletionCallbackCommandPath is required when CompletionCallbackEnabled is true.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.CompletionCallbackCommandPath));
+        }
+
         await runtimeSettingsStore.UpsertAsync(new Dictionary<string, string>
         {
             [RuntimeSettingsKeys.SeedingStopMode] = seedingStopMode.ToString(),
@@ -163,6 +190,13 @@ public sealed class RuntimeSettingsService(
             [RuntimeSettingsKeys.EngineMaximumUploadRateBytesPerSecond] = request.EngineMaximumUploadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.MaxActiveMetadataResolutions] = request.MaxActiveMetadataResolutions.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.MaxActiveDownloads] = request.MaxActiveDownloads.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.CompletionCallbackEnabled] = completionCallbackEnabled.ToString(),
+            [RuntimeSettingsKeys.CompletionCallbackCommandPath] = completionCallbackCommandPath ?? string.Empty,
+            [RuntimeSettingsKeys.CompletionCallbackArguments] = completionCallbackArguments ?? string.Empty,
+            [RuntimeSettingsKeys.CompletionCallbackWorkingDirectory] = completionCallbackWorkingDirectory ?? string.Empty,
+            [RuntimeSettingsKeys.CompletionCallbackTimeoutSeconds] = completionCallbackTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.CompletionCallbackApiBaseUrlOverride] = completionCallbackApiBaseUrlOverride ?? string.Empty,
+            [RuntimeSettingsKeys.CompletionCallbackApiKeyOverride] = completionCallbackApiKeyOverride ?? string.Empty,
         }, cancellationToken);
 
         await activityLogService.WriteAsync(new ActivityLogWriteRequest
@@ -187,6 +221,11 @@ public sealed class RuntimeSettingsService(
                 request.EngineMaximumUploadRateBytesPerSecond,
                 request.MaxActiveMetadataResolutions,
                 request.MaxActiveDownloads,
+                completionCallbackEnabled,
+                completionCallbackCommandPath,
+                completionCallbackWorkingDirectory,
+                completionCallbackTimeoutSeconds,
+                completionCallbackApiBaseUrlOverride,
             }),
         }, cancellationToken);
 
@@ -301,6 +340,43 @@ public sealed class RuntimeSettingsService(
             maxActiveDownloads = parsedMaxActiveDownloads;
         }
 
+        var completionCallbackEnabled = baseOptions.CompletionCallbackEnabled;
+        if (values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackEnabled, out var completionCallbackEnabledValue) &&
+            bool.TryParse(completionCallbackEnabledValue, out var parsedCompletionCallbackEnabled))
+        {
+            completionCallbackEnabled = parsedCompletionCallbackEnabled;
+        }
+
+        var completionCallbackCommandPath = NormalizePersistedText(
+            values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackCommandPath, out var completionCallbackCommandPathValue)
+                ? completionCallbackCommandPathValue
+                : baseOptions.CompletionCallbackCommandPath);
+        var completionCallbackArguments = NormalizePersistedText(
+            values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackArguments, out var completionCallbackArgumentsValue)
+                ? completionCallbackArgumentsValue
+                : baseOptions.CompletionCallbackArguments);
+        var completionCallbackWorkingDirectory = NormalizePersistedText(
+            values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackWorkingDirectory, out var completionCallbackWorkingDirectoryValue)
+                ? completionCallbackWorkingDirectoryValue
+                : baseOptions.CompletionCallbackWorkingDirectory);
+
+        var completionCallbackTimeoutSeconds = baseOptions.CompletionCallbackTimeoutSeconds;
+        if (values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackTimeoutSeconds, out var completionCallbackTimeoutValue) &&
+            int.TryParse(completionCallbackTimeoutValue, CultureInfo.InvariantCulture, out var parsedCompletionCallbackTimeout) &&
+            parsedCompletionCallbackTimeout > 0)
+        {
+            completionCallbackTimeoutSeconds = parsedCompletionCallbackTimeout;
+        }
+
+        var completionCallbackApiBaseUrlOverride = NormalizePersistedText(
+            values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackApiBaseUrlOverride, out var completionCallbackApiBaseUrlOverrideValue)
+                ? completionCallbackApiBaseUrlOverrideValue
+                : baseOptions.CompletionCallbackApiBaseUrlOverride);
+        var completionCallbackApiKeyOverride = NormalizePersistedText(
+            values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackApiKeyOverride, out var completionCallbackApiKeyOverrideValue)
+                ? completionCallbackApiKeyOverrideValue
+                : baseOptions.CompletionCallbackApiKeyOverride);
+
         return new RuntimeSettingsSnapshot
         {
             UsesPersistedOverrides = persistedSettings.Values.Count > 0,
@@ -319,6 +395,13 @@ public sealed class RuntimeSettingsService(
             EngineMaximumUploadRateBytesPerSecond = engineMaximumUploadRateBytesPerSecond,
             MaxActiveMetadataResolutions = maxActiveMetadataResolutions,
             MaxActiveDownloads = maxActiveDownloads,
+            CompletionCallbackEnabled = completionCallbackEnabled,
+            CompletionCallbackCommandPath = completionCallbackCommandPath,
+            CompletionCallbackArguments = completionCallbackArguments,
+            CompletionCallbackWorkingDirectory = completionCallbackWorkingDirectory,
+            CompletionCallbackTimeoutSeconds = completionCallbackTimeoutSeconds,
+            CompletionCallbackApiBaseUrlOverride = completionCallbackApiBaseUrlOverride,
+            CompletionCallbackApiKeyOverride = completionCallbackApiKeyOverride,
             EngineSettingsRequireRestart =
                 engineMaximumConnections != appliedEngineSettingsState.EngineMaximumConnections ||
                 engineMaximumHalfOpenConnections != appliedEngineSettingsState.EngineMaximumHalfOpenConnections ||
@@ -350,6 +433,13 @@ public sealed class RuntimeSettingsService(
             EngineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond,
             MaxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions,
             MaxActiveDownloads = settings.MaxActiveDownloads,
+            CompletionCallbackEnabled = settings.CompletionCallbackEnabled,
+            CompletionCallbackCommandPath = settings.CompletionCallbackCommandPath,
+            CompletionCallbackArguments = settings.CompletionCallbackArguments,
+            CompletionCallbackWorkingDirectory = settings.CompletionCallbackWorkingDirectory,
+            CompletionCallbackTimeoutSeconds = settings.CompletionCallbackTimeoutSeconds,
+            CompletionCallbackApiBaseUrlOverride = settings.CompletionCallbackApiBaseUrlOverride,
+            CompletionCallbackApiKeyOverride = settings.CompletionCallbackApiKeyOverride,
             AppliedEngineMaximumConnections = appliedEngineSettingsState.EngineMaximumConnections,
             AppliedEngineMaximumHalfOpenConnections = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
             AppliedEngineMaximumDownloadRateBytesPerSecond = appliedEngineSettingsState.EngineMaximumDownloadRateBytesPerSecond,
@@ -359,4 +449,8 @@ public sealed class RuntimeSettingsService(
             RetrievedAtUtc = DateTimeOffset.UtcNow,
         };
     }
+
+    private static string? NormalizePersistedText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeOptionalText(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

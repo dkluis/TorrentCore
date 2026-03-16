@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Data.Sqlite;
 
 namespace TorrentCore.Persistence.Sqlite.Schema;
@@ -268,10 +269,68 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                             ELSE 'Runnable'
                         END
                         WHERE desired_state IS NULL OR desired_state = '' OR state = 'Paused';
-                        """;
+                    """;
                     await normalizeCommand.ExecuteNonQueryAsync(cancellationToken);
                 }),
+            new SqliteMigrationDefinition(
+                8,
+                "create_torrent_categories_and_add_torrent_category_key",
+                async (connection, cancellationToken) =>
+                {
+                    if (!await TableExistsAsync(connection, "torrent_categories", cancellationToken))
+                    {
+                        var createCategoriesCommand = connection.CreateCommand();
+                        createCategoriesCommand.CommandText =
+                            """
+                            CREATE TABLE torrent_categories (
+                                category_key TEXT PRIMARY KEY,
+                                display_name TEXT NOT NULL,
+                                callback_label TEXT NOT NULL,
+                                download_root_path TEXT NOT NULL,
+                                enabled INTEGER NOT NULL,
+                                invoke_completion_callback INTEGER NOT NULL,
+                                sort_order INTEGER NOT NULL,
+                                updated_at_utc TEXT NOT NULL
+                            );
+
+                            CREATE INDEX IF NOT EXISTS idx_torrent_categories_sort_order
+                                ON torrent_categories (sort_order ASC, category_key ASC);
+                            """;
+                        await createCategoriesCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "category_key", cancellationToken))
+                    {
+                        var alterTorrentsCommand = connection.CreateCommand();
+                        alterTorrentsCommand.CommandText = "ALTER TABLE torrents ADD COLUMN category_key TEXT NULL;";
+                        await alterTorrentsCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    var indexCommand = connection.CreateCommand();
+                    indexCommand.CommandText =
+                        """
+                        CREATE INDEX IF NOT EXISTS idx_torrents_category_key
+                            ON torrents (category_key);
+                        """;
+                    await indexCommand.ExecuteNonQueryAsync(cancellationToken);
+                }),
         ];
+    }
+
+    private static async Task<bool> TableExistsAsync(SqliteConnection connection, string tableName, CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT EXISTS(
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table' AND name = $table_name
+            );
+            """;
+        command.Parameters.AddWithValue("$table_name", tableName);
+        var result = await command.ExecuteScalarAsync(cancellationToken);
+        return Convert.ToInt32(result, CultureInfo.InvariantCulture) == 1;
     }
 
     private static async Task<bool> ColumnExistsAsync(SqliteConnection connection, string tableName, string columnName, CancellationToken cancellationToken)

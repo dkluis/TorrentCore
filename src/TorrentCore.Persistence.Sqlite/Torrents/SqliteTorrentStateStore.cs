@@ -82,6 +82,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             SELECT
                 torrent_id,
                 name,
+                category_key,
                 state,
                 desired_state,
                 magnet_uri,
@@ -121,6 +122,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             SELECT
                 torrent_id,
                 name,
+                category_key,
                 state,
                 desired_state,
                 magnet_uri,
@@ -196,25 +198,26 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             {
                 TorrentId = Guid.Parse(reader.GetString(0)),
                 Name = reader.GetString(1),
-                State = Enum.Parse<TorrentState>(reader.GetString(2), ignoreCase: true),
-                DesiredState = Enum.Parse<TorrentDesiredState>(reader.GetString(3), ignoreCase: true),
-                MagnetUri = reader.GetString(4),
-                InfoHash = reader.IsDBNull(5) ? null : reader.GetString(5),
-                DownloadRootPath = reader.IsDBNull(6) ? null : reader.GetString(6),
-                SavePath = reader.GetString(7),
-                ProgressPercent = reader.GetDouble(8),
-                DownloadedBytes = reader.GetInt64(9),
-                UploadedBytes = reader.GetInt64(10),
-                TotalBytes = reader.IsDBNull(11) ? null : reader.GetInt64(11),
-                DownloadRateBytesPerSecond = reader.GetInt64(12),
-                UploadRateBytesPerSecond = reader.GetInt64(13),
-                TrackerCount = reader.GetInt32(14),
-                ConnectedPeerCount = reader.GetInt32(15),
-                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(16), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                CompletedAtUtc = reader.IsDBNull(17) ? null : DateTimeOffset.Parse(reader.GetString(17), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                SeedingStartedAtUtc = reader.IsDBNull(18) ? null : DateTimeOffset.Parse(reader.GetString(18), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                LastActivityAtUtc = reader.IsDBNull(19) ? null : DateTimeOffset.Parse(reader.GetString(19), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-                ErrorMessage = reader.IsDBNull(20) ? null : reader.GetString(20),
+                CategoryKey = reader.IsDBNull(2) ? null : reader.GetString(2),
+                State = Enum.Parse<TorrentState>(reader.GetString(3), ignoreCase: true),
+                DesiredState = Enum.Parse<TorrentDesiredState>(reader.GetString(4), ignoreCase: true),
+                MagnetUri = reader.GetString(5),
+                InfoHash = reader.IsDBNull(6) ? null : reader.GetString(6),
+                DownloadRootPath = reader.IsDBNull(7) ? null : reader.GetString(7),
+                SavePath = reader.GetString(8),
+                ProgressPercent = reader.GetDouble(9),
+                DownloadedBytes = reader.GetInt64(10),
+                UploadedBytes = reader.GetInt64(11),
+                TotalBytes = reader.IsDBNull(12) ? null : reader.GetInt64(12),
+                DownloadRateBytesPerSecond = reader.GetInt64(13),
+                UploadRateBytesPerSecond = reader.GetInt64(14),
+                TrackerCount = reader.GetInt32(15),
+                ConnectedPeerCount = reader.GetInt32(16),
+                AddedAtUtc = DateTimeOffset.Parse(reader.GetString(17), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                CompletedAtUtc = reader.IsDBNull(18) ? null : DateTimeOffset.Parse(reader.GetString(18), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                SeedingStartedAtUtc = reader.IsDBNull(19) ? null : DateTimeOffset.Parse(reader.GetString(19), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                LastActivityAtUtc = reader.IsDBNull(20) ? null : DateTimeOffset.Parse(reader.GetString(20), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                ErrorMessage = reader.IsDBNull(21) ? null : reader.GetString(21),
             });
         }
 
@@ -229,6 +232,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             INSERT INTO torrents (
                 torrent_id,
                 name,
+                category_key,
                 state,
                 desired_state,
                 magnet_uri,
@@ -252,6 +256,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             VALUES (
                 $torrent_id,
                 $name,
+                $category_key,
                 $state,
                 $desired_state,
                 $magnet_uri,
@@ -286,6 +291,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             UPDATE torrents
             SET
                 name = $name,
+                category_key = $category_key,
                 state = $state,
                 desired_state = $desired_state,
                 magnet_uri = $magnet_uri,
@@ -316,6 +322,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         command.Parameters.AddWithValue("$torrent_id", torrent.TorrentId.ToString());
         command.Parameters.AddWithValue("$name", torrent.Name);
+        command.Parameters.AddWithValue("$category_key", torrent.CategoryKey ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$state", torrent.State.ToString());
         command.Parameters.AddWithValue("$desired_state", torrent.DesiredState.ToString());
         command.Parameters.AddWithValue("$magnet_uri", torrent.MagnetUri);

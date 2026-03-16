@@ -57,6 +57,11 @@ TorrentCore should resolve category download roots and callback labels internall
 
 TVMaze should not submit raw download directories or callback command details.
 
+Transition compatibility rule:
+
+- if a client omits `CategoryKey`, TorrentCore currently falls back to the host's global `DownloadRootPath`
+- that fallback exists to keep older/manual add flows working until all clients move to explicit category submission
+
 ## Shared Callback Rule
 
 TorrentCore and Transmission should be able to call the same existing TVMaze completion callback entrypoint.

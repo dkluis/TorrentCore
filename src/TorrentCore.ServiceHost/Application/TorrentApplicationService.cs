@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
@@ -17,6 +18,7 @@ public sealed class TorrentApplicationService(
     IActivityLogService activityLogService,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService,
+    ITorrentCategoryService torrentCategoryService,
     AppliedEngineSettingsState appliedEngineSettingsState,
     ServiceInstanceContext serviceInstanceContext,
     StartupRecoveryState startupRecoveryState,
@@ -103,6 +105,9 @@ public sealed class TorrentApplicationService(
     public Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken) =>
         runtimeSettingsService.UpdateAsync(request, cancellationToken);
 
+    public Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken) =>
+        torrentCategoryService.GetCategoriesAsync(cancellationToken);
+
     public Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken) =>
         torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
 
@@ -123,7 +128,14 @@ public sealed class TorrentApplicationService(
     {
         try
         {
-            var torrent = await torrentEngineAdapter.AddMagnetAsync(request, servicePaths.DownloadRootPath, cancellationToken);
+            var categorySelection = await torrentCategoryService.ResolveSelectionAsync(request.CategoryKey, cancellationToken);
+            var normalizedRequest = new AddMagnetRequest
+            {
+                MagnetUri = request.MagnetUri,
+                CategoryKey = categorySelection.CategoryKey,
+            };
+
+            var torrent = await torrentEngineAdapter.AddMagnetAsync(normalizedRequest, categorySelection.DownloadRootPath, cancellationToken);
 
             logger.LogInformation("Added torrent {TorrentId} named {TorrentName}", torrent.TorrentId, torrent.Name);
 
@@ -138,6 +150,7 @@ public sealed class TorrentApplicationService(
                 DetailsJson = JsonSerializer.Serialize(new
                 {
                     torrent.Name,
+                    torrent.CategoryKey,
                     torrent.State,
                     torrent.SavePath,
                 }),

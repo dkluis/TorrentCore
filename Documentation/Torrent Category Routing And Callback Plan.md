@@ -2,9 +2,27 @@
 
 ## Status
 
-Planned and accepted as the next major TorrentCore workstream.
+Phase 1 is implemented.
 
-Not implemented yet.
+Implemented in this slice:
+
+- persisted `torrent_categories` table
+- seeded default categories:
+  - `TV`
+  - `Movie`
+  - `Audiobook`
+  - `Music`
+- read-only categories API
+- `CategoryKey` on add/list/detail torrent contracts
+- category-aware add routing to the category download root
+- host-level callback invocation settings added to runtime settings
+
+Not implemented yet:
+
+- completion callback invocation
+- Web UI category management
+- Web UI callback settings management
+- Avalonia category/callback management
 
 ## Goal
 
@@ -58,6 +76,9 @@ Design rules:
 - `CallbackLabel` is the label sent to the shared callback app through `TR_TORRENT_LABELS`.
 - `DownloadRootPath` is resolved by TorrentCore at add time and stored on the torrent.
 - Editing a category later affects future torrents only. Existing torrents keep their resolved routing data.
+- Compatibility rule for this phase:
+  - if `CategoryKey` is omitted, TorrentCore keeps using the current global `DownloadRootPath`
+  - this avoids silently misrouting existing manual add flows before category pickers are added to the UI
 
 Example defaults:
 
@@ -187,6 +208,12 @@ Exit criteria:
 
 - category definitions are persisted and queryable
 - torrents can store a category key and resolved routing data
+
+Status:
+
+- complete
+- implemented with a read-only `GET /api/categories` surface
+- default categories are seeded on startup using subdirectories under the configured host download root
 
 ### Phase 2 - Category-aware submission and routing
 

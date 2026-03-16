@@ -119,6 +119,7 @@ public sealed class PersistedTorrentEngineAdapter(
         {
             TorrentId = Guid.NewGuid(),
             Name = magnet.DisplayName,
+            CategoryKey = request.CategoryKey,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = magnet.InfoHash,
             DownloadRootPath = downloadRootPath,
@@ -309,6 +310,7 @@ public sealed class PersistedTorrentEngineAdapter(
         {
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
+            CategoryKey = snapshot.CategoryKey,
             State = snapshot.State,
             ProgressPercent = snapshot.ProgressPercent,
             DownloadedBytes = snapshot.DownloadedBytes,
@@ -335,6 +337,7 @@ public sealed class PersistedTorrentEngineAdapter(
         {
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
+            CategoryKey = snapshot.CategoryKey,
             State = snapshot.State,
             MagnetUri = snapshot.MagnetUri,
             InfoHash = snapshot.InfoHash,

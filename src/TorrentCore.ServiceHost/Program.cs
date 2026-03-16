@@ -1,5 +1,7 @@
+using TorrentCore.Core.Categories;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
+using TorrentCore.Persistence.Sqlite.Categories;
 using TorrentCore.Persistence.Sqlite.Configuration;
 using TorrentCore.Persistence.Sqlite.Logging;
 using TorrentCore.Persistence.Sqlite.Schema;
@@ -65,12 +67,18 @@ builder.Services.AddSingleton(serviceProvider =>
     var servicePaths = serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>();
     return new SqliteRuntimeSettingsStore(servicePaths.DatabaseFilePath);
 });
+builder.Services.AddSingleton<ITorrentCategoryStore>(serviceProvider =>
+{
+    var servicePaths = serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>();
+    return new SqliteTorrentCategoryStore(servicePaths.DatabaseFilePath);
+});
 builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
 {
     var servicePaths = serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>();
     return new SqliteTorrentStateStore(servicePaths.DatabaseFilePath);
 });
 builder.Services.AddSingleton<IRuntimeSettingsService, RuntimeSettingsService>();
+builder.Services.AddSingleton<ITorrentCategoryService, TorrentCategoryService>();
 builder.Services.AddSingleton<PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<MonoTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider =>
@@ -78,6 +86,7 @@ builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider =>
         ? serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>()
         : serviceProvider.GetRequiredService<PersistedTorrentEngineAdapter>());
 builder.Services.AddHostedService<SqlitePersistenceInitializer>();
+builder.Services.AddHostedService<TorrentCategoryInitializationService>();
 builder.Services.AddHostedService<AppliedEngineSettingsInitializationService>();
 builder.Services.AddHostedService<TorrentStartupRecoveryService>();
 builder.Services.AddHostedService<FakeTorrentRuntimeService>();

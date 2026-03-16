@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
@@ -120,6 +121,13 @@ public sealed class TorrentApiTests
         Assert.Equal(0, settings.EngineMaximumUploadRateBytesPerSecond);
         Assert.Equal(4, settings.MaxActiveMetadataResolutions);
         Assert.Equal(4, settings.MaxActiveDownloads);
+        Assert.False(settings.CompletionCallbackEnabled);
+        Assert.Null(settings.CompletionCallbackCommandPath);
+        Assert.Null(settings.CompletionCallbackArguments);
+        Assert.Null(settings.CompletionCallbackWorkingDirectory);
+        Assert.Equal(30, settings.CompletionCallbackTimeoutSeconds);
+        Assert.Null(settings.CompletionCallbackApiBaseUrlOverride);
+        Assert.Null(settings.CompletionCallbackApiKeyOverride);
         Assert.Equal(150, settings.AppliedEngineMaximumConnections);
         Assert.Equal(8, settings.AppliedEngineMaximumHalfOpenConnections);
         Assert.Equal(0, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
@@ -153,6 +161,13 @@ public sealed class TorrentApiTests
                 EngineMaximumUploadRateBytesPerSecond = 1_500_000,
                 MaxActiveMetadataResolutions = 3,
                 MaxActiveDownloads = 2,
+                CompletionCallbackEnabled = true,
+                CompletionCallbackCommandPath = "/usr/local/bin/torrentcore-callback",
+                CompletionCallbackArguments = "--run",
+                CompletionCallbackWorkingDirectory = "/Users/dick/TorrentCore/Scripts",
+                CompletionCallbackTimeoutSeconds = 45,
+                CompletionCallbackApiBaseUrlOverride = "http://127.0.0.1:5501/api/complete",
+                CompletionCallbackApiKeyOverride = "integration-key",
             });
             updateResponse.EnsureSuccessStatusCode();
 
@@ -174,6 +189,13 @@ public sealed class TorrentApiTests
             Assert.Equal(1_500_000, settings.EngineMaximumUploadRateBytesPerSecond);
             Assert.Equal(3, settings.MaxActiveMetadataResolutions);
             Assert.Equal(2, settings.MaxActiveDownloads);
+            Assert.True(settings.CompletionCallbackEnabled);
+            Assert.Equal("/usr/local/bin/torrentcore-callback", settings.CompletionCallbackCommandPath);
+            Assert.Equal("--run", settings.CompletionCallbackArguments);
+            Assert.Equal("/Users/dick/TorrentCore/Scripts", settings.CompletionCallbackWorkingDirectory);
+            Assert.Equal(45, settings.CompletionCallbackTimeoutSeconds);
+            Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
+            Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
             Assert.True(settings.EngineSettingsRequireRestart);
             Assert.NotNull(settings.UpdatedAtUtc);
 
@@ -216,6 +238,13 @@ public sealed class TorrentApiTests
             Assert.Equal(1_500_000, settings.EngineMaximumUploadRateBytesPerSecond);
             Assert.Equal(3, settings.MaxActiveMetadataResolutions);
             Assert.Equal(2, settings.MaxActiveDownloads);
+            Assert.True(settings.CompletionCallbackEnabled);
+            Assert.Equal("/usr/local/bin/torrentcore-callback", settings.CompletionCallbackCommandPath);
+            Assert.Equal("--run", settings.CompletionCallbackArguments);
+            Assert.Equal("/Users/dick/TorrentCore/Scripts", settings.CompletionCallbackWorkingDirectory);
+            Assert.Equal(45, settings.CompletionCallbackTimeoutSeconds);
+            Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
+            Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
             Assert.Equal(6, settings.AppliedEngineMaximumHalfOpenConnections);
             Assert.Equal(4_000_000, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
@@ -237,6 +266,28 @@ public sealed class TorrentApiTests
             Assert.NotNull(logs);
             Assert.Contains(logs, log => log.EventType == "service.runtime_settings.updated");
         }
+    }
+
+    [Fact]
+    public async Task GetCategories_ReturnsSeededDefaults()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-category-defaults");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var categories = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentCategoryDto>>("api/categories");
+
+        Assert.NotNull(categories);
+        Assert.Equal(["TV", "Movie", "Audiobook", "Music"], categories.Select(category => category.Key).ToArray());
+        Assert.All(categories, category =>
+        {
+            Assert.True(category.Enabled);
+            Assert.True(category.InvokeCompletionCallback);
+            Assert.Equal(Path.Combine(downloadPath, category.Key), category.DownloadRootPath);
+        });
     }
 
     [Fact]
@@ -265,10 +316,37 @@ public sealed class TorrentApiTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.NotNull(torrent);
         Assert.Equal("API Test Torrent", torrent.Name);
+        Assert.Null(torrent.CategoryKey);
         Assert.Equal(TorrentState.ResolvingMetadata, torrent.State);
         Assert.Equal("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB", torrent.InfoHash);
         Assert.Equal(0, torrent.TrackerCount);
         Assert.Equal(0, torrent.ConnectedPeerCount);
+    }
+
+    [Fact]
+    public async Task AddMagnet_WithCategory_UsesCategoryDownloadRoot_AndPersistsCategoryKey()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-category-add");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(httpClient, "BCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBCBC", "Categorized Torrent", "Movie");
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(torrent);
+        Assert.Equal("Movie", torrent.CategoryKey);
+        Assert.StartsWith(Path.Combine(downloadPath, "Movie"), torrent.SavePath, StringComparison.Ordinal);
+
+        Assert.NotNull(torrents);
+        Assert.Contains(
+            torrents,
+            item => item.TorrentId == torrent.TorrentId &&
+                    item.CategoryKey == "Movie");
     }
 
     [Fact]
@@ -1206,6 +1284,24 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task AddMagnet_ReturnsBadRequest_ForUnknownCategory()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
+        {
+            MagnetUri = "magnet:?xt=urn:btih:1234123412341234123412341234123412341234&dn=Unknown%20Category",
+            CategoryKey = "Podcast",
+        });
+
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_category", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task AddMagnet_ReturnsConflict_ForPersistedDuplicate()
     {
         var rootPath = CreateTempRootPath("torrentcore-duplicate");
@@ -1376,11 +1472,12 @@ public sealed class TorrentApiTests
             });
     }
 
-    private static async Task<HttpResponseMessage> AddMagnetAsync(HttpClient httpClient, string infoHash, string name)
+    private static async Task<HttpResponseMessage> AddMagnetAsync(HttpClient httpClient, string infoHash, string name, string? categoryKey = null)
     {
         return await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
         {
             MagnetUri = $"magnet:?xt=urn:btih:{infoHash}&dn={Uri.EscapeDataString(name)}",
+            CategoryKey = categoryKey,
         });
     }
 

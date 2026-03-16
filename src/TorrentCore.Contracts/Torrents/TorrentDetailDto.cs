@@ -4,6 +4,7 @@ public sealed class TorrentDetailDto
 {
     public required Guid TorrentId { get; init; }
     public required string Name { get; init; }
+    public string? CategoryKey { get; init; }
     public required TorrentState State { get; init; }
     public required string MagnetUri { get; init; }
     public string? InfoHash { get; init; }

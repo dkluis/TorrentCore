@@ -15,4 +15,11 @@ public static class RuntimeSettingsKeys
     public const string EngineMaximumUploadRateBytesPerSecond = "engine_maximum_upload_rate_bytes_per_second";
     public const string MaxActiveMetadataResolutions = "max_active_metadata_resolutions";
     public const string MaxActiveDownloads = "max_active_downloads";
+    public const string CompletionCallbackEnabled = "completion_callback_enabled";
+    public const string CompletionCallbackCommandPath = "completion_callback_command_path";
+    public const string CompletionCallbackArguments = "completion_callback_arguments";
+    public const string CompletionCallbackWorkingDirectory = "completion_callback_working_directory";
+    public const string CompletionCallbackTimeoutSeconds = "completion_callback_timeout_seconds";
+    public const string CompletionCallbackApiBaseUrlOverride = "completion_callback_api_base_url_override";
+    public const string CompletionCallbackApiKeyOverride = "completion_callback_api_key_override";
 }

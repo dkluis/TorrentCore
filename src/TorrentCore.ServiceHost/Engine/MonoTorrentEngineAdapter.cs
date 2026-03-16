@@ -318,6 +318,7 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = torrentId,
             Name = string.IsNullOrWhiteSpace(magnet.Name) ? $"Magnet {infoHash[..8]}" : magnet.Name,
+            CategoryKey = request.CategoryKey,
             State = ContractTorrentState.Queued,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = request.MagnetUri.Trim(),
@@ -897,6 +898,7 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = existing.TorrentId,
             Name = string.IsNullOrWhiteSpace(manager.Name) ? existing.Name : manager.Name,
+            CategoryKey = existing.CategoryKey,
             State = state,
             DesiredState = existing.DesiredState,
             MagnetUri = existing.MagnetUri,
@@ -935,6 +937,7 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = existing.TorrentId,
             Name = string.IsNullOrWhiteSpace(manager.Name) ? existing.Name : manager.Name,
+            CategoryKey = existing.CategoryKey,
             State = state,
             DesiredState = existing.DesiredState,
             MagnetUri = existing.MagnetUri,
@@ -1188,6 +1191,7 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
+            CategoryKey = snapshot.CategoryKey,
             State = ContractTorrentState.Completed,
             DesiredState = snapshot.DesiredState,
             MagnetUri = snapshot.MagnetUri,
@@ -1337,6 +1341,7 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
+            CategoryKey = snapshot.CategoryKey,
             State = snapshot.State,
             ProgressPercent = snapshot.ProgressPercent,
             DownloadedBytes = snapshot.DownloadedBytes,
@@ -1363,6 +1368,7 @@ public sealed class MonoTorrentEngineAdapter(
         {
             TorrentId = snapshot.TorrentId,
             Name = snapshot.Name,
+            CategoryKey = snapshot.CategoryKey,
             State = snapshot.State,
             MagnetUri = snapshot.MagnetUri,
             InfoHash = snapshot.InfoHash,
