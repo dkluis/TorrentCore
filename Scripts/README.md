@@ -103,6 +103,57 @@ cd ~/TorrentCore/Scripts
 
 Copy [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example) to `Scripts/torrentcore.env` and edit the values you need.
 
+# Completion Callback Contract
+
+## Purpose
+TorrentCore invokes an external callback script when a torrent completes downloading.
+This allows integration with downstream systems (e.g., TVMaze) without coupling TorrentCore to their internals.
+
+## Invocation Trigger
+The callback is invoked **once** when a torrent transitions to completed state:
+- `CompletedAtUtc` changes from null to a value
+- `State` is `Completed` or `Seeding`
+- `InvokeCompletionCallback` is true
+- `CompletionCallbackLabel` is non-empty
+
+## Environment Variables
+The callback script receives the following environment variables:
+
+| Variable | Source | Example |
+|----------|--------|---------|
+| `TR_TORRENT_HASH` | InfoHash | `abc123...` |
+| `TR_TORRENT_NAME` | Torrent name | `Show.S01E01.1080p` |
+| `TR_TORRENT_DIR` | Download root path | `/downloads/tv` |
+| `TR_TORRENT_LABELS` | Category callback label | `TV` |
+| `TVMAZE_API_COMPLETE_URL` | Optional API override | `https://api.example.com` |
+| `TVMAZE_API_COMPLETE_API_KEY` | Optional API key override | `secret123` |
+
+Note: `TR_TORRENT_ID` is always `"0"` (reserved for future use).
+
+## Exit Code Contract
+- **0**: Success - callback processed the completion
+- **Non-zero**: Failure - callback encountered an error
+
+Failed callbacks are logged but **not retried automatically**.
+
+## Timeout
+Callbacks must complete within `CompletionCallbackTimeoutSeconds` (configurable, default TBD).
+Timed-out processes are killed and logged as warnings.
+
+## Failure Handling
+- Launch failures, timeouts, and non-zero exits are logged to the activity log
+- No automatic retries
+- Operators can manually re-invoke via [TBD: API endpoint or UI action]
+
+## Category Mapping
+Each category defines its own `CallbackLabel`:
+- `TV` → `"TV"`
+- `Movie` → `"Movie"`
+- `Audiobook` → `"Audiobook"`
+- `Music` → `"Music"`
+
+The label is passed to the callback script via `TR_TORRENT_LABELS` for routing logic.
+
 Useful overrides:
 - `TORRENTCORE_DEPLOY_BASE`
 - `TORRENTCORE_DEPLOY_BASE_INTEL`
