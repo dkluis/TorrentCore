@@ -855,6 +855,178 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_PendingFinalization_OnRecovery_WaitsForVisibilityThenInvokesCallback()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-callback-pending");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+        var finalPayloadPath = Path.Combine(downloadPath, "TV", "MonoTorrent Pending Show");
+        var partialPayloadPath = finalPayloadPath + ".!mt";
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+            var addResponse = await AddMagnetAsync(httpClient, "8282828282828282828282828282828282828282", "MonoTorrent Pending Show", "TV");
+            var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+        }
+
+        CreateSingleFilePayload(finalPayloadPath);
+        File.WriteAllText(partialPayloadPath, "partial");
+
+        var completedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
+        await UpdatePersistedCompletionCallbackSnapshotAsync(
+            storagePath,
+            torrentId,
+            TorrentState.Completed,
+            TorrentDesiredState.Runnable,
+            completedAtUtc,
+            TorrentCompletionCallbackState.PendingFinalization,
+            completedAtUtc,
+            invokedAtUtc: null,
+            lastError: null);
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var pendingTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization.ToString(),
+                timeout: TimeSpan.FromSeconds(5));
+
+            Assert.NotNull(pendingTorrent);
+            Assert.Equal(finalPayloadPath, pendingTorrent.CompletionCallbackFinalPayloadPath);
+            Assert.Equal("The partial-suffix sibling is still visible.", pendingTorrent.CompletionCallbackPendingReason);
+
+            await Task.Delay(300);
+            Assert.Empty(ReadCallbackInvocations(callbackOutputPath));
+
+            File.Delete(partialPayloadPath);
+
+            await WaitForAsync(
+                () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
+                invocations => invocations.Count == 1,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var invokedTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+                timeout: TimeSpan.FromSeconds(5));
+
+            Assert.NotNull(invokedTorrent);
+            Assert.False(invokedTorrent.CanRetryCompletionCallback);
+            Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+
+            var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={torrentId}");
+            Assert.NotNull(logs);
+            Assert.Contains(logs, log => log.EventType == "torrent.callback.invoked");
+        }
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_RetryCompletionCallback_RequeuesTimedOutState_AndInvokesWhenPayloadAppears()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-callback-retry");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+        var finalPayloadPath = Path.Combine(downloadPath, "Movie", "MonoTorrent Retry Movie");
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+            var addResponse = await AddMagnetAsync(httpClient, "8383838383838383838383838383838383838383", "MonoTorrent Retry Movie", "Movie");
+            var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+        }
+
+        var completedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
+        await UpdatePersistedCompletionCallbackSnapshotAsync(
+            storagePath,
+            torrentId,
+            TorrentState.Completed,
+            TorrentDesiredState.Runnable,
+            completedAtUtc,
+            TorrentCompletionCallbackState.TimedOut,
+            completedAtUtc,
+            invokedAtUtc: null,
+            lastError: "Timed out waiting for final payload visibility at '/tmp/missing'. The final payload path is not visible yet.");
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var timedOutTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.TimedOut.ToString(),
+                timeout: TimeSpan.FromSeconds(5));
+
+            Assert.NotNull(timedOutTorrent);
+            Assert.True(timedOutTorrent.CanRetryCompletionCallback);
+            Assert.Equal(finalPayloadPath, timedOutTorrent.CompletionCallbackFinalPayloadPath);
+            Assert.Equal("The final payload path is not visible yet.", timedOutTorrent.CompletionCallbackPendingReason);
+
+            var retryResponse = await httpClient.PostAsync($"api/torrents/{torrentId}/completion-callback/retry", content: null);
+            retryResponse.EnsureSuccessStatusCode();
+
+            var retryResult = await retryResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
+            Assert.NotNull(retryResult);
+            Assert.Equal("retry_completion_callback", retryResult.Action);
+
+            var pendingTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization.ToString(),
+                timeout: TimeSpan.FromSeconds(5));
+
+            Assert.NotNull(pendingTorrent);
+            Assert.Null(pendingTorrent.CompletionCallbackLastError);
+            Assert.False(pendingTorrent.CanRetryCompletionCallback);
+
+            CreateSingleFilePayload(finalPayloadPath);
+
+            await WaitForAsync(
+                () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
+                invocations => invocations.Count == 1,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var invokedTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+                timeout: TimeSpan.FromSeconds(5));
+
+            Assert.NotNull(invokedTorrent);
+            Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+
+            var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={torrentId}");
+            Assert.NotNull(logs);
+            Assert.Contains(logs, log => log.EventType == "torrent.callback.retry_requested");
+            Assert.Contains(logs, log => log.EventType == "torrent.callback.invoked");
+        }
+    }
+
+    [Fact]
     public async Task FakeRuntime_EventuallyResolvesMetadata_AndCompletesDownload()
     {
         await using var factory = CreateFactory(
@@ -2061,6 +2233,52 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue("$state", state.ToString());
         command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
         command.Parameters.AddWithValue("$error_message", (object?)errorMessage ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task UpdatePersistedCompletionCallbackSnapshotAsync(
+        string storagePath,
+        Guid torrentId,
+        TorrentState state,
+        TorrentDesiredState desiredState,
+        DateTimeOffset completedAtUtc,
+        TorrentCompletionCallbackState callbackState,
+        DateTimeOffset? pendingSinceUtc,
+        DateTimeOffset? invokedAtUtc,
+        string? lastError)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE torrents
+            SET
+                state = $state,
+                desired_state = $desired_state,
+                progress_percent = 100,
+                download_rate_bytes_per_second = 0,
+                upload_rate_bytes_per_second = 0,
+                connected_peer_count = 0,
+                error_message = NULL,
+                completed_at_utc = $completed_at_utc,
+                seeding_started_at_utc = $completed_at_utc,
+                completion_callback_state = $completion_callback_state,
+                completion_callback_pending_since_utc = $completion_callback_pending_since_utc,
+                completion_callback_invoked_at_utc = $completion_callback_invoked_at_utc,
+                completion_callback_last_error = $completion_callback_last_error
+            WHERE torrent_id = $torrent_id;
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$state", state.ToString());
+        command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
+        command.Parameters.AddWithValue("$completed_at_utc", completedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$completion_callback_state", callbackState.ToString());
+        command.Parameters.AddWithValue("$completion_callback_pending_since_utc", pendingSinceUtc?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$completion_callback_invoked_at_utc", invokedAtUtc?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$completion_callback_last_error", (object?)lastError ?? DBNull.Value);
         await command.ExecuteNonQueryAsync();
     }
 

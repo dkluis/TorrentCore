@@ -126,6 +126,7 @@ Current service configuration section:
 - torrent list/detail contracts and the operator UI now expose callback lifecycle state, timestamps, and last error, and failed or timed-out callbacks can be retried through the public API/UI without touching persistence directly
 - the web settings page now exposes both callback process timeout and callback finalization-wait timeout, and callback transition observability now includes a pending-finalization activity log plus dashboard/list visibility for retryable callback states
 - the torrent detail screen now surfaces richer callback diagnostics from the existing callback/activity log data, and the add-magnet form now defaults the category selection to `TV` when that seeded category is available
+- service-level regression coverage now exercises callback finalization recovery and manual retry through the real MonoTorrent adapter, not just the fake runtime
 - the Web UI callback settings now place the TVMaze API override fields under an explicit advanced area so the main operator flow matches the normal centrally managed TVMaze deployment model
 - the Web UI callback settings now treat `Arguments` and `WorkingDirectory` as advanced-only too, leaving the normal operator flow centered on enable, full script path, and timeout
 
