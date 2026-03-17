@@ -129,6 +129,7 @@ Current service configuration section:
 - service-level regression coverage now exercises callback finalization recovery and manual retry through the real MonoTorrent adapter, not just the fake runtime
 - the Web UI callback settings now place the TVMaze API override fields under an explicit advanced area so the main operator flow matches the normal centrally managed TVMaze deployment model
 - the Web UI callback settings now treat `Arguments` and `WorkingDirectory` as advanced-only too, leaving the normal operator flow centered on enable, full script path, and timeout
+- the Web and Avalonia UIs now support runtime service-endpoint bootstrap for LAN deployments: the Web host persists one global tested backend endpoint, Avalonia persists a local tested endpoint, and both UIs can recover from an unreachable service without changing repo defaults
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
