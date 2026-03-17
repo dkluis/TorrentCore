@@ -1,0 +1,162 @@
+@page "/service-connection"
+@inject NavigationManager NavigationManager
+@inject WebServiceConnectionManager ConnectionManager
+
+<PageTitle>Service Connection</PageTitle>
+
+<h1>Service Connection</h1>
+
+<p>Configure the shared TorrentCore service endpoint used by this Web host. The value is stored once for the whole Web app, tested against <code>/api/health</code> before save, and reused on the next startup.</p>
+
+@if (_isLoading)
+{
+    <p>Loading current service connection...</p>
+}
+else
+{
+    <section class="mb-4">
+        <h2 class="h5">Current Status</h2>
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <label class="form-label" for="configuredEndpoint">Configured Endpoint</label>
+                <input id="configuredEndpoint" class="form-control tc-break" value="@(_status?.BaseUrl ?? "Not configured")" readonly />
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label" for="reachabilityStatus">Reachability</label>
+                <input id="reachabilityStatus" class="form-control" value="@GetReachabilityText(_status)" readonly />
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <label class="form-label" for="lastChecked">Last Checked</label>
+                <input id="lastChecked" class="form-control" value="@GetCheckedAtText(_status)" readonly />
+            </div>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(_status?.ErrorMessage))
+        {
+            <p class="mt-3 text-danger">@_status.ErrorMessage</p>
+        }
+    </section>
+
+    <section class="mb-4">
+        <h2 class="h5">Update Shared Endpoint</h2>
+        <div class="row g-3">
+            <div class="col-12 col-lg-8">
+                <label class="form-label" for="serviceBaseUrl">Service Base URL</label>
+                <input id="serviceBaseUrl" class="form-control tc-break" @bind="_baseUrl" @bind:event="oninput" placeholder="http://torrentcore-service.local:5078/" />
+                <div class="form-text">Use the LAN hostname or IP address for the machine running <code>TorrentCore.Service</code>.</div>
+            </div>
+        </div>
+        <div class="mt-3 tc-toolbar">
+            <button class="btn btn-secondary" type="button" @onclick="TestAsync" disabled="@(_isTesting || _isSaving)">Test Connection</button>
+            <button class="btn btn-primary" type="button" @onclick="SaveAsync" disabled="@(_isSaving || _isTesting)">Save Shared Endpoint</button>
+            <button class="btn btn-outline-secondary" type="button" @onclick="RefreshStatusAsync" disabled="@(_isSaving || _isTesting)">Recheck Current</button>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_message))
+    {
+        <p class="text-success">@_message</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <p class="text-danger">@_error</p>
+    }
+}
+
+@code
+{
+    private string _baseUrl = string.Empty;
+    private bool _isLoading = true;
+    private bool _isTesting;
+    private bool _isSaving;
+    private string? _message;
+    private string? _error;
+    private TorrentCoreConnectionProbeResult? _status;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _message = null;
+        _error = null;
+
+        _status = await ConnectionManager.GetStatusAsync();
+        _baseUrl = _status.BaseUrl ?? ConnectionManager.DefaultBaseUrl ?? string.Empty;
+        _isLoading = false;
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        _message = null;
+        _error = null;
+        _status = await ConnectionManager.RefreshAsync();
+    }
+
+    private async Task TestAsync()
+    {
+        _isTesting = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var probeResult = await ConnectionManager.TestAsync(_baseUrl);
+            _status = probeResult;
+
+            if (probeResult.IsReachable)
+            {
+                _message = "Connection test passed. Save this endpoint to make it the shared Web target.";
+                return;
+            }
+
+            _error = probeResult.ErrorMessage ?? "The configured endpoint could not be reached.";
+        }
+        finally
+        {
+            _isTesting = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        _message = null;
+        _error = null;
+
+        try
+        {
+            var probeResult = await ConnectionManager.SaveAsync(_baseUrl);
+            _status = probeResult;
+
+            if (!probeResult.IsReachable)
+            {
+                _error = probeResult.ErrorMessage ?? "The configured endpoint could not be reached.";
+                return;
+            }
+
+            _message = "Shared endpoint saved. The Web UI will use it immediately.";
+            NavigationManager.NavigateTo("/");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static string GetReachabilityText(TorrentCoreConnectionProbeResult? status)
+    {
+        if (status is null)
+        {
+            return "Unknown";
+        }
+
+        return status.IsReachable ? "Reachable" : "Unavailable";
+    }
+
+    private static string GetCheckedAtText(TorrentCoreConnectionProbeResult? status) =>
+        status?.CheckedAtUtc.LocalDateTime.ToString("g") ?? "Not checked yet";
+}

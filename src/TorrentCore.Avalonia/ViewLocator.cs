@@ -10,6 +10,7 @@ public sealed class ViewLocator : IDataTemplate
     public Control? Build(object? data) =>
         data switch
         {
+            ConnectionSetupViewModel viewModel => new ConnectionSetupView { DataContext = viewModel },
             DashboardViewModel viewModel => new DashboardView { DataContext = viewModel },
             TorrentsViewModel viewModel => new TorrentsView { DataContext = viewModel },
             TorrentDetailViewModel viewModel => new TorrentDetailView { DataContext = viewModel },

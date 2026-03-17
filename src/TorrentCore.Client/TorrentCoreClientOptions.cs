@@ -6,16 +6,18 @@ public sealed class TorrentCoreClientOptions
 
     public string BaseUrl { get; init; } = string.Empty;
 
-    public Uri ToUri()
+    public Uri ToUri() => ParseBaseUrl(BaseUrl);
+
+    public static Uri ParseBaseUrl(string? baseUrl)
     {
-        if (string.IsNullOrWhiteSpace(BaseUrl))
+        if (string.IsNullOrWhiteSpace(baseUrl))
         {
             throw new InvalidOperationException("TorrentCoreService:BaseUrl is required.");
         }
 
-        if (!Uri.TryCreate(BaseUrl, UriKind.Absolute, out var uri))
+        if (!Uri.TryCreate(baseUrl.Trim(), UriKind.Absolute, out var uri))
         {
-            throw new InvalidOperationException($"TorrentCoreService:BaseUrl '{BaseUrl}' is not a valid absolute URI.");
+            throw new InvalidOperationException($"TorrentCoreService:BaseUrl '{baseUrl}' is not a valid absolute URI.");
         }
 
         if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
@@ -26,4 +28,6 @@ public sealed class TorrentCoreClientOptions
 
         return uri;
     }
+
+    public static string NormalizeBaseUrl(string? baseUrl) => ParseBaseUrl(baseUrl).ToString();
 }

@@ -5,6 +5,7 @@
 
 # dotenv files
 .env
+src/TorrentCore.Web/Config/service-connection.json
 
 # User-specific files
 *.rsuser

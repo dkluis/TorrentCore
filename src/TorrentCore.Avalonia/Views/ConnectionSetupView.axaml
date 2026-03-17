@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
+             x:Class="TorrentCore.Avalonia.Views.ConnectionSetupView"
+             x:DataType="vm:ConnectionSetupViewModel">
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24" Spacing="18">
+      <StackPanel Spacing="6">
+        <TextBlock Text="Service Connection" Classes="text-section-title" />
+        <TextBlock Text="Point this desktop app at the TorrentCore service on your local network. The endpoint is tested against /api/health before it is saved."
+                   TextWrapping="Wrap"
+                   Classes="text-body-small"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+      </StackPanel>
+
+      <Border Classes="panel-card">
+        <StackPanel Spacing="14">
+          <TextBlock Text="Current Status" Classes="text-panel-title" />
+
+          <StackPanel Spacing="6">
+            <TextBlock Text="Configured Endpoint" Classes="text-body-small" Foreground="{DynamicResource TextSecondaryBrush}" />
+            <SelectableTextBlock Text="{Binding ConfiguredEndpoint}" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+            <StackPanel Grid.Column="0" Spacing="6">
+              <TextBlock Text="Reachability" Classes="text-body-small" Foreground="{DynamicResource TextSecondaryBrush}" />
+              <TextBlock Text="{Binding ReachabilityStatus}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Spacing="6">
+              <TextBlock Text="Last Checked" Classes="text-body-small" Foreground="{DynamicResource TextSecondaryBrush}" />
+              <TextBlock Text="{Binding LastCheckedSummary}" />
+            </StackPanel>
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <Border Classes="panel-card">
+        <StackPanel Spacing="14">
+          <TextBlock Text="Update Endpoint" Classes="text-panel-title" />
+
+          <StackPanel Spacing="6">
+            <TextBlock Text="Service Base URL" Classes="text-body-small" Foreground="{DynamicResource TextSecondaryBrush}" />
+            <TextBox Watermark="http://torrentcore-service.local:5078/"
+                     Text="{Binding BaseUrl}" />
+            <TextBlock Text="Use the LAN hostname or IP address for the machine running TorrentCore.Service."
+                       TextWrapping="Wrap"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+          </StackPanel>
+
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button Content="Test Connection"
+                    Command="{Binding TestCommand}" />
+            <Button Content="Save Endpoint"
+                    Command="{Binding SaveCommand}" />
+            <Button Content="Reload Status"
+                    Command="{Binding RefreshCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="Testing service connectivity..."
+                 IsVisible="{Binding IsLoading}"
+                 Classes="text-body-small"
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
+
+      <TextBlock Text="{Binding Message}"
+                 IsVisible="{Binding HasMessage}"
+                 Classes="text-body-small"
+                 Foreground="#186535" />
+
+      <TextBlock Text="{Binding ErrorMessage}"
+                 IsVisible="{Binding HasError}"
+                 Classes="text-body-small"
+                 Foreground="#A61B1B"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -3,7 +3,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using TorrentCore.Avalonia.Infrastructure;
-using TorrentCore.Avalonia.Models;
 using TorrentCore.Avalonia.ViewModels;
 using TorrentCore.Client;
 
@@ -20,12 +19,16 @@ public partial class App : Application
     {
         var configuration = AppConfigLoader.Load();
         var clientOptions = configuration.TorrentCoreService;
-        var serviceUri = clientOptions.ToUri();
+        var endpointProvider = new MutableTorrentCoreEndpointProvider(clientOptions.BaseUrl);
 
         var services = new ServiceCollection();
         services.AddSingleton(configuration);
         services.AddSingleton(clientOptions);
-        services.AddHttpClient<TorrentCoreClient>(client => client.BaseAddress = serviceUri);
+        services.AddSingleton(endpointProvider);
+        services.AddSingleton<ITorrentCoreEndpointProvider>(endpointProvider);
+        services.AddSingleton<AppConnectionSettingsStore>();
+        services.AddSingleton<AvaloniaServiceConnectionManager>();
+        services.AddHttpClient<TorrentCoreClient>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
         _services = services.BuildServiceProvider();
@@ -33,6 +36,7 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = _services.GetRequiredService<MainWindow>();
+            _ = _services.GetRequiredService<MainWindowViewModel>().InitializeAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

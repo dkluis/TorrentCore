@@ -1,6 +1,6 @@
-using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json;
+using System.Net.Http.Json;
 using TorrentCore.Contracts;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
@@ -9,52 +9,52 @@ using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.Client;
 
-public sealed class TorrentCoreClient(HttpClient httpClient)
+public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpointProvider endpointProvider)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ServiceHealthDto?> GetHealthAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync("api/health", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/health"), cancellationToken);
         return await ReadResponseAsync<ServiceHealthDto>(response, cancellationToken);
     }
 
     public async Task<EngineHostStatusDto?> GetHostStatusAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync("api/host/status", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/host/status"), cancellationToken);
         return await ReadResponseAsync<EngineHostStatusDto>(response, cancellationToken);
     }
 
     public async Task<RuntimeSettingsDto?> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync("api/host/runtime-settings", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/host/runtime-settings"), cancellationToken);
         return await ReadResponseAsync<RuntimeSettingsDto>(response, cancellationToken);
     }
 
     public async Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PutAsJsonAsync("api/host/runtime-settings", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PutAsJsonAsync(BuildRequestUri("api/host/runtime-settings"), request, JsonOptions, cancellationToken);
         return await ReadResponseAsync<RuntimeSettingsDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no runtime settings payload.");
     }
 
     public async Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync("api/categories", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/categories"), cancellationToken);
         return await ReadResponseAsync<IReadOnlyList<TorrentCategoryDto>>(response, cancellationToken)
                ?? Array.Empty<TorrentCategoryDto>();
     }
 
     public async Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PutAsJsonAsync($"api/categories/{Uri.EscapeDataString(key)}", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PutAsJsonAsync(BuildRequestUri($"api/categories/{Uri.EscapeDataString(key)}"), request, JsonOptions, cancellationToken);
         return await ReadResponseAsync<TorrentCategoryDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no category payload.");
     }
 
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync("api/torrents", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/torrents"), cancellationToken);
         return await ReadResponseAsync<IReadOnlyList<TorrentSummaryDto>>(response, cancellationToken)
                ?? Array.Empty<TorrentSummaryDto>();
     }
@@ -107,50 +107,61 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
             query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
         }
 
-        using var response = await httpClient.GetAsync($"api/logs?{string.Join("&", query)}", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri($"api/logs?{string.Join("&", query)}"), cancellationToken);
         return await ReadResponseAsync<IReadOnlyList<ActivityLogEntryDto>>(response, cancellationToken)
                ?? Array.Empty<ActivityLogEntryDto>();
     }
 
     public async Task<TorrentDetailDto?> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.GetAsync($"api/torrents/{torrentId}", cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri($"api/torrents/{torrentId}"), cancellationToken);
         return await ReadResponseAsync<TorrentDetailDto>(response, cancellationToken);
     }
 
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PostAsJsonAsync("api/torrents", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync(BuildRequestUri("api/torrents"), request, JsonOptions, cancellationToken);
         return await ReadResponseAsync<TorrentDetailDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no torrent payload.");
     }
 
     public async Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PostAsync($"api/torrents/{torrentId}/pause", content: null, cancellationToken);
+        using var response = await httpClient.PostAsync(BuildRequestUri($"api/torrents/{torrentId}/pause"), content: null, cancellationToken);
         return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
     }
 
     public async Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PostAsync($"api/torrents/{torrentId}/resume", content: null, cancellationToken);
+        using var response = await httpClient.PostAsync(BuildRequestUri($"api/torrents/{torrentId}/resume"), content: null, cancellationToken);
         return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
     }
 
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PostAsync($"api/torrents/{torrentId}/completion-callback/retry", content: null, cancellationToken);
+        using var response = await httpClient.PostAsync(BuildRequestUri($"api/torrents/{torrentId}/completion-callback/retry"), content: null, cancellationToken);
         return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
     }
 
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken = default)
     {
-        using var response = await httpClient.PostAsJsonAsync($"api/torrents/{torrentId}/remove", request, JsonOptions, cancellationToken);
+        using var response = await httpClient.PostAsJsonAsync(BuildRequestUri($"api/torrents/{torrentId}/remove"), request, JsonOptions, cancellationToken);
         return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken)
                ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
+    }
+
+    private Uri BuildRequestUri(string relativePath)
+    {
+        var baseUri = endpointProvider.CurrentBaseUri;
+        if (baseUri is null)
+        {
+            throw new InvalidOperationException("TorrentCore service endpoint is not configured.");
+        }
+
+        return new Uri(baseUri, relativePath);
     }
 
     private static async Task<T?> ReadResponseAsync<T>(HttpResponseMessage response, CancellationToken cancellationToken)

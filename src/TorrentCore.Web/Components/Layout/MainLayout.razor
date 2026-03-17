@@ -1,23 +1,128 @@
 ﻿@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject WebServiceConnectionManager ConnectionManager
+@implements IDisposable
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-3 px-md-4">
-            <span>Primary TorrentCore admin shell</span>
+@if (_isCheckingConnection)
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
         </div>
 
-        <article class="content px-3 px-md-4">
-            @Body
-        </article>
-    </main>
-</div>
+        <main>
+            <div class="top-row px-3 px-md-4">
+                <span>Primary TorrentCore admin shell</span>
+            </div>
+
+            <article class="content px-3 px-md-4">
+                <div class="alert alert-secondary mt-3 mb-0" role="status">
+                    Checking TorrentCore service connectivity...
+                </div>
+            </article>
+        </main>
+    </div>
+}
+else if (_requiresConnectionSetup && !_isConnectionPage)
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-3 px-md-4">
+                <span>Primary TorrentCore admin shell</span>
+            </div>
+
+            <article class="content px-3 px-md-4">
+                <div class="alert alert-warning mt-3" role="alert">
+                    <h2 class="h5">TorrentCore service connection is unavailable</h2>
+                    <p class="mb-2">The Web host cannot reach its configured TorrentCore service endpoint yet. Open the shared service connection page, test the endpoint, and save it before continuing.</p>
+                    @if (!string.IsNullOrWhiteSpace(_connectionStatus?.BaseUrl))
+                    {
+                        <p class="mb-2"><strong>Current endpoint:</strong> @_connectionStatus.BaseUrl</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_connectionStatus?.ErrorMessage))
+                    {
+                        <p class="mb-3"><strong>Last check:</strong> @_connectionStatus.ErrorMessage</p>
+                    }
+                    <a class="btn btn-primary" href="service-connection">Open Service Connection</a>
+                </div>
+            </article>
+        </main>
+    </div>
+}
+else
+{
+    <div class="page">
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-3 px-md-4">
+                <span>Primary TorrentCore admin shell</span>
+            </div>
+
+            <article class="content px-3 px-md-4">
+                @Body
+            </article>
+        </main>
+    </div>
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code
+{
+    private bool _isCheckingConnection = true;
+    private bool _requiresConnectionSetup;
+    private bool _isConnectionPage;
+    private TorrentCoreConnectionProbeResult? _connectionStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isConnectionPage = IsConnectionPage(NavigationManager.Uri);
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        ConnectionManager.StateChanged += HandleConnectionStateChanged;
+        await LoadConnectionStatusAsync();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+        ConnectionManager.StateChanged -= HandleConnectionStateChanged;
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs eventArgs)
+    {
+        _isConnectionPage = IsConnectionPage(eventArgs.Location);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleConnectionStateChanged() =>
+        _ = InvokeAsync(LoadConnectionStatusAsync);
+
+    private async Task LoadConnectionStatusAsync()
+    {
+        _isCheckingConnection = true;
+        await InvokeAsync(StateHasChanged);
+
+        _connectionStatus = await ConnectionManager.GetStatusAsync();
+        _requiresConnectionSetup = !_connectionStatus.IsReachable;
+        _isCheckingConnection = false;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsConnectionPage(string absoluteUri)
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(absoluteUri);
+        return string.Equals(relativePath.Trim('/'), "service-connection", StringComparison.OrdinalIgnoreCase);
+    }
+}

@@ -26,6 +26,7 @@
                  Margin="12,0,12,12"
                  ItemsSource="{Binding Sections}"
                  SelectedItem="{Binding SelectedSection}"
+                 IsEnabled="{Binding CanNavigate}"
                  Background="Transparent"
                  BorderThickness="0">
           <ListBox.Styles>
@@ -106,13 +107,17 @@
                                    Classes="text-body-small"
                                    TextWrapping="Wrap"
                                    Foreground="{DynamicResource TextSecondaryBrush}" />
+              <TextBlock Text="{Binding ServiceStatusSummary}"
+                         Classes="text-body-small"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource TextSecondaryBrush}" />
             </StackPanel>
           </Border>
 
           <Border Classes="panel-card">
             <StackPanel Spacing="6">
               <TextBlock Text="Desktop Scope" Classes="text-panel-title" />
-              <TextBlock Text="Dashboard, Torrents, Logs, Settings, and torrent detail are wired to the current service boundary."
+              <TextBlock Text="Connection, Dashboard, Torrents, Logs, Settings, and torrent detail are wired to the current service boundary."
                          Classes="text-body-small"
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource TextSecondaryBrush}" />
