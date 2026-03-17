@@ -62,6 +62,7 @@ public sealed class TorrentCompletionCallbackInvoker(
                 currentSnapshot,
                 runtimeSettings,
                 null,
+                null,
                 workingDirectory,
                 exception.Message,
                 cancellationToken);
@@ -106,6 +107,7 @@ public sealed class TorrentCompletionCallbackInvoker(
                 currentSnapshot,
                 runtimeSettings,
                 processId,
+                null,
                 workingDirectory,
                 $"The callback exceeded the {runtimeSettings.CompletionCallbackTimeoutSeconds}-second timeout.",
                 cancellationToken);
@@ -131,6 +133,7 @@ public sealed class TorrentCompletionCallbackInvoker(
                 currentSnapshot,
                 runtimeSettings,
                 processId,
+                process.ExitCode,
                 workingDirectory,
                 $"The callback exited with code {process.ExitCode}.",
                 cancellationToken);
@@ -148,6 +151,7 @@ public sealed class TorrentCompletionCallbackInvoker(
             currentSnapshot,
             runtimeSettings,
             processId,
+            process.ExitCode,
             workingDirectory,
             null,
             cancellationToken);
@@ -211,6 +215,7 @@ public sealed class TorrentCompletionCallbackInvoker(
         TorrentSnapshot snapshot,
         RuntimeSettingsSnapshot runtimeSettings,
         int? processId,
+        int? exitCode,
         string workingDirectory,
         string? error,
         CancellationToken cancellationToken)
@@ -235,6 +240,7 @@ public sealed class TorrentCompletionCallbackInvoker(
                 WorkingDirectory = workingDirectory,
                 runtimeSettings.CompletionCallbackTimeoutSeconds,
                 ProcessId = processId,
+                ExitCode = exitCode,
                 Error = error,
             }),
         }, cancellationToken);

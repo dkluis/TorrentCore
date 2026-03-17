@@ -3,13 +3,16 @@ using Microsoft.Extensions.Primitives;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
+using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Engine;
 
 public sealed class PersistedTorrentEngineAdapter(
     ITorrentStateStore torrentStateStore,
-    IRuntimeSettingsService runtimeSettingsService) : ITorrentEngineAdapter
+    IRuntimeSettingsService runtimeSettingsService,
+    ITorrentCompletionFinalizationChecker finalizationChecker,
+    ResolvedTorrentCoreServicePaths servicePaths) : ITorrentEngineAdapter
 {
     public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken) =>
         torrentStateStore.CountAsync(cancellationToken);
@@ -98,7 +101,8 @@ public sealed class PersistedTorrentEngineAdapter(
                 torrent,
                 TorrentQueueDiagnostics.Create(
                     torrents,
-                    await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId]);
+                    await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId],
+                await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken));
     }
 
     public async Task<TorrentDetailDto> AddMagnetAsync(
@@ -148,7 +152,7 @@ public sealed class PersistedTorrentEngineAdapter(
         };
 
         await torrentStateStore.InsertAsync(torrent, cancellationToken);
-        return MapDetail(torrent, new TorrentQueueDiagnostic(null, null));
+        return MapDetail(torrent, new TorrentQueueDiagnostic(null, null), null);
     }
 
     public async Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -377,8 +381,21 @@ public sealed class PersistedTorrentEngineAdapter(
         };
     }
 
-    private static TorrentDetailDto MapDetail(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)
+    private TorrentDetailDto MapDetail(
+        TorrentSnapshot snapshot,
+        TorrentQueueDiagnostic diagnostic,
+        RuntimeSettingsSnapshot? runtimeSettings)
     {
+        var callbackFinalPayloadPath = Path.Combine(snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath, snapshot.Name);
+        string? callbackPendingReason = null;
+        if (runtimeSettings is not null &&
+            snapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or TorrentCompletionCallbackState.TimedOut)
+        {
+            var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
+            callbackFinalPayloadPath = finalizationResult.FinalPayloadPath;
+            callbackPendingReason = finalizationResult.IsReady ? null : finalizationResult.PendingReason;
+        }
+
         return new TorrentDetailDto
         {
             TorrentId = snapshot.TorrentId,
@@ -403,6 +420,8 @@ public sealed class PersistedTorrentEngineAdapter(
             CompletionCallbackState = snapshot.CompletionCallbackState?.ToString(),
             CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
             CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
+            CompletionCallbackFinalPayloadPath = callbackFinalPayloadPath,
+            CompletionCallbackPendingReason = callbackPendingReason,
             CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
             CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),

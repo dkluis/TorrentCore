@@ -18,6 +18,7 @@ public sealed class MonoTorrentEngineAdapter(
     ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService,
     ITorrentCompletionCallbackProcessor completionCallbackProcessor,
+    ITorrentCompletionFinalizationChecker finalizationChecker,
     ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService,
@@ -274,7 +275,8 @@ public sealed class MonoTorrentEngineAdapter(
                 torrent,
                 TorrentQueueDiagnostics.Create(
                     torrents,
-                    await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId]);
+                    await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken))[torrent.TorrentId],
+                await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken));
     }
 
     public async Task<TorrentDetailDto> AddMagnetAsync(
@@ -364,7 +366,7 @@ public sealed class MonoTorrentEngineAdapter(
         await SynchronizeAsync(cancellationToken);
 
         var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
-        return MapDetail(persistedSnapshot, new TorrentQueueDiagnostic(null, null));
+        return MapDetail(persistedSnapshot, new TorrentQueueDiagnostic(null, null), null);
     }
 
     public async Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -805,7 +807,7 @@ public sealed class MonoTorrentEngineAdapter(
             }
 
             var previousCompletedAtUtc = snapshot.CompletedAtUtc;
-            completionCallbackProcessor.MarkPendingIfTriggered(previousCompletedAtUtc, updatedSnapshot, now);
+            await completionCallbackProcessor.MarkPendingIfTriggeredAsync(previousCompletedAtUtc, updatedSnapshot, runtimeSettings, now, cancellationToken);
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
 
             if (updatedSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
@@ -1459,8 +1461,21 @@ public sealed class MonoTorrentEngineAdapter(
         };
     }
 
-    private static TorrentDetailDto MapDetail(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic)
+    private TorrentDetailDto MapDetail(
+        TorrentSnapshot snapshot,
+        TorrentQueueDiagnostic diagnostic,
+        RuntimeSettingsSnapshot? runtimeSettings)
     {
+        var callbackFinalPayloadPath = Path.Combine(snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath, snapshot.Name);
+        string? callbackPendingReason = null;
+        if (runtimeSettings is not null &&
+            snapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or TorrentCompletionCallbackState.TimedOut)
+        {
+            var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
+            callbackFinalPayloadPath = finalizationResult.FinalPayloadPath;
+            callbackPendingReason = finalizationResult.IsReady ? null : finalizationResult.PendingReason;
+        }
+
         return new TorrentDetailDto
         {
             TorrentId = snapshot.TorrentId,
@@ -1485,6 +1500,8 @@ public sealed class MonoTorrentEngineAdapter(
             CompletionCallbackState = snapshot.CompletionCallbackState?.ToString(),
             CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
             CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
+            CompletionCallbackFinalPayloadPath = callbackFinalPayloadPath,
+            CompletionCallbackPendingReason = callbackPendingReason,
             CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
             CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),

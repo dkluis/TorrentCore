@@ -86,6 +86,16 @@ else
                 </select>
             </div>
             <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label" for="torrentCallbackFilter">Callback Filter</label>
+                <select id="torrentCallbackFilter" class="form-select" @bind="_callbackStateFilter">
+                    <option value="">All</option>
+                    <option value="PendingFinalization">PendingFinalization</option>
+                    <option value="Invoked">Invoked</option>
+                    <option value="Failed">Failed</option>
+                    <option value="TimedOut">TimedOut</option>
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
                 <label class="form-label" for="torrentSort">Sort</label>
                 <select id="torrentSort" class="form-select" @bind="_sortOption">
                     <option value="@TorrentSortOption.Name">Name</option>
@@ -247,6 +257,7 @@ else
     private string _nameFilter = string.Empty;
     private string _statusFilter = string.Empty;
     private string _categoryFilter = string.Empty;
+    private string _callbackStateFilter = string.Empty;
     private TorrentSortOption _sortOption = TorrentSortOption.AddedNewest;
     private readonly HashSet<Guid> _busyTorrentIds = [];
     private readonly HashSet<Guid> _selectedTorrentIds = [];
@@ -254,6 +265,7 @@ else
     private CancellationTokenSource? _refreshLoopCts;
     private Task? _refreshLoopTask;
     private bool _isDisposed;
+    private bool _categorySelectionInitialized;
 
     private IReadOnlyList<TorrentSummaryDto> VisibleTorrents =>
         ApplySort(
@@ -261,6 +273,7 @@ else
                 .Where(MatchesNameFilter)
                 .Where(MatchesStatusFilter)
                 .Where(MatchesCategoryFilter)
+                .Where(MatchesCallbackStateFilter)
                 .ToArray())
         .ToArray();
 
@@ -300,6 +313,16 @@ else
             await Task.WhenAll(categoriesTask, torrentsTask);
             _categories = categoriesTask.Result;
             _torrents = torrentsTask.Result;
+            if (!_categorySelectionInitialized)
+            {
+                _selectedCategoryKey = ResolveDefaultAddCategoryKey();
+                _categorySelectionInitialized = true;
+            }
+            else if (!string.IsNullOrWhiteSpace(_selectedCategoryKey) && !CategoryIsSelectable(_selectedCategoryKey))
+            {
+                _selectedCategoryKey = ResolveDefaultAddCategoryKey();
+            }
+
             _selectedTorrentIds.RemoveWhere(torrentId => _torrents.All(torrent => torrent.TorrentId != torrentId));
         }
         catch (Exception exception)
@@ -334,7 +357,7 @@ else
 
             _submitMessage = $"Added torrent '{torrent.Name}' in state '{torrent.State}'.";
             _magnetUri = string.Empty;
-            _selectedCategoryKey = string.Empty;
+            _selectedCategoryKey = ResolveDefaultAddCategoryKey();
             await LoadAsync();
         }
         catch (TorrentCoreClientException exception)
@@ -378,6 +401,20 @@ else
             : completedAtUtc is null
                 ? "Waiting for completion"
                 : "Not requested";
+
+    private string ResolveDefaultAddCategoryKey()
+    {
+        var tvCategory = _categories.FirstOrDefault(category =>
+            category.Enabled &&
+            string.Equals(category.Key, "TV", StringComparison.OrdinalIgnoreCase));
+
+        return tvCategory?.Key ?? string.Empty;
+    }
+
+    private bool CategoryIsSelectable(string categoryKey) =>
+        _categories.Any(category =>
+            category.Enabled &&
+            string.Equals(category.Key, categoryKey, StringComparison.OrdinalIgnoreCase));
 
     private async Task PauseAsync(TorrentSummaryDto torrent)
     {
@@ -526,6 +563,10 @@ else
         (_categoryFilter == UncategorizedFilterValue
             ? string.IsNullOrWhiteSpace(torrent.CategoryKey)
             : string.Equals(torrent.CategoryKey, _categoryFilter, StringComparison.OrdinalIgnoreCase));
+
+    private bool MatchesCallbackStateFilter(TorrentSummaryDto torrent) =>
+        string.IsNullOrWhiteSpace(_callbackStateFilter) ||
+        string.Equals(torrent.CompletionCallbackState, _callbackStateFilter, StringComparison.OrdinalIgnoreCase);
 
     private IEnumerable<TorrentSummaryDto> ApplySort(IEnumerable<TorrentSummaryDto> torrents)
     {

@@ -3,6 +3,7 @@
 @inject NavigationManager NavigationManager
 @inject TorrentCoreClient TorrentCoreClient
 @using System.Globalization
+@using System.Text.Json
 @using TorrentCore.Contracts.Diagnostics
 @using TorrentCore.Contracts.Torrents
 
@@ -127,7 +128,19 @@ else if (_torrent is not null)
                         <p class="mb-1"><strong>Status:</strong> @FormatCompletionCallbackState(_torrent.CompletionCallbackState, _torrent.CompletedAtUtc)</p>
                         <p class="mb-1"><strong>Pending Since:</strong> @FormatLocalTime(_torrent.CompletionCallbackPendingSinceUtc)</p>
                         <p class="mb-1"><strong>Invoked:</strong> @FormatLocalTime(_torrent.CompletionCallbackInvokedAtUtc)</p>
-                        <p class="mb-0"><strong>Last Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackLastError) ? "None" : _torrent.CompletionCallbackLastError)</p>
+                        <p class="mb-1"><strong>Final Payload:</strong> <span class="tc-break">@(_torrent.CompletionCallbackFinalPayloadPath ?? "Not available")</span></p>
+                        <p class="mb-1"><strong>Pending Reason:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackPendingReason) ? "None" : _torrent.CompletionCallbackPendingReason)</p>
+                        <p class="mb-1"><strong>Last Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackLastError) ? "None" : _torrent.CompletionCallbackLastError)</p>
+                        <hr />
+                        <p class="mb-1"><strong>Last Event:</strong> @FormatCallbackEvent(_latestCallbackLog)</p>
+                        <p class="mb-1"><strong>Last Event Time:</strong> @FormatCallbackEventTime(_latestCallbackLog)</p>
+                        <p class="mb-1"><strong>Last Message:</strong> @(_latestCallbackLog?.Message ?? "Not yet")</p>
+                        <p class="mb-1"><strong>Process Id:</strong> @FormatNullableInt(_latestCallbackLog?.ProcessId)</p>
+                        <p class="mb-1"><strong>Exit Code:</strong> @FormatNullableInt(_latestCallbackLog?.ExitCode)</p>
+                        <p class="mb-1"><strong>Command:</strong> <span class="tc-break">@(_latestCallbackLog?.CommandPath ?? "Not yet")</span></p>
+                        <p class="mb-1"><strong>Working Directory:</strong> <span class="tc-break">@(_latestCallbackLog?.WorkingDirectory ?? "Not yet")</span></p>
+                        <p class="mb-1"><strong>Process Timeout:</strong> @FormatTimeoutSeconds(_latestCallbackLog?.ProcessTimeoutSeconds)</p>
+                        <p class="mb-0"><strong>Finalization Wait:</strong> @FormatTimeoutSeconds(_latestCallbackLog?.FinalizationTimeoutSeconds)</p>
                     </div>
                 </div>
             </div>
@@ -219,6 +232,7 @@ else if (_torrent is not null)
 
     private TorrentDetailDto? _torrent;
     private IReadOnlyList<ActivityLogEntryDto> _logs = Array.Empty<ActivityLogEntryDto>();
+    private CallbackLogSummary? _latestCallbackLog;
     private string? _error;
     private string? _message;
     private bool _isLoading = true;
@@ -258,12 +272,14 @@ else if (_torrent is not null)
             {
                 _error = $"Torrent '{TorrentId}' was not found.";
                 _logs = Array.Empty<ActivityLogEntryDto>();
+                _latestCallbackLog = null;
                 return;
             }
 
             _logs = await TorrentCoreClient.GetRecentLogsAsync(
                 take: 20,
                 torrentId: TorrentId);
+            _latestCallbackLog = GetLatestCallbackLog(_logs);
         }
         catch (TorrentCoreClientException exception)
         {
@@ -443,6 +459,93 @@ else if (_torrent is not null)
                 ? "Waiting for completion"
                 : "Not requested";
 
+    private static string FormatCallbackEvent(CallbackLogSummary? callbackLog) =>
+        callbackLog is null
+            ? "Not yet"
+            : FormatCallbackEventName(callbackLog.EventType);
+
+    private static string FormatCallbackEventTime(CallbackLogSummary? callbackLog) =>
+        callbackLog is null
+            ? "Not yet"
+            : callbackLog.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+
+    private static string FormatNullableInt(int? value) =>
+        value?.ToString(CultureInfo.CurrentCulture) ?? "Not available";
+
+    private static string FormatTimeoutSeconds(int? value) =>
+        value is null ? "Not available" : $"{value.Value.ToString(CultureInfo.CurrentCulture)} seconds";
+
+    private static string FormatCallbackEventName(string eventType)
+    {
+        const string prefix = "torrent.callback.";
+        var normalized = eventType.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+            ? eventType[prefix.Length..]
+            : eventType;
+        var parts = normalized.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0
+            ? eventType
+            : string.Join(' ', parts.Select(static part => char.ToUpperInvariant(part[0]) + part[1..]));
+    }
+
+    private static CallbackLogSummary? GetLatestCallbackLog(IReadOnlyList<ActivityLogEntryDto> logs)
+    {
+        var callbackLog = logs
+            .Where(log => log.EventType.StartsWith("torrent.callback.", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(log => log.OccurredAtUtc)
+            .FirstOrDefault();
+
+        if (callbackLog is null)
+        {
+            return null;
+        }
+
+        string? commandPath = null;
+        string? workingDirectory = null;
+        int? processId = null;
+        int? exitCode = null;
+        int? processTimeoutSeconds = null;
+        int? finalizationTimeoutSeconds = null;
+
+        if (!string.IsNullOrWhiteSpace(callbackLog.DetailsJson))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(callbackLog.DetailsJson);
+                var root = document.RootElement;
+                commandPath = GetOptionalString(root, "CommandPath");
+                workingDirectory = GetOptionalString(root, "WorkingDirectory");
+                processId = GetOptionalInt32(root, "ProcessId");
+                exitCode = GetOptionalInt32(root, "ExitCode");
+                processTimeoutSeconds = GetOptionalInt32(root, "CompletionCallbackTimeoutSeconds");
+                finalizationTimeoutSeconds = GetOptionalInt32(root, "CompletionCallbackFinalizationTimeoutSeconds");
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return new CallbackLogSummary(
+            callbackLog.EventType,
+            callbackLog.OccurredAtUtc,
+            callbackLog.Message,
+            commandPath,
+            workingDirectory,
+            processId,
+            exitCode,
+            processTimeoutSeconds,
+            finalizationTimeoutSeconds);
+    }
+
+    private static string? GetOptionalString(JsonElement root, string propertyName) =>
+        root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static int? GetOptionalInt32(JsonElement root, string propertyName) =>
+        root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)
+            ? number
+            : null;
+
     private static string FormatWaitReason(TorrentWaitReason? waitReason, int? queuePosition)
     {
         var text = waitReason switch
@@ -485,4 +588,15 @@ else if (_torrent is not null)
             }
         }
     }
+
+    private sealed record CallbackLogSummary(
+        string EventType,
+        DateTimeOffset OccurredAtUtc,
+        string Message,
+        string? CommandPath,
+        string? WorkingDirectory,
+        int? ProcessId,
+        int? ExitCode,
+        int? ProcessTimeoutSeconds,
+        int? FinalizationTimeoutSeconds);
 }

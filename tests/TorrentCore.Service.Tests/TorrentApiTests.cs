@@ -940,6 +940,7 @@ public sealed class TorrentApiTests
         Assert.Equal("callback-test-key", callbackInvocation["TVMAZE_API_COMPLETE_API_KEY"]);
 
         Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.pending_finalization");
         Assert.Contains(logs, log => log.EventType == "torrent.callback.invoked");
     }
 
@@ -1036,6 +1037,12 @@ public sealed class TorrentApiTests
         var pendingState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
         Assert.Equal(TorrentCompletionCallbackState.PendingFinalization.ToString(), pendingState.State);
 
+        var pendingTorrent = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+        Assert.NotNull(pendingTorrent);
+        Assert.Equal(TorrentCompletionCallbackState.PendingFinalization.ToString(), pendingTorrent.CompletionCallbackState);
+        Assert.Equal(finalPayloadPath, pendingTorrent.CompletionCallbackFinalPayloadPath);
+        Assert.Equal("The partial-suffix sibling is still visible.", pendingTorrent.CompletionCallbackPendingReason);
+
         File.Delete(partialPayloadPath);
 
         await WaitForAsync(
@@ -1043,9 +1050,20 @@ public sealed class TorrentApiTests
             invocations => invocations.Count == 1,
             timeout: TimeSpan.FromSeconds(5));
 
-        var invokedState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId);
+        var invokedState = await WaitForAsync(
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId),
+            state => state.State == TorrentCompletionCallbackState.Invoked.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
         Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
         Assert.NotNull(invokedState.InvokedAtUtc);
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
+        Assert.NotNull(logs);
+        var pendingLog = Assert.Single(logs, log => log.EventType == "torrent.callback.pending_finalization");
+        var pendingDetails = ParseLogDetails(pendingLog);
+        Assert.Equal(finalPayloadPath, pendingDetails.GetProperty("FinalPayloadPath").GetString());
+        Assert.Equal("The partial-suffix sibling is still visible.", pendingDetails.GetProperty("PendingReason").GetString());
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.invoked");
     }
 
     [Fact]
@@ -1094,7 +1112,10 @@ public sealed class TorrentApiTests
             invocations => invocations.Count == 1,
             timeout: TimeSpan.FromSeconds(5));
 
-        var invokedState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId);
+        var invokedState = await WaitForAsync(
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId),
+            state => state.State == TorrentCompletionCallbackState.Invoked.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
         Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
     }
 
@@ -1201,6 +1222,8 @@ public sealed class TorrentApiTests
         Assert.Equal(TorrentCompletionCallbackState.TimedOut.ToString(), torrentDetail.CompletionCallbackState);
         Assert.True(torrentDetail.CanRetryCompletionCallback);
         Assert.Contains("Timed out waiting for final payload visibility", torrentDetail.CompletionCallbackLastError ?? string.Empty, StringComparison.Ordinal);
+        Assert.Equal(Path.Combine(downloadPath, "Movie", "Timeout Movie"), torrentDetail.CompletionCallbackFinalPayloadPath);
+        Assert.Equal("The final payload path is not visible yet.", torrentDetail.CompletionCallbackPendingReason);
 
         var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
         var torrentSummary = Assert.Single(torrents!, torrent => torrent.TorrentId == addedTorrent.TorrentId);
@@ -1209,7 +1232,11 @@ public sealed class TorrentApiTests
 
         var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
         Assert.NotNull(logs);
-        Assert.Contains(logs, log => log.EventType == "torrent.callback.finalization_timed_out");
+        var timedOutLog = Assert.Single(logs, log => log.EventType == "torrent.callback.finalization_timed_out");
+        var timedOutDetails = ParseLogDetails(timedOutLog);
+        Assert.Equal(Path.Combine(downloadPath, "Movie", "Timeout Movie"), timedOutDetails.GetProperty("FinalPayloadPath").GetString());
+        Assert.Equal("The final payload path is not visible yet.", timedOutDetails.GetProperty("PendingReason").GetString());
+        Assert.Equal(1, timedOutDetails.GetProperty("CompletionCallbackFinalizationTimeoutSeconds").GetInt32());
     }
 
     [Fact]
@@ -1248,6 +1275,19 @@ public sealed class TorrentApiTests
         Assert.Equal(TorrentCompletionCallbackState.Failed.ToString(), torrentDetail.CompletionCallbackState);
         Assert.True(torrentDetail.CanRetryCompletionCallback);
         Assert.Equal("The callback exited with code 1.", torrentDetail.CompletionCallbackLastError);
+        Assert.Equal(Path.Combine(downloadPath, "Movie", "Failed Movie"), torrentDetail.CompletionCallbackFinalPayloadPath);
+        Assert.Null(torrentDetail.CompletionCallbackPendingReason);
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.pending_finalization");
+        var failedLog = Assert.Single(logs, log => log.EventType == "torrent.callback.failed");
+        var failedDetails = ParseLogDetails(failedLog);
+        Assert.Equal("/bin/sh", failedDetails.GetProperty("CommandPath").GetString());
+        Assert.Equal(callbackScriptPath, failedDetails.GetProperty("CompletionCallbackArguments").GetString());
+        Assert.Equal(rootPath, failedDetails.GetProperty("WorkingDirectory").GetString());
+        Assert.Equal(1, failedDetails.GetProperty("ExitCode").GetInt32());
+        Assert.True(failedDetails.GetProperty("ProcessId").GetInt32() > 0);
     }
 
     [Fact]
@@ -1316,6 +1356,10 @@ public sealed class TorrentApiTests
         Assert.NotNull(invokedTorrent);
         Assert.False(invokedTorrent.CanRetryCompletionCallback);
         Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={addedTorrent.TorrentId}");
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.retry_requested");
     }
 
     [Fact]
@@ -2160,6 +2204,13 @@ public sealed class TorrentApiTests
         }
 
         return invocations;
+    }
+
+    private static JsonElement ParseLogDetails(ActivityLogEntryDto logEntry)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(logEntry.DetailsJson));
+        using var document = JsonDocument.Parse(logEntry.DetailsJson!);
+        return document.RootElement.Clone();
     }
 
     private static string CreateTempRootPath(string prefix)

@@ -24,6 +24,8 @@ public sealed class TorrentDetailDto
     public string? CompletionCallbackState { get; init; }
     public DateTimeOffset? CompletionCallbackPendingSinceUtc { get; init; }
     public DateTimeOffset? CompletionCallbackInvokedAtUtc { get; init; }
+    public string? CompletionCallbackFinalPayloadPath { get; init; }
+    public string? CompletionCallbackPendingReason { get; init; }
     public string? CompletionCallbackLastError { get; init; }
     public string? ErrorMessage { get; init; }
     public required bool CanRetryCompletionCallback { get; init; }

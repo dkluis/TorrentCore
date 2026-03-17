@@ -12,7 +12,12 @@ public sealed class TorrentCompletionCallbackProcessor(
     IActivityLogService activityLogService,
     ServiceInstanceContext serviceInstanceContext) : ITorrentCompletionCallbackProcessor
 {
-    public bool MarkPendingIfTriggered(DateTimeOffset? previousCompletedAtUtc, TorrentSnapshot snapshot, DateTimeOffset now)
+    public async Task<bool> MarkPendingIfTriggeredAsync(
+        DateTimeOffset? previousCompletedAtUtc,
+        TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot runtimeSettings,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         if (previousCompletedAtUtc is not null ||
             snapshot.CompletedAtUtc is null ||
@@ -28,6 +33,8 @@ public sealed class TorrentCompletionCallbackProcessor(
         snapshot.CompletionCallbackPendingSinceUtc = now;
         snapshot.CompletionCallbackInvokedAtUtc = null;
         snapshot.CompletionCallbackLastError = null;
+        var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
+        await WritePendingFinalizationLogAsync(snapshot, runtimeSettings, finalizationResult, cancellationToken);
         return true;
     }
 
@@ -100,6 +107,37 @@ public sealed class TorrentCompletionCallbackProcessor(
             Category = "torrent",
             EventType = "torrent.callback.finalization_timed_out",
             Message = $"Completion callback finalization timed out for torrent '{snapshot.Name}'.",
+            TorrentId = snapshot.TorrentId,
+            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                snapshot.Name,
+                snapshot.CategoryKey,
+                snapshot.InfoHash,
+                snapshot.DownloadRootPath,
+                snapshot.CompletionCallbackLabel,
+                snapshot.CompletionCallbackPendingSinceUtc,
+                runtimeSettings.PartialFilesEnabled,
+                runtimeSettings.PartialFileSuffix,
+                runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds,
+                finalizationResult.FinalPayloadPath,
+                finalizationResult.PendingReason,
+            }),
+        }, cancellationToken);
+    }
+
+    private async Task WritePendingFinalizationLogAsync(
+        TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot runtimeSettings,
+        TorrentCompletionFinalizationCheckResult finalizationResult,
+        CancellationToken cancellationToken)
+    {
+        await activityLogService.WriteAsync(new ActivityLogWriteRequest
+        {
+            Level = ActivityLogLevel.Information,
+            Category = "torrent",
+            EventType = "torrent.callback.pending_finalization",
+            Message = $"Waiting for final payload visibility before invoking completion callback for torrent '{snapshot.Name}'.",
             TorrentId = snapshot.TorrentId,
             ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
             DetailsJson = JsonSerializer.Serialize(new

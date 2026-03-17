@@ -270,7 +270,7 @@ public sealed class FakeTorrentRuntimeService(
                     torrent.ConnectedPeerCount = 0;
                     torrent.DownloadRateBytesPerSecond = 0;
                     torrent.UploadRateBytesPerSecond = 0;
-                    completionCallbackProcessor.MarkPendingIfTriggered(previousCompletedAtUtc, torrent, now);
+                    await completionCallbackProcessor.MarkPendingIfTriggeredAsync(previousCompletedAtUtc, torrent, runtimeSettings, now, cancellationToken);
 
                     await torrentStateStore.UpdateAsync(torrent, cancellationToken);
                     await LogTorrentEventAsync(
@@ -302,7 +302,7 @@ public sealed class FakeTorrentRuntimeService(
                 torrent.ConnectedPeerCount = CalculatePeerCount(torrent);
                 torrent.DownloadRateBytesPerSecond = 0;
                 torrent.UploadRateBytesPerSecond = CalculateUploadRate(torrent);
-                completionCallbackProcessor.MarkPendingIfTriggered(previousCompletedAtUtc, torrent, now);
+                await completionCallbackProcessor.MarkPendingIfTriggeredAsync(previousCompletedAtUtc, torrent, runtimeSettings, now, cancellationToken);
 
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
                 await LogTorrentEventAsync(

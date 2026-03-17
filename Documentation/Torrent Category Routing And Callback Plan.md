@@ -290,6 +290,7 @@ Scope:
 - apply a configurable finalization wait timeout and log timeout/failure outcomes
 - provide a manual retry action for callback states that failed or timed out
 - log callback invocation success/failure for diagnostics
+- log the transition into pending finalization so operators can distinguish "completed" from "visible and invoked"
 
 Out of scope:
 
@@ -304,6 +305,7 @@ Exit criteria:
 - the existing callback app can consume TorrentCore-originated completions without modification
 - pending finalization survives restart without losing whether the callback is still waiting, timed out, or already invoked
 - operators can retry failed or timed-out callbacks through the public boundary without touching the database
+- operators can see callback lifecycle state, retryability, and finalization timing controls in the supported UI
 
 Status:
 
@@ -334,8 +336,9 @@ Status:
 - Web UI now supports:
   - category editing
   - callback settings editing
-  - category selection during magnet add
+  - category selection during magnet add, with `TV` preselected when that seeded category is enabled
   - category filtering/display in the torrent list
+  - richer torrent-detail callback diagnostics, including the final payload path, pending reason, and the latest callback event/process metadata
 - Avalonia catch-up is still pending
 
 ## Test Expectations

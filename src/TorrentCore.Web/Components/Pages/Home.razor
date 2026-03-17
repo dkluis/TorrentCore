@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject TorrentCoreClient TorrentCoreClient
 @using TorrentCore.Contracts.Host
+@using TorrentCore.Contracts.Torrents
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -104,6 +105,19 @@ else if (_hostStatus is not null)
                     </div>
                 </div>
             </div>
+
+            <div class="col-xl-3 col-md-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="h6 card-title">Completion Callbacks</h3>
+                        <p class="mb-1"><strong>Pending Finalization:</strong> @CallbackPendingCount</p>
+                        <p class="mb-1"><strong>Invoked:</strong> @CallbackInvokedCount</p>
+                        <p class="mb-1"><strong>Failed:</strong> @CallbackFailedCount</p>
+                        <p class="mb-1"><strong>Timed Out:</strong> @CallbackTimedOutCount</p>
+                        <p class="mb-0"><strong>Retryable:</strong> @(CallbackFailedCount + CallbackTimedOutCount)</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 }
@@ -128,12 +142,17 @@ else if (_hostStatus is not null)
 
 @code {
     private EngineHostStatusDto? _hostStatus;
+    private IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
     private string? _error;
     private bool _isLoading = true;
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private CancellationTokenSource? _refreshLoopCts;
     private Task? _refreshLoopTask;
     private bool _isDisposed;
+    private int CallbackPendingCount => CountCallbackState("PendingFinalization");
+    private int CallbackInvokedCount => CountCallbackState("Invoked");
+    private int CallbackFailedCount => CountCallbackState("Failed");
+    private int CallbackTimedOutCount => CountCallbackState("TimedOut");
 
     protected override async Task OnInitializedAsync()
     {
@@ -159,7 +178,11 @@ else if (_hostStatus is not null)
             }
 
             _error = null;
-            _hostStatus = await TorrentCoreClient.GetHostStatusAsync();
+            var hostStatusTask = TorrentCoreClient.GetHostStatusAsync();
+            var torrentsTask = TorrentCoreClient.GetTorrentsAsync();
+            await Task.WhenAll(hostStatusTask, torrentsTask);
+            _hostStatus = hostStatusTask.Result;
+            _torrents = torrentsTask.Result;
         }
         catch (Exception exception)
         {
@@ -201,6 +224,9 @@ else if (_hostStatus is not null)
 
     private static string FormatRateLimit(int bytesPerSecond) =>
         bytesPerSecond <= 0 ? "Unlimited" : FormatRate(bytesPerSecond);
+
+    private int CountCallbackState(string state) =>
+        _torrents.Count(torrent => string.Equals(torrent.CompletionCallbackState, state, StringComparison.OrdinalIgnoreCase));
 
     public async ValueTask DisposeAsync()
     {
