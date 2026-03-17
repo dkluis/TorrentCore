@@ -8,6 +8,40 @@ namespace TorrentCore.Service.Tests;
 public sealed class SqliteTorrentStateStoreTests
 {
     [Fact]
+    public async Task InsertAndGet_PreservesCallbackLifecycleFields()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-store-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var store = new SqliteTorrentStateStore(databaseFilePath);
+            var torrent = CreateSnapshot();
+
+            await store.InsertAsync(torrent, CancellationToken.None);
+
+            var reloaded = await store.GetAsync(torrent.TorrentId, CancellationToken.None);
+
+            Assert.NotNull(reloaded);
+            Assert.Equal(TorrentCompletionCallbackState.Failed, reloaded.CompletionCallbackState);
+            Assert.Equal(torrent.CompletionCallbackPendingSinceUtc, reloaded.CompletionCallbackPendingSinceUtc);
+            Assert.Equal(torrent.CompletionCallbackInvokedAtUtc, reloaded.CompletionCallbackInvokedAtUtc);
+            Assert.Equal("The callback exited with code 1.", reloaded.CompletionCallbackLastError);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task UpdateAfterDelete_DoesNotRecreateTorrentRow()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-store-{Guid.NewGuid():N}");
@@ -55,6 +89,10 @@ public sealed class SqliteTorrentStateStoreTests
             CategoryKey = "Movie",
             CompletionCallbackLabel = "Movie",
             InvokeCompletionCallback = true,
+            CompletionCallbackState = TorrentCompletionCallbackState.Failed,
+            CompletionCallbackPendingSinceUtc = now,
+            CompletionCallbackInvokedAtUtc = now.AddMinutes(2),
+            CompletionCallbackLastError = "The callback exited with code 1.",
             State = TorrentState.Queued,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=Store%20Regression",

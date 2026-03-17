@@ -69,6 +69,22 @@ TorrentCore and Transmission should be able to call the same existing TVMaze com
 TorrentCore should emulate the expected Transmission-style environment variables when invoking that shared callback,
 instead of requiring a second callback application or a TorrentCore-specific callback protocol.
 
+Important timing rule:
+
+- do not fire the shared callback on the engine's first internal completed edge alone
+- fire it only after the downstream-visible final path at `Path.Combine(TR_TORRENT_DIR, TR_TORRENT_NAME)` exists as a file or directory
+- if incomplete-file mode is enabled, the callback must wait until the incomplete-suffix variant is no longer the only visible payload
+
+Finalization check guidance:
+
+- if `Path.Combine(TR_TORRENT_DIR, TR_TORRENT_NAME)` resolves to a file, TorrentCore should wait until the final-name file exists and the partial-suffix sibling is gone
+- if it resolves to a directory, TorrentCore should recursively scan that subtree and wait until no partial-suffix files remain
+- TorrentCore should persist a generic callback lifecycle state such as `PendingFinalization`, `Invoked`, `Failed`, or `TimedOut` so restart recovery does not confuse transfer state with callback state
+- TorrentCore should not persist TVMaze-specific outcome states; TVMaze ownership remains outside the TorrentCore boundary
+
+TVMaze validates source existence immediately when it receives the callback. If TorrentCore invokes the callback too
+early, TVMaze treats it as already handled or missing because the expected final path does not exist yet.
+
 ## API Boundary Rule
 
 TVMaze must talk to TorrentCore only through stable HTTP contracts or an intentionally versioned client library.

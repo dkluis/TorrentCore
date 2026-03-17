@@ -333,6 +333,39 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                         await alterCommand.ExecuteNonQueryAsync(cancellationToken);
                     }
                 }),
+            new SqliteMigrationDefinition(
+                10,
+                "add_torrent_callback_lifecycle_fields",
+                async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_state", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN completion_callback_state TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_pending_since_utc", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN completion_callback_pending_since_utc TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_invoked_at_utc", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN completion_callback_invoked_at_utc TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_last_error", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText = "ALTER TABLE torrents ADD COLUMN completion_callback_last_error TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }),
         ];
     }
 

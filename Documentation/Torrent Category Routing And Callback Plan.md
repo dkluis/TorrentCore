@@ -115,6 +115,36 @@ TVMaze should not send raw download paths.
 
 TorrentCore should invoke the existing callback entrypoint with the same environment shape that Transmission uses today.
 
+Timing requirement:
+
+- invoke the callback only after the final payload path is visible at `Path.Combine(TR_TORRENT_DIR, TR_TORRENT_NAME)`
+- do not treat the engine's first completed or seeding edge as sufficient by itself
+- when partial files are enabled, wait until the final name is visible and the incomplete-suffix file is not the only payload
+- TVMaze checks the source path immediately and will return a duplicate or missing-source outcome if invoked before final visibility
+
+Finalization readiness rule:
+
+- resolve a candidate final path at `Path.Combine(TR_TORRENT_DIR, TR_TORRENT_NAME)`
+- if that candidate is a file, require the final-name file to exist and the partial-suffix sibling not to exist
+- if that candidate is a directory, recursively scan the torrent subtree and require that no files using the active partial-file suffix remain
+- evaluate readiness on normal runtime ticks instead of blocking the engine loop in a long-running wait
+- keep a configurable finalization wait timeout with a default target of 120 seconds; if readiness is still not reached, log the timeout and leave the torrent in a recoverable callback state instead of pretending the callback succeeded
+
+Callback lifecycle state:
+
+- TorrentCore should persist a generic callback lifecycle state on the torrent that is separate from the torrent's transfer state such as `Queued`, `Downloading`, `Seeding`, or `Completed`
+- TorrentCore should not persist TVMaze-specific downstream ownership states such as "Submitted to TVMaze" or "On TVMaze"
+- recommended persisted callback states:
+  - `PendingFinalization`
+  - `Invoked`
+  - `Failed`
+  - `TimedOut`
+- recommended persisted callback timestamps/details:
+  - `CompletionCallbackPendingSinceUtc`
+  - `CompletionCallbackInvokedAtUtc`
+  - `CompletionCallbackLastError`
+- `PendingFinalization` should resume across restart on normal runtime ticks until the finalization check succeeds or the timeout is reached
+
 Primary environment variables:
 
 - `TR_TORRENT_ID`
@@ -247,33 +277,37 @@ Exit criteria:
 
 Goal:
 
-- call the existing shared callback app when a torrent first completes
+- call the existing shared callback app when a torrent reaches downstream-visible finalization
 
 Scope:
 
-- detect first completion/finalization transition
+- detect the first finalization-visible transition
 - persist resolved callback label/invoke decision on the torrent at add time so later category edits affect only future torrents
+- persist generic callback lifecycle state separately from torrent transfer state
 - invoke configured callback command
 - populate Transmission-compatible environment variables
 - apply optional API override environment variables when configured
+- apply a configurable finalization wait timeout and log timeout/failure outcomes
 - log callback invocation success/failure for diagnostics
 
 Out of scope:
 
 - callback worker infrastructure
-- callback retry/state persistence ledger
+- a separate callback worker or ledger subsystem beyond the minimal per-torrent callback lifecycle fields
+- downstream-specific acknowledgement states owned by TVMaze or another callback consumer
 - replacing the existing TVMaze callback app
 
 Exit criteria:
 
-- completed torrents invoke the shared callback entrypoint once
+- completed torrents invoke the shared callback entrypoint once after the final payload path is visible
 - the existing callback app can consume TorrentCore-originated completions without modification
+- pending finalization survives restart without losing whether the callback is still waiting, timed out, or already invoked
 
 Status:
 
-- complete
-- invocation is edge-based from the torrent completion transition, not a callback ledger or retry worker
-- restart coverage verifies the callback is not fired again for an already-completed torrent
+- partially complete
+- callback configuration, routing, Transmission-style environment generation, and no-duplicate-after-restart coverage are implemented
+- current implementation still fires from the first completion edge and does not yet persist a generic callback lifecycle state for finalization-gated recovery
 
 ### Phase 4 - Operator UI
 
@@ -311,9 +345,11 @@ Required tests:
 - add-torrent request with valid and invalid category keys
 - category-aware download-root resolution
 - category shown correctly in list/detail DTOs
-- completion edge detection triggers callback once
+- finalization visibility detection triggers callback once
 - callback invocation populates the expected Transmission-style environment values
 - callback-disabled categories do not invoke the callback
+- pending finalization survives restart until the callback is invoked or timed out
+- multi-file torrents do not invoke the callback while partial-suffix files remain anywhere in the final torrent subtree
 
 Manual validation should also confirm that the shared callback app behaves the same when called by:
 
