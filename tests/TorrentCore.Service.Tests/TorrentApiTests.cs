@@ -126,6 +126,7 @@ public sealed class TorrentApiTests
         Assert.Null(settings.CompletionCallbackArguments);
         Assert.Null(settings.CompletionCallbackWorkingDirectory);
         Assert.Equal(30, settings.CompletionCallbackTimeoutSeconds);
+        Assert.Equal(120, settings.CompletionCallbackFinalizationTimeoutSeconds);
         Assert.Null(settings.CompletionCallbackApiBaseUrlOverride);
         Assert.Null(settings.CompletionCallbackApiKeyOverride);
         Assert.Equal(150, settings.AppliedEngineMaximumConnections);
@@ -166,6 +167,7 @@ public sealed class TorrentApiTests
                 CompletionCallbackArguments = "--run",
                 CompletionCallbackWorkingDirectory = "/Users/dick/TorrentCore/Scripts",
                 CompletionCallbackTimeoutSeconds = 45,
+                CompletionCallbackFinalizationTimeoutSeconds = 180,
                 CompletionCallbackApiBaseUrlOverride = "http://127.0.0.1:5501/api/complete",
                 CompletionCallbackApiKeyOverride = "integration-key",
             });
@@ -194,6 +196,7 @@ public sealed class TorrentApiTests
             Assert.Equal("--run", settings.CompletionCallbackArguments);
             Assert.Equal("/Users/dick/TorrentCore/Scripts", settings.CompletionCallbackWorkingDirectory);
             Assert.Equal(45, settings.CompletionCallbackTimeoutSeconds);
+            Assert.Equal(180, settings.CompletionCallbackFinalizationTimeoutSeconds);
             Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
             Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
             Assert.True(settings.EngineSettingsRequireRestart);
@@ -243,6 +246,7 @@ public sealed class TorrentApiTests
             Assert.Equal("--run", settings.CompletionCallbackArguments);
             Assert.Equal("/Users/dick/TorrentCore/Scripts", settings.CompletionCallbackWorkingDirectory);
             Assert.Equal(45, settings.CompletionCallbackTimeoutSeconds);
+            Assert.Equal(180, settings.CompletionCallbackFinalizationTimeoutSeconds);
             Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
             Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
@@ -911,6 +915,7 @@ public sealed class TorrentApiTests
 
         var response = await AddMagnetAsync(httpClient, "7373737373737373737373737373737373737373", "Callback Movie", "Movie");
         var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Callback Movie"));
 
         var completedTorrent = await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
@@ -960,6 +965,7 @@ public sealed class TorrentApiTests
 
             var response = await AddMagnetAsync(httpClient, "7474747474747474747474747474747474747474", "Callback TV", "TV");
             var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            CreateSingleFilePayload(Path.Combine(downloadPath, "TV", "Callback TV"));
 
             await WaitForAsync(
                 async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
@@ -989,6 +995,242 @@ public sealed class TorrentApiTests
             var callbackInvocations = ReadCallbackInvocations(callbackOutputPath);
             Assert.Single(callbackInvocations);
         }
+    }
+
+    [Fact]
+    public async Task FakeRuntime_CompletionCallback_WaitsForSingleFileFinalizationVisibility()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-single-finalization");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+        var finalPayloadPath = Path.Combine(downloadPath, "Movie", "Finalization Movie");
+        var partialPayloadPath = finalPayloadPath + ".!mt";
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
+        File.WriteAllText(finalPayloadPath, "final");
+        File.WriteAllText(partialPayloadPath, "partial");
+
+        var response = await AddMagnetAsync(httpClient, "7575757575757575757575757575757575757575", "Finalization Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.Completed,
+            timeout: TimeSpan.FromSeconds(5));
+
+        await Task.Delay(300);
+        Assert.Empty(ReadCallbackInvocations(callbackOutputPath));
+
+        var pendingState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
+        Assert.Equal(TorrentCompletionCallbackState.PendingFinalization.ToString(), pendingState.State);
+
+        File.Delete(partialPayloadPath);
+
+        await WaitForAsync(
+            () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
+            invocations => invocations.Count == 1,
+            timeout: TimeSpan.FromSeconds(5));
+
+        var invokedState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId);
+        Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
+        Assert.NotNull(invokedState.InvokedAtUtc);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_CompletionCallback_WaitsForMultiFileFinalizationTree()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-multi-finalization");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+        var finalPayloadPath = Path.Combine(downloadPath, "TV", "Finalization Show");
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+        Directory.CreateDirectory(finalPayloadPath);
+        var partialEpisodePath = Path.Combine(finalPayloadPath, "Season 01", "Episode 01.mkv.!mt");
+        Directory.CreateDirectory(Path.GetDirectoryName(partialEpisodePath)!);
+        File.WriteAllText(partialEpisodePath, "partial");
+
+        var response = await AddMagnetAsync(httpClient, "7676767676767676767676767676767676767676", "Finalization Show", "TV");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.Completed,
+            timeout: TimeSpan.FromSeconds(5));
+
+        await Task.Delay(300);
+        Assert.Empty(ReadCallbackInvocations(callbackOutputPath));
+
+        var pendingState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
+        Assert.Equal(TorrentCompletionCallbackState.PendingFinalization.ToString(), pendingState.State);
+
+        File.Move(partialEpisodePath, Path.Combine(finalPayloadPath, "Season 01", "Episode 01.mkv"));
+
+        await WaitForAsync(
+            () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
+            invocations => invocations.Count == 1,
+            timeout: TimeSpan.FromSeconds(5));
+
+        var invokedState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId);
+        Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_PendingFinalization_SurvivesRestart_AndInvokesWhenPayloadAppears()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-pending-restart");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         runtimeTickIntervalMilliseconds: 50,
+                         metadataResolutionDelayMilliseconds: 0,
+                         downloadProgressPercentPerTick: 50))
+        {
+            using var httpClient = factory.CreateClient();
+            await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+            var response = await AddMagnetAsync(httpClient, "7777777777777777777777777777777777777777", "Restart Pending Movie", "Movie");
+            var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+
+            await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.State == TorrentState.Completed,
+                timeout: TimeSpan.FromSeconds(5));
+
+            await Task.Delay(300);
+            Assert.Empty(ReadCallbackInvocations(callbackOutputPath));
+
+            var pendingState = await ReadPersistedCallbackStateAsync(storagePath, torrentId);
+            Assert.Equal(TorrentCompletionCallbackState.PendingFinalization.ToString(), pendingState.State);
+        }
+
+        CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Restart Pending Movie"));
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         runtimeTickIntervalMilliseconds: 50,
+                         metadataResolutionDelayMilliseconds: 0,
+                         downloadProgressPercentPerTick: 50))
+        {
+            using var httpClient = factory.CreateClient();
+
+            await WaitForAsync(
+                () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
+                invocations => invocations.Count == 1,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var invokedState = await ReadPersistedCallbackStateAsync(storagePath, torrentId);
+            Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
+            Assert.NotNull(invokedState.InvokedAtUtc);
+
+            var hostStatusResponse = await httpClient.GetAsync("api/host/status");
+            hostStatusResponse.EnsureSuccessStatusCode();
+        }
+    }
+
+    [Fact]
+    public async Task FakeRuntime_PendingFinalization_TimesOut_WhenPayloadNeverAppears()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-finalization-timeout");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(
+            httpClient,
+            "/bin/sh",
+            callbackScriptPath,
+            rootPath,
+            finalizationTimeoutSeconds: 1);
+
+        var response = await AddMagnetAsync(httpClient, "7878787878787878787878787878787878787878", "Timeout Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        await WaitForAsync(
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId),
+            state => state.State == TorrentCompletionCallbackState.TimedOut.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.Empty(ReadCallbackInvocations(callbackOutputPath));
+
+        var timedOutState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
+        Assert.Contains("Timed out waiting for final payload visibility", timedOutState.LastError ?? string.Empty, StringComparison.Ordinal);
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.finalization_timed_out");
+    }
+
+    [Fact]
+    public async Task FakeRuntime_CompletionCallback_Failure_PersistsFailedState()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-failed");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath, exitCode: 1);
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+        var response = await AddMagnetAsync(httpClient, "7979797979797979797979797979797979797979", "Failed Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Failed Movie"));
+
+        await WaitForAsync(
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId),
+            state => state.State == TorrentCompletionCallbackState.Failed.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        var failedState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
+        Assert.Equal("The callback exited with code 1.", failedState.LastError);
     }
 
     [Fact]
@@ -1664,7 +1906,8 @@ public sealed class TorrentApiTests
         string? arguments,
         string? workingDirectory,
         string? apiBaseUrlOverride = null,
-        string? apiKeyOverride = null)
+        string? apiKeyOverride = null,
+        int? finalizationTimeoutSeconds = null)
     {
         var response = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
         {
@@ -1686,13 +1929,14 @@ public sealed class TorrentApiTests
             CompletionCallbackArguments = arguments,
             CompletionCallbackWorkingDirectory = workingDirectory,
             CompletionCallbackTimeoutSeconds = 30,
+            CompletionCallbackFinalizationTimeoutSeconds = finalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride = apiBaseUrlOverride,
             CompletionCallbackApiKeyOverride = apiKeyOverride,
         });
         response.EnsureSuccessStatusCode();
     }
 
-    private static string CreateCallbackCaptureScript(string rootPath, string outputPath)
+    private static string CreateCallbackCaptureScript(string rootPath, string outputPath, int exitCode = 0)
     {
         Directory.CreateDirectory(rootPath);
 
@@ -1711,9 +1955,49 @@ public sealed class TorrentApiTests
               printf 'TVMAZE_API_COMPLETE_API_KEY=%s\n' "${TVMAZE_API_COMPLETE_API_KEY}"
               printf -- '---\n'
             } >> '{{outputPath}}'
+            exit {{exitCode}}
             """);
 
         return scriptPath;
+    }
+
+    private static void CreateSingleFilePayload(string finalPayloadPath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
+        File.WriteAllText(finalPayloadPath, "payload");
+    }
+
+    private static async Task<PersistedCallbackState> ReadPersistedCallbackStateAsync(string storagePath, Guid torrentId)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                completion_callback_state,
+                completion_callback_pending_since_utc,
+                completion_callback_invoked_at_utc,
+                completion_callback_last_error
+            FROM torrents
+            WHERE torrent_id = $torrent_id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return new PersistedCallbackState(null, null, null, null);
+        }
+
+        return new PersistedCallbackState(
+            reader.IsDBNull(0) ? null : reader.GetString(0),
+            reader.IsDBNull(1) ? null : DateTimeOffset.Parse(reader.GetString(1), System.Globalization.CultureInfo.InvariantCulture),
+            reader.IsDBNull(2) ? null : DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture),
+            reader.IsDBNull(3) ? null : reader.GetString(3));
     }
 
     private static IReadOnlyList<IReadOnlyDictionary<string, string>> ReadCallbackInvocations(string outputPath)
@@ -1762,6 +2046,12 @@ public sealed class TorrentApiTests
     {
         return Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
     }
+
+    private sealed record PersistedCallbackState(
+        string? State,
+        DateTimeOffset? PendingSinceUtc,
+        DateTimeOffset? InvokedAtUtc,
+        string? LastError);
 
     private static async Task<T> WaitForAsync<T>(
         Func<Task<T>> action,

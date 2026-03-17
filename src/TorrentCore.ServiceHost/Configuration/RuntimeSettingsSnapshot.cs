@@ -23,6 +23,7 @@ public sealed class RuntimeSettingsSnapshot
     public string? CompletionCallbackArguments { get; init; }
     public string? CompletionCallbackWorkingDirectory { get; init; }
     public required int CompletionCallbackTimeoutSeconds { get; init; }
+    public required int CompletionCallbackFinalizationTimeoutSeconds { get; init; }
     public string? CompletionCallbackApiBaseUrlOverride { get; init; }
     public string? CompletionCallbackApiKeyOverride { get; init; }
     public required bool EngineSettingsRequireRestart { get; init; }

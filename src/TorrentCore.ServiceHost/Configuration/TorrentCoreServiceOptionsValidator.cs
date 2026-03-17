@@ -113,6 +113,11 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackTimeoutSeconds must be 1 or greater.");
         }
 
+        if (options.CompletionCallbackFinalizationTimeoutSeconds < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackFinalizationTimeoutSeconds must be 1 or greater.");
+        }
+
         if (options.CompletionCallbackEnabled && string.IsNullOrWhiteSpace(options.CompletionCallbackCommandPath))
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackCommandPath is required when CompletionCallbackEnabled is true.");

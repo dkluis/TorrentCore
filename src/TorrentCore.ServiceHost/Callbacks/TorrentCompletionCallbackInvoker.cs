@@ -22,20 +22,17 @@ public sealed class TorrentCompletionCallbackInvoker(
     private const string TransmissionTorrentLabelsEnvironmentVariable = "TR_TORRENT_LABELS";
     private const string TransmissionTorrentNameEnvironmentVariable = "TR_TORRENT_NAME";
 
-    public async Task InvokeIfTriggeredAsync(
-        DateTimeOffset? previousCompletedAtUtc,
+    public async Task<TorrentCompletionCallbackInvocationResult> InvokeAsync(
         TorrentSnapshot currentSnapshot,
         CancellationToken cancellationToken)
     {
-        if (!ShouldInvoke(previousCompletedAtUtc, currentSnapshot))
-        {
-            return;
-        }
-
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         if (!runtimeSettings.CompletionCallbackEnabled || string.IsNullOrWhiteSpace(runtimeSettings.CompletionCallbackCommandPath))
         {
-            return;
+            return new TorrentCompletionCallbackInvocationResult
+            {
+                Status = TorrentCompletionCallbackInvocationStatus.Skipped,
+            };
         }
 
         var commandPath = runtimeSettings.CompletionCallbackCommandPath.Trim();
@@ -68,7 +65,11 @@ public sealed class TorrentCompletionCallbackInvoker(
                 workingDirectory,
                 exception.Message,
                 cancellationToken);
-            return;
+            return new TorrentCompletionCallbackInvocationResult
+            {
+                Status = TorrentCompletionCallbackInvocationStatus.Failed,
+                Error = exception.Message,
+            };
         }
 
         using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(runtimeSettings.CompletionCallbackTimeoutSeconds));
@@ -108,7 +109,11 @@ public sealed class TorrentCompletionCallbackInvoker(
                 workingDirectory,
                 $"The callback exceeded the {runtimeSettings.CompletionCallbackTimeoutSeconds}-second timeout.",
                 cancellationToken);
-            return;
+            return new TorrentCompletionCallbackInvocationResult
+            {
+                Status = TorrentCompletionCallbackInvocationStatus.TimedOut,
+                Error = $"The callback exceeded the {runtimeSettings.CompletionCallbackTimeoutSeconds}-second timeout.",
+            };
         }
 
         if (process.ExitCode != 0)
@@ -129,7 +134,11 @@ public sealed class TorrentCompletionCallbackInvoker(
                 workingDirectory,
                 $"The callback exited with code {process.ExitCode}.",
                 cancellationToken);
-            return;
+            return new TorrentCompletionCallbackInvocationResult
+            {
+                Status = TorrentCompletionCallbackInvocationStatus.Failed,
+                Error = $"The callback exited with code {process.ExitCode}.",
+            };
         }
 
         await WriteCallbackLogAsync(
@@ -142,15 +151,11 @@ public sealed class TorrentCompletionCallbackInvoker(
             workingDirectory,
             null,
             cancellationToken);
-    }
 
-    private static bool ShouldInvoke(DateTimeOffset? previousCompletedAtUtc, TorrentSnapshot currentSnapshot)
-    {
-        return previousCompletedAtUtc is null &&
-               currentSnapshot.CompletedAtUtc is not null &&
-               currentSnapshot.State is TorrentState.Completed or TorrentState.Seeding &&
-               currentSnapshot.InvokeCompletionCallback &&
-               !string.IsNullOrWhiteSpace(currentSnapshot.CompletionCallbackLabel);
+        return new TorrentCompletionCallbackInvocationResult
+        {
+            Status = TorrentCompletionCallbackInvocationStatus.Invoked,
+        };
     }
 
     private ProcessStartInfo BuildProcessStartInfo(

@@ -31,6 +31,7 @@ public sealed class TorrentCoreServiceOptions
     public string? CompletionCallbackArguments { get; init; }
     public string? CompletionCallbackWorkingDirectory { get; init; }
     public int CompletionCallbackTimeoutSeconds { get; init; } = 30;
+    public int CompletionCallbackFinalizationTimeoutSeconds { get; init; } = 120;
     public string? CompletionCallbackApiBaseUrlOverride { get; init; }
     public string? CompletionCallbackApiKeyOverride { get; init; }
     public int RuntimeTickIntervalMilliseconds { get; init; } = 1_000;

@@ -305,9 +305,9 @@ Exit criteria:
 
 Status:
 
-- partially complete
-- callback configuration, routing, Transmission-style environment generation, and no-duplicate-after-restart coverage are implemented
-- current implementation still fires from the first completion edge and does not yet persist a generic callback lifecycle state for finalization-gated recovery
+- complete
+- callback configuration, routing, Transmission-style environment generation, finalization-gated invocation, and restart-safe callback lifecycle persistence are implemented
+- service-level coverage verifies single-file and multi-file finalization waits, timeout behavior, callback failure persistence, and no-duplicate-after-restart behavior
 
 ### Phase 4 - Operator UI
 

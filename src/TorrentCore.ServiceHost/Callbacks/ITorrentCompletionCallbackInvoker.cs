@@ -4,8 +4,7 @@ namespace TorrentCore.Service.Callbacks;
 
 public interface ITorrentCompletionCallbackInvoker
 {
-    Task InvokeIfTriggeredAsync(
-        DateTimeOffset? previousCompletedAtUtc,
+    Task<TorrentCompletionCallbackInvocationResult> InvokeAsync(
         TorrentSnapshot currentSnapshot,
         CancellationToken cancellationToken);
 }

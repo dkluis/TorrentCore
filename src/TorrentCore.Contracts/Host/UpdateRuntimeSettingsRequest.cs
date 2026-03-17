@@ -20,6 +20,7 @@ public sealed class UpdateRuntimeSettingsRequest
     public string? CompletionCallbackArguments { get; init; }
     public string? CompletionCallbackWorkingDirectory { get; init; }
     public int? CompletionCallbackTimeoutSeconds { get; init; }
+    public int? CompletionCallbackFinalizationTimeoutSeconds { get; init; }
     public string? CompletionCallbackApiBaseUrlOverride { get; init; }
     public string? CompletionCallbackApiKeyOverride { get; init; }
 }

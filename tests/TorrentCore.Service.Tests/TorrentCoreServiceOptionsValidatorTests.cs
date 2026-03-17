@@ -92,6 +92,7 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             CompletionCallbackEnabled = true,
             CompletionCallbackCommandPath = "",
             CompletionCallbackTimeoutSeconds = 0,
+            CompletionCallbackFinalizationTimeoutSeconds = 0,
             RuntimeTickIntervalMilliseconds = 49,
             MetadataResolutionDelayMilliseconds = -1,
             DownloadProgressPercentPerTick = 0,
@@ -117,6 +118,7 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         Assert.Contains(result.Failures, failure => failure.Contains("MaxActiveDownloads", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackCommandPath", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackTimeoutSeconds", StringComparison.Ordinal));
+        Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackFinalizationTimeoutSeconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("RuntimeTickIntervalMilliseconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MetadataResolutionDelayMilliseconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("DownloadProgressPercentPerTick", StringComparison.Ordinal));

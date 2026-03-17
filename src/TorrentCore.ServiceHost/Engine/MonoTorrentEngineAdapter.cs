@@ -17,7 +17,7 @@ namespace TorrentCore.Service.Engine;
 public sealed class MonoTorrentEngineAdapter(
     ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService,
-    ITorrentCompletionCallbackInvoker completionCallbackInvoker,
+    ITorrentCompletionCallbackProcessor completionCallbackProcessor,
     ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService,
@@ -729,7 +729,8 @@ public sealed class MonoTorrentEngineAdapter(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var callbackSnapshots = new List<TorrentSnapshot>();
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var pendingCallbackSnapshots = new List<TorrentSnapshot>();
 
         foreach (var entry in managers)
         {
@@ -760,19 +761,25 @@ public sealed class MonoTorrentEngineAdapter(
             }
 
             var previousCompletedAtUtc = snapshot.CompletedAtUtc;
+            completionCallbackProcessor.MarkPendingIfTriggered(previousCompletedAtUtc, updatedSnapshot, now);
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
 
-            if (previousCompletedAtUtc is null && updatedSnapshot.CompletedAtUtc is not null)
+            if (updatedSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
             {
-                callbackSnapshots.Add(updatedSnapshot);
+                pendingCallbackSnapshots.Add(updatedSnapshot);
             }
         }
 
         await ReconcileRuntimeQueueAsync(cancellationToken);
 
-        foreach (var callbackSnapshot in callbackSnapshots)
+        foreach (var callbackSnapshot in pendingCallbackSnapshots)
         {
-            await completionCallbackInvoker.InvokeIfTriggeredAsync(null, callbackSnapshot, cancellationToken);
+            if (!await completionCallbackProcessor.ProcessPendingAsync(callbackSnapshot, runtimeSettings, now, cancellationToken))
+            {
+                continue;
+            }
+
+            await torrentStateStore.UpdateAsync(callbackSnapshot, cancellationToken);
         }
     }
 

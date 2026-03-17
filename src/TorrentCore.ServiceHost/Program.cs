@@ -80,7 +80,9 @@ builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
 });
 builder.Services.AddSingleton<IRuntimeSettingsService, RuntimeSettingsService>();
 builder.Services.AddSingleton<ITorrentCategoryService, TorrentCategoryService>();
+builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentCompletionFinalizationChecker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackInvoker, TorrentCompletionCallbackInvoker>();
+builder.Services.AddSingleton<ITorrentCompletionCallbackProcessor, TorrentCompletionCallbackProcessor>();
 builder.Services.AddSingleton<PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<MonoTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider =>

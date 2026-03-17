@@ -20,6 +20,7 @@ public static class RuntimeSettingsKeys
     public const string CompletionCallbackArguments = "completion_callback_arguments";
     public const string CompletionCallbackWorkingDirectory = "completion_callback_working_directory";
     public const string CompletionCallbackTimeoutSeconds = "completion_callback_timeout_seconds";
+    public const string CompletionCallbackFinalizationTimeoutSeconds = "completion_callback_finalization_timeout_seconds";
     public const string CompletionCallbackApiBaseUrlOverride = "completion_callback_api_base_url_override";
     public const string CompletionCallbackApiKeyOverride = "completion_callback_api_key_override";
 }

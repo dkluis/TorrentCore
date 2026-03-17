@@ -160,6 +160,7 @@ public sealed class RuntimeSettingsService(
             ? currentSettings.CompletionCallbackWorkingDirectory
             : NormalizeOptionalText(request.CompletionCallbackWorkingDirectory);
         var completionCallbackTimeoutSeconds = request.CompletionCallbackTimeoutSeconds ?? currentSettings.CompletionCallbackTimeoutSeconds;
+        var completionCallbackFinalizationTimeoutSeconds = request.CompletionCallbackFinalizationTimeoutSeconds ?? currentSettings.CompletionCallbackFinalizationTimeoutSeconds;
         var completionCallbackApiBaseUrlOverride = request.CompletionCallbackApiBaseUrlOverride is null
             ? currentSettings.CompletionCallbackApiBaseUrlOverride
             : NormalizeOptionalText(request.CompletionCallbackApiBaseUrlOverride);
@@ -174,6 +175,15 @@ public sealed class RuntimeSettingsService(
                 "CompletionCallbackTimeoutSeconds must be 1 or greater.",
                 StatusCodes.Status400BadRequest,
                 nameof(request.CompletionCallbackTimeoutSeconds));
+        }
+
+        if (completionCallbackFinalizationTimeoutSeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "CompletionCallbackFinalizationTimeoutSeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.CompletionCallbackFinalizationTimeoutSeconds));
         }
 
         if (completionCallbackEnabled && string.IsNullOrWhiteSpace(completionCallbackCommandPath))
@@ -205,6 +215,7 @@ public sealed class RuntimeSettingsService(
             [RuntimeSettingsKeys.CompletionCallbackArguments] = completionCallbackArguments ?? string.Empty,
             [RuntimeSettingsKeys.CompletionCallbackWorkingDirectory] = completionCallbackWorkingDirectory ?? string.Empty,
             [RuntimeSettingsKeys.CompletionCallbackTimeoutSeconds] = completionCallbackTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.CompletionCallbackFinalizationTimeoutSeconds] = completionCallbackFinalizationTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.CompletionCallbackApiBaseUrlOverride] = completionCallbackApiBaseUrlOverride ?? string.Empty,
             [RuntimeSettingsKeys.CompletionCallbackApiKeyOverride] = completionCallbackApiKeyOverride ?? string.Empty,
         }, cancellationToken);
@@ -235,6 +246,7 @@ public sealed class RuntimeSettingsService(
                 completionCallbackCommandPath,
                 completionCallbackWorkingDirectory,
                 completionCallbackTimeoutSeconds,
+                completionCallbackFinalizationTimeoutSeconds,
                 completionCallbackApiBaseUrlOverride,
             }),
         }, cancellationToken);
@@ -378,6 +390,14 @@ public sealed class RuntimeSettingsService(
             completionCallbackTimeoutSeconds = parsedCompletionCallbackTimeout;
         }
 
+        var completionCallbackFinalizationTimeoutSeconds = baseOptions.CompletionCallbackFinalizationTimeoutSeconds;
+        if (values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackFinalizationTimeoutSeconds, out var completionCallbackFinalizationTimeoutValue) &&
+            int.TryParse(completionCallbackFinalizationTimeoutValue, CultureInfo.InvariantCulture, out var parsedCompletionCallbackFinalizationTimeout) &&
+            parsedCompletionCallbackFinalizationTimeout > 0)
+        {
+            completionCallbackFinalizationTimeoutSeconds = parsedCompletionCallbackFinalizationTimeout;
+        }
+
         var completionCallbackApiBaseUrlOverride = NormalizePersistedText(
             values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackApiBaseUrlOverride, out var completionCallbackApiBaseUrlOverrideValue)
                 ? completionCallbackApiBaseUrlOverrideValue
@@ -410,6 +430,7 @@ public sealed class RuntimeSettingsService(
             CompletionCallbackArguments = completionCallbackArguments,
             CompletionCallbackWorkingDirectory = completionCallbackWorkingDirectory,
             CompletionCallbackTimeoutSeconds = completionCallbackTimeoutSeconds,
+            CompletionCallbackFinalizationTimeoutSeconds = completionCallbackFinalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride = completionCallbackApiBaseUrlOverride,
             CompletionCallbackApiKeyOverride = completionCallbackApiKeyOverride,
             EngineSettingsRequireRestart =
@@ -448,6 +469,7 @@ public sealed class RuntimeSettingsService(
             CompletionCallbackArguments = settings.CompletionCallbackArguments,
             CompletionCallbackWorkingDirectory = settings.CompletionCallbackWorkingDirectory,
             CompletionCallbackTimeoutSeconds = settings.CompletionCallbackTimeoutSeconds,
+            CompletionCallbackFinalizationTimeoutSeconds = settings.CompletionCallbackFinalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride = settings.CompletionCallbackApiBaseUrlOverride,
             CompletionCallbackApiKeyOverride = settings.CompletionCallbackApiKeyOverride,
             AppliedEngineMaximumConnections = appliedEngineSettingsState.EngineMaximumConnections,
