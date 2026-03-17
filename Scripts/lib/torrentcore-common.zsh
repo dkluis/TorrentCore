@@ -48,11 +48,63 @@ tc_log_error() {
 
 tc_load_env_file() {
   local env_file="${TORRENTCORE_ENV_FILE:-${TORRENTCORE_SCRIPT_DIR}/torrentcore.env}"
+  export TORRENTCORE_ENV_FILE_RESOLVED="${env_file}"
+  export TORRENTCORE_ENV_FILE_PRESENT=false
 
   if [[ -f "${env_file}" ]]; then
+    export TORRENTCORE_ENV_FILE_PRESENT=true
     # shellcheck disable=SC1090
     source "${env_file}"
   fi
+}
+
+tc_is_loopback_url() {
+  local url="$1"
+
+  [[ "${url}" == http://127.0.0.1* || "${url}" == https://127.0.0.1* || "${url}" == http://localhost* || "${url}" == https://localhost* ]]
+}
+
+tc_log_runtime_override_status() {
+  local app_name="$1"
+
+  if [[ "${TORRENTCORE_ENV_FILE_PRESENT:-false}" == true ]]; then
+    tc_log_info "${app_name} runtime overrides loaded from ${TORRENTCORE_ENV_FILE_RESOLVED}."
+    return
+  fi
+
+  tc_log_warn "${app_name} is using built-in script defaults because ${TORRENTCORE_ENV_FILE_RESOLVED} was not found."
+  tc_log_warn "Copy torrentcore.env.example to torrentcore.env on each target host so network bindings are explicit."
+}
+
+tc_log_service_runtime_configuration() {
+  tc_log_runtime_override_status "TorrentCore.Service"
+  tc_log_info "TorrentCore.Service binding URLs: ${TORRENTCORE_SERVICE_URLS}"
+
+  if tc_is_loopback_url "${TORRENTCORE_SERVICE_URLS}"; then
+    tc_log_info "TorrentCore.Service is bound to loopback only. Remote API and remote Avalonia access are disabled."
+  fi
+}
+
+tc_log_webui_runtime_configuration() {
+  tc_log_runtime_override_status "TorrentCore.WebUI"
+  tc_log_info "TorrentCore.WebUI binding URLs: ${TORRENTCORE_WEBUI_URLS}"
+  tc_log_info "TorrentCore.WebUI service base URL: ${TORRENTCORE_WEBUI_SERVICE_BASE_URL}"
+
+  if tc_is_loopback_url "${TORRENTCORE_WEBUI_URLS}"; then
+    tc_log_warn "TorrentCore.WebUI is bound to loopback only. Other machines will not be able to open the Web UI."
+    tc_log_warn "For LAN browser access, set TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053 in torrentcore.env and restart the Web UI."
+  fi
+}
+
+tc_warn_if_target_env_file_missing() {
+  local target_env_file="${TORRENTCORE_DEPLOY_BASE}/Scripts/torrentcore.env"
+
+  if [[ -f "${target_env_file}" ]]; then
+    return
+  fi
+
+  tc_log_warn "No target runtime override file exists at ${target_env_file}."
+  tc_log_warn "Copy ${TORRENTCORE_DEPLOY_BASE}/Scripts/torrentcore.env.example to torrentcore.env on the target host before first runtime start."
 }
 
 tc_require_command() {
@@ -243,6 +295,8 @@ tc_sync_scripts_to_target() {
     --exclude 'deploy-*.zsh' \
     "${repo_root}/Scripts/" \
     "${TORRENTCORE_DEPLOY_BASE}/Scripts/"
+
+  tc_warn_if_target_env_file_missing
 }
 
 tc_select_deploy_target() {

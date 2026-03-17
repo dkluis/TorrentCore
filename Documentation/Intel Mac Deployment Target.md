@@ -157,6 +157,10 @@ Current script-created state files:
 Current environment template:
 - [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example)
 
+Required first-start step on each deployed host:
+- copy `~/TorrentCore/Scripts/torrentcore.env.example` to `~/TorrentCore/Scripts/torrentcore.env`
+- choose the host's intended network profile before starting the service or web UI
+
 ## Logging Expectations
 
 The script layer should log enough to troubleshoot:
@@ -199,11 +203,25 @@ Current runtime defaults implemented in the scripts:
 
 These can be overridden through `Scripts/torrentcore.env`.
 
+Recommended deployed-host baseline:
+- `TORRENTCORE_SERVICE_URLS=http://127.0.0.1:7033`
+- `TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053`
+- `TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/`
+
+Use this tighter baseline when:
+- the Web UI should be reachable from other machines
+- the service itself does not need to be called directly from other machines
+
+If remote Avalonia or direct remote API access is required on that host, change:
+- `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
+
 Remote access note:
-- the defaults are intentionally loopback-only
+- the built-in defaults are intentionally loopback-only
+- deployed hosts should not rely on those defaults
+- the target host should always create `torrentcore.env` explicitly
 - to open the Web UI from another machine on the LAN, set `TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053`
-- if remote Swagger/API access is also desired, set `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
-- the web UI can still keep `TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/` because the service is local to the Intel Mac
+- if remote Swagger/API access or remote Avalonia access is also desired, set `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
+- the web UI can still keep `TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/` because the service is local to that host
 
 ## Deploy Behavior
 

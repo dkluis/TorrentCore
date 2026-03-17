@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export TORRENTCORE_SCRIPT_DIR="${SCRIPT_DIR}"
 source "${SCRIPT_DIR}/lib/torrentcore-common.zsh"
 tc_load_env_file
+tc_log_webui_runtime_configuration
 
 APP_DIR="${TORRENTCORE_BASE_DIR}/WebUI"
 PID_FILE="${TORRENTCORE_RUN_DIR}/webui.pid"

@@ -103,6 +103,25 @@ cd ~/TorrentCore/Scripts
 
 Copy [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example) to `Scripts/torrentcore.env` and edit the values you need.
 
+First-start rule:
+- every deployed host should create its own `~/TorrentCore/Scripts/torrentcore.env`
+- do not rely on the script built-in defaults for a real deployed host
+- if `torrentcore.env` is missing, the start scripts now log a warning and fall back to the built-in loopback defaults
+
+Recommended host profile for a LAN-accessible Web UI with a local-only service:
+
+```bash
+TORRENTCORE_SERVICE_URLS=http://127.0.0.1:7033
+TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053
+TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/
+```
+
+If you also want remote API access or remote Avalonia clients to hit that host's service directly:
+
+```bash
+TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033
+```
+
 # Completion Callback Contract
 
 ## Purpose
@@ -169,23 +188,10 @@ Useful overrides:
 
 ## Remote Web Access
 
-The default script bindings are loopback-only:
+The built-in script defaults are loopback-only:
 - service: `http://127.0.0.1:7033`
 - web UI: `http://127.0.0.1:7053`
 
-That means the Intel Mac itself can open the UI, but another machine cannot.
+Those defaults are only a fallback. Real deployed hosts should use `torrentcore.env`.
 
-To allow browser access from another machine on the network, set this in `Scripts/torrentcore.env` on the Intel Mac:
-
-```bash
-TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053
-TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/
-```
-
-If you also want remote Swagger/API access, set:
-
-```bash
-TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033
-```
-
-After changing those values, restart the affected process.
+After changing network bindings in `torrentcore.env`, restart the affected process.
