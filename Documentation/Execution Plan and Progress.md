@@ -123,6 +123,7 @@ Current service configuration section:
 - completed torrents now invoke the shared TVMaze callback entrypoint once using Transmission-compatible environment variables, and callback diagnostics are written to the activity log
 - service-level regression coverage now verifies the callback environment contract and that restart/recovery does not re-fire the completion callback for an already-completed torrent
 - callback invocation now waits for downstream-visible finalization, recursively verifies that no active partial-suffix files remain for multi-file torrents, and persists a generic callback lifecycle state so pending finalization survives restart without inventing TVMaze-specific states
+- torrent list/detail contracts and the operator UI now expose callback lifecycle state, timestamps, and last error, and failed or timed-out callbacks can be retried through the public API/UI without touching persistence directly
 - the Web UI callback settings now place the TVMaze API override fields under an explicit advanced area so the main operator flow matches the normal centrally managed TVMaze deployment model
 - the Web UI callback settings now treat `Arguments` and `WorkingDirectory` as advanced-only too, leaving the normal operator flow centered on enable, full script path, and timeout
 
@@ -293,6 +294,7 @@ Current progress:
 - resolved callback label/invoke settings are now persisted on the torrent at add time
 - completed torrents now invoke the configured shared callback entrypoint once using Transmission-style environment variables after downstream-visible finalization is confirmed
 - finalization-gated callback timing and restart-safe callback lifecycle persistence are implemented for normal runtime ticks, timeout handling, and restart recovery
+- callback lifecycle state is now projected through torrent list/detail contracts, and operators can retry failed or timed-out callbacks from the public boundary
 
 ## Phase Gates
 

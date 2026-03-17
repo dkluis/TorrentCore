@@ -288,6 +288,7 @@ Scope:
 - populate Transmission-compatible environment variables
 - apply optional API override environment variables when configured
 - apply a configurable finalization wait timeout and log timeout/failure outcomes
+- provide a manual retry action for callback states that failed or timed out
 - log callback invocation success/failure for diagnostics
 
 Out of scope:
@@ -302,12 +303,13 @@ Exit criteria:
 - completed torrents invoke the shared callback entrypoint once after the final payload path is visible
 - the existing callback app can consume TorrentCore-originated completions without modification
 - pending finalization survives restart without losing whether the callback is still waiting, timed out, or already invoked
+- operators can retry failed or timed-out callbacks through the public boundary without touching the database
 
 Status:
 
 - complete
-- callback configuration, routing, Transmission-style environment generation, finalization-gated invocation, and restart-safe callback lifecycle persistence are implemented
-- service-level coverage verifies single-file and multi-file finalization waits, timeout behavior, callback failure persistence, and no-duplicate-after-restart behavior
+- callback configuration, routing, Transmission-style environment generation, finalization-gated invocation, restart-safe callback lifecycle persistence, and manual retry are implemented
+- service-level coverage verifies single-file and multi-file finalization waits, timeout behavior, callback failure persistence, manual retry, and no-duplicate-after-restart behavior
 
 ### Phase 4 - Operator UI
 

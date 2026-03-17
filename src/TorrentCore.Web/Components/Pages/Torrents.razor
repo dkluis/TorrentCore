@@ -173,7 +173,10 @@ else
                             </td>
                             <td><a class="tc-break" href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a></td>
                             <td>@FormatCategory(torrent.CategoryKey)</td>
-                            <td>@torrent.State</td>
+                            <td>
+                                <div>@torrent.State</div>
+                                <div class="small text-muted">Callback: @FormatCompletionCallbackState(torrent.CompletionCallbackState, torrent.CompletedAtUtc)</div>
+                            </td>
                             <td>@FormatWaitReason(torrent)</td>
                             <td>@torrent.ProgressPercent.ToString("0.0")%</td>
                             <td>@FormatRate(torrent.DownloadRateBytesPerSecond)</td>
@@ -202,6 +205,7 @@ else
                                 <span>
                                     <a class="fw-semibold tc-break d-block" href="@($"/torrents/{torrent.TorrentId:D}")">@torrent.Name</a>
                                     <small class="text-muted">@FormatCategory(torrent.CategoryKey) · @torrent.State</small>
+                                    <small class="text-muted d-block">Callback: @FormatCompletionCallbackState(torrent.CompletionCallbackState, torrent.CompletedAtUtc)</small>
                                 </span>
                             </label>
                         </div>
@@ -368,6 +372,13 @@ else
             : $"{waitReason} (#{torrent.QueuePosition.Value})";
     }
 
+    private static string FormatCompletionCallbackState(string? state, DateTimeOffset? completedAtUtc) =>
+        !string.IsNullOrWhiteSpace(state)
+            ? state
+            : completedAtUtc is null
+                ? "Waiting for completion"
+                : "Not requested";
+
     private async Task PauseAsync(TorrentSummaryDto torrent)
     {
         await RunTorrentActionAsync(
@@ -387,6 +398,17 @@ else
             {
                 var result = await TorrentCoreClient.ResumeAsync(torrent.TorrentId);
                 _actionMessage = $"Resumed torrent '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
+    private async Task RetryCompletionCallbackAsync(TorrentSummaryDto torrent)
+    {
+        await RunTorrentActionAsync(
+            torrent.TorrentId,
+            async () =>
+            {
+                var result = await TorrentCoreClient.RetryCompletionCallbackAsync(torrent.TorrentId);
+                _actionMessage = $"Queued completion callback retry for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
             });
     }
 
@@ -694,6 +716,15 @@ else
                     @onclick="() => ResumeAsync(torrent)"
                     disabled="@IsActionBusy(torrent.TorrentId)">
                 Resume
+            </button>
+        }
+        @if (torrent.CanRetryCompletionCallback)
+        {
+            <button class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    @onclick="() => RetryCompletionCallbackAsync(torrent)"
+                    disabled="@IsActionBusy(torrent.TorrentId)">
+                Retry Callback
             </button>
         }
         @if (torrent.CanRemove)

@@ -38,6 +38,10 @@ else if (_torrent is not null)
                 {
                     <button class="btn btn-outline-secondary" type="button" @onclick="ResumeAsync" disabled="@_isBusy">Resume</button>
                 }
+                @if (_torrent.CanRetryCompletionCallback)
+                {
+                    <button class="btn btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">Retry Callback</button>
+                }
                 @if (_torrent.CanRemove)
                 {
                     <button class="btn btn-outline-danger" type="button" @onclick="RemoveAsync" disabled="@_isBusy">Remove</button>
@@ -102,6 +106,28 @@ else if (_torrent is not null)
                     <div class="card-body">
                         <h3 class="h6 card-title">Magnet</h3>
                         <p class="mb-0 tc-code-wrap"><code>@_torrent.MagnetUri</code></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="mb-4">
+        <div class="row g-3">
+            <div class="col-xl-6 col-lg-8">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="tc-section-header mb-3">
+                            <h3 class="h6 card-title mb-0">Completion Callback</h3>
+                            @if (_torrent.CanRetryCompletionCallback)
+                            {
+                                <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">Retry</button>
+                            }
+                        </div>
+                        <p class="mb-1"><strong>Status:</strong> @FormatCompletionCallbackState(_torrent.CompletionCallbackState, _torrent.CompletedAtUtc)</p>
+                        <p class="mb-1"><strong>Pending Since:</strong> @FormatLocalTime(_torrent.CompletionCallbackPendingSinceUtc)</p>
+                        <p class="mb-1"><strong>Invoked:</strong> @FormatLocalTime(_torrent.CompletionCallbackInvokedAtUtc)</p>
+                        <p class="mb-0"><strong>Last Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackLastError) ? "None" : _torrent.CompletionCallbackLastError)</p>
                     </div>
                 </div>
             </div>
@@ -287,6 +313,20 @@ else if (_torrent is not null)
         });
     }
 
+    private async Task RetryCompletionCallbackAsync()
+    {
+        if (_torrent is null)
+        {
+            return;
+        }
+
+        await RunActionAsync(async () =>
+        {
+            var result = await TorrentCoreClient.RetryCompletionCallbackAsync(_torrent.TorrentId);
+            _message = $"Queued completion callback retry at {result.ProcessedAtUtc.ToLocalTime():g}.";
+        });
+    }
+
     private async Task RemoveAsync()
     {
         if (_torrent is null)
@@ -395,6 +435,13 @@ else if (_torrent is not null)
 
     private static string FormatLocalTime(DateTimeOffset? value) =>
         value?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "Not yet";
+
+    private static string FormatCompletionCallbackState(string? state, DateTimeOffset? completedAtUtc) =>
+        !string.IsNullOrWhiteSpace(state)
+            ? state
+            : completedAtUtc is null
+                ? "Waiting for completion"
+                : "Not requested";
 
     private static string FormatWaitReason(TorrentWaitReason? waitReason, int? queuePosition)
     {

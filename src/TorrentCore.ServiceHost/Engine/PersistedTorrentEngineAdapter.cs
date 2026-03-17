@@ -214,6 +214,38 @@ public sealed class PersistedTorrentEngineAdapter(
         };
     }
 
+    public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
+
+        if (!CanRetryCompletionCallback(torrent.CompletionCallbackState))
+        {
+            throw new ServiceOperationException(
+                "invalid_callback_state",
+                $"Completion callback for torrent '{torrent.Name}' cannot be retried while in state '{torrent.CompletionCallbackState?.ToString() ?? "None"}'.",
+                StatusCodes.Status409Conflict,
+                nameof(torrentId));
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        torrent.CompletionCallbackState = TorrentCompletionCallbackState.PendingFinalization;
+        torrent.CompletionCallbackPendingSinceUtc = now;
+        torrent.CompletionCallbackInvokedAtUtc = null;
+        torrent.CompletionCallbackLastError = null;
+        torrent.LastActivityAtUtc = now;
+
+        await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+
+        return new TorrentActionResultDto
+        {
+            TorrentId = torrent.TorrentId,
+            Action = "retry_completion_callback",
+            State = torrent.State,
+            ProcessedAtUtc = now,
+            DataDeleted = false,
+        };
+    }
+
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
     {
         var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
@@ -333,7 +365,12 @@ public sealed class PersistedTorrentEngineAdapter(
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
+            CompletionCallbackState = snapshot.CompletionCallbackState?.ToString(),
+            CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
+            CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
+            CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
+            CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
             CanPause = CanPause(snapshot.State),
             CanResume = CanResume(snapshot.State),
             CanRemove = CanRemove(snapshot.State),
@@ -363,7 +400,12 @@ public sealed class PersistedTorrentEngineAdapter(
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
+            CompletionCallbackState = snapshot.CompletionCallbackState?.ToString(),
+            CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
+            CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
+            CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
+            CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
             CanPause = CanPause(snapshot.State),
             CanResume = CanResume(snapshot.State),
             CanRemove = CanRemove(snapshot.State),
@@ -373,6 +415,9 @@ public sealed class PersistedTorrentEngineAdapter(
     private static bool CanPause(TorrentState state) => state is TorrentState.Downloading or TorrentState.Seeding or TorrentState.Queued or TorrentState.ResolvingMetadata;
 
     private static bool CanResume(TorrentState state) => state is TorrentState.Paused or TorrentState.Error;
+
+    private static bool CanRetryCompletionCallback(TorrentCompletionCallbackState? callbackState) =>
+        callbackState is TorrentCompletionCallbackState.Failed or TorrentCompletionCallbackState.TimedOut;
 
     private static bool CanRemove(TorrentState state) => state is not TorrentState.Removed;
 

@@ -1196,6 +1196,17 @@ public sealed class TorrentApiTests
         var timedOutState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
         Assert.Contains("Timed out waiting for final payload visibility", timedOutState.LastError ?? string.Empty, StringComparison.Ordinal);
 
+        var torrentDetail = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+        Assert.NotNull(torrentDetail);
+        Assert.Equal(TorrentCompletionCallbackState.TimedOut.ToString(), torrentDetail.CompletionCallbackState);
+        Assert.True(torrentDetail.CanRetryCompletionCallback);
+        Assert.Contains("Timed out waiting for final payload visibility", torrentDetail.CompletionCallbackLastError ?? string.Empty, StringComparison.Ordinal);
+
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+        var torrentSummary = Assert.Single(torrents!, torrent => torrent.TorrentId == addedTorrent.TorrentId);
+        Assert.Equal(TorrentCompletionCallbackState.TimedOut.ToString(), torrentSummary.CompletionCallbackState);
+        Assert.True(torrentSummary.CanRetryCompletionCallback);
+
         var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
         Assert.NotNull(logs);
         Assert.Contains(logs, log => log.EventType == "torrent.callback.finalization_timed_out");
@@ -1231,6 +1242,115 @@ public sealed class TorrentApiTests
 
         var failedState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
         Assert.Equal("The callback exited with code 1.", failedState.LastError);
+
+        var torrentDetail = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+        Assert.NotNull(torrentDetail);
+        Assert.Equal(TorrentCompletionCallbackState.Failed.ToString(), torrentDetail.CompletionCallbackState);
+        Assert.True(torrentDetail.CanRetryCompletionCallback);
+        Assert.Equal("The callback exited with code 1.", torrentDetail.CompletionCallbackLastError);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_RetryCompletionCallback_RequeuesTimedOutState_AndInvokesWhenPayloadAppears()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-retry-timeout");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(
+            httpClient,
+            "/bin/sh",
+            callbackScriptPath,
+            rootPath,
+            finalizationTimeoutSeconds: 1);
+
+        var response = await AddMagnetAsync(httpClient, "8080808080808080808080808080808080808080", "Retry Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var timedOutTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.TimedOut.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(timedOutTorrent);
+        Assert.True(timedOutTorrent.CanRetryCompletionCallback);
+
+        var retryResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/completion-callback/retry", content: null);
+        retryResponse.EnsureSuccessStatusCode();
+
+        var retryResult = await retryResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
+        Assert.NotNull(retryResult);
+        Assert.Equal("retry_completion_callback", retryResult.Action);
+
+        var pendingTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(pendingTorrent);
+        Assert.False(pendingTorrent.CanRetryCompletionCallback);
+        Assert.Null(pendingTorrent.CompletionCallbackLastError);
+
+        CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Retry Movie"));
+
+        await WaitForAsync(
+            () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
+            invocations => invocations.Count == 1,
+            timeout: TimeSpan.FromSeconds(5));
+
+        var invokedTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(invokedTorrent);
+        Assert.False(invokedTorrent.CanRetryCompletionCallback);
+        Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_RetryCompletionCallback_ReturnsConflict_ForInvokedState()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-retry-conflict");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
+
+        var response = await AddMagnetAsync(httpClient, "8181818181818181818181818181818181818181", "Retry Conflict Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Retry Conflict Movie"));
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        var retryResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/completion-callback/retry", content: null);
+        var error = await retryResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.Conflict, retryResponse.StatusCode);
+        Assert.Equal("invalid_callback_state", error.GetProperty("code").GetString());
     }
 
     [Fact]

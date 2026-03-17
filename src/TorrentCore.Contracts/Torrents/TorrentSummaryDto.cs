@@ -18,7 +18,12 @@ public sealed class TorrentSummaryDto
     public required DateTimeOffset AddedAtUtc { get; init; }
     public DateTimeOffset? CompletedAtUtc { get; init; }
     public DateTimeOffset? LastActivityAtUtc { get; init; }
+    public string? CompletionCallbackState { get; init; }
+    public DateTimeOffset? CompletionCallbackPendingSinceUtc { get; init; }
+    public DateTimeOffset? CompletionCallbackInvokedAtUtc { get; init; }
+    public string? CompletionCallbackLastError { get; init; }
     public string? ErrorMessage { get; init; }
+    public required bool CanRetryCompletionCallback { get; init; }
     public required bool CanPause { get; init; }
     public required bool CanResume { get; init; }
     public required bool CanRemove { get; init; }

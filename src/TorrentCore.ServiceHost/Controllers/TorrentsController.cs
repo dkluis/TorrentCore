@@ -56,6 +56,16 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
         return Ok(result);
     }
 
+    [HttpPost("{torrentId:guid}/completion-callback/retry")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    public async Task<ActionResult<TorrentActionResultDto>> RetryCompletionCallback(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var result = await torrentApplicationService.RetryCompletionCallbackAsync(torrentId, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("{torrentId:guid}/remove")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]

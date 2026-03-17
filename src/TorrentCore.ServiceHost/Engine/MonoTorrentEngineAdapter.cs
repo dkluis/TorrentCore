@@ -446,6 +446,50 @@ public sealed class MonoTorrentEngineAdapter(
         }
     }
 
+    public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+
+        if (!CanRetryCompletionCallback(snapshot.CompletionCallbackState))
+        {
+            throw new ServiceOperationException(
+                "invalid_callback_state",
+                $"Completion callback for torrent '{snapshot.Name}' cannot be retried while in state '{snapshot.CompletionCallbackState?.ToString() ?? "None"}'.",
+                StatusCodes.Status409Conflict,
+                nameof(torrentId));
+        }
+
+        await _synchronizationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
+            var now = DateTimeOffset.UtcNow;
+            var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
+            updatedSnapshot.CompletionCallbackState = TorrentCompletionCallbackState.PendingFinalization;
+            updatedSnapshot.CompletionCallbackPendingSinceUtc = now;
+            updatedSnapshot.CompletionCallbackInvokedAtUtc = null;
+            updatedSnapshot.CompletionCallbackLastError = null;
+            await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+
+            await SynchronizeCoreAsync(cancellationToken);
+
+            var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? updatedSnapshot;
+
+            return new TorrentActionResultDto
+            {
+                TorrentId = torrentId,
+                Action = "retry_completion_callback",
+                State = persistedSnapshot.State,
+                ProcessedAtUtc = now,
+                DataDeleted = false,
+            };
+        }
+        finally
+        {
+            _synchronizationGate.Release();
+        }
+    }
+
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
     {
         var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
@@ -1403,7 +1447,12 @@ public sealed class MonoTorrentEngineAdapter(
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
+            CompletionCallbackState = snapshot.CompletionCallbackState?.ToString(),
+            CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
+            CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
+            CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
+            CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
             CanPause = CanPause(snapshot.State),
             CanResume = CanResume(snapshot.State),
             CanRemove = snapshot.State is not ContractTorrentState.Removed,
@@ -1433,10 +1482,18 @@ public sealed class MonoTorrentEngineAdapter(
             AddedAtUtc = snapshot.AddedAtUtc,
             CompletedAtUtc = snapshot.CompletedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
+            CompletionCallbackState = snapshot.CompletionCallbackState?.ToString(),
+            CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
+            CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
+            CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
+            CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
             CanPause = CanPause(snapshot.State),
             CanResume = CanResume(snapshot.State),
             CanRemove = snapshot.State is not ContractTorrentState.Removed,
         };
     }
+
+    private static bool CanRetryCompletionCallback(TorrentCompletionCallbackState? callbackState) =>
+        callbackState is TorrentCompletionCallbackState.Failed or TorrentCompletionCallbackState.TimedOut;
 }

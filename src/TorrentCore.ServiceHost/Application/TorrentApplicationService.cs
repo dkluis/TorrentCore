@@ -198,6 +198,21 @@ public sealed class TorrentApplicationService(
         }
     }
 
+    public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await torrentEngineAdapter.RetryCompletionCallbackAsync(torrentId, cancellationToken);
+            await LogActionAsync("torrent.callback.retry_requested", "Queued completion callback retry.", torrentId, result.State, cancellationToken);
+            return result;
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.callback.retry.failed", exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
     {
         try

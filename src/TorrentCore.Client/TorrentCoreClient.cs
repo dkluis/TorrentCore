@@ -139,6 +139,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient)
                ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
     }
 
+    public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsync($"api/torrents/{torrentId}/completion-callback/retry", content: null, cancellationToken);
+        return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken)
+               ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
+    }
+
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.PostAsJsonAsync($"api/torrents/{torrentId}/remove", request, JsonOptions, cancellationToken);
