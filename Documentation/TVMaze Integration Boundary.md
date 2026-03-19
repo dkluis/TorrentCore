@@ -69,6 +69,20 @@ TorrentCore and Transmission should be able to call the same existing TVMaze com
 TorrentCore should emulate the expected Transmission-style environment variables when invoking that shared callback,
 instead of requiring a second callback application or a TorrentCore-specific callback protocol.
 
+Directory alignment rule:
+
+- when TVMaze validates completion callbacks against `TransmissionRoute:{Category}` configuration, TorrentCore category
+  `DownloadRootPath` must match that route for the same callback label/category
+- otherwise TVMaze rejects the callback before downstream FileOps handling begins
+- changing a TorrentCore category affects future torrents only because the resolved download root is persisted per
+  torrent at add time
+
+Possible later evolution:
+
+- if shared download roots become too constraining, TVMaze and TorrentCore may later adopt a client-scoped acquisition
+  root model so Transmission and TorrentCore can keep different physical directory structures
+- that would need an explicit mapping layer at the shared completion boundary; it is not the current design
+
 Important timing rule:
 
 - do not fire the shared callback on the engine's first internal completed edge alone
