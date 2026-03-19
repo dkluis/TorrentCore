@@ -13,7 +13,8 @@ Current status:
 
 - Slice 1 (`Settings` parity) is now implemented
 - Slice 2 (`Torrents` parity) is now implemented
-- `Torrent Detail` and `Dashboard` plus `Logs` remain pending
+- Slice 3 (`Torrent Detail` parity) is now implemented
+- `Dashboard` plus `Logs` remain pending
 
 ## Design Guardrails
 
@@ -33,30 +34,12 @@ Do not copy these Web patterns directly:
 
 ## Current Gap Summary
 
-The current Avalonia client already covers connection bootstrap, dashboard, torrents, logs, settings, and torrent detail. The main parity gaps are:
+The current Avalonia client already covers connection bootstrap, settings parity, torrents parity, and torrent detail parity. The remaining parity gaps are:
 
-1. `Settings`
-- no shared callback configuration UI
-- no category administration UI
-
-2. `Torrents`
-- no category selector on add
-- no `TV` default category behavior
-- no category filter
-- no callback-state filter
-- no category or callback-state presentation in the torrent list
-- no retry callback action
-
-3. `Torrent Detail`
-- no callback lifecycle card
-- no retry callback action
-- no richer callback diagnostics such as final payload path, pending reason, last callback event, exit code, or timeout values
-- no category presentation
-
-4. `Dashboard`
+1. `Dashboard`
 - no callback lifecycle rollup card
 
-5. `Logs`
+2. `Logs`
 - missing the Web-style auto-refresh behavior that fits the operator monitoring use case
 - no direct desktop shortcut from a log entry into torrent detail
 
@@ -144,6 +127,10 @@ Exit criteria:
 - callback retryable torrents are visible and actionable from the list
 
 ### Slice 3: Torrent Detail Parity
+
+Status:
+
+- implemented
 
 Planned changes:
 

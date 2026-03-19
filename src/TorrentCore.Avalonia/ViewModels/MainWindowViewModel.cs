@@ -38,13 +38,16 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isConnectionSetupRequired = true;
 
-    public MainWindowViewModel(TorrentCoreClient client, AvaloniaServiceConnectionManager connectionManager)
+    public MainWindowViewModel(
+        TorrentCoreClient client,
+        AvaloniaServiceConnectionManager connectionManager,
+        IClipboardTextService clipboardTextService)
     {
         _client = client;
         _connectionManager = connectionManager;
 
         _dashboardViewModel = new DashboardViewModel(client);
-        _torrentsViewModel = new TorrentsViewModel(client, ShowTorrentDetail);
+        _torrentsViewModel = new TorrentsViewModel(client, ShowTorrentDetail, clipboardTextService);
         _logsViewModel = new LogsViewModel(client);
         _settingsViewModel = new SettingsViewModel(client);
         _connectionSetupViewModel = new ConnectionSetupViewModel(connectionManager, HandleConnectionSavedAsync);
@@ -148,17 +151,31 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void ShowTorrentDetail(Guid torrentId)
     {
+        var detailViewModel = new TorrentDetailViewModel(_client, torrentId, ShowTorrents);
         CurrentTitle = "Torrent Detail";
-        CurrentDescription = "Runtime, transfer, identity, and recent log diagnostics for the selected torrent.";
-        CurrentViewModel = new TorrentDetailViewModel(_client, torrentId, ShowTorrents);
+        CurrentDescription = "Runtime, transfer, category, callback lifecycle, and recent log diagnostics for the selected torrent.";
+        CurrentViewModel = detailViewModel;
+        _ = detailViewModel.LoadAsync();
     }
 
     private void ShowTorrents()
     {
-        if (_sectionMap.TryGetValue("torrents", out var torrentsSection))
+        if (!_sectionMap.TryGetValue("torrents", out var torrentsSection))
+        {
+            return;
+        }
+
+        CurrentTitle = torrentsSection.Title;
+        CurrentDescription = torrentsSection.Description;
+        CurrentViewModel = _torrentsViewModel;
+
+        if (!ReferenceEquals(SelectedSection, torrentsSection))
         {
             SelectedSection = torrentsSection;
+            return;
         }
+
+        _ = _torrentsViewModel.LoadAsync();
     }
 
     private async Task HandleConnectionSavedAsync()

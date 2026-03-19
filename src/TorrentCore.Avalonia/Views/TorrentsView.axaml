@@ -22,9 +22,11 @@
         <StackPanel Spacing="12">
           <TextBlock Text="Add Magnet" Classes="text-section-title" />
           <Grid ColumnDefinitions="*,220" ColumnSpacing="12">
-            <TextBox Text="{Binding MagnetUri}"
+            <TextBox x:Name="MagnetUriTextBox"
+                     Text="{Binding MagnetUri}"
                      Watermark="magnet:?xt=urn:btih:..."
-                     TextWrapping="Wrap" />
+                     TextWrapping="Wrap"
+                     KeyDown="MagnetUriTextBox_OnKeyDown" />
             <StackPanel Grid.Column="1" Spacing="4">
               <TextBlock Text="Category" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
               <ComboBox ItemsSource="{Binding AddCategoryOptions}"
@@ -38,6 +40,9 @@
             </StackPanel>
           </Grid>
           <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="toolbar-action"
+                    Content="Paste Magnet"
+                    Command="{Binding PasteMagnetCommand}" />
             <Button Classes="toolbar-action accent"
                     Content="Add Torrent"
                     Command="{Binding AddMagnetCommand}" />

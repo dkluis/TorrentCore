@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using TorrentCore.Avalonia.Infrastructure;
 using TorrentCore.Avalonia.ViewModels;
 using TorrentCore.Client;
 using TorrentCore.Contracts.Categories;
@@ -25,7 +26,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 "/api/torrents" => torrents,
                 _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
             })));
-        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { });
+        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { }, new TestClipboardTextService());
 
         await viewModel.LoadAsync();
 
@@ -49,7 +50,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 "/api/torrents" => torrents,
                 _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
             })));
-        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { });
+        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { }, new TestClipboardTextService());
         await viewModel.LoadAsync();
 
         viewModel.SelectedCategoryFilter = Assert.Single(viewModel.CategoryFilterOptions, item => item.Key == "Movies");
@@ -115,7 +116,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
             };
         });
-        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { });
+        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { }, new TestClipboardTextService());
         await viewModel.LoadAsync();
 
         viewModel.SelectedAddCategory = Assert.Single(viewModel.AddCategoryOptions, item => item.Key == "Movies");
@@ -158,7 +159,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
             };
         });
-        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { });
+        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { }, new TestClipboardTextService());
         await viewModel.LoadAsync();
 
         var torrent = Assert.Single(viewModel.VisibleTorrents, item => item.TorrentId == retryableTorrent.TorrentId);
@@ -168,6 +169,37 @@ public sealed class AvaloniaTorrentsViewModelTests
             capturedRequests,
             item => item.Method == "POST" && item.Path == $"/api/torrents/{retryableTorrent.TorrentId:D}/completion-callback/retry");
         Assert.Contains("Queued completion callback retry", viewModel.ActionMessage);
+    }
+
+    [Fact]
+    public async Task PasteMagnetAsync_LoadsClipboardText_AndTrimsIt()
+    {
+        var torrentCoreClient = CreateClient((request, _) => Task.FromResult(CreateJsonResponse(Array.Empty<TorrentSummaryDto>())));
+        var viewModel = new TorrentsViewModel(
+            torrentCoreClient,
+            _ => { },
+            new TestClipboardTextService("  magnet:?xt=urn:btih:pasted-value  "));
+
+        await viewModel.PasteMagnetAsync();
+
+        Assert.Equal("magnet:?xt=urn:btih:pasted-value", viewModel.MagnetUri);
+        Assert.Equal("Pasted magnet text from the clipboard.", viewModel.SubmitMessage);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task PasteMagnetAsync_ReportsEmptyClipboard()
+    {
+        var torrentCoreClient = CreateClient((request, _) => Task.FromResult(CreateJsonResponse(Array.Empty<TorrentSummaryDto>())));
+        var viewModel = new TorrentsViewModel(
+            torrentCoreClient,
+            _ => { },
+            new TestClipboardTextService("   "));
+
+        await viewModel.PasteMagnetAsync();
+
+        Assert.Equal(string.Empty, viewModel.MagnetUri);
+        Assert.Equal("Clipboard does not contain text to paste.", viewModel.SubmitMessage);
     }
 
     private static IReadOnlyList<TorrentCategoryDto> CreateCategories()
@@ -304,6 +336,11 @@ public sealed class AvaloniaTorrentsViewModelTests
     }
 
     private sealed record CapturedRequest(string Method, string Path, string? Body);
+
+    private sealed class TestClipboardTextService(string? text = null) : IClipboardTextService
+    {
+        public Task<string?> GetTextAsync(CancellationToken cancellationToken = default) => Task.FromResult(text);
+    }
 
     private sealed class TestHttpMessageHandler(Func<HttpRequestMessage, string?, Task<HttpResponseMessage>> responseFactory) : HttpMessageHandler
     {

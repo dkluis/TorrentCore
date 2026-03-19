@@ -2,13 +2,17 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using TorrentCore.Avalonia.Infrastructure;
 using TorrentCore.Client;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.Avalonia.ViewModels;
 
-public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> showTorrentDetail) : ViewModelBase
+public partial class TorrentsViewModel(
+    TorrentCoreClient client,
+    Action<Guid> showTorrentDetail,
+    IClipboardTextService clipboardTextService) : ViewModelBase
 {
     private const string AllCategoryFilterKey = "__all";
     private const string UncategorizedCategoryFilterKey = "__uncategorized";
@@ -134,6 +138,40 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
         finally
         {
             IsBusy = false;
+            RaiseComputedState();
+        }
+    }
+
+    [RelayCommand]
+    public async Task PasteMagnetAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        SubmitMessage = null;
+        ActionMessage = null;
+        ErrorMessage = null;
+
+        try
+        {
+            var clipboardText = await clipboardTextService.GetTextAsync();
+            if (string.IsNullOrWhiteSpace(clipboardText))
+            {
+                SubmitMessage = "Clipboard does not contain text to paste.";
+                return;
+            }
+
+            MagnetUri = clipboardText.Trim();
+            SubmitMessage = "Pasted magnet text from the clipboard.";
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = $"Unable to read the clipboard: {exception.Message}";
+        }
+        finally
+        {
             RaiseComputedState();
         }
     }

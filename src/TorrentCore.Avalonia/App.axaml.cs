@@ -28,6 +28,7 @@ public partial class App : Application
         services.AddSingleton<ITorrentCoreEndpointProvider>(endpointProvider);
         services.AddSingleton<AppConnectionSettingsStore>();
         services.AddSingleton<AvaloniaServiceConnectionManager>();
+        services.AddSingleton<IClipboardTextService, AvaloniaClipboardTextService>();
         services.AddHttpClient<TorrentCoreClient>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();

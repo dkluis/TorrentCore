@@ -6,7 +6,7 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
         <Button Classes="toolbar-action"
                 Content="Back"
                 Command="{Binding BackCommand}" />
@@ -34,11 +34,17 @@
                 Command="{Binding ResumeCommand}"
                 IsEnabled="{Binding Torrent.CanResume}" />
         <Button Grid.Column="5"
+                Classes="toolbar-action"
+                Content="Retry Callback"
+                Command="{Binding RetryCompletionCallbackCommand}"
+                IsEnabled="{Binding CanRetryCompletionCallback}"
+                IsVisible="{Binding CanRetryCompletionCallback}" />
+        <Button Grid.Column="6"
                 Classes="toolbar-action danger"
                 Content="Remove"
                 Command="{Binding RemoveCommand}"
                 IsEnabled="{Binding Torrent.CanRemove}" />
-        <Button Grid.Column="6"
+        <Button Grid.Column="7"
                 Classes="toolbar-action danger"
                 Content="Delete Data"
                 Command="{Binding DeleteDataCommand}"
@@ -90,6 +96,7 @@
         <Border Classes="panel-card" Margin="0,0,18,18">
           <StackPanel Spacing="8">
             <TextBlock Text="Identity" Classes="text-section-title" />
+            <TextBlock Text="{Binding CategoryText, StringFormat='Category: {0}'}" />
             <SelectableTextBlock Text="{Binding InfoHashText, StringFormat='Info Hash: {0}'}"
                                  Classes="text-body-small"
                                  TextWrapping="Wrap" />
@@ -99,6 +106,50 @@
             <SelectableTextBlock Text="{Binding Torrent.SavePath, StringFormat='Save Path: {0}'}"
                                  Classes="text-body-small"
                                  TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+              <TextBlock Text="Completion Callback" Classes="text-section-title" />
+              <Button Grid.Column="1"
+                      Classes="toolbar-action"
+                      Content="Retry"
+                      Command="{Binding RetryCompletionCallbackCommand}"
+                      IsEnabled="{Binding CanRetryCompletionCallback}"
+                      IsVisible="{Binding CanRetryCompletionCallback}" />
+            </Grid>
+            <TextBlock Text="{Binding CompletionCallbackStateText, StringFormat='Status: {0}'}" />
+            <TextBlock Text="{Binding CompletionCallbackPendingSinceText, StringFormat='Pending Since: {0}'}" />
+            <TextBlock Text="{Binding CompletionCallbackInvokedAtText, StringFormat='Invoked: {0}'}" />
+            <SelectableTextBlock Text="{Binding CompletionCallbackFinalPayloadPathText, StringFormat='Final Payload: {0}'}"
+                                 Classes="text-body-small"
+                                 TextWrapping="Wrap" />
+            <TextBlock Text="{Binding CompletionCallbackPendingReasonText, StringFormat='Pending Reason: {0}'}"
+                       TextWrapping="Wrap" />
+            <TextBlock Text="{Binding CompletionCallbackLastErrorText, StringFormat='Last Error: {0}'}"
+                       TextWrapping="Wrap" />
+            <Border BorderBrush="{DynamicResource RowDividerBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="0,8,0,0">
+              <StackPanel Spacing="6">
+                <TextBlock Text="{Binding LatestCallbackEventText, StringFormat='Last Event: {0}'}" />
+                <TextBlock Text="{Binding LatestCallbackEventTimeText, StringFormat='Last Event Time: {0}'}" />
+                <TextBlock Text="{Binding LatestCallbackMessageText, StringFormat='Last Message: {0}'}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding LatestCallbackProcessIdText, StringFormat='Process Id: {0}'}" />
+                <TextBlock Text="{Binding LatestCallbackExitCodeText, StringFormat='Exit Code: {0}'}" />
+                <SelectableTextBlock Text="{Binding LatestCallbackCommandPathText, StringFormat='Command: {0}'}"
+                                     Classes="text-body-small"
+                                     TextWrapping="Wrap" />
+                <SelectableTextBlock Text="{Binding LatestCallbackWorkingDirectoryText, StringFormat='Working Directory: {0}'}"
+                                     Classes="text-body-small"
+                                     TextWrapping="Wrap" />
+                <TextBlock Text="{Binding LatestCallbackProcessTimeoutText, StringFormat='Process Timeout: {0}'}" />
+                <TextBlock Text="{Binding LatestCallbackFinalizationWaitText, StringFormat='Finalization Wait: {0}'}" />
+              </StackPanel>
+            </Border>
           </StackPanel>
         </Border>
 
