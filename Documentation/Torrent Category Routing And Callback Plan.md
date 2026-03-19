@@ -332,14 +332,21 @@ Exit criteria:
 
 Status:
 
-- partially complete
+- complete
 - Web UI now supports:
   - category editing
   - callback settings editing
   - category selection during magnet add, with `TV` preselected when that seeded category is enabled
   - category filtering/display in the torrent list
   - richer torrent-detail callback diagnostics, including the final payload path, pending reason, and the latest callback event/process metadata
-- Avalonia `Settings`, `Torrents`, and `Torrent Detail` now support category administration, shared callback administration, category-aware magnet adds, callback-state filtering, callback retry, and callback diagnostics; remaining desktop parity work is the dashboard/logs observability slice tracked in `Documentation/Avalonia UI Catch-Up Plan.md`
+- Avalonia now supports:
+  - category administration
+  - shared callback administration
+  - category-aware magnet adds with `TV` as the default when available
+  - callback-state filtering and callback retry
+  - callback diagnostics in torrent detail
+  - dashboard callback-state rollups
+  - log auto-refresh and log-to-detail navigation for torrent-scoped callback events
 
 ## Test Expectations
 

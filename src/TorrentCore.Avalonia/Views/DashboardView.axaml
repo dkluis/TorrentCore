@@ -6,17 +6,26 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center" ColumnSpacing="10">
         <StackPanel Spacing="4">
           <TextBlock Text="Dashboard" Classes="text-page-title" />
           <TextBlock Text="Host health, engine saturation, and runtime policy summary."
                      Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
-        <Button Grid.Column="1"
+        <CheckBox Grid.Column="1"
+                  Content="Auto Refresh"
+                  IsChecked="{Binding AutoRefresh}"
+                  VerticalAlignment="Center" />
+        <Button Grid.Column="2"
                 Classes="toolbar-action"
                 Content="Refresh"
                 Command="{Binding RefreshCommand}" />
       </Grid>
+
+      <TextBlock Text="{Binding LastRefreshedText, StringFormat='Last refreshed: {0}'}"
+                 IsVisible="{Binding HasLastRefreshed}"
+                 Classes="text-body-small"
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
 
       <Border Classes="panel-card"
               IsVisible="{Binding IsLoading}">
@@ -120,6 +129,19 @@
             <TextBlock Text="Capabilities" Classes="text-section-title" />
             <TextBlock Text="{Binding SupportsLiveControlText}" TextWrapping="Wrap" />
             <TextBlock Text="{Binding HostModelText}" TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <Border Classes="panel-card" Margin="0,0,18,18">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Completion Callbacks" Classes="text-section-title" />
+            <TextBlock Text="{Binding CallbackPendingCount, StringFormat='Pending Finalization: {0}'}" />
+            <TextBlock Text="{Binding CallbackInvokedCount, StringFormat='Invoked: {0}'}" />
+            <TextBlock Text="{Binding CallbackFailedCount, StringFormat='Failed: {0}'}" />
+            <TextBlock Text="{Binding CallbackTimedOutCount, StringFormat='Timed Out: {0}'}" />
+            <TextBlock Text="{Binding CallbackRetryableCount, StringFormat='Retryable: {0}'}"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
           </StackPanel>
         </Border>
       </WrapPanel>

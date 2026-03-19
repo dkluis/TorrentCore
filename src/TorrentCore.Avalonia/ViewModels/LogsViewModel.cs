@@ -2,12 +2,13 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
+
 namespace TorrentCore.Avalonia.ViewModels;
 
-public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
+public partial class LogsViewModel(TorrentCoreClient client, Action<Guid> showTorrentDetail) : ViewModelBase
 {
     [ObservableProperty]
-    private bool _autoRefresh;
+    private bool _autoRefresh = true;
 
     [ObservableProperty]
     private int _take = 100;
@@ -91,7 +92,7 @@ public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
             Entries.Clear();
             foreach (var entry in logs)
             {
-                Entries.Add(new ActivityLogEntryItemViewModel(entry));
+                Entries.Add(new ActivityLogEntryItemViewModel(entry, showTorrentDetail));
             }
 
             LastRefreshedText = DateTimeOffset.Now.ToString("g");
@@ -103,10 +104,15 @@ public partial class LogsViewModel(TorrentCoreClient client) : ViewModelBase
         finally
         {
             IsLoading = false;
-            OnPropertyChanged(nameof(HasError));
-            OnPropertyChanged(nameof(HasEntries));
-            OnPropertyChanged(nameof(HasNoEntries));
-            OnPropertyChanged(nameof(HasLastRefreshed));
+            RaiseComputedState();
         }
+    }
+
+    private void RaiseComputedState()
+    {
+        OnPropertyChanged(nameof(HasError));
+        OnPropertyChanged(nameof(HasEntries));
+        OnPropertyChanged(nameof(HasNoEntries));
+        OnPropertyChanged(nameof(HasLastRefreshed));
     }
 }

@@ -48,7 +48,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _dashboardViewModel = new DashboardViewModel(client);
         _torrentsViewModel = new TorrentsViewModel(client, ShowTorrentDetail, clipboardTextService);
-        _logsViewModel = new LogsViewModel(client);
+        _logsViewModel = new LogsViewModel(client, ShowTorrentDetail);
         _settingsViewModel = new SettingsViewModel(client);
         _connectionSetupViewModel = new ConnectionSetupViewModel(connectionManager, HandleConnectionSavedAsync);
 
@@ -64,7 +64,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 "dashboard",
                 "Dashboard",
                 "Host and engine status",
-                "Dashboard cards for service health, engine runtime, queue pressure, and storage policy."
+                "Dashboard cards for service health, engine runtime, queue pressure, callback lifecycle counts, and storage policy."
             ),
             new NavigationSection(
                 "torrents",
@@ -76,7 +76,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 "logs",
                 "Logs",
                 "Recent activity and errors",
-                "Inspect persisted service, torrent, and engine events with lightweight filtering."
+                "Inspect persisted service, torrent, and engine events with lightweight filtering, auto refresh, and one-click torrent detail jumps."
             ),
             new NavigationSection(
                 "settings",

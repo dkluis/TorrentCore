@@ -6,17 +6,21 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center" ColumnSpacing="10">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto" VerticalAlignment="Center" ColumnSpacing="10">
         <StackPanel Spacing="4">
           <TextBlock Text="Logs" Classes="text-page-title" />
           <TextBlock Text="Persisted service, torrent, and engine events."
                      Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
-        <Button Grid.Column="1"
+        <CheckBox Grid.Column="1"
+                  Content="Auto Refresh"
+                  IsChecked="{Binding AutoRefresh}"
+                  VerticalAlignment="Center" />
+        <Button Grid.Column="2"
                 Classes="toolbar-action"
                 Content="Clear Filters"
                 Command="{Binding ClearFiltersCommand}" />
-        <Button Grid.Column="2"
+        <Button Grid.Column="3"
                 Classes="toolbar-action"
                 Content="Refresh"
                 Command="{Binding RefreshCommand}" />
@@ -88,6 +92,11 @@
                                Classes="text-body-small" />
                   </Grid>
                   <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                  <Button Content="Open Torrent"
+                          Command="{Binding OpenTorrentDetailCommand}"
+                          IsVisible="{Binding CanOpenTorrentDetail}"
+                          Classes="toolbar-action"
+                          HorizontalAlignment="Left" />
                   <SelectableTextBlock Text="{Binding TorrentIdText, StringFormat='Torrent Id: {0}'}"
                                        IsVisible="{Binding HasTorrentId}"
                                        Classes="text-body-small"

@@ -136,6 +136,7 @@ Current service configuration section:
 - the Avalonia `Settings` screen now exposes the same shared callback settings and category administration surface as the Web UI, while keeping the existing desktop card layout and moving advanced callback overrides under an expander
 - the Avalonia `Torrents` screen now supports category-aware magnet adds with `TV` as the default when available, category and callback-state filtering, category and callback-state display in each torrent card, and retrying eligible completion callbacks from the list
 - the Avalonia `Torrent Detail` screen now surfaces category plus callback lifecycle diagnostics, including final payload path, pending reason, last callback event/process metadata, and retry from the detail command bar and callback card
+- the Avalonia `Dashboard` now aggregates completion-callback lifecycle counts with a desktop auto-refresh toggle, and the Avalonia `Logs` screen now supports auto-refresh plus direct torrent-detail navigation for torrent-scoped log entries
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

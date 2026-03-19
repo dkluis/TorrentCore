@@ -14,7 +14,8 @@ Current status:
 - Slice 1 (`Settings` parity) is now implemented
 - Slice 2 (`Torrents` parity) is now implemented
 - Slice 3 (`Torrent Detail` parity) is now implemented
-- `Dashboard` plus `Logs` remain pending
+- Slice 4 (`Dashboard` plus `Logs` observability) is now implemented
+- the main Avalonia parity slices are complete; broader shell/inspector refinement remains a separate follow-up if needed
 
 ## Design Guardrails
 
@@ -34,14 +35,11 @@ Do not copy these Web patterns directly:
 
 ## Current Gap Summary
 
-The current Avalonia client already covers connection bootstrap, settings parity, torrents parity, and torrent detail parity. The remaining parity gaps are:
+The current Avalonia client now covers connection bootstrap, settings parity, torrents parity, torrent detail parity, and the dashboard/logs observability slice. Remaining improvements are optional refinements rather than parity blockers:
 
-1. `Dashboard`
-- no callback lifecycle rollup card
-
-2. `Logs`
-- missing the Web-style auto-refresh behavior that fits the operator monitoring use case
-- no direct desktop shortcut from a log entry into torrent detail
+1. shell and inspector refinement
+- make the right-side inspector contextual instead of static
+- decide whether torrents and torrent detail also need toggleable auto-refresh in the desktop client
 
 ## Planned UI Direction
 
@@ -164,6 +162,10 @@ Exit criteria:
 
 ### Slice 4: Dashboard And Logs Observability
 
+Status:
+
+- implemented
+
 Planned changes:
 
 - add a `Completion Callbacks` card on the dashboard with:
@@ -186,6 +188,13 @@ Exit criteria:
 
 - Avalonia supports the same callback-state monitoring workflow the Web dashboard and torrents list now support
 - logs work as a real desktop operations tool instead of a read-only event dump
+
+Delivered:
+
+- dashboard callback lifecycle rollups for pending finalization, invoked, failed, timed out, and retryable torrents
+- dashboard auto-refresh toggle with last-refreshed summary
+- logs auto-refresh toggle with last-refreshed summary
+- direct log-entry navigation into torrent detail when a log entry is tied to a torrent id
 
 ## Recommended Implementation Order
 

@@ -2,13 +2,19 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
 using TorrentCore.Contracts.Host;
+using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.Avalonia.ViewModels;
 
 public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBase
 {
+    private IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
+
     [ObservableProperty]
     private EngineHostStatusDto? _hostStatus;
+
+    [ObservableProperty]
+    private bool _autoRefresh = true;
 
     [ObservableProperty]
     private bool _isLoading;
@@ -16,9 +22,14 @@ public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBas
     [ObservableProperty]
     private string? _errorMessage;
 
+    [ObservableProperty]
+    private string _lastRefreshedText = string.Empty;
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasHostStatus => HostStatus is not null;
+
+    public bool HasLastRefreshed => !string.IsNullOrWhiteSpace(LastRefreshedText);
 
     public string CheckedAtLocalText => HostStatus?.CheckedAtUtc.ToLocalTime().ToString("g") ?? string.Empty;
     public string CurrentDownloadRateText => FormatRate(HostStatus?.CurrentDownloadRateBytesPerSecond ?? 0);
@@ -26,6 +37,11 @@ public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBas
     public string MaxDownloadRateText => FormatRateLimit(HostStatus?.EngineMaximumDownloadRateBytesPerSecond ?? 0);
     public string MaxUploadRateText => FormatRateLimit(HostStatus?.EngineMaximumUploadRateBytesPerSecond ?? 0);
     public string RecoveryCompletedText => HostStatus?.StartupRecoveryCompletedAtUtc?.ToLocalTime().ToString("g") ?? "Not yet completed";
+    public int CallbackPendingCount => CountCallbackState("PendingFinalization");
+    public int CallbackInvokedCount => CountCallbackState("Invoked");
+    public int CallbackFailedCount => CountCallbackState("Failed");
+    public int CallbackTimedOutCount => CountCallbackState("TimedOut");
+    public int CallbackRetryableCount => CallbackFailedCount + CallbackTimedOutCount;
     public string SupportsLiveControlText => HostStatus is null
         ? string.Empty
         : $"Magnet Adds={HostStatus.SupportsMagnetAdds}, Pause={HostStatus.SupportsPause}, Resume={HostStatus.SupportsResume}, Remove={HostStatus.SupportsRemove}";
@@ -48,26 +64,22 @@ public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBas
 
         try
         {
-            HostStatus = await client.GetHostStatusAsync();
-            OnPropertyChanged(nameof(HasHostStatus));
-            OnPropertyChanged(nameof(CheckedAtLocalText));
-            OnPropertyChanged(nameof(CurrentDownloadRateText));
-            OnPropertyChanged(nameof(CurrentUploadRateText));
-            OnPropertyChanged(nameof(MaxDownloadRateText));
-            OnPropertyChanged(nameof(MaxUploadRateText));
-            OnPropertyChanged(nameof(RecoveryCompletedText));
-            OnPropertyChanged(nameof(SupportsLiveControlText));
-            OnPropertyChanged(nameof(HostModelText));
+            var hostStatusTask = client.GetHostStatusAsync();
+            var torrentsTask = client.GetTorrentsAsync();
+            await Task.WhenAll(hostStatusTask, torrentsTask);
+
+            HostStatus = hostStatusTask.Result;
+            _torrents = torrentsTask.Result;
+            LastRefreshedText = DateTimeOffset.Now.ToString("g");
         }
         catch (Exception exception)
         {
             ErrorMessage = $"Unable to load host status: {exception.Message}";
-            OnPropertyChanged(nameof(HasError));
         }
         finally
         {
             IsLoading = false;
-            OnPropertyChanged(nameof(HasError));
+            RaiseComputedState();
         }
     }
 
@@ -76,4 +88,27 @@ public partial class DashboardViewModel(TorrentCoreClient client) : ViewModelBas
 
     private static string FormatRateLimit(int bytesPerSecond) =>
         bytesPerSecond <= 0 ? "Unlimited" : FormatRate(bytesPerSecond);
+
+    private int CountCallbackState(string state) =>
+        _torrents.Count(torrent => string.Equals(torrent.CompletionCallbackState, state, StringComparison.OrdinalIgnoreCase));
+
+    private void RaiseComputedState()
+    {
+        OnPropertyChanged(nameof(HasError));
+        OnPropertyChanged(nameof(HasHostStatus));
+        OnPropertyChanged(nameof(HasLastRefreshed));
+        OnPropertyChanged(nameof(CheckedAtLocalText));
+        OnPropertyChanged(nameof(CurrentDownloadRateText));
+        OnPropertyChanged(nameof(CurrentUploadRateText));
+        OnPropertyChanged(nameof(MaxDownloadRateText));
+        OnPropertyChanged(nameof(MaxUploadRateText));
+        OnPropertyChanged(nameof(RecoveryCompletedText));
+        OnPropertyChanged(nameof(CallbackPendingCount));
+        OnPropertyChanged(nameof(CallbackInvokedCount));
+        OnPropertyChanged(nameof(CallbackFailedCount));
+        OnPropertyChanged(nameof(CallbackTimedOutCount));
+        OnPropertyChanged(nameof(CallbackRetryableCount));
+        OnPropertyChanged(nameof(SupportsLiveControlText));
+        OnPropertyChanged(nameof(HostModelText));
+    }
 }
