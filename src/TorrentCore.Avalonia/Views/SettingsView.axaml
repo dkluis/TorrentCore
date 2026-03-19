@@ -9,7 +9,7 @@
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
         <StackPanel Spacing="4">
           <TextBlock Text="Runtime Settings" Classes="text-page-title" />
-          <TextBlock Text="Queue and policy settings apply live. Engine throttle changes are saved and apply after the service restarts."
+          <TextBlock Text="Operator settings for seeding policy, cleanup, queue concurrency, engine throttling, shared callback configuration, and category routing."
                      Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
         <Button Grid.Column="1"
@@ -179,6 +179,123 @@
         <TextBlock Text="Saved engine throttle settings are pending. Restart TorrentCore.Service to apply them."
                    IsVisible="{Binding EngineSettingsRequireRestart}"
                    Foreground="{DynamicResource WarningTextBrush}" />
+      </StackPanel>
+
+      <StackPanel Spacing="12">
+        <TextBlock Text="Shared Callback Settings" Classes="text-section-title" />
+        <TextBlock Text="These settings describe the shared TVMaze callback entrypoint used after torrent completion. Most operators should only need to enable the callback, set the full script path, and keep the timeout values aligned with the environment."
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+        <Grid ColumnDefinitions="3*,2*" ColumnSpacing="18">
+          <Border Classes="panel-card" Margin="0,0,0,18">
+            <StackPanel Spacing="10">
+              <TextBlock Text="Callback Runtime" Classes="text-panel-title" />
+              <CheckBox Content="Enable completion callback invocation"
+                        IsChecked="{Binding CompletionCallbackEnabled}" />
+              <StackPanel Spacing="4">
+                <TextBlock Text="Command Path" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                <TextBox Text="{Binding CompletionCallbackCommandPath}"
+                         Watermark="/Users/dick/TVMaze/Scripts/torrentcore-callback.zsh" />
+              </StackPanel>
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Process Timeout Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBox Text="{Binding CompletionCallbackTimeoutSeconds}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="4">
+                  <TextBlock Text="Finalization Wait Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBox Text="{Binding CompletionCallbackFinalizationTimeoutSeconds}" />
+                </StackPanel>
+              </Grid>
+              <TextBlock Text="TorrentCore waits this long for the final visible payload before marking the callback timed out."
+                         Classes="text-body-small"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource TextSecondaryBrush}" />
+            </StackPanel>
+          </Border>
+
+          <Border Grid.Column="1" Classes="panel-card" Margin="0,0,0,18">
+            <Expander Header="Advanced Overrides"
+                      IsExpanded="{Binding IsCallbackAdvancedExpanded}">
+              <StackPanel Margin="0,12,0,0" Spacing="10">
+                <TextBlock Text="Leave these blank for the normal centrally managed TVMaze callback setup. They are only needed for unusual launcher or override scenarios."
+                           Classes="text-body-small"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Arguments" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBox Text="{Binding CompletionCallbackArguments}" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Working Directory" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBox Text="{Binding CompletionCallbackWorkingDirectory}" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock Text="API Base URL Override" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBox Text="{Binding CompletionCallbackApiBaseUrlOverride}" />
+                </StackPanel>
+                <StackPanel Spacing="4">
+                  <TextBlock Text="API Key Override" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                  <TextBox Text="{Binding CompletionCallbackApiKeyOverride}" />
+                </StackPanel>
+              </StackPanel>
+            </Expander>
+          </Border>
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Spacing="12">
+        <TextBlock Text="Categories" Classes="text-section-title" />
+        <TextBlock Text="These definitions route future torrent adds. Editing a category does not move existing torrents that were already added."
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource TextSecondaryBrush}" />
+
+        <ItemsControl ItemsSource="{Binding Categories}"
+                      IsVisible="{Binding HasCategories}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:EditableTorrentCategoryViewModel">
+              <Border Classes="panel-card" Margin="0,0,0,14">
+                <StackPanel Spacing="12">
+                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="{Binding Key}" Classes="text-panel-title" />
+                      <TextBlock Text="{Binding DisplayName, StringFormat='Display Name: {0}'}"
+                                 Classes="text-body-small"
+                                 Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+                    <CheckBox Grid.Column="1"
+                              Content="Enabled"
+                              IsChecked="{Binding Enabled}"
+                              VerticalAlignment="Center" />
+                    <CheckBox Grid.Column="2"
+                              Content="Invoke Callback"
+                              IsChecked="{Binding InvokeCompletionCallback}"
+                              VerticalAlignment="Center" />
+                  </Grid>
+
+                  <Grid ColumnDefinitions="120,120,*,100" ColumnSpacing="10">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="Display Name" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                      <TextBox Text="{Binding DisplayName}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                      <TextBlock Text="Callback Label" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                      <TextBox Text="{Binding CallbackLabel}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="4">
+                      <TextBlock Text="Download Root" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                      <TextBox Text="{Binding DownloadRootPath}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Spacing="4">
+                      <TextBlock Text="Sort Order" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                      <TextBox Text="{Binding SortOrder}" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
       </StackPanel>
     </StackPanel>
   </ScrollViewer>

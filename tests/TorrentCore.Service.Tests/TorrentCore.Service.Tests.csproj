@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\TorrentCore.Avalonia\TorrentCore.Avalonia.csproj" />
     <ProjectReference Include="..\..\src\TorrentCore.Client\TorrentCore.Client.csproj" />
     <ProjectReference Include="..\..\src\TorrentCore.Contracts\TorrentCore.Contracts.csproj" />
     <ProjectReference Include="..\..\src\TorrentCore.ServiceHost\TorrentCore.Service.csproj" />

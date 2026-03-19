@@ -133,6 +133,7 @@ Current service configuration section:
 - the repo now includes an ARM-only Avalonia desktop deploy wrapper that publishes `TorrentCore.Avalonia`, builds a macOS `.app` bundle, and syncs both the raw publish output and the bundle to operator-configurable targets
 - TorrentCore Avalonia now has a first product icon asset set based on the `Core + Orbit` design, including a checked-in macOS `.icns` used by the ARM desktop deploy flow
 - the next Avalonia slice is now planned in `Documentation/Avalonia UI Catch-Up Plan.md`, with `Settings` first, then `Torrents`, `Torrent Detail`, and finally `Dashboard` plus `Logs`, while preserving the existing three-column desktop control-center design
+- the Avalonia `Settings` screen now exposes the same shared callback settings and category administration surface as the Web UI, while keeping the existing desktop card layout and moving advanced callback overrides under an expander
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

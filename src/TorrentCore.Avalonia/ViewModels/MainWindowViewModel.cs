@@ -79,7 +79,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 "settings",
                 "Settings",
                 "Runtime policy controls",
-                "Edit seeding, cleanup, queue concurrency, and engine throttle settings from the desktop client."
+                "Edit seeding, cleanup, queue concurrency, callback settings, and category routing from the desktop client."
             ),
         ]);
 

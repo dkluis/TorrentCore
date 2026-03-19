@@ -1,6 +1,8 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
+using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Host;
 
 namespace TorrentCore.Avalonia.ViewModels;
@@ -77,6 +79,33 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
     private int _maxActiveDownloads = 4;
 
     [ObservableProperty]
+    private bool _completionCallbackEnabled;
+
+    [ObservableProperty]
+    private string _completionCallbackCommandPath = string.Empty;
+
+    [ObservableProperty]
+    private string _completionCallbackArguments = string.Empty;
+
+    [ObservableProperty]
+    private string _completionCallbackWorkingDirectory = string.Empty;
+
+    [ObservableProperty]
+    private int _completionCallbackTimeoutSeconds = 30;
+
+    [ObservableProperty]
+    private int _completionCallbackFinalizationTimeoutSeconds = 120;
+
+    [ObservableProperty]
+    private string _completionCallbackApiBaseUrlOverride = string.Empty;
+
+    [ObservableProperty]
+    private string _completionCallbackApiKeyOverride = string.Empty;
+
+    [ObservableProperty]
+    private bool _isCallbackAdvancedExpanded;
+
+    [ObservableProperty]
     private int _appliedMaxConnections = 150;
 
     [ObservableProperty]
@@ -90,6 +119,8 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
 
     [ObservableProperty]
     private bool _engineSettingsRequireRestart;
+
+    public ObservableCollection<EditableTorrentCategoryViewModel> Categories { get; } = [];
 
     public IReadOnlyList<string> SeedingModes { get; } =
     [
@@ -108,6 +139,7 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
 
     public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public bool HasCategories => Categories.Count > 0;
     public string AppliedDownloadRateText => FormatRateLimit(AppliedDownloadRateBytesPerSecond);
     public string AppliedUploadRateText => FormatRateLimit(AppliedUploadRateBytesPerSecond);
 
@@ -143,16 +175,39 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
                 EngineMaximumUploadRateBytesPerSecond = EngineMaximumUploadRateBytesPerSecond,
                 MaxActiveMetadataResolutions = MaxActiveMetadataResolutions,
                 MaxActiveDownloads = MaxActiveDownloads,
+                CompletionCallbackEnabled = CompletionCallbackEnabled,
+                CompletionCallbackCommandPath = CompletionCallbackCommandPath,
+                CompletionCallbackArguments = CompletionCallbackArguments,
+                CompletionCallbackWorkingDirectory = CompletionCallbackWorkingDirectory,
+                CompletionCallbackTimeoutSeconds = CompletionCallbackTimeoutSeconds,
+                CompletionCallbackFinalizationTimeoutSeconds = CompletionCallbackFinalizationTimeoutSeconds,
+                CompletionCallbackApiBaseUrlOverride = CompletionCallbackApiBaseUrlOverride,
+                CompletionCallbackApiKeyOverride = CompletionCallbackApiKeyOverride,
             });
 
+            var updatedCategories = new List<TorrentCategoryDto>(Categories.Count);
+            foreach (var category in Categories.OrderBy(item => item.SortOrder).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                updatedCategories.Add(await client.UpdateCategoryAsync(category.Key, new UpdateTorrentCategoryRequest
+                {
+                    DisplayName = category.DisplayName,
+                    CallbackLabel = category.CallbackLabel,
+                    DownloadRootPath = category.DownloadRootPath,
+                    Enabled = category.Enabled,
+                    InvokeCompletionCallback = category.InvokeCompletionCallback,
+                    SortOrder = category.SortOrder,
+                }));
+            }
+
             Apply(settings);
+            ApplyCategories(updatedCategories);
             Message = settings.EngineSettingsRequireRestart
-                ? "Runtime settings saved. Restart TorrentCore.Service to apply engine throttle changes."
-                : "Runtime settings saved.";
+                ? "Runtime settings and categories saved. Restart TorrentCore.Service to apply engine throttle changes."
+                : "Runtime settings and categories saved.";
         }
         catch (Exception exception)
         {
-            ErrorMessage = $"Unable to save runtime settings: {exception.Message}";
+            ErrorMessage = $"Unable to save runtime settings and categories: {exception.Message}";
         }
         finally
         {
@@ -174,7 +229,10 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
 
         try
         {
-            var settings = await client.GetRuntimeSettingsAsync();
+            var settingsTask = client.GetRuntimeSettingsAsync();
+            var categoriesTask = client.GetCategoriesAsync();
+            await Task.WhenAll(settingsTask, categoriesTask);
+            var settings = settingsTask.Result;
             if (settings is null)
             {
                 ErrorMessage = "Runtime settings endpoint returned no payload.";
@@ -182,10 +240,11 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
             }
 
             Apply(settings);
+            ApplyCategories(categoriesTask.Result);
         }
         catch (Exception exception)
         {
-            ErrorMessage = $"Unable to load runtime settings: {exception.Message}";
+            ErrorMessage = $"Unable to load runtime settings and categories: {exception.Message}";
         }
         finally
         {
@@ -217,6 +276,14 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
         EngineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond;
         MaxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions;
         MaxActiveDownloads = settings.MaxActiveDownloads;
+        CompletionCallbackEnabled = settings.CompletionCallbackEnabled;
+        CompletionCallbackCommandPath = settings.CompletionCallbackCommandPath ?? string.Empty;
+        CompletionCallbackArguments = settings.CompletionCallbackArguments ?? string.Empty;
+        CompletionCallbackWorkingDirectory = settings.CompletionCallbackWorkingDirectory ?? string.Empty;
+        CompletionCallbackTimeoutSeconds = settings.CompletionCallbackTimeoutSeconds;
+        CompletionCallbackFinalizationTimeoutSeconds = settings.CompletionCallbackFinalizationTimeoutSeconds;
+        CompletionCallbackApiBaseUrlOverride = settings.CompletionCallbackApiBaseUrlOverride ?? string.Empty;
+        CompletionCallbackApiKeyOverride = settings.CompletionCallbackApiKeyOverride ?? string.Empty;
         AppliedMaxConnections = settings.AppliedEngineMaximumConnections;
         AppliedHalfOpenConnections = settings.AppliedEngineMaximumHalfOpenConnections;
         AppliedDownloadRateBytesPerSecond = settings.AppliedEngineMaximumDownloadRateBytesPerSecond;
@@ -225,10 +292,33 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
         RaiseComputedState();
     }
 
+    private void ApplyCategories(IReadOnlyList<TorrentCategoryDto> categories)
+    {
+        Categories.Clear();
+
+        foreach (var category in categories
+                     .OrderBy(item => item.SortOrder)
+                     .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            Categories.Add(new EditableTorrentCategoryViewModel(category.Key)
+            {
+                DisplayName = category.DisplayName,
+                CallbackLabel = category.CallbackLabel,
+                DownloadRootPath = category.DownloadRootPath,
+                Enabled = category.Enabled,
+                InvokeCompletionCallback = category.InvokeCompletionCallback,
+                SortOrder = category.SortOrder,
+            });
+        }
+
+        OnPropertyChanged(nameof(HasCategories));
+    }
+
     private void RaiseComputedState()
     {
         OnPropertyChanged(nameof(HasMessage));
         OnPropertyChanged(nameof(HasError));
+        OnPropertyChanged(nameof(HasCategories));
         OnPropertyChanged(nameof(AppliedDownloadRateText));
         OnPropertyChanged(nameof(AppliedUploadRateText));
     }

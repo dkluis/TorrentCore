@@ -9,6 +9,11 @@ Bring `TorrentCore.Avalonia` up to date with the current operator capabilities i
 
 This is a parity plan, not a visual port of the Web UI.
 
+Current status:
+
+- Slice 1 (`Settings` parity) is now implemented
+- `Torrents`, `Torrent Detail`, and `Dashboard` plus `Logs` remain pending
+
 ## Design Guardrails
 
 Keep these Avalonia concepts in place:
@@ -76,6 +81,10 @@ Inspector usage by screen:
 ### Slice 1: Settings Parity
 
 This is the highest-value catch-up slice because it unlocks desktop-side administration of the current live runtime model.
+
+Status:
+
+- implemented
 
 Planned changes:
 
