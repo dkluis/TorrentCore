@@ -12,7 +12,8 @@ This is a parity plan, not a visual port of the Web UI.
 Current status:
 
 - Slice 1 (`Settings` parity) is now implemented
-- `Torrents`, `Torrent Detail`, and `Dashboard` plus `Logs` remain pending
+- Slice 2 (`Torrents` parity) is now implemented
+- `Torrent Detail` and `Dashboard` plus `Logs` remain pending
 
 ## Design Guardrails
 
@@ -113,6 +114,10 @@ Exit criteria:
 - Avalonia can manage category routing definitions already supported by the Web UI
 
 ### Slice 2: Torrents Parity
+
+Status:
+
+- implemented
 
 Planned changes:
 

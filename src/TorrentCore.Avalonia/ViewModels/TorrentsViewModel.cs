@@ -3,22 +3,35 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
+using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.Avalonia.ViewModels;
 
 public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> showTorrentDetail) : ViewModelBase
 {
+    private const string AllCategoryFilterKey = "__all";
+    private const string UncategorizedCategoryFilterKey = "__uncategorized";
     private readonly List<TorrentListItemViewModel> _allTorrents = [];
+    private readonly Dictionary<string, string> _categoryDisplayNames = new(StringComparer.OrdinalIgnoreCase);
 
     [ObservableProperty]
     private string _magnetUri = string.Empty;
+
+    [ObservableProperty]
+    private TorrentCategoryOptionViewModel? _selectedAddCategory;
 
     [ObservableProperty]
     private string _nameFilter = string.Empty;
 
     [ObservableProperty]
     private string _selectedStatus = "All";
+
+    [ObservableProperty]
+    private TorrentCategoryOptionViewModel? _selectedCategoryFilter;
+
+    [ObservableProperty]
+    private string _selectedCallbackState = "All";
 
     [ObservableProperty]
     private string _selectedSort = "Added (Newest)";
@@ -39,10 +52,20 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
     private string? _actionMessage;
 
     public ObservableCollection<TorrentListItemViewModel> VisibleTorrents { get; } = [];
+    public ObservableCollection<TorrentCategoryOptionViewModel> AddCategoryOptions { get; } = [];
+    public ObservableCollection<TorrentCategoryOptionViewModel> CategoryFilterOptions { get; } = [];
     public ObservableCollection<string> StatusOptions { get; } = new(
     [
         "All",
         ..Enum.GetNames<TorrentState>(),
+    ]);
+    public ObservableCollection<string> CallbackStateOptions { get; } = new(
+    [
+        "All",
+        "PendingFinalization",
+        "Invoked",
+        "Failed",
+        "TimedOut",
     ]);
     public ObservableCollection<string> SortOptions { get; } = new(
     [
@@ -68,6 +91,8 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
 
     partial void OnNameFilterChanged(string value) => RebuildVisibleTorrents();
     partial void OnSelectedStatusChanged(string value) => RebuildVisibleTorrents();
+    partial void OnSelectedCategoryFilterChanged(TorrentCategoryOptionViewModel? value) => RebuildVisibleTorrents();
+    partial void OnSelectedCallbackStateChanged(string value) => RebuildVisibleTorrents();
     partial void OnSelectedSortChanged(string value) => RebuildVisibleTorrents();
 
     [RelayCommand]
@@ -88,10 +113,19 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
 
         try
         {
-            var detail = await client.AddMagnetAsync(new AddMagnetRequest { MagnetUri = MagnetUri.Trim() });
+            var detail = await client.AddMagnetAsync(new AddMagnetRequest
+            {
+                MagnetUri = MagnetUri.Trim(),
+                CategoryKey = string.IsNullOrWhiteSpace(SelectedAddCategory?.Key) ? null : SelectedAddCategory.Key,
+            });
             SubmitMessage = $"Added torrent '{detail.Name}' in state '{detail.State}'.";
             MagnetUri = string.Empty;
+            SelectedAddCategory = ResolveDefaultAddCategory();
             await LoadAsync();
+        }
+        catch (TorrentCoreClientException exception)
+        {
+            SubmitMessage = exception.ServiceError?.Message ?? exception.Message;
         }
         catch (Exception exception)
         {
@@ -222,6 +256,23 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
     }
 
     [RelayCommand]
+    public async Task RetryCompletionCallbackAsync(TorrentListItemViewModel? torrent)
+    {
+        if (torrent is null || torrent.IsBusy || !torrent.CanRetryCompletionCallback)
+        {
+            return;
+        }
+
+        await RunItemActionAsync(
+            torrent,
+            async () =>
+            {
+                var result = await client.RetryCompletionCallbackAsync(torrent.TorrentId);
+                ActionMessage = $"Queued completion callback retry for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
+    [RelayCommand]
     public void OpenDetail(TorrentListItemViewModel? torrent)
     {
         if (torrent is null)
@@ -245,13 +296,20 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
         try
         {
             var selectedIds = _allTorrents.Where(item => item.IsSelected).Select(item => item.TorrentId).ToHashSet();
+            var selectedAddCategoryKey = SelectedAddCategory?.Key;
+            var selectedCategoryFilterKey = SelectedCategoryFilter?.Key;
             foreach (var item in _allTorrents)
             {
                 item.PropertyChanged -= HandleTorrentPropertyChanged;
             }
 
             _allTorrents.Clear();
-            var torrents = await client.GetTorrentsAsync();
+            var categoriesTask = client.GetCategoriesAsync();
+            var torrentsTask = client.GetTorrentsAsync();
+            await Task.WhenAll(categoriesTask, torrentsTask);
+
+            ApplyCategoryOptions(categoriesTask.Result, selectedAddCategoryKey, selectedCategoryFilterKey);
+            var torrents = torrentsTask.Result;
 
             foreach (var torrent in torrents.OrderByDescending(item => item.AddedAtUtc))
             {
@@ -261,7 +319,9 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
                     PauseAsync,
                     ResumeAsync,
                     RemoveAsync,
-                    DeleteDataAsync)
+                    DeleteDataAsync,
+                    RetryCompletionCallbackAsync,
+                    FormatCategory(torrent.CategoryKey))
                 {
                     IsSelected = selectedIds.Contains(torrent.TorrentId),
                 };
@@ -361,6 +421,9 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
             .Where(item => string.IsNullOrWhiteSpace(NameFilter) || item.Name.Contains(NameFilter, StringComparison.OrdinalIgnoreCase))
             .Where(item => string.Equals(SelectedStatus, "All", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(item.State.ToString(), SelectedStatus, StringComparison.OrdinalIgnoreCase))
+            .Where(MatchesCategoryFilter)
+            .Where(item => string.Equals(SelectedCallbackState, "All", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(item.CompletionCallbackState, SelectedCallbackState, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
         filtered = SelectedSort switch
@@ -399,5 +462,109 @@ public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> sh
         OnPropertyChanged(nameof(HasError));
         OnPropertyChanged(nameof(HasActionMessage));
         OnPropertyChanged(nameof(HasSubmitMessage));
+    }
+
+    private void ApplyCategoryOptions(
+        IReadOnlyList<TorrentCategoryDto> categories,
+        string? selectedAddCategoryKey,
+        string? selectedCategoryFilterKey)
+    {
+        _categoryDisplayNames.Clear();
+        AddCategoryOptions.Clear();
+        CategoryFilterOptions.Clear();
+
+        AddCategoryOptions.Add(new TorrentCategoryOptionViewModel
+        {
+            Key = string.Empty,
+            DisplayName = "Uncategorized",
+        });
+
+        CategoryFilterOptions.Add(new TorrentCategoryOptionViewModel
+        {
+            Key = AllCategoryFilterKey,
+            DisplayName = "All",
+        });
+        CategoryFilterOptions.Add(new TorrentCategoryOptionViewModel
+        {
+            Key = UncategorizedCategoryFilterKey,
+            DisplayName = "Uncategorized",
+        });
+
+        foreach (var category in categories
+                     .OrderBy(item => item.SortOrder)
+                     .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase))
+        {
+            _categoryDisplayNames[category.Key] = category.DisplayName;
+
+            if (category.Enabled)
+            {
+                AddCategoryOptions.Add(new TorrentCategoryOptionViewModel
+                {
+                    Key = category.Key,
+                    DisplayName = category.DisplayName,
+                });
+            }
+
+            CategoryFilterOptions.Add(new TorrentCategoryOptionViewModel
+            {
+                Key = category.Key,
+                DisplayName = category.DisplayName,
+            });
+        }
+
+        SelectedAddCategory = ResolveAddCategoryByKey(selectedAddCategoryKey) ?? ResolveDefaultAddCategory();
+        SelectedCategoryFilter = ResolveCategoryFilterByKey(selectedCategoryFilterKey) ?? CategoryFilterOptions.FirstOrDefault();
+    }
+
+    private bool MatchesCategoryFilter(TorrentListItemViewModel item)
+    {
+        var selectedKey = SelectedCategoryFilter?.Key ?? AllCategoryFilterKey;
+        if (string.Equals(selectedKey, AllCategoryFilterKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(selectedKey, UncategorizedCategoryFilterKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(item.CategoryKey);
+        }
+
+        return string.Equals(item.CategoryKey, selectedKey, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private TorrentCategoryOptionViewModel ResolveDefaultAddCategory() =>
+        AddCategoryOptions.FirstOrDefault(option => string.Equals(option.Key, "TV", StringComparison.OrdinalIgnoreCase))
+        ?? AddCategoryOptions.First();
+
+    private TorrentCategoryOptionViewModel? ResolveAddCategoryByKey(string? key)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        return AddCategoryOptions.FirstOrDefault(option => string.Equals(option.Key, key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private TorrentCategoryOptionViewModel? ResolveCategoryFilterByKey(string? key)
+    {
+        if (key is null)
+        {
+            return null;
+        }
+
+        return CategoryFilterOptions.FirstOrDefault(option => string.Equals(option.Key, key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private string FormatCategory(string? categoryKey)
+    {
+        if (string.IsNullOrWhiteSpace(categoryKey))
+        {
+            return "Uncategorized";
+        }
+
+        return _categoryDisplayNames.TryGetValue(categoryKey, out var displayName)
+            ? displayName
+            : categoryKey;
     }
 }

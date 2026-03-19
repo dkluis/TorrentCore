@@ -12,7 +12,9 @@ public partial class TorrentListItemViewModel : ViewModelBase
         Func<TorrentListItemViewModel, Task> pause,
         Func<TorrentListItemViewModel, Task> resume,
         Func<TorrentListItemViewModel, Task> remove,
-        Func<TorrentListItemViewModel, Task> deleteData)
+        Func<TorrentListItemViewModel, Task> deleteData,
+        Func<TorrentListItemViewModel, Task> retryCompletionCallback,
+        string categoryText)
     {
         TorrentId = dto.TorrentId;
         OpenDetailCommand = new RelayCommand(() => openDetail(this));
@@ -20,7 +22,8 @@ public partial class TorrentListItemViewModel : ViewModelBase
         ResumeCommand = new AsyncRelayCommand(() => resume(this));
         RemoveCommand = new AsyncRelayCommand(() => remove(this));
         DeleteDataCommand = new AsyncRelayCommand(() => deleteData(this));
-        Apply(dto);
+        RetryCompletionCallbackCommand = new AsyncRelayCommand(() => retryCompletionCallback(this));
+        Apply(dto, categoryText);
     }
 
     public Guid TorrentId { get; }
@@ -29,12 +32,19 @@ public partial class TorrentListItemViewModel : ViewModelBase
     public IAsyncRelayCommand ResumeCommand { get; }
     public IAsyncRelayCommand RemoveCommand { get; }
     public IAsyncRelayCommand DeleteDataCommand { get; }
+    public IAsyncRelayCommand RetryCompletionCallbackCommand { get; }
 
     [ObservableProperty]
     private bool _isSelected;
 
     [ObservableProperty]
     private string _name = string.Empty;
+
+    [ObservableProperty]
+    private string? _categoryKey;
+
+    [ObservableProperty]
+    private string _categoryText = "Uncategorized";
 
     [ObservableProperty]
     private TorrentState _state;
@@ -70,6 +80,12 @@ public partial class TorrentListItemViewModel : ViewModelBase
     private DateTimeOffset? _lastActivityAtUtc;
 
     [ObservableProperty]
+    private string? _completionCallbackState;
+
+    [ObservableProperty]
+    private string? _completionCallbackLastError;
+
+    [ObservableProperty]
     private string? _errorMessage;
 
     [ObservableProperty]
@@ -85,6 +101,9 @@ public partial class TorrentListItemViewModel : ViewModelBase
     private bool _canDeleteData;
 
     [ObservableProperty]
+    private bool _canRetryCompletionCallback;
+
+    [ObservableProperty]
     private bool _isBusy;
 
     public string ProgressText => $"{ProgressPercent:0.0}%";
@@ -94,6 +113,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
     public string CompletedAtLocalText => CompletedAtUtc?.ToLocalTime().ToString("g") ?? "Not completed";
     public string LastActivityAtLocalText => LastActivityAtUtc?.ToLocalTime().ToString("g") ?? "No recent activity";
     public bool HasErrorMessage => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public bool HasCompletionCallbackLastError => !string.IsNullOrWhiteSpace(CompletionCallbackLastError);
 
     public string WaitReasonText => WaitReason switch
     {
@@ -111,9 +131,18 @@ public partial class TorrentListItemViewModel : ViewModelBase
             ? WaitReasonText
             : $"{WaitReasonText} (#{QueuePosition.Value})";
 
-    public void Apply(TorrentSummaryDto dto)
+    public string CompletionCallbackStateText =>
+        !string.IsNullOrWhiteSpace(CompletionCallbackState)
+            ? CompletionCallbackState!
+            : CompletedAtUtc is null
+                ? "Waiting for completion"
+                : "Not requested";
+
+    public void Apply(TorrentSummaryDto dto, string categoryText)
     {
         Name = dto.Name;
+        CategoryKey = dto.CategoryKey;
+        CategoryText = categoryText;
         State = dto.State;
         ProgressPercent = dto.ProgressPercent;
         DownloadRateBytesPerSecond = dto.DownloadRateBytesPerSecond;
@@ -125,7 +154,10 @@ public partial class TorrentListItemViewModel : ViewModelBase
         AddedAtUtc = dto.AddedAtUtc;
         CompletedAtUtc = dto.CompletedAtUtc;
         LastActivityAtUtc = dto.LastActivityAtUtc;
+        CompletionCallbackState = dto.CompletionCallbackState;
+        CompletionCallbackLastError = dto.CompletionCallbackLastError;
         ErrorMessage = dto.ErrorMessage;
+        CanRetryCompletionCallback = dto.CanRetryCompletionCallback;
         CanPause = dto.CanPause;
         CanResume = dto.CanResume;
         CanRemove = dto.CanRemove;
@@ -139,6 +171,8 @@ public partial class TorrentListItemViewModel : ViewModelBase
         OnPropertyChanged(nameof(AddedAtLocalText));
         OnPropertyChanged(nameof(CompletedAtLocalText));
         OnPropertyChanged(nameof(LastActivityAtLocalText));
+        OnPropertyChanged(nameof(CompletionCallbackStateText));
         OnPropertyChanged(nameof(HasErrorMessage));
+        OnPropertyChanged(nameof(HasCompletionCallbackLastError));
     }
 }

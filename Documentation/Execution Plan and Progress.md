@@ -134,6 +134,7 @@ Current service configuration section:
 - TorrentCore Avalonia now has a first product icon asset set based on the `Core + Orbit` design, including a checked-in macOS `.icns` used by the ARM desktop deploy flow
 - the next Avalonia slice is now planned in `Documentation/Avalonia UI Catch-Up Plan.md`, with `Settings` first, then `Torrents`, `Torrent Detail`, and finally `Dashboard` plus `Logs`, while preserving the existing three-column desktop control-center design
 - the Avalonia `Settings` screen now exposes the same shared callback settings and category administration surface as the Web UI, while keeping the existing desktop card layout and moving advanced callback overrides under an expander
+- the Avalonia `Torrents` screen now supports category-aware magnet adds with `TV` as the default when available, category and callback-state filtering, category and callback-state display in each torrent card, and retrying eligible completion callbacks from the list
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

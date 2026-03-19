@@ -67,7 +67,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 "torrents",
                 "Torrents",
                 "Magnets and lifecycle actions",
-                "Add magnets, filter the torrent list, select multiple torrents, and run operator actions."
+                "Add categorized magnets, filter by callback state, select multiple torrents, and run operator actions including callback retry."
             ),
             new NavigationSection(
                 "logs",

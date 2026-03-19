@@ -339,7 +339,7 @@ Status:
   - category selection during magnet add, with `TV` preselected when that seeded category is enabled
   - category filtering/display in the torrent list
   - richer torrent-detail callback diagnostics, including the final payload path, pending reason, and the latest callback event/process metadata
-- Avalonia `Settings` now supports category and shared callback administration; remaining desktop parity work for torrent list/detail and callback observability is tracked in `Documentation/Avalonia UI Catch-Up Plan.md`
+- Avalonia `Settings` and `Torrents` now support category administration, shared callback administration, category-aware magnet adds, callback-state filtering, and callback retry; remaining desktop parity work for torrent detail and callback observability is tracked in `Documentation/Avalonia UI Catch-Up Plan.md`
 
 ## Test Expectations
 
