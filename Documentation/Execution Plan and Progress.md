@@ -130,6 +130,9 @@ Current service configuration section:
 - the Web UI callback settings now place the TVMaze API override fields under an explicit advanced area so the main operator flow matches the normal centrally managed TVMaze deployment model
 - the Web UI callback settings now treat `Arguments` and `WorkingDirectory` as advanced-only too, leaving the normal operator flow centered on enable, full script path, and timeout
 - the Web and Avalonia UIs now support runtime service-endpoint bootstrap for LAN deployments: the Web host persists one global tested backend endpoint, Avalonia persists a local tested endpoint, and both UIs can recover from an unreachable service without changing repo defaults
+- the repo now includes an ARM-only Avalonia desktop deploy wrapper that publishes `TorrentCore.Avalonia`, builds a macOS `.app` bundle, and syncs both the raw publish output and the bundle to operator-configurable targets
+- TorrentCore Avalonia now has a first product icon asset set based on the `Core + Orbit` design, including a checked-in macOS `.icns` used by the ARM desktop deploy flow
+- the next Avalonia slice is now planned in `Documentation/Avalonia UI Catch-Up Plan.md`, with `Settings` first, then `Torrents`, `Torrent Detail`, and finally `Dashboard` plus `Logs`, while preserving the existing three-column desktop control-center design
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

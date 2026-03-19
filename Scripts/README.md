@@ -3,6 +3,7 @@
 This folder contains:
 - runtime control scripts intended to live on the deployed host under `~/TorrentCore/Scripts`
 - deploy scripts intended to run from the repo on the development machine and sync to either the Intel or Arm deployment target
+- one ARM desktop deploy script for the Avalonia app that publishes and bundles a macOS `.app`
 
 ## Execution Model
 
@@ -42,6 +43,10 @@ What is copied to the target host `Scripts` directory:
 What is not copied to the target host:
 - `deploy-*.zsh`
 
+Desktop app note:
+- `TorrentCore.Avalonia` is not managed through the start/stop/restart runtime scripts
+- its deploy script builds a macOS `.app` bundle for ARM Macs instead
+
 ## Runtime Files
 
 The scripts create:
@@ -76,6 +81,7 @@ From the repo root on the development machine:
 ./Scripts/deploy-service-arm.zsh
 ./Scripts/deploy-webui-arm.zsh
 ./Scripts/deploy-all-arm.zsh
+./Scripts/deploy-avalonia-arm.zsh
 ```
 
 Optional restart during deploy:
@@ -85,6 +91,20 @@ Optional restart during deploy:
 ```
 
 Use `--restart` only when the deploy script is being run on the same host that will run TorrentCore.
+
+Desktop app deploy:
+
+```bash
+./Scripts/deploy-avalonia-arm.zsh
+```
+
+That script:
+- publishes `src/TorrentCore.Avalonia`
+- creates a macOS `.app` bundle
+- syncs raw publish output to `TORRENTCORE_AVALONIA_PUBLISH_TARGET`
+- syncs the `.app` bundle to `TORRENTCORE_AVALONIA_APP_TARGET`
+- when the deploy target is local to the current ARM machine, also mirrors the `.app` bundle to `/Applications` by default
+- optionally syncs a second `.app` bundle copy to `TORRENTCORE_AVALONIA_APP_MIRROR_TARGET`
 
 For cross-machine deploy over a mounted share:
 1. run the deploy script without `--restart`
@@ -185,6 +205,11 @@ Useful overrides:
 - `TORRENTCORE_PUBLISH_RUNTIME`
 - `TORRENTCORE_PUBLISH_RUNTIME_INTEL`
 - `TORRENTCORE_PUBLISH_RUNTIME_ARM`
+- `TORRENTCORE_AVALONIA_PUBLISH_TARGET`
+- `TORRENTCORE_AVALONIA_APP_TARGET`
+- `TORRENTCORE_AVALONIA_APP_MIRROR_TARGET`
+- `TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET`
+- `TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR`
 
 ## Remote Web Access
 

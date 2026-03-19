@@ -22,6 +22,17 @@ fi
 : "${TORRENTCORE_SERVICE_URLS:=http://127.0.0.1:7033}"
 : "${TORRENTCORE_WEBUI_URLS:=http://127.0.0.1:7053}"
 : "${TORRENTCORE_WEBUI_SERVICE_BASE_URL:=http://127.0.0.1:7033/}"
+: "${TORRENTCORE_AVALONIA_PUBLISH_TARGET:=}"
+: "${TORRENTCORE_AVALONIA_APP_TARGET:=}"
+: "${TORRENTCORE_AVALONIA_APP_MIRROR_TARGET:=}"
+: "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET:=/Applications}"
+: "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR:=auto}"
+: "${TORRENTCORE_AVALONIA_BUNDLE_NAME:=TorrentCore}"
+: "${TORRENTCORE_AVALONIA_DISPLAY_NAME:=TorrentCore Control Center}"
+: "${TORRENTCORE_AVALONIA_BUNDLE_IDENTIFIER:=com.torrentcore.controlcenter}"
+: "${TORRENTCORE_AVALONIA_EXECUTABLE_NAME:=TorrentCore.Avalonia}"
+: "${TORRENTCORE_AVALONIA_ICON_PATH:=}"
+: "${TORRENTCORE_AVALONIA_ICON_NAME:=TorrentCore.icns}"
 : "${TORRENTCORE_ARTIFACT_SEGMENT:=intel}"
 
 tc_timestamp() {
@@ -62,6 +73,13 @@ tc_is_loopback_url() {
   local url="$1"
 
   [[ "${url}" == http://127.0.0.1* || "${url}" == https://127.0.0.1* || "${url}" == http://localhost* || "${url}" == https://localhost* ]]
+}
+
+tc_path_is_within_home() {
+  local path="$1"
+  local normalized_home="${HOME%/}"
+
+  [[ "${path}" == "${normalized_home}" || "${path}" == "${normalized_home}/"* ]]
 }
 
 tc_log_runtime_override_status() {
@@ -276,6 +294,132 @@ tc_sync_directory() {
   tc_require_command rsync
   mkdir -p "${target_dir}"
   rsync -a --delete "${source_dir}/" "${target_dir}/"
+}
+
+tc_create_macos_app_bundle() {
+  local publish_dir="$1"
+  local bundle_output_dir="$2"
+  local executable_name="$3"
+  local bundle_name="$4"
+  local display_name="$5"
+  local bundle_identifier="$6"
+  local icon_path="${7:-}"
+  local icon_name="${8:-}"
+  local app_bundle="${bundle_output_dir}/${bundle_name}.app"
+  local app_contents="${app_bundle}/Contents"
+  local app_macos="${app_contents}/MacOS"
+  local app_resources="${app_contents}/Resources"
+
+  tc_require_command rsync
+  tc_require_file "${publish_dir}/${executable_name}"
+
+  rm -rf "${app_bundle}"
+  mkdir -p "${app_macos}" "${app_resources}"
+  rsync -a --exclude "*.app" "${publish_dir}/" "${app_macos}/"
+  chmod +x "${app_macos}/${executable_name}" || true
+
+  if [[ -n "${icon_path}" && -f "${icon_path}" ]]; then
+    cp "${icon_path}" "${app_resources}/${icon_name}"
+  fi
+
+  cat > "${app_contents}/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>${bundle_name}</string>
+    <key>CFBundleDisplayName</key>
+    <string>${display_name}</string>
+    <key>CFBundleIdentifier</key>
+    <string>${bundle_identifier}</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleExecutable</key>
+    <string>${executable_name}</string>
+EOF
+
+  if [[ -n "${icon_path}" && -f "${icon_path}" ]]; then
+    cat >> "${app_contents}/Info.plist" <<EOF
+    <key>CFBundleIconFile</key>
+    <string>${icon_name}</string>
+EOF
+  fi
+
+  cat >> "${app_contents}/Info.plist" <<EOF
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+  print -- "${app_bundle}"
+}
+
+tc_sync_app_bundle() {
+  local app_bundle="$1"
+  local target_dir="$2"
+  local bundle_name
+
+  if [[ -z "${target_dir}" ]]; then
+    return 0
+  fi
+
+  tc_require_command rsync
+  mkdir -p "${target_dir}"
+  bundle_name="$(basename "${app_bundle}")"
+  rm -rf "${target_dir}/${bundle_name}"
+  rsync -a "${app_bundle}" "${target_dir}/"
+}
+
+tc_apply_avalonia_target_defaults() {
+  local repo_root=""
+  local default_icon_path=""
+  local should_enable_system_mirror=false
+
+  if [[ -z "${TORRENTCORE_AVALONIA_PUBLISH_TARGET}" ]]; then
+    export TORRENTCORE_AVALONIA_PUBLISH_TARGET="${TORRENTCORE_DEPLOY_BASE}/Avalonia"
+  fi
+
+  if [[ -z "${TORRENTCORE_AVALONIA_APP_TARGET}" ]]; then
+    export TORRENTCORE_AVALONIA_APP_TARGET="${TORRENTCORE_DEPLOY_BASE}/Applications"
+  fi
+
+  if [[ -z "${TORRENTCORE_AVALONIA_ICON_PATH}" ]]; then
+    repo_root="$(tc_resolve_repo_root)"
+    default_icon_path="${repo_root}/src/TorrentCore.Avalonia/Assets/TorrentCore.icns"
+    if [[ -f "${default_icon_path}" ]]; then
+      export TORRENTCORE_AVALONIA_ICON_PATH="${default_icon_path}"
+    fi
+  fi
+
+  case "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR}" in
+    auto)
+      if tc_path_is_within_home "${TORRENTCORE_DEPLOY_BASE}"; then
+        should_enable_system_mirror=true
+      fi
+      ;;
+    always)
+      should_enable_system_mirror=true
+      ;;
+    never)
+      should_enable_system_mirror=false
+      ;;
+    *)
+      tc_log_error "Unknown TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR value '${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR}'. Expected auto, always, or never."
+      return 1
+      ;;
+  esac
+
+  if [[ "${should_enable_system_mirror}" == true &&
+        -z "${TORRENTCORE_AVALONIA_APP_MIRROR_TARGET}" &&
+        "${TORRENTCORE_AVALONIA_APP_TARGET}" != "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET}" ]]; then
+    export TORRENTCORE_AVALONIA_APP_MIRROR_TARGET="${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET}"
+  fi
 }
 
 tc_sync_scripts_to_target() {

@@ -339,7 +339,7 @@ Status:
   - category selection during magnet add, with `TV` preselected when that seeded category is enabled
   - category filtering/display in the torrent list
   - richer torrent-detail callback diagnostics, including the final payload path, pending reason, and the latest callback event/process metadata
-- Avalonia catch-up is still pending
+- Avalonia catch-up is still pending implementation, with the planned desktop parity work captured in `Documentation/Avalonia UI Catch-Up Plan.md`
 
 ## Test Expectations
 

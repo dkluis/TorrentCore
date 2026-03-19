@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="128" x2="864" y2="896" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#253842" />
+      <stop offset="0.5" stop-color="#1C2B33" />
+      <stop offset="1" stop-color="#10181D" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(512 494) rotate(90) scale(290)">
+      <stop offset="0" stop-color="#F6FBFF" stop-opacity="0.95" />
+      <stop offset="0.35" stop-color="#DDEFFF" stop-opacity="0.9" />
+      <stop offset="0.7" stop-color="#BBD9F5" stop-opacity="0.75" />
+      <stop offset="1" stop-color="#8FB5D4" stop-opacity="0.15" />
+    </radialGradient>
+    <linearGradient id="ring" x1="356" y1="312" x2="694" y2="710" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8FCFF" />
+      <stop offset="0.42" stop-color="#DCEEFF" />
+      <stop offset="1" stop-color="#A4C9E6" />
+    </linearGradient>
+    <linearGradient id="ringSoft" x1="314" y1="378" x2="736" y2="640" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C7E1F7" stop-opacity="0.95" />
+      <stop offset="1" stop-color="#88AFCF" stop-opacity="0.82" />
+    </linearGradient>
+    <linearGradient id="core" x1="438" y1="392" x2="612" y2="610" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FCFEFF" />
+      <stop offset="0.4" stop-color="#E8F4FF" />
+      <stop offset="1" stop-color="#B8D7F4" />
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#091116" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <rect x="96" y="96" width="832" height="832" rx="196" fill="url(#bg)" />
+  <rect x="96" y="96" width="832" height="832" rx="196" fill="none" stroke="#344A57" stroke-width="6" opacity="0.65" />
+
+  <circle cx="512" cy="512" r="248" fill="url(#glow)" opacity="0.38" />
+
+  <g filter="url(#softShadow)">
+    <path d="M512 272
+             A240 240 0 0 1 742 440"
+          fill="none"
+          stroke="url(#ring)"
+          stroke-width="66"
+          stroke-linecap="round" />
+
+    <path d="M774 532
+             A268 268 0 0 1 600 760"
+          fill="none"
+          stroke="url(#ringSoft)"
+          stroke-width="38"
+          stroke-linecap="round"
+          opacity="0.98" />
+
+    <path d="M420 762
+             A252 252 0 0 1 256 534"
+          fill="none"
+          stroke="url(#ring)"
+          stroke-width="48"
+          stroke-linecap="round"
+          opacity="0.95" />
+
+    <path d="M292 430
+             A228 228 0 0 1 430 288"
+          fill="none"
+          stroke="url(#ringSoft)"
+          stroke-width="34"
+          stroke-linecap="round"
+          opacity="0.88" />
+
+    <path d="M530 688
+             C602 700 656 756 660 826"
+          fill="none"
+          stroke="url(#ring)"
+          stroke-width="36"
+          stroke-linecap="round"
+          opacity="0.95" />
+  </g>
+
+  <circle cx="512" cy="512" r="122" fill="url(#core)" />
+  <circle cx="512" cy="512" r="93" fill="#EFF8FF" opacity="0.68" />
+  <circle cx="512" cy="512" r="51" fill="#FFFFFF" opacity="0.98" />
+
+  <path d="M612 676
+           C654 686 682 718 688 758"
+        fill="none"
+        stroke="#F7FBFF"
+        stroke-width="14"
+        stroke-linecap="round"
+        opacity="0.75" />
+</svg>
