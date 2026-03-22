@@ -148,6 +148,24 @@ public sealed class RuntimeSettingsService(
                 nameof(request.MaxActiveDownloads));
         }
 
+        if (request.MetadataRefreshStaleSeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "MetadataRefreshStaleSeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.MetadataRefreshStaleSeconds));
+        }
+
+        if (request.MetadataRefreshRestartDelaySeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "MetadataRefreshRestartDelaySeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.MetadataRefreshRestartDelaySeconds));
+        }
+
         var currentSettings = await GetEffectiveSettingsAsync(cancellationToken);
         var completionCallbackEnabled = request.CompletionCallbackEnabled ?? currentSettings.CompletionCallbackEnabled;
         var completionCallbackCommandPath = request.CompletionCallbackCommandPath is null
@@ -210,6 +228,8 @@ public sealed class RuntimeSettingsService(
             [RuntimeSettingsKeys.EngineMaximumUploadRateBytesPerSecond] = request.EngineMaximumUploadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.MaxActiveMetadataResolutions] = request.MaxActiveMetadataResolutions.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.MaxActiveDownloads] = request.MaxActiveDownloads.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.MetadataRefreshStaleSeconds] = request.MetadataRefreshStaleSeconds.ToString(CultureInfo.InvariantCulture),
+            [RuntimeSettingsKeys.MetadataRefreshRestartDelaySeconds] = request.MetadataRefreshRestartDelaySeconds.ToString(CultureInfo.InvariantCulture),
             [RuntimeSettingsKeys.CompletionCallbackEnabled] = completionCallbackEnabled.ToString(),
             [RuntimeSettingsKeys.CompletionCallbackCommandPath] = completionCallbackCommandPath ?? string.Empty,
             [RuntimeSettingsKeys.CompletionCallbackArguments] = completionCallbackArguments ?? string.Empty,
@@ -242,6 +262,8 @@ public sealed class RuntimeSettingsService(
                 request.EngineMaximumUploadRateBytesPerSecond,
                 request.MaxActiveMetadataResolutions,
                 request.MaxActiveDownloads,
+                request.MetadataRefreshStaleSeconds,
+                request.MetadataRefreshRestartDelaySeconds,
                 completionCallbackEnabled,
                 completionCallbackCommandPath,
                 completionCallbackWorkingDirectory,
@@ -362,6 +384,22 @@ public sealed class RuntimeSettingsService(
             maxActiveDownloads = parsedMaxActiveDownloads;
         }
 
+        var metadataRefreshStaleSeconds = baseOptions.MetadataRefreshStaleSeconds;
+        if (values.TryGetValue(RuntimeSettingsKeys.MetadataRefreshStaleSeconds, out var metadataRefreshStaleSecondsValue) &&
+            int.TryParse(metadataRefreshStaleSecondsValue, CultureInfo.InvariantCulture, out var parsedMetadataRefreshStaleSeconds) &&
+            parsedMetadataRefreshStaleSeconds > 0)
+        {
+            metadataRefreshStaleSeconds = parsedMetadataRefreshStaleSeconds;
+        }
+
+        var metadataRefreshRestartDelaySeconds = baseOptions.MetadataRefreshRestartDelaySeconds;
+        if (values.TryGetValue(RuntimeSettingsKeys.MetadataRefreshRestartDelaySeconds, out var metadataRefreshRestartDelaySecondsValue) &&
+            int.TryParse(metadataRefreshRestartDelaySecondsValue, CultureInfo.InvariantCulture, out var parsedMetadataRefreshRestartDelaySeconds) &&
+            parsedMetadataRefreshRestartDelaySeconds > 0)
+        {
+            metadataRefreshRestartDelaySeconds = parsedMetadataRefreshRestartDelaySeconds;
+        }
+
         var completionCallbackEnabled = baseOptions.CompletionCallbackEnabled;
         if (values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackEnabled, out var completionCallbackEnabledValue) &&
             bool.TryParse(completionCallbackEnabledValue, out var parsedCompletionCallbackEnabled))
@@ -425,6 +463,8 @@ public sealed class RuntimeSettingsService(
             EngineMaximumUploadRateBytesPerSecond = engineMaximumUploadRateBytesPerSecond,
             MaxActiveMetadataResolutions = maxActiveMetadataResolutions,
             MaxActiveDownloads = maxActiveDownloads,
+            MetadataRefreshStaleSeconds = metadataRefreshStaleSeconds,
+            MetadataRefreshRestartDelaySeconds = metadataRefreshRestartDelaySeconds,
             CompletionCallbackEnabled = completionCallbackEnabled,
             CompletionCallbackCommandPath = completionCallbackCommandPath,
             CompletionCallbackArguments = completionCallbackArguments,
@@ -464,6 +504,8 @@ public sealed class RuntimeSettingsService(
             EngineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond,
             MaxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions,
             MaxActiveDownloads = settings.MaxActiveDownloads,
+            MetadataRefreshStaleSeconds = settings.MetadataRefreshStaleSeconds,
+            MetadataRefreshRestartDelaySeconds = settings.MetadataRefreshRestartDelaySeconds,
             CompletionCallbackEnabled = settings.CompletionCallbackEnabled,
             CompletionCallbackCommandPath = settings.CompletionCallbackCommandPath,
             CompletionCallbackArguments = settings.CompletionCallbackArguments,

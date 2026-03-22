@@ -91,6 +91,77 @@ public sealed class AvaloniaTorrentDetailViewModelTests
         Assert.Contains("Queued completion callback retry", viewModel.ActionMessage);
     }
 
+    [Fact]
+    public async Task RefreshMetadataAsync_PostsRefreshEndpoint_AndReloads()
+    {
+        var torrentId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+        var detail = new TorrentDetailDto
+        {
+            TorrentId = torrentId,
+            Name = "Refreshable Magnet",
+            CategoryKey = "TV",
+            State = TorrentState.ResolvingMetadata,
+            MagnetUri = "magnet:?xt=urn:btih:refreshable",
+            InfoHash = "REFRESHABLE1234567890",
+            SavePath = "/Volumes/Media/Incoming/TV/Refreshable Magnet",
+            ProgressPercent = 0,
+            DownloadedBytes = 0,
+            TotalBytes = null,
+            DownloadRateBytesPerSecond = 0,
+            UploadRateBytesPerSecond = 0,
+            TrackerCount = 2,
+            ConnectedPeerCount = 0,
+            WaitReason = null,
+            QueuePosition = null,
+            AddedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            CompletedAtUtc = null,
+            LastActivityAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletionCallbackState = null,
+            CompletionCallbackPendingSinceUtc = null,
+            CompletionCallbackInvokedAtUtc = null,
+            CompletionCallbackFinalPayloadPath = "/Volumes/Media/Incoming/TV/Refreshable Magnet",
+            CompletionCallbackPendingReason = null,
+            CompletionCallbackLastError = null,
+            ErrorMessage = null,
+            CanRefreshMetadata = true,
+            CanRetryCompletionCallback = false,
+            CanPause = true,
+            CanResume = false,
+            CanRemove = true,
+        };
+        var categories = CreateCategories();
+        var capturedRequests = new ConcurrentQueue<CapturedRequest>();
+
+        var torrentCoreClient = CreateClient(async (request, body) =>
+        {
+            capturedRequests.Enqueue(new CapturedRequest(request.Method.Method, request.RequestUri!.AbsolutePath, body));
+
+            return request.RequestUri!.AbsolutePath switch
+            {
+                var path when path == $"/api/torrents/{torrentId:D}" => CreateJsonResponse(detail),
+                "/api/categories" => CreateJsonResponse(categories),
+                "/api/logs" => CreateJsonResponse(Array.Empty<ActivityLogEntryDto>()),
+                var path when path == $"/api/torrents/{torrentId:D}/metadata/refresh" => CreateJsonResponse(new TorrentActionResultDto
+                {
+                    TorrentId = torrentId,
+                    Action = "refresh_metadata",
+                    State = TorrentState.ResolvingMetadata,
+                    ProcessedAtUtc = DateTimeOffset.UtcNow,
+                }),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
+            };
+        });
+        var viewModel = new TorrentDetailViewModel(torrentCoreClient, torrentId, () => { });
+        await viewModel.LoadAsync();
+
+        await viewModel.RefreshMetadataAsync();
+
+        Assert.Contains(
+            capturedRequests,
+            item => item.Method == "POST" && item.Path == $"/api/torrents/{torrentId:D}/metadata/refresh");
+        Assert.Contains("Requested metadata refresh", viewModel.ActionMessage);
+    }
+
     private static TorrentDetailDto CreateTorrentDetail(Guid torrentId)
     {
         return new TorrentDetailDto
@@ -121,6 +192,7 @@ public sealed class AvaloniaTorrentDetailViewModelTests
             CompletionCallbackPendingReason = "Waiting for final visible payload",
             CompletionCallbackLastError = "Callback exited with code 1",
             ErrorMessage = null,
+            CanRefreshMetadata = false,
             CanRetryCompletionCallback = true,
             CanPause = false,
             CanResume = false,

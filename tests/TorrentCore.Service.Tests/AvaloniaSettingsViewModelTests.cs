@@ -47,6 +47,8 @@ public sealed class AvaloniaSettingsViewModelTests
         Assert.Equal(150, viewModel.CompletionCallbackFinalizationTimeoutSeconds);
         Assert.Equal("http://tvmaze:5078/", viewModel.CompletionCallbackApiBaseUrlOverride);
         Assert.Equal("secret", viewModel.CompletionCallbackApiKeyOverride);
+        Assert.Equal(90, viewModel.MetadataRefreshStaleSeconds);
+        Assert.Equal(30, viewModel.MetadataRefreshRestartDelaySeconds);
         Assert.True(viewModel.HasCategories);
         Assert.Equal(2, viewModel.Categories.Count);
 
@@ -125,6 +127,8 @@ public sealed class AvaloniaSettingsViewModelTests
         viewModel.CompletionCallbackFinalizationTimeoutSeconds = 180;
         viewModel.CompletionCallbackApiBaseUrlOverride = "http://tvmaze:5078/";
         viewModel.CompletionCallbackApiKeyOverride = "secret";
+        viewModel.MetadataRefreshStaleSeconds = 120;
+        viewModel.MetadataRefreshRestartDelaySeconds = 45;
 
         var tvCategory = Assert.Single(viewModel.Categories, item => item.Key == "TV");
         tvCategory.DisplayName = "Television";
@@ -153,6 +157,8 @@ public sealed class AvaloniaSettingsViewModelTests
         Assert.Equal(180, runtimeJson.RootElement.GetProperty("completionCallbackFinalizationTimeoutSeconds").GetInt32());
         Assert.Equal("http://tvmaze:5078/", runtimeJson.RootElement.GetProperty("completionCallbackApiBaseUrlOverride").GetString());
         Assert.Equal("secret", runtimeJson.RootElement.GetProperty("completionCallbackApiKeyOverride").GetString());
+        Assert.Equal(120, runtimeJson.RootElement.GetProperty("metadataRefreshStaleSeconds").GetInt32());
+        Assert.Equal(45, runtimeJson.RootElement.GetProperty("metadataRefreshRestartDelaySeconds").GetInt32());
 
         var tvPut = capturedRequests.Single(item => item.Method == "PUT" && item.Path == "/api/categories/TV");
         using var tvJson = JsonDocument.Parse(tvPut.Body!);
@@ -195,6 +201,8 @@ public sealed class AvaloniaSettingsViewModelTests
             EngineMaximumUploadRateBytesPerSecond = 0,
             MaxActiveMetadataResolutions = 4,
             MaxActiveDownloads = 4,
+            MetadataRefreshStaleSeconds = 90,
+            MetadataRefreshRestartDelaySeconds = 30,
             CompletionCallbackEnabled = completionCallbackEnabled,
             CompletionCallbackCommandPath = completionCallbackCommandPath,
             CompletionCallbackArguments = completionCallbackArguments,

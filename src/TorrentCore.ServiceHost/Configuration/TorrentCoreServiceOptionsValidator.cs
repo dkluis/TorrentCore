@@ -108,6 +108,16 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:MaxActiveDownloads must be 1 or greater.");
         }
 
+        if (options.MetadataRefreshStaleSeconds < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MetadataRefreshStaleSeconds must be 1 or greater.");
+        }
+
+        if (options.MetadataRefreshRestartDelaySeconds < 1)
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MetadataRefreshRestartDelaySeconds must be 1 or greater.");
+        }
+
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackTimeoutSeconds must be 1 or greater.");

@@ -39,6 +39,10 @@ else if (_torrent is not null)
                 {
                     <button class="btn btn-outline-secondary" type="button" @onclick="ResumeAsync" disabled="@_isBusy">Resume</button>
                 }
+                @if (_torrent.CanRefreshMetadata)
+                {
+                    <button class="btn btn-outline-secondary" type="button" @onclick="RefreshMetadataAsync" disabled="@_isBusy">Refresh Metadata</button>
+                }
                 @if (_torrent.CanRetryCompletionCallback)
                 {
                     <button class="btn btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">Retry Callback</button>
@@ -326,6 +330,20 @@ else if (_torrent is not null)
         {
             var result = await TorrentCoreClient.ResumeAsync(_torrent.TorrentId);
             _message = $"Resumed at {result.ProcessedAtUtc.ToLocalTime():g}.";
+        });
+    }
+
+    private async Task RefreshMetadataAsync()
+    {
+        if (_torrent is null)
+        {
+            return;
+        }
+
+        await RunActionAsync(async () =>
+        {
+            var result = await TorrentCoreClient.RefreshMetadataAsync(_torrent.TorrentId);
+            _message = $"Requested metadata refresh at {result.ProcessedAtUtc.ToLocalTime():g}.";
         });
     }
 

@@ -122,6 +122,7 @@ public sealed class AvaloniaDashboardViewModelTests
             CompletionCallbackInvokedAtUtc = null,
             CompletionCallbackLastError = null,
             ErrorMessage = null,
+            CanRefreshMetadata = false,
             CanRetryCompletionCallback = string.Equals(completionCallbackState, "Failed", StringComparison.OrdinalIgnoreCase) ||
                                          string.Equals(completionCallbackState, "TimedOut", StringComparison.OrdinalIgnoreCase),
             CanPause = false,

@@ -218,6 +218,34 @@ public sealed class PersistedTorrentEngineAdapter(
         };
     }
 
+    public async Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
+
+        if (!CanRefreshMetadata(torrent.State))
+        {
+            throw new ServiceOperationException(
+                "invalid_state",
+                $"Torrent '{torrent.Name}' cannot refresh metadata while in state '{torrent.State}'.",
+                StatusCodes.Status409Conflict,
+                nameof(torrentId));
+        }
+
+        torrent.LastActivityAtUtc = DateTimeOffset.UtcNow;
+        torrent.ErrorMessage = null;
+
+        await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+
+        return new TorrentActionResultDto
+        {
+            TorrentId = torrent.TorrentId,
+            Action = "refresh_metadata",
+            State = torrent.State,
+            ProcessedAtUtc = torrent.LastActivityAtUtc.Value,
+            DataDeleted = false,
+        };
+    }
+
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
@@ -374,6 +402,7 @@ public sealed class PersistedTorrentEngineAdapter(
             CompletionCallbackInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
             CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
+            CanRefreshMetadata = CanRefreshMetadata(snapshot.State),
             CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
             CanPause = CanPause(snapshot.State),
             CanResume = CanResume(snapshot.State),
@@ -424,12 +453,15 @@ public sealed class PersistedTorrentEngineAdapter(
             CompletionCallbackPendingReason = callbackPendingReason,
             CompletionCallbackLastError = snapshot.CompletionCallbackLastError,
             ErrorMessage = snapshot.ErrorMessage,
+            CanRefreshMetadata = CanRefreshMetadata(snapshot.State),
             CanRetryCompletionCallback = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
             CanPause = CanPause(snapshot.State),
             CanResume = CanResume(snapshot.State),
             CanRemove = CanRemove(snapshot.State),
         };
     }
+
+    private static bool CanRefreshMetadata(TorrentState state) => state == TorrentState.ResolvingMetadata;
 
     private static bool CanPause(TorrentState state) => state is TorrentState.Downloading or TorrentState.Seeding or TorrentState.Queued or TorrentState.ResolvingMetadata;
 

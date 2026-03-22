@@ -260,6 +260,23 @@ public partial class TorrentsViewModel(
     }
 
     [RelayCommand]
+    public async Task RefreshMetadataAsync(TorrentListItemViewModel? torrent)
+    {
+        if (torrent is null || torrent.IsBusy || !torrent.CanRefreshMetadata)
+        {
+            return;
+        }
+
+        await RunItemActionAsync(
+            torrent,
+            async () =>
+            {
+                var result = await client.RefreshMetadataAsync(torrent.TorrentId);
+                ActionMessage = $"Requested metadata refresh for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
+    [RelayCommand]
     public async Task RemoveAsync(TorrentListItemViewModel? torrent)
     {
         if (torrent is null || torrent.IsBusy)
@@ -356,6 +373,7 @@ public partial class TorrentsViewModel(
                     OpenDetail,
                     PauseAsync,
                     ResumeAsync,
+                    RefreshMetadataAsync,
                     RemoveAsync,
                     DeleteDataAsync,
                     RetryCompletionCallbackAsync,

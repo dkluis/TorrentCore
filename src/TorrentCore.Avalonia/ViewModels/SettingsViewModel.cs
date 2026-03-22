@@ -79,6 +79,12 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
     private int _maxActiveDownloads = 4;
 
     [ObservableProperty]
+    private int _metadataRefreshStaleSeconds = 90;
+
+    [ObservableProperty]
+    private int _metadataRefreshRestartDelaySeconds = 30;
+
+    [ObservableProperty]
     private bool _completionCallbackEnabled;
 
     [ObservableProperty]
@@ -175,6 +181,8 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
                 EngineMaximumUploadRateBytesPerSecond = EngineMaximumUploadRateBytesPerSecond,
                 MaxActiveMetadataResolutions = MaxActiveMetadataResolutions,
                 MaxActiveDownloads = MaxActiveDownloads,
+                MetadataRefreshStaleSeconds = MetadataRefreshStaleSeconds,
+                MetadataRefreshRestartDelaySeconds = MetadataRefreshRestartDelaySeconds,
                 CompletionCallbackEnabled = CompletionCallbackEnabled,
                 CompletionCallbackCommandPath = CompletionCallbackCommandPath,
                 CompletionCallbackArguments = CompletionCallbackArguments,
@@ -276,6 +284,8 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
         EngineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond;
         MaxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions;
         MaxActiveDownloads = settings.MaxActiveDownloads;
+        MetadataRefreshStaleSeconds = settings.MetadataRefreshStaleSeconds;
+        MetadataRefreshRestartDelaySeconds = settings.MetadataRefreshRestartDelaySeconds;
         CompletionCallbackEnabled = settings.CompletionCallbackEnabled;
         CompletionCallbackCommandPath = settings.CompletionCallbackCommandPath ?? string.Empty;
         CompletionCallbackArguments = settings.CompletionCallbackArguments ?? string.Empty;

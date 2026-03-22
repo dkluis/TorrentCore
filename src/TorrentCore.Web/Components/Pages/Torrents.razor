@@ -438,6 +438,17 @@ else
             });
     }
 
+    private async Task RefreshMetadataAsync(TorrentSummaryDto torrent)
+    {
+        await RunTorrentActionAsync(
+            torrent.TorrentId,
+            async () =>
+            {
+                var result = await TorrentCoreClient.RefreshMetadataAsync(torrent.TorrentId);
+                _actionMessage = $"Requested metadata refresh for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            });
+    }
+
     private async Task RetryCompletionCallbackAsync(TorrentSummaryDto torrent)
     {
         await RunTorrentActionAsync(
@@ -757,6 +768,15 @@ else
                     @onclick="() => ResumeAsync(torrent)"
                     disabled="@IsActionBusy(torrent.TorrentId)">
                 Resume
+            </button>
+        }
+        @if (torrent.CanRefreshMetadata)
+        {
+            <button class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    @onclick="() => RefreshMetadataAsync(torrent)"
+                    disabled="@IsActionBusy(torrent.TorrentId)">
+                Refresh Metadata
             </button>
         }
         @if (torrent.CanRetryCompletionCallback)

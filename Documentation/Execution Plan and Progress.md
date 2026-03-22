@@ -137,6 +137,8 @@ Current service configuration section:
 - the Avalonia `Torrents` screen now supports category-aware magnet adds with `TV` as the default when available, category and callback-state filtering, category and callback-state display in each torrent card, and retrying eligible completion callbacks from the list
 - the Avalonia `Torrent Detail` screen now surfaces category plus callback lifecycle diagnostics, including final payload path, pending reason, last callback event/process metadata, and retry from the detail command bar and callback card
 - the Avalonia `Dashboard` now aggregates completion-callback lifecycle counts with a desktop auto-refresh toggle, and the Avalonia `Logs` screen now supports auto-refresh plus direct torrent-detail navigation for torrent-scoped log entries
+- MonoTorrent torrents stuck in `ResolvingMetadata` can now be nudged manually through a new `refresh_metadata` action in the API and both UIs, and the engine now performs throttled automatic stale-metadata recovery by issuing a DHT/tracker refresh first and escalating to a stop/start if discovery still stays cold
+- the operator settings reference now includes a short troubleshooting guide for magnets stuck in `ResolvingMetadata`, covering the automatic recovery sequence, when to use `refresh_metadata`, and which engine events to inspect
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

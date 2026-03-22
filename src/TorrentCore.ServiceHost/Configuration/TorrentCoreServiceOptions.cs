@@ -26,6 +26,8 @@ public sealed class TorrentCoreServiceOptions
     public int MaxActivityLogEntries { get; init; } = 20_000;
     public int MaxActiveMetadataResolutions { get; init; } = 4;
     public int MaxActiveDownloads { get; init; } = 4;
+    public int MetadataRefreshStaleSeconds { get; init; } = 90;
+    public int MetadataRefreshRestartDelaySeconds { get; init; } = 30;
     public bool CompletionCallbackEnabled { get; init; }
     public string CompletionCallbackCommandPath { get; init; } = string.Empty;
     public string? CompletionCallbackArguments { get; init; }

@@ -108,6 +108,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                     CompletionCallbackPendingReason = null,
                     CompletionCallbackLastError = null,
                     ErrorMessage = null,
+                    CanRefreshMetadata = false,
                     CanRetryCompletionCallback = false,
                     CanPause = true,
                     CanResume = false,
@@ -169,6 +170,73 @@ public sealed class AvaloniaTorrentsViewModelTests
             capturedRequests,
             item => item.Method == "POST" && item.Path == $"/api/torrents/{retryableTorrent.TorrentId:D}/completion-callback/retry");
         Assert.Contains("Queued completion callback retry", viewModel.ActionMessage);
+    }
+
+    [Fact]
+    public async Task RefreshMetadataAsync_PostsRefreshEndpoint()
+    {
+        var categories = CreateCategories();
+        var refreshableTorrent = new TorrentSummaryDto
+        {
+            TorrentId = Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            Name = "Refreshable Magnet",
+            CategoryKey = "TV",
+            State = TorrentState.ResolvingMetadata,
+            ProgressPercent = 0,
+            DownloadedBytes = 0,
+            TotalBytes = null,
+            DownloadRateBytesPerSecond = 0,
+            UploadRateBytesPerSecond = 0,
+            TrackerCount = 2,
+            ConnectedPeerCount = 0,
+            WaitReason = null,
+            QueuePosition = null,
+            AddedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            CompletedAtUtc = null,
+            LastActivityAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletionCallbackState = null,
+            CompletionCallbackPendingSinceUtc = null,
+            CompletionCallbackInvokedAtUtc = null,
+            CompletionCallbackLastError = null,
+            ErrorMessage = null,
+            CanRefreshMetadata = true,
+            CanRetryCompletionCallback = false,
+            CanPause = true,
+            CanResume = false,
+            CanRemove = true,
+        };
+        var torrents = new[] { refreshableTorrent };
+        var capturedRequests = new ConcurrentQueue<CapturedRequest>();
+
+        var torrentCoreClient = CreateClient(async (request, body) =>
+        {
+            capturedRequests.Enqueue(new CapturedRequest(request.Method.Method, request.RequestUri!.AbsolutePath, body));
+
+            return request.RequestUri!.AbsolutePath switch
+            {
+                "/api/categories" => CreateJsonResponse(categories),
+                "/api/torrents" when request.Method == HttpMethod.Get => CreateJsonResponse(torrents),
+                var path when path == $"/api/torrents/{refreshableTorrent.TorrentId:D}/metadata/refresh" =>
+                    CreateJsonResponse(new TorrentActionResultDto
+                    {
+                        TorrentId = refreshableTorrent.TorrentId,
+                        Action = "refresh_metadata",
+                        State = TorrentState.ResolvingMetadata,
+                        ProcessedAtUtc = DateTimeOffset.UtcNow,
+                    }),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
+            };
+        });
+        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { }, new TestClipboardTextService());
+        await viewModel.LoadAsync();
+
+        var torrent = Assert.Single(viewModel.VisibleTorrents, item => item.TorrentId == refreshableTorrent.TorrentId);
+        await viewModel.RefreshMetadataAsync(torrent);
+
+        Assert.Contains(
+            capturedRequests,
+            item => item.Method == "POST" && item.Path == $"/api/torrents/{refreshableTorrent.TorrentId:D}/metadata/refresh");
+        Assert.Contains("Requested metadata refresh", viewModel.ActionMessage);
     }
 
     [Fact]
@@ -256,6 +324,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 CompletionCallbackInvokedAtUtc = null,
                 CompletionCallbackLastError = null,
                 ErrorMessage = null,
+                CanRefreshMetadata = false,
                 CanRetryCompletionCallback = false,
                 CanPause = true,
                 CanResume = false,
@@ -284,6 +353,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 CompletionCallbackInvokedAtUtc = null,
                 CompletionCallbackLastError = "Launcher exited with code 1",
                 ErrorMessage = null,
+                CanRefreshMetadata = false,
                 CanRetryCompletionCallback = true,
                 CanPause = false,
                 CanResume = false,
@@ -312,6 +382,7 @@ public sealed class AvaloniaTorrentsViewModelTests
                 CompletionCallbackInvokedAtUtc = null,
                 CompletionCallbackLastError = null,
                 ErrorMessage = null,
+                CanRefreshMetadata = false,
                 CanRetryCompletionCallback = false,
                 CanPause = true,
                 CanResume = false,

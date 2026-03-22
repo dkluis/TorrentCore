@@ -139,6 +139,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
                ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
     }
 
+    public async Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsync(BuildRequestUri($"api/torrents/{torrentId}/metadata/refresh"), content: null, cancellationToken);
+        return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken)
+               ?? throw new InvalidOperationException("TorrentCore service returned no action payload.");
+    }
+
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.PostAsync(BuildRequestUri($"api/torrents/{torrentId}/completion-callback/retry"), content: null, cancellationToken);

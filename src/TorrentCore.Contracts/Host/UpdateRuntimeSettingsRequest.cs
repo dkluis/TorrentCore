@@ -15,6 +15,8 @@ public sealed class UpdateRuntimeSettingsRequest
     public required int EngineMaximumUploadRateBytesPerSecond { get; init; }
     public required int MaxActiveMetadataResolutions { get; init; }
     public required int MaxActiveDownloads { get; init; }
+    public required int MetadataRefreshStaleSeconds { get; init; }
+    public required int MetadataRefreshRestartDelaySeconds { get; init; }
     public bool? CompletionCallbackEnabled { get; init; }
     public string? CompletionCallbackCommandPath { get; init; }
     public string? CompletionCallbackArguments { get; init; }

@@ -217,6 +217,11 @@
                           Content="Resume"
                           Command="{Binding ResumeCommand}"
                           IsEnabled="{Binding CanResume}" />
+                  <Button Classes="toolbar-action"
+                          Content="Refresh Metadata"
+                          Command="{Binding RefreshMetadataCommand}"
+                          IsEnabled="{Binding CanRefreshMetadata}"
+                          IsVisible="{Binding CanRefreshMetadata}" />
                   <Button Classes="toolbar-action danger"
                           Content="Remove"
                           Command="{Binding RemoveCommand}"

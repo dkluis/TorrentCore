@@ -33,6 +33,7 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
     public bool HasTorrent => Torrent is not null;
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasActionMessage => !string.IsNullOrWhiteSpace(ActionMessage);
+    public bool CanRefreshMetadata => Torrent?.CanRefreshMetadata ?? false;
     public bool CanRetryCompletionCallback => Torrent?.CanRetryCompletionCallback ?? false;
     public string CategoryText { get; private set; } = "Uncategorized";
     public string WaitText => FormatWaitReason(Torrent?.WaitReason, Torrent?.QueuePosition);
@@ -96,6 +97,21 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
         {
             var result = await client.ResumeAsync(Torrent.TorrentId);
             ActionMessage = $"Resumed at {result.ProcessedAtUtc.ToLocalTime():g}.";
+        });
+    }
+
+    [RelayCommand]
+    public async Task RefreshMetadataAsync()
+    {
+        if (Torrent is null || !CanRefreshMetadata)
+        {
+            return;
+        }
+
+        await RunActionAsync(async () =>
+        {
+            var result = await client.RefreshMetadataAsync(Torrent.TorrentId);
+            ActionMessage = $"Requested metadata refresh at {result.ProcessedAtUtc.ToLocalTime():g}.";
         });
     }
 
@@ -263,6 +279,7 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
         OnPropertyChanged(nameof(LatestCallbackWorkingDirectoryText));
         OnPropertyChanged(nameof(LatestCallbackProcessTimeoutText));
         OnPropertyChanged(nameof(LatestCallbackFinalizationWaitText));
+        OnPropertyChanged(nameof(CanRefreshMetadata));
         OnPropertyChanged(nameof(CanRetryCompletionCallback));
         OnPropertyChanged(nameof(CanDeleteData));
     }

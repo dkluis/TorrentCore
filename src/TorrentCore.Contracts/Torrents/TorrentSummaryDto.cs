@@ -23,6 +23,7 @@ public sealed class TorrentSummaryDto
     public DateTimeOffset? CompletionCallbackInvokedAtUtc { get; init; }
     public string? CompletionCallbackLastError { get; init; }
     public string? ErrorMessage { get; init; }
+    public required bool CanRefreshMetadata { get; init; }
     public required bool CanRetryCompletionCallback { get; init; }
     public required bool CanPause { get; init; }
     public required bool CanResume { get; init; }

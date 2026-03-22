@@ -56,6 +56,16 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
         return Ok(result);
     }
 
+    [HttpPost("{torrentId:guid}/metadata/refresh")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    public async Task<ActionResult<TorrentActionResultDto>> RefreshMetadata(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var result = await torrentApplicationService.RefreshMetadataAsync(torrentId, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("{torrentId:guid}/completion-callback/retry")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]

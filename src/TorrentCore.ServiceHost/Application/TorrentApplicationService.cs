@@ -198,6 +198,21 @@ public sealed class TorrentApplicationService(
         }
     }
 
+    public async Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await torrentEngineAdapter.RefreshMetadataAsync(torrentId, cancellationToken);
+            await LogActionAsync("torrent.metadata.refresh_requested", "Requested metadata discovery refresh.", torrentId, result.State, cancellationToken);
+            return result;
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.metadata.refresh.failed", exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         try

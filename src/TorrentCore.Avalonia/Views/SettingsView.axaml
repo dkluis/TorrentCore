@@ -123,6 +123,24 @@
 
           <Border Classes="panel-card" Margin="0,0,18,18">
             <StackPanel Spacing="10">
+              <TextBlock Text="Metadata Recovery" Classes="text-panel-title" />
+              <StackPanel Spacing="4">
+                <TextBlock Text="Refresh After Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                <TextBox Text="{Binding MetadataRefreshStaleSeconds}" />
+              </StackPanel>
+              <StackPanel Spacing="4">
+                <TextBlock Text="Restart Delay Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                <TextBox Text="{Binding MetadataRefreshRestartDelaySeconds}" />
+              </StackPanel>
+              <TextBlock Text="TorrentCore first requests a fresh DHT and tracker peer search, then escalates to a stop/start if metadata still stays cold."
+                         Classes="text-body-small"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource TextSecondaryBrush}" />
+            </StackPanel>
+          </Border>
+
+          <Border Classes="panel-card" Margin="0,0,18,18">
+            <StackPanel Spacing="10">
               <TextBlock Text="Log Throttling" Classes="text-panel-title" />
               <StackPanel Spacing="4">
                 <TextBlock Text="Connection Failure Burst Limit" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />

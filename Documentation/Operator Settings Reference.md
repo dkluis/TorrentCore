@@ -64,6 +64,66 @@ Unit:
 Applies:
 - Live.
 
+## Metadata Recovery
+
+These settings control how TorrentCore tries to wake up a public magnet that is stuck in `ResolvingMetadata` without any useful peer activity.
+
+### Metadata Refresh Stale Seconds
+
+Meaning:
+- How long TorrentCore waits before it considers a metadata-resolution session stale.
+
+Practical interpretation:
+- This is the idle window before TorrentCore sends an explicit metadata-discovery nudge.
+- When the threshold is reached, TorrentCore asks MonoTorrent to do a DHT announce and a forced tracker announce for that torrent.
+- Lower values make TorrentCore react sooner to a cold magnet, but also increase how often it prods trackers and DHT for weak swarms.
+
+Unit:
+- Seconds.
+
+Applies:
+- Live.
+
+### Metadata Refresh Restart Delay Seconds
+
+Meaning:
+- How long TorrentCore waits after a stale-metadata refresh before it escalates to restarting the torrent manager.
+
+Practical interpretation:
+- TorrentCore first tries a non-destructive peer-discovery refresh.
+- If the torrent still shows no meaningful metadata progress after this additional delay, TorrentCore performs a stop/start and immediately asks for fresh peers again.
+- Lower values make recovery more aggressive, but can create extra churn for magnets that only need a little more time.
+
+Unit:
+- Seconds.
+
+Applies:
+- Live.
+
+## Troubleshooting: Magnet Stuck In Metadata
+
+If a public magnet stays in `ResolvingMetadata`, TorrentCore now has both automatic recovery and a manual operator nudge.
+
+What TorrentCore does automatically:
+- After `Metadata Refresh Stale Seconds`, TorrentCore requests a DHT announce and a forced tracker announce for the torrent.
+- If the torrent still stays cold through `Metadata Refresh Restart Delay Seconds`, TorrentCore restarts the torrent manager and immediately refreshes peer discovery again.
+
+When to use `Refresh Metadata` manually:
+- The torrent is still in `ResolvingMetadata` after the automatic windows have already elapsed.
+- The torrent detail view or list still shows no useful peer activity.
+- You want to force a fresh discovery attempt immediately instead of waiting for the next automatic recovery window.
+
+What to check:
+- `torrent.metadata.refresh_requested` confirms a manual or automatic discovery refresh was issued.
+- `torrent.metadata.restart_requested` confirms TorrentCore escalated from refresh to stop/start recovery.
+- `torrent.engine.peers_found` shows whether the swarm is returning candidate peers.
+- `torrent.engine.connection_failed` helps distinguish "no peers discovered" from "peers discovered but connections failed."
+
+Operator guidance:
+- `Refresh Metadata` is most useful for public magnets that appear stuck after a quiet period or after a weak first discovery pass.
+- Weak or dead swarms may still never resolve metadata even after refresh and restart if no reachable peers exist.
+- If the same magnet resolves immediately in another client on the same host, compare TorrentCore's recent log events and current runtime settings before changing global limits again.
+
 ## MonoTorrent Engine Throttle Settings
 
 These settings are global to the engine host, not per torrent.

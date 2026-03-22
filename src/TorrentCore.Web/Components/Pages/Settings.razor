@@ -143,6 +143,21 @@ else
         </section>
 
         <section class="mb-4">
+            <h2 class="h5">Metadata Recovery</h2>
+            <p class="text-muted mb-2">These settings control how TorrentCore nudges stuck metadata-only magnets. First it requests a fresh DHT/tracker peer search, then it escalates to a stop/start if the torrent still stays cold.</p>
+            <div class="row g-3">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label" for="metadataRefreshStaleSeconds">Refresh After Seconds</label>
+                    <input id="metadataRefreshStaleSeconds" class="form-control" type="number" min="1" step="1" @bind="_metadataRefreshStaleSeconds" />
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <label class="form-label" for="metadataRefreshRestartDelaySeconds">Restart Delay Seconds</label>
+                    <input id="metadataRefreshRestartDelaySeconds" class="form-control" type="number" min="1" step="1" @bind="_metadataRefreshRestartDelaySeconds" />
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-4">
             <h2 class="h5">Shared Callback Settings</h2>
             <p class="text-muted mb-2">These settings describe the existing shared TVMaze callback entrypoint. In the normal centrally managed TVMaze setup, operators should only need to enable the callback, set the full launcher script path, and keep the process and finalization timeout values aligned with their environment.</p>
             <div class="row g-3">
@@ -282,6 +297,8 @@ else
     private int _engineMaximumUploadRateBytesPerSecond;
     private int _maxActiveMetadataResolutions = 4;
     private int _maxActiveDownloads = 4;
+    private int _metadataRefreshStaleSeconds = 90;
+    private int _metadataRefreshRestartDelaySeconds = 30;
     private bool _completionCallbackEnabled;
     private string _completionCallbackCommandPath = string.Empty;
     private string _completionCallbackArguments = string.Empty;
@@ -357,6 +374,8 @@ else
                 EngineMaximumUploadRateBytesPerSecond = _engineMaximumUploadRateBytesPerSecond,
                 MaxActiveMetadataResolutions = _maxActiveMetadataResolutions,
                 MaxActiveDownloads = _maxActiveDownloads,
+                MetadataRefreshStaleSeconds = _metadataRefreshStaleSeconds,
+                MetadataRefreshRestartDelaySeconds = _metadataRefreshRestartDelaySeconds,
                 CompletionCallbackEnabled = _completionCallbackEnabled,
                 CompletionCallbackCommandPath = _completionCallbackCommandPath,
                 CompletionCallbackArguments = _completionCallbackArguments,
@@ -418,6 +437,8 @@ else
         _engineMaximumUploadRateBytesPerSecond = settings.EngineMaximumUploadRateBytesPerSecond;
         _maxActiveMetadataResolutions = settings.MaxActiveMetadataResolutions;
         _maxActiveDownloads = settings.MaxActiveDownloads;
+        _metadataRefreshStaleSeconds = settings.MetadataRefreshStaleSeconds;
+        _metadataRefreshRestartDelaySeconds = settings.MetadataRefreshRestartDelaySeconds;
         _completionCallbackEnabled = settings.CompletionCallbackEnabled;
         _completionCallbackCommandPath = settings.CompletionCallbackCommandPath ?? string.Empty;
         _completionCallbackArguments = settings.CompletionCallbackArguments ?? string.Empty;

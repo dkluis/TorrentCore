@@ -11,6 +11,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
         Action<TorrentListItemViewModel> openDetail,
         Func<TorrentListItemViewModel, Task> pause,
         Func<TorrentListItemViewModel, Task> resume,
+        Func<TorrentListItemViewModel, Task> refreshMetadata,
         Func<TorrentListItemViewModel, Task> remove,
         Func<TorrentListItemViewModel, Task> deleteData,
         Func<TorrentListItemViewModel, Task> retryCompletionCallback,
@@ -20,6 +21,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
         OpenDetailCommand = new RelayCommand(() => openDetail(this));
         PauseCommand = new AsyncRelayCommand(() => pause(this));
         ResumeCommand = new AsyncRelayCommand(() => resume(this));
+        RefreshMetadataCommand = new AsyncRelayCommand(() => refreshMetadata(this));
         RemoveCommand = new AsyncRelayCommand(() => remove(this));
         DeleteDataCommand = new AsyncRelayCommand(() => deleteData(this));
         RetryCompletionCallbackCommand = new AsyncRelayCommand(() => retryCompletionCallback(this));
@@ -30,6 +32,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
     public IRelayCommand OpenDetailCommand { get; }
     public IAsyncRelayCommand PauseCommand { get; }
     public IAsyncRelayCommand ResumeCommand { get; }
+    public IAsyncRelayCommand RefreshMetadataCommand { get; }
     public IAsyncRelayCommand RemoveCommand { get; }
     public IAsyncRelayCommand DeleteDataCommand { get; }
     public IAsyncRelayCommand RetryCompletionCallbackCommand { get; }
@@ -101,6 +104,9 @@ public partial class TorrentListItemViewModel : ViewModelBase
     private bool _canDeleteData;
 
     [ObservableProperty]
+    private bool _canRefreshMetadata;
+
+    [ObservableProperty]
     private bool _canRetryCompletionCallback;
 
     [ObservableProperty]
@@ -157,6 +163,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
         CompletionCallbackState = dto.CompletionCallbackState;
         CompletionCallbackLastError = dto.CompletionCallbackLastError;
         ErrorMessage = dto.ErrorMessage;
+        CanRefreshMetadata = dto.CanRefreshMetadata;
         CanRetryCompletionCallback = dto.CanRetryCompletionCallback;
         CanPause = dto.CanPause;
         CanResume = dto.CanResume;
