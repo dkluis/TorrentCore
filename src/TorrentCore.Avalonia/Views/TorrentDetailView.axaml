@@ -3,222 +3,231 @@
              xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
              x:Class="TorrentCore.Avalonia.Views.TorrentDetailView"
              x:DataType="vm:TorrentDetailViewModel">
-  <ScrollViewer VerticalScrollBarVisibility="Auto"
-                HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
-        <Button Classes="toolbar-action"
-                Content="Back"
-                Command="{Binding BackCommand}" />
-        <StackPanel Grid.Column="1" Spacing="4">
-          <TextBlock Text="{Binding Torrent.Name, FallbackValue='Torrent Detail'}"
-                     Classes="text-page-title"
-                     TextWrapping="Wrap" />
-          <SelectableTextBlock Text="{Binding Torrent.TorrentId, StringFormat='Torrent Id: {0}'}"
-                               Classes="text-body-small"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+                <Button Classes="toolbar-action"
+                        Content="Back"
+                        Command="{Binding BackCommand}" />
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Text="{Binding Torrent.Name, FallbackValue='Torrent Detail'}"
+                               Classes="text-page-title"
                                TextWrapping="Wrap" />
-        </StackPanel>
-        <Button Grid.Column="2"
-                Classes="toolbar-action"
-                Content="Refresh"
-                Command="{Binding RefreshCommand}" />
-        <Button Grid.Column="3"
-                Classes="toolbar-action"
-                Content="Pause"
-                Command="{Binding PauseCommand}"
-                IsEnabled="{Binding Torrent.CanPause}" />
-        <Button Grid.Column="4"
-                Classes="toolbar-action success"
-                Content="Resume"
-                Command="{Binding ResumeCommand}"
-                IsEnabled="{Binding Torrent.CanResume}" />
-        <Button Grid.Column="5"
-                Classes="toolbar-action"
-                Content="Refresh Metadata"
-                Command="{Binding RefreshMetadataCommand}"
-                IsEnabled="{Binding CanRefreshMetadata}"
-                IsVisible="{Binding CanRefreshMetadata}" />
-        <Button Grid.Column="6"
-                Classes="toolbar-action"
-                Content="Reset Metadata"
-                Command="{Binding ResetMetadataSessionCommand}"
-                IsEnabled="{Binding CanRefreshMetadata}"
-                IsVisible="{Binding CanRefreshMetadata}" />
-        <Button Grid.Column="7"
-                Classes="toolbar-action"
-                Content="Retry Callback"
-                Command="{Binding RetryCompletionCallbackCommand}"
-                IsEnabled="{Binding CanRetryCompletionCallback}"
-                IsVisible="{Binding CanRetryCompletionCallback}" />
-        <Button Grid.Column="8"
-                Classes="toolbar-action danger"
-                Content="Remove"
-                Command="{Binding RemoveCommand}"
-                IsEnabled="{Binding Torrent.CanRemove}" />
-        <Button Grid.Column="9"
-                Classes="toolbar-action danger"
-                Content="Delete Data"
-                Command="{Binding DeleteDataCommand}"
-                IsEnabled="{Binding CanDeleteData}"
-                IsVisible="{Binding CanDeleteData}" />
-      </Grid>
-
-      <TextBlock Text="{Binding ActionMessage}"
-                 IsVisible="{Binding HasActionMessage}"
-                 Foreground="{DynamicResource TextSecondaryBrush}" />
-
-      <TextBlock Text="{Binding ErrorMessage}"
-                 IsVisible="{Binding HasError}"
-                 Foreground="{DynamicResource ErrorTextBrush}"
-                 TextWrapping="Wrap" />
-
-      <Border Classes="panel-card"
-              IsVisible="{Binding IsLoading}">
-        <TextBlock Text="Loading torrent detail..." />
-      </Border>
-
-      <WrapPanel Orientation="Horizontal"
-                 ItemWidth="310"
-                 IsVisible="{Binding HasTorrent}">
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Runtime" Classes="text-section-title" />
-            <TextBlock Text="{Binding Torrent.State, StringFormat='Status: {0}'}" />
-            <TextBlock Text="{Binding WaitText, StringFormat='Wait: {0}'}" />
-            <TextBlock Text="{Binding Torrent.ProgressPercent, StringFormat='Progress: {0:0.0}%'}" />
-            <TextBlock Text="{Binding DownloadRateText, StringFormat='Download Rate: {0}'}" />
-            <TextBlock Text="{Binding UploadRateText, StringFormat='Upload Rate: {0}'}" />
-            <TextBlock Text="{Binding Torrent.ConnectedPeerCount, StringFormat='Peers: {0}'}" />
-            <TextBlock Text="{Binding Torrent.TrackerCount, StringFormat='Trackers: {0}'}" />
-          </StackPanel>
-        </Border>
-
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Transfer" Classes="text-section-title" />
-            <TextBlock Text="{Binding DownloadedText, StringFormat='Downloaded: {0}'}" />
-            <TextBlock Text="{Binding TotalSizeText, StringFormat='Total Size: {0}'}" />
-            <TextBlock Text="{Binding MetadataResolvedText, StringFormat='Metadata Resolved: {0}'}" />
-            <TextBlock Text="{Binding ErrorText, StringFormat='Error: {0}'}"
-                       TextWrapping="Wrap" />
-          </StackPanel>
-        </Border>
-
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Identity" Classes="text-section-title" />
-            <TextBlock Text="{Binding CategoryText, StringFormat='Category: {0}'}" />
-            <SelectableTextBlock Text="{Binding InfoHashText, StringFormat='Info Hash: {0}'}"
-                                 Classes="text-body-small"
-                                 TextWrapping="Wrap" />
-            <TextBlock Text="{Binding AddedAtLocalText, StringFormat='Added: {0}'}" />
-            <TextBlock Text="{Binding CompletedAtLocalText, StringFormat='Completed: {0}'}" />
-            <TextBlock Text="{Binding LastActivityAtLocalText, StringFormat='Last Activity: {0}'}" />
-            <SelectableTextBlock Text="{Binding Torrent.SavePath, StringFormat='Save Path: {0}'}"
-                                 Classes="text-body-small"
-                                 TextWrapping="Wrap" />
-          </StackPanel>
-        </Border>
-
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="8">
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-              <TextBlock Text="Completion Callback" Classes="text-section-title" />
-              <Button Grid.Column="1"
-                      Classes="toolbar-action"
-                      Content="Retry"
-                      Command="{Binding RetryCompletionCallbackCommand}"
-                      IsEnabled="{Binding CanRetryCompletionCallback}"
-                      IsVisible="{Binding CanRetryCompletionCallback}" />
+                    <SelectableTextBlock Text="{Binding Torrent.TorrentId, StringFormat='Torrent Id: {0}'}"
+                                         Classes="text-body-small"
+                                         Foreground="{DynamicResource TextSecondaryBrush}"
+                                         TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="2"
+                        Classes="toolbar-action"
+                        Content="Refresh"
+                        Command="{Binding RefreshCommand}" />
+                <Button Grid.Column="3"
+                        Classes="toolbar-action"
+                        Content="Pause"
+                        Command="{Binding PauseCommand}"
+                        IsEnabled="{Binding Torrent.CanPause}" />
+                <Button Grid.Column="4"
+                        Classes="toolbar-action success"
+                        Content="Resume"
+                        Command="{Binding ResumeCommand}"
+                        IsEnabled="{Binding Torrent.CanResume}" />
+                <Button Grid.Column="5"
+                        Classes="toolbar-action"
+                        Content="Refresh Metadata"
+                        Command="{Binding RefreshMetadataCommand}"
+                        IsEnabled="{Binding CanRefreshMetadata}"
+                        IsVisible="{Binding CanRefreshMetadata}" />
+                <Button Grid.Column="6"
+                        Classes="toolbar-action"
+                        Content="Reset Metadata"
+                        Command="{Binding ResetMetadataSessionCommand}"
+                        IsEnabled="{Binding CanRefreshMetadata}"
+                        IsVisible="{Binding CanRefreshMetadata}" />
+                <Button Grid.Column="7"
+                        Classes="toolbar-action"
+                        Content="Retry Callback"
+                        Command="{Binding RetryCompletionCallbackCommand}"
+                        IsEnabled="{Binding CanRetryCompletionCallback}"
+                        IsVisible="{Binding CanRetryCompletionCallback}" />
+                <Button Grid.Column="8"
+                        Classes="toolbar-action danger"
+                        Content="Remove"
+                        Command="{Binding RemoveCommand}"
+                        IsEnabled="{Binding Torrent.CanRemove}" />
+                <Button Grid.Column="9"
+                        Classes="toolbar-action danger"
+                        Content="Delete Data"
+                        Command="{Binding DeleteDataCommand}"
+                        IsEnabled="{Binding CanDeleteData}"
+                        IsVisible="{Binding CanDeleteData}" />
             </Grid>
-            <TextBlock Text="{Binding CompletionCallbackStateText, StringFormat='Status: {0}'}" />
-            <TextBlock Text="{Binding CompletionCallbackPendingSinceText, StringFormat='Pending Since: {0}'}" />
-            <TextBlock Text="{Binding CompletionCallbackInvokedAtText, StringFormat='Invoked: {0}'}" />
-            <SelectableTextBlock Text="{Binding CompletionCallbackFinalPayloadPathText, StringFormat='Final Payload: {0}'}"
-                                 Classes="text-body-small"
-                                 TextWrapping="Wrap" />
-            <TextBlock Text="{Binding CompletionCallbackPendingReasonText, StringFormat='Pending Reason: {0}'}"
+
+            <TextBlock Text="{Binding ActionMessage}"
+                       IsVisible="{Binding HasActionMessage}"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+
+            <TextBlock Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding HasError}"
+                       Foreground="{DynamicResource ErrorTextBrush}"
                        TextWrapping="Wrap" />
-            <TextBlock Text="{Binding CompletionCallbackLastErrorText, StringFormat='Last Error: {0}'}"
-                       TextWrapping="Wrap" />
-            <Border BorderBrush="{DynamicResource RowDividerBrush}"
-                    BorderThickness="0,1,0,0"
-                    Padding="0,8,0,0">
-              <StackPanel Spacing="6">
-                <TextBlock Text="{Binding LatestCallbackEventText, StringFormat='Last Event: {0}'}" />
-                <TextBlock Text="{Binding LatestCallbackEventTimeText, StringFormat='Last Event Time: {0}'}" />
-                <TextBlock Text="{Binding LatestCallbackMessageText, StringFormat='Last Message: {0}'}"
-                           TextWrapping="Wrap" />
-                <TextBlock Text="{Binding LatestCallbackProcessIdText, StringFormat='Process Id: {0}'}" />
-                <TextBlock Text="{Binding LatestCallbackExitCodeText, StringFormat='Exit Code: {0}'}" />
-                <SelectableTextBlock Text="{Binding LatestCallbackCommandPathText, StringFormat='Command: {0}'}"
-                                     Classes="text-body-small"
-                                     TextWrapping="Wrap" />
-                <SelectableTextBlock Text="{Binding LatestCallbackWorkingDirectoryText, StringFormat='Working Directory: {0}'}"
-                                     Classes="text-body-small"
-                                     TextWrapping="Wrap" />
-                <TextBlock Text="{Binding LatestCallbackProcessTimeoutText, StringFormat='Process Timeout: {0}'}" />
-                <TextBlock Text="{Binding LatestCallbackFinalizationWaitText, StringFormat='Finalization Wait: {0}'}" />
-              </StackPanel>
+
+            <Border Classes="panel-card"
+                    IsVisible="{Binding IsLoading}">
+                <TextBlock Text="Loading torrent detail..." />
             </Border>
-          </StackPanel>
-        </Border>
 
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Magnet" Classes="text-section-title" />
-            <SelectableTextBlock Text="{Binding MagnetUriText}"
-                                 Classes="text-body-small"
-                                 TextWrapping="Wrap" />
-          </StackPanel>
-        </Border>
-      </WrapPanel>
-
-      <Border Classes="panel-card"
-              IsVisible="{Binding HasTorrent}">
-        <StackPanel Spacing="12">
-          <TextBlock Text="Recent Torrent Logs" Classes="text-section-title" />
-          <ItemsControl ItemsSource="{Binding Logs}">
-            <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:ActivityLogEntryItemViewModel">
-              <Border BorderBrush="{DynamicResource RowDividerBrush}"
-                      BorderThickness="0,0,0,1"
-                      Padding="0,0,0,10"
-                      Margin="0,0,0,10">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{Binding OccurredAtLocalText, StringFormat='When: {0}'}"
-                               Classes="text-body-small"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <TextBlock Text="{Binding EventType}"
-                               Classes="text-panel-title" />
-                    <TextBlock Text="{Binding Message}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Level, StringFormat='Level: {0}'}"
-                               Classes="text-body-small"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <TextBlock Text="{Binding Category, StringFormat='Category: {0}'}"
-                               Classes="text-body-small"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <SelectableTextBlock Text="{Binding TraceIdText, StringFormat='Trace Id: {0}'}"
-                                         IsVisible="{Binding HasTraceId}"
-                                         Classes="text-body-small"
-                                         TextWrapping="Wrap" />
-                    <SelectableTextBlock Text="{Binding ServiceInstanceIdText, StringFormat='Service Instance: {0}'}"
-                                         IsVisible="{Binding HasServiceInstanceId}"
-                                         Classes="text-body-small"
-                                         TextWrapping="Wrap" />
-                    <SelectableTextBlock Text="{Binding DetailsJson}"
-                                         IsVisible="{Binding HasDetails}"
-                                         Classes="text-body-small"
-                                         TextWrapping="Wrap" />
-                  </StackPanel>
+            <WrapPanel Orientation="Horizontal"
+                       ItemWidth="310"
+                       IsVisible="{Binding HasTorrent}">
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Runtime" Classes="text-section-title" />
+                        <TextBlock Text="{Binding Torrent.State, StringFormat='Status: {0}'}" />
+                        <TextBlock Text="{Binding WaitText, StringFormat='Wait: {0}'}" />
+                        <TextBlock Text="{Binding Torrent.ProgressPercent, StringFormat='Progress: {0:0.0}%'}" />
+                        <TextBlock Text="{Binding DownloadRateText, StringFormat='Download Rate: {0}'}" />
+                        <TextBlock Text="{Binding UploadRateText, StringFormat='Upload Rate: {0}'}" />
+                        <TextBlock Text="{Binding Torrent.ConnectedPeerCount, StringFormat='Peers: {0}'}" />
+                        <TextBlock Text="{Binding Torrent.TrackerCount, StringFormat='Trackers: {0}'}" />
+                    </StackPanel>
                 </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Transfer" Classes="text-section-title" />
+                        <TextBlock Text="{Binding DownloadedText, StringFormat='Downloaded: {0}'}" />
+                        <TextBlock Text="{Binding TotalSizeText, StringFormat='Total Size: {0}'}" />
+                        <TextBlock Text="{Binding MetadataResolvedText, StringFormat='Metadata Resolved: {0}'}" />
+                        <TextBlock Text="{Binding ErrorText, StringFormat='Error: {0}'}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Identity" Classes="text-section-title" />
+                        <TextBlock Text="{Binding CategoryText, StringFormat='Category: {0}'}" />
+                        <SelectableTextBlock Text="{Binding InfoHashText, StringFormat='Info Hash: {0}'}"
+                                             Classes="text-body-small"
+                                             TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding AddedAtLocalText, StringFormat='Added: {0}'}" />
+                        <TextBlock Text="{Binding CompletedAtLocalText, StringFormat='Completed: {0}'}" />
+                        <TextBlock Text="{Binding LastActivityAtLocalText, StringFormat='Last Activity: {0}'}" />
+                        <SelectableTextBlock Text="{Binding Torrent.SavePath, StringFormat='Save Path: {0}'}"
+                                             Classes="text-body-small"
+                                             TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBlock Text="Completion Callback" Classes="text-section-title" />
+                            <Button Grid.Column="1"
+                                    Classes="toolbar-action"
+                                    Content="Retry"
+                                    Command="{Binding RetryCompletionCallbackCommand}"
+                                    IsEnabled="{Binding CanRetryCompletionCallback}"
+                                    IsVisible="{Binding CanRetryCompletionCallback}" />
+                        </Grid>
+                        <TextBlock Text="{Binding CompletionCallbackStateText, StringFormat='Status: {0}'}" />
+                        <TextBlock
+                            Text="{Binding CompletionCallbackPendingSinceText, StringFormat='Pending Since: {0}'}" />
+                        <TextBlock Text="{Binding CompletionCallbackInvokedAtText, StringFormat='Invoked: {0}'}" />
+                        <SelectableTextBlock
+                            Text="{Binding CompletionCallbackFinalPayloadPathText, StringFormat='Final Payload: {0}'}"
+                            Classes="text-body-small"
+                            TextWrapping="Wrap" />
+                        <TextBlock
+                            Text="{Binding CompletionCallbackPendingReasonText, StringFormat='Pending Reason: {0}'}"
+                            TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding CompletionCallbackLastErrorText, StringFormat='Last Error: {0}'}"
+                                   TextWrapping="Wrap" />
+                        <Border BorderBrush="{DynamicResource RowDividerBrush}"
+                                BorderThickness="0,1,0,0"
+                                Padding="0,8,0,0">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{Binding LatestCallbackEventText, StringFormat='Last Event: {0}'}" />
+                                <TextBlock
+                                    Text="{Binding LatestCallbackEventTimeText, StringFormat='Last Event Time: {0}'}" />
+                                <TextBlock Text="{Binding LatestCallbackMessageText, StringFormat='Last Message: {0}'}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding LatestCallbackProcessIdText, StringFormat='Process Id: {0}'}" />
+                                <TextBlock Text="{Binding LatestCallbackExitCodeText, StringFormat='Exit Code: {0}'}" />
+                                <SelectableTextBlock
+                                    Text="{Binding LatestCallbackCommandPathText, StringFormat='Command: {0}'}"
+                                    Classes="text-body-small"
+                                    TextWrapping="Wrap" />
+                                <SelectableTextBlock
+                                    Text="{Binding LatestCallbackWorkingDirectoryText, StringFormat='Working Directory: {0}'}"
+                                    Classes="text-body-small"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Text="{Binding LatestCallbackProcessTimeoutText, StringFormat='Process Timeout: {0}'}" />
+                                <TextBlock
+                                    Text="{Binding LatestCallbackFinalizationWaitText, StringFormat='Finalization Wait: {0}'}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Magnet" Classes="text-section-title" />
+                        <SelectableTextBlock Text="{Binding MagnetUriText}"
+                                             Classes="text-body-small"
+                                             TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+
+            <Border Classes="panel-card"
+                    IsVisible="{Binding HasTorrent}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Recent Torrent Logs" Classes="text-section-title" />
+                    <ItemsControl ItemsSource="{Binding Logs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ActivityLogEntryItemViewModel">
+                                <Border BorderBrush="{DynamicResource RowDividerBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="0,0,0,10"
+                                        Margin="0,0,0,10">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding OccurredAtLocalText, StringFormat='When: {0}'}"
+                                                   Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Text="{Binding EventType}"
+                                                   Classes="text-panel-title" />
+                                        <TextBlock Text="{Binding Message}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Level, StringFormat='Level: {0}'}"
+                                                   Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Text="{Binding Category, StringFormat='Category: {0}'}"
+                                                   Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <SelectableTextBlock Text="{Binding TraceIdText, StringFormat='Trace Id: {0}'}"
+                                                             IsVisible="{Binding HasTraceId}"
+                                                             Classes="text-body-small"
+                                                             TextWrapping="Wrap" />
+                                        <SelectableTextBlock
+                                            Text="{Binding ServiceInstanceIdText, StringFormat='Service Instance: {0}'}"
+                                            IsVisible="{Binding HasServiceInstanceId}"
+                                            Classes="text-body-small"
+                                            TextWrapping="Wrap" />
+                                        <SelectableTextBlock Text="{Binding DetailsJson}"
+                                                             IsVisible="{Binding HasDetails}"
+                                                             Classes="text-body-small"
+                                                             TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
         </StackPanel>
-      </Border>
-    </StackPanel>
-  </ScrollViewer>
+    </ScrollViewer>
 </UserControl>

@@ -1,11 +1,14 @@
+#region
+
 using Microsoft.Extensions.Options;
 using TorrentCore.Service.Configuration;
 
+#endregion
+
 namespace TorrentCore.Service.Engine;
 
-public sealed class TorrentEngineSynchronizationService(
-    ITorrentEngineAdapter torrentEngineAdapter,
-    IOptions<TorrentCoreServiceOptions> serviceOptions) : BackgroundService
+public sealed class TorrentEngineSynchronizationService(ITorrentEngineAdapter torrentEngineAdapter,
+    IOptions<TorrentCoreServiceOptions>                                       serviceOptions) : BackgroundService
 {
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
 

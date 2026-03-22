@@ -3,7 +3,6 @@ namespace TorrentCore.Service.Configuration;
 public sealed class TorrentCoreServiceOptions
 {
     public const string SectionName = "TorrentCore";
-
     public TorrentEngineMode EngineMode { get; init; } = TorrentEngineMode.MonoTorrent;
     public int EngineListenPort { get; init; } = 55_123;
     public int EngineDhtPort { get; init; } = 55_124;

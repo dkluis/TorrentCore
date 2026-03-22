@@ -1,4 +1,8 @@
+#region
+
 using System.Text.Json.Serialization;
+
+#endregion
 
 namespace TorrentCore.Contracts.Host;
 
@@ -6,8 +10,8 @@ namespace TorrentCore.Contracts.Host;
 public enum EngineHostStatus
 {
     Starting = 0,
-    Ready = 1,
+    Ready    = 1,
     Degraded = 2,
-    Stopped = 3,
-    Faulted = 4,
+    Stopped  = 3,
+    Faulted  = 4,
 }

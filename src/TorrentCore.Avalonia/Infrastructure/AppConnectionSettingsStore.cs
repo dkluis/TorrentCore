@@ -1,4 +1,8 @@
+#region
+
 using System.Text.Json;
+
+#endregion
 
 namespace TorrentCore.Avalonia.Infrastructure;
 
@@ -8,11 +12,10 @@ public sealed class AppConnectionSettingsStore
     {
         WriteIndented = true,
     };
-
     private readonly string _filePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "TorrentCore.Avalonia",
-        "service-connection.json");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TorrentCore.Avalonia",
+        "service-connection.json"
+    );
 
     public async Task<AppConnectionSettingsRecord?> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -22,7 +25,9 @@ public sealed class AppConnectionSettingsStore
         }
 
         await using var stream = File.OpenRead(_filePath);
-        return await JsonSerializer.DeserializeAsync<AppConnectionSettingsRecord>(stream, JsonOptions, cancellationToken);
+        return await JsonSerializer.DeserializeAsync<AppConnectionSettingsRecord>(
+            stream, JsonOptions, cancellationToken
+        );
     }
 
     public async Task SaveAsync(AppConnectionSettingsRecord record, CancellationToken cancellationToken = default)

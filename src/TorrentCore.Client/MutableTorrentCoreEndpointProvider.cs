@@ -2,15 +2,10 @@ namespace TorrentCore.Client;
 
 public sealed class MutableTorrentCoreEndpointProvider : ITorrentCoreEndpointProvider
 {
-    private readonly object _gate = new();
-    private string? _currentBaseUrl;
-    private Uri? _currentBaseUri;
-
-    public MutableTorrentCoreEndpointProvider(string? initialBaseUrl = null)
-    {
-        Update(initialBaseUrl);
-    }
-
+    private readonly object  _gate = new();
+    private          Uri?    _currentBaseUri;
+    private          string? _currentBaseUrl;
+    public MutableTorrentCoreEndpointProvider(string? initialBaseUrl = null) { Update(initialBaseUrl); }
     public string? CurrentBaseUrl
     {
         get
@@ -21,7 +16,6 @@ public sealed class MutableTorrentCoreEndpointProvider : ITorrentCoreEndpointPro
             }
         }
     }
-
     public Uri? CurrentBaseUri
     {
         get

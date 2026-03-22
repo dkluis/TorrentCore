@@ -1,12 +1,17 @@
+#region
+
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TorrentCore.Service.Application;
+
+#endregion
 
 namespace TorrentCore.Service.Infrastructure;
 
 public sealed class ServiceOperationExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {
-    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception,
+        CancellationToken                                   cancellationToken)
     {
         if (exception is not ServiceOperationException serviceOperationException)
         {
@@ -23,7 +28,7 @@ public sealed class ServiceOperationExceptionHandler(IProblemDetailsService prob
             Type   = $"urn:torrentcore:error:{serviceOperationException.Code}",
         };
 
-        problemDetails.Extensions["code"] = serviceOperationException.Code;
+        problemDetails.Extensions["code"]    = serviceOperationException.Code;
         problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
 
         if (!string.IsNullOrWhiteSpace(serviceOperationException.Target))
@@ -31,11 +36,13 @@ public sealed class ServiceOperationExceptionHandler(IProblemDetailsService prob
             problemDetails.Extensions["target"] = serviceOperationException.Target;
         }
 
-        return await problemDetailsService.TryWriteAsync(new ProblemDetailsContext
-        {
-            HttpContext = httpContext,
-            Exception = exception,
-            ProblemDetails = problemDetails,
-        });
+        return await problemDetailsService.TryWriteAsync(
+            new ProblemDetailsContext
+            {
+                HttpContext    = httpContext,
+                Exception      = exception,
+                ProblemDetails = problemDetails,
+            }
+        );
     }
 }

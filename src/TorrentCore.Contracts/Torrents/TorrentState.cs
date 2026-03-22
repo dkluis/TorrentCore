@@ -1,4 +1,8 @@
+#region
+
 using System.Text.Json.Serialization;
+
+#endregion
 
 namespace TorrentCore.Contracts.Torrents;
 
@@ -6,11 +10,11 @@ namespace TorrentCore.Contracts.Torrents;
 public enum TorrentState
 {
     ResolvingMetadata = 0,
-    Queued = 1,
-    Downloading = 2,
-    Seeding = 3,
-    Paused = 4,
-    Completed = 5,
-    Error = 6,
-    Removed = 7,
+    Queued            = 1,
+    Downloading       = 2,
+    Seeding           = 3,
+    Paused            = 4,
+    Completed         = 5,
+    Error             = 6,
+    Removed           = 7,
 }

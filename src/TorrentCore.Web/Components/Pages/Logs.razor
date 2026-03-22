@@ -1,7 +1,7 @@
 @page "/logs"
+@using System.Globalization
 @implements IAsyncDisposable
 @inject TorrentCoreClient TorrentCoreClient
-@using System.Globalization
 
 <PageTitle>Logs</PageTitle>
 
@@ -46,7 +46,7 @@
                    placeholder="Exact event type"
                    @bind="_eventType"
                    @bind:event="oninput"
-                   @onkeydown="HandleFilterKeyDownAsync" />
+                   @onkeydown="HandleFilterKeyDownAsync"/>
         </div>
         <div class="col-12 col-md-3">
             <label class="form-label" for="torrentId">Torrent Id</label>
@@ -55,7 +55,7 @@
                    placeholder="Exact torrent GUID"
                    @bind="_torrentIdText"
                    @bind:event="oninput"
-                   @onkeydown="HandleFilterKeyDownAsync" />
+                   @onkeydown="HandleFilterKeyDownAsync"/>
         </div>
     </div>
 
@@ -63,7 +63,7 @@
         <button class="btn btn-primary" @onclick="ApplyFiltersAsync" disabled="@_isLoading">Apply Filters</button>
         <button class="btn btn-secondary" @onclick="ClearFiltersAsync">Clear Filters</button>
         <div class="form-check align-self-center">
-            <input id="autoRefresh" class="form-check-input" type="checkbox" @bind="_autoRefresh" />
+            <input id="autoRefresh" class="form-check-input" type="checkbox" @bind="_autoRefresh"/>
             <label class="form-check-label" for="autoRefresh">Auto refresh</label>
         </div>
     </div>
@@ -71,26 +71,23 @@
     @if (!string.IsNullOrWhiteSpace(_filterError))
     {
         <p class="mt-2 text-danger">@_filterError</p>
-    }
-    else if (!string.IsNullOrWhiteSpace(_error))
+    } else if (!string.IsNullOrWhiteSpace(_error))
     {
         <p class="mt-2 text-danger">@_error</p>
-    }
-    else if (_lastRefreshedAtLocal is not null)
+    } else if (_lastRefreshedAtLocal is not null)
     {
-        <p class="mt-2 text-muted">Last refreshed: @_lastRefreshedAtLocal.Value.ToString("g", CultureInfo.CurrentCulture)</p>
+        <p class="mt-2 text-muted">Last
+            refreshed: @_lastRefreshedAtLocal.Value.ToString("g", CultureInfo.CurrentCulture)</p>
     }
 </section>
 
 @if (_isLoading)
 {
     <p>Loading logs...</p>
-}
-else if (_logs.Count == 0)
+} else if (_logs.Count == 0)
 {
     <p>No log entries matched the current filters.</p>
-}
-else
+} else
 {
     <div class="tc-table-wrap d-none d-md-block">
         <table class="table table-sm align-middle">
@@ -162,26 +159,26 @@ else
 }
 
 @code {
-    private IReadOnlyList<ActivityLogEntryDto> _logs = Array.Empty<ActivityLogEntryDto>();
-    private readonly SemaphoreSlim _loadGate = new(1, 1);
-    private CancellationTokenSource? _refreshLoopCts;
-    private Task? _refreshLoopTask;
-    private string? _error;
-    private string? _filterError;
-    private bool _isLoading = true;
-    private bool _autoRefresh = true;
-    private int _take = 100;
-    private string _level = string.Empty;
-    private string _category = string.Empty;
-    private string _eventType = string.Empty;
-    private string _torrentIdText = string.Empty;
-    private DateTimeOffset? _lastRefreshedAtLocal;
-    private bool _isDisposed;
+    private          IReadOnlyList<ActivityLogEntryDto> _logs     = Array.Empty<ActivityLogEntryDto>();
+    private readonly SemaphoreSlim                      _loadGate = new(1, 1);
+    private          CancellationTokenSource?           _refreshLoopCts;
+    private          Task?                              _refreshLoopTask;
+    private          string?                            _error;
+    private          string?                            _filterError;
+    private          bool                               _isLoading     = true;
+    private          bool                               _autoRefresh   = true;
+    private          int                                _take          = 100;
+    private          string                             _level         = string.Empty;
+    private          string                             _category      = string.Empty;
+    private          string                             _eventType     = string.Empty;
+    private          string                             _torrentIdText = string.Empty;
+    private          DateTimeOffset?                    _lastRefreshedAtLocal;
+    private          bool                               _isDisposed;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
-        _refreshLoopCts = new CancellationTokenSource();
+        _refreshLoopCts  = new CancellationTokenSource();
         _refreshLoopTask = RunRefreshLoopAsync(_refreshLoopCts.Token);
     }
 
@@ -200,8 +197,8 @@ else
             if (!Guid.TryParse(_torrentIdText, out var parsedTorrentId))
             {
                 _filterError = "Torrent Id must be a valid GUID.";
-                _logs = Array.Empty<ActivityLogEntryDto>();
-                _isLoading = false;
+                _logs        = Array.Empty<ActivityLogEntryDto>();
+                _isLoading   = false;
                 return;
             }
 
@@ -217,14 +214,9 @@ else
                 return;
             }
 
-            _isLoading = true;
-            _error = null;
-            _logs = await TorrentCoreClient.GetRecentLogsAsync(
-                take: _take,
-                category: NullIfWhiteSpace(_category),
-                eventType: NullIfWhiteSpace(_eventType),
-                level: NullIfWhiteSpace(_level),
-                torrentId: torrentId);
+            _isLoading            = true;
+            _error                = null;
+            _logs                 = await TorrentCoreClient.GetRecentLogsAsync(_take, NullIfWhiteSpace(_category), NullIfWhiteSpace(_eventType), NullIfWhiteSpace(_level), torrentId);
             _lastRefreshedAtLocal = DateTimeOffset.Now;
         }
         catch (Exception exception)
@@ -238,19 +230,16 @@ else
         }
     }
 
-    private async Task ApplyFiltersAsync()
-    {
-        await LoadAsync();
-    }
+    private async Task ApplyFiltersAsync() { await LoadAsync(); }
 
     private async Task ClearFiltersAsync()
     {
-        _take = 100;
-        _level = string.Empty;
-        _category = string.Empty;
-        _eventType = string.Empty;
+        _take          = 100;
+        _level         = string.Empty;
+        _category      = string.Empty;
+        _eventType     = string.Empty;
         _torrentIdText = string.Empty;
-        _filterError = null;
+        _filterError   = null;
         await ApplyFiltersAsync();
     }
 
@@ -276,23 +265,21 @@ else
             }
 
             await InvokeAsync(async () =>
-            {
-                if (_isDisposed)
                 {
-                    return;
-                }
+                    if (_isDisposed)
+                    {
+                        return;
+                    }
 
-                await LoadAsync();
-                StateHasChanged();
-            });
+                    await LoadAsync();
+                    StateHasChanged();
+                }
+            );
         }
     }
 
-    private static string? NullIfWhiteSpace(string value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string FormatGuid(Guid? value) =>
-        value?.ToString("D")[..8] ?? string.Empty;
+    private static string? NullIfWhiteSpace(string value) { return string.IsNullOrWhiteSpace(value) ? null : value.Trim(); }
+    private static string  FormatGuid(Guid?        value) { return value?.ToString("D")[..8] ?? string.Empty; }
 
     public async ValueTask DisposeAsync()
     {
@@ -310,9 +297,8 @@ else
             {
                 await _refreshLoopTask;
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
         }
     }
+
 }

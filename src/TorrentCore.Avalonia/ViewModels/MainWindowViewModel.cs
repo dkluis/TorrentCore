@@ -1,98 +1,83 @@
+#region
+
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using TorrentCore.Avalonia.Infrastructure;
 using TorrentCore.Avalonia.Models;
 using TorrentCore.Client;
 
+#endregion
+
 namespace TorrentCore.Avalonia.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
+    private readonly TorrentCoreClient                     _client;
+    private readonly AvaloniaServiceConnectionManager      _connectionManager;
+    private readonly ConnectionSetupViewModel              _connectionSetupViewModel;
+    private readonly DashboardViewModel                    _dashboardViewModel;
+    private readonly LogsViewModel                         _logsViewModel;
     private readonly Dictionary<string, NavigationSection> _sectionMap;
-    private readonly AvaloniaServiceConnectionManager _connectionManager;
-    private readonly DashboardViewModel _dashboardViewModel;
-    private readonly TorrentsViewModel _torrentsViewModel;
-    private readonly LogsViewModel _logsViewModel;
-    private readonly SettingsViewModel _settingsViewModel;
-    private readonly ConnectionSetupViewModel _connectionSetupViewModel;
-    private readonly TorrentCoreClient _client;
-
-    [ObservableProperty]
-    private NavigationSection? _selectedSection;
-
-    [ObservableProperty]
-    private ViewModelBase? _currentViewModel;
-
-    [ObservableProperty]
-    private string _currentTitle = "Service Connection";
-
+    private readonly SettingsViewModel                     _settingsViewModel;
+    private readonly TorrentsViewModel                     _torrentsViewModel;
     [ObservableProperty]
     private string _currentDescription = "Connect this desktop client to a TorrentCore service on the local network.";
-
+    [ObservableProperty]
+    private string _currentTitle = "Service Connection";
+    [ObservableProperty]
+    private ViewModelBase? _currentViewModel;
+    [ObservableProperty]
+    private bool _isConnectionSetupRequired = true;
+    [ObservableProperty]
+    private NavigationSection? _selectedSection;
     [ObservableProperty]
     private string _serviceBaseUrl = "Not configured";
-
     [ObservableProperty]
     private string _serviceStatusSummary = "Checking TorrentCore service connectivity...";
 
-    [ObservableProperty]
-    private bool _isConnectionSetupRequired = true;
-
-    public MainWindowViewModel(
-        TorrentCoreClient client,
-        AvaloniaServiceConnectionManager connectionManager,
-        IClipboardTextService clipboardTextService)
+    public MainWindowViewModel(TorrentCoreClient client, AvaloniaServiceConnectionManager connectionManager,
+        IClipboardTextService                    clipboardTextService)
     {
-        _client = client;
+        _client            = client;
         _connectionManager = connectionManager;
 
-        _dashboardViewModel = new DashboardViewModel(client);
-        _torrentsViewModel = new TorrentsViewModel(client, ShowTorrentDetail, clipboardTextService);
-        _logsViewModel = new LogsViewModel(client, ShowTorrentDetail);
-        _settingsViewModel = new SettingsViewModel(client);
+        _dashboardViewModel       = new DashboardViewModel(client);
+        _torrentsViewModel        = new TorrentsViewModel(client, ShowTorrentDetail, clipboardTextService);
+        _logsViewModel            = new LogsViewModel(client, ShowTorrentDetail);
+        _settingsViewModel        = new SettingsViewModel(client);
         _connectionSetupViewModel = new ConnectionSetupViewModel(connectionManager, HandleConnectionSavedAsync);
 
         Sections = new ObservableCollection<NavigationSection>(
-        [
-            new NavigationSection(
-                "connection",
-                "Connection",
-                "Service target",
-                "Test and save the desktop app's TorrentCore service endpoint."
-            ),
-            new NavigationSection(
-                "dashboard",
-                "Dashboard",
-                "Host and engine status",
-                "Dashboard cards for service health, engine runtime, queue pressure, callback lifecycle counts, and storage policy."
-            ),
-            new NavigationSection(
-                "torrents",
-                "Torrents",
-                "Magnets and lifecycle actions",
-                "Add categorized magnets, filter by callback state, select multiple torrents, and run operator actions including callback retry."
-            ),
-            new NavigationSection(
-                "logs",
-                "Logs",
-                "Recent activity and errors",
-                "Inspect persisted service, torrent, and engine events with lightweight filtering, auto refresh, and one-click torrent detail jumps."
-            ),
-            new NavigationSection(
-                "settings",
-                "Settings",
-                "Runtime policy controls",
-                "Edit seeding, cleanup, queue concurrency, callback settings, and category routing from the desktop client."
-            ),
-        ]);
+            [
+                new NavigationSection(
+                    "connection", "Connection", "Service target",
+                    "Test and save the desktop app's TorrentCore service endpoint."
+                ),
+                new NavigationSection(
+                    "dashboard", "Dashboard", "Host and engine status",
+                    "Dashboard cards for service health, engine runtime, queue pressure, callback lifecycle counts, and storage policy."
+                ),
+                new NavigationSection(
+                    "torrents", "Torrents", "Magnets and lifecycle actions",
+                    "Add categorized magnets, filter by callback state, select multiple torrents, and run operator actions including callback retry."
+                ),
+                new NavigationSection(
+                    "logs", "Logs", "Recent activity and errors",
+                    "Inspect persisted service, torrent, and engine events with lightweight filtering, auto refresh, and one-click torrent detail jumps."
+                ),
+                new NavigationSection(
+                    "settings", "Settings", "Runtime policy controls",
+                    "Edit seeding, cleanup, queue concurrency, callback settings, and category routing from the desktop client."
+                ),
+            ]
+        );
 
-        _sectionMap = Sections.ToDictionary(section => section.Key, StringComparer.OrdinalIgnoreCase);
+        _sectionMap      = Sections.ToDictionary(section => section.Key, StringComparer.OrdinalIgnoreCase);
         CurrentViewModel = _connectionSetupViewModel;
     }
 
-    public ObservableCollection<NavigationSection> Sections { get; }
-
-    public bool CanNavigate => !IsConnectionSetupRequired;
+    public ObservableCollection<NavigationSection> Sections    { get; }
+    public bool                                    CanNavigate => !IsConnectionSetupRequired;
 
     public async Task InitializeAsync()
     {
@@ -100,7 +85,7 @@ public partial class MainWindowViewModel : ViewModelBase
         await ApplyConnectionStatusAsync(probeResult);
     }
 
-    partial void OnIsConnectionSetupRequiredChanged(bool value) => OnPropertyChanged(nameof(CanNavigate));
+    partial void OnIsConnectionSetupRequiredChanged(bool value) { OnPropertyChanged(nameof(CanNavigate)); }
 
     partial void OnSelectedSectionChanged(NavigationSection? value)
     {
@@ -117,35 +102,35 @@ public partial class MainWindowViewModel : ViewModelBase
         switch (value.Key)
         {
             case "connection":
-                CurrentViewModel = _connectionSetupViewModel;
-                CurrentTitle = value.Title;
+                CurrentViewModel   = _connectionSetupViewModel;
+                CurrentTitle       = value.Title;
                 CurrentDescription = value.Description;
-                _ = _connectionSetupViewModel.LoadAsync();
-                break;
+                _                  = _connectionSetupViewModel.LoadAsync();
+            break;
             case "dashboard":
-                CurrentViewModel = _dashboardViewModel;
-                CurrentTitle = value.Title;
+                CurrentViewModel   = _dashboardViewModel;
+                CurrentTitle       = value.Title;
                 CurrentDescription = value.Description;
-                _ = _dashboardViewModel.LoadAsync();
-                break;
+                _                  = _dashboardViewModel.LoadAsync();
+            break;
             case "torrents":
-                CurrentViewModel = _torrentsViewModel;
-                CurrentTitle = value.Title;
+                CurrentViewModel   = _torrentsViewModel;
+                CurrentTitle       = value.Title;
                 CurrentDescription = value.Description;
-                _ = _torrentsViewModel.LoadAsync();
-                break;
+                _                  = _torrentsViewModel.LoadAsync();
+            break;
             case "logs":
-                CurrentViewModel = _logsViewModel;
-                CurrentTitle = value.Title;
+                CurrentViewModel   = _logsViewModel;
+                CurrentTitle       = value.Title;
                 CurrentDescription = value.Description;
-                _ = _logsViewModel.LoadAsync();
-                break;
+                _                  = _logsViewModel.LoadAsync();
+            break;
             case "settings":
-                CurrentViewModel = _settingsViewModel;
-                CurrentTitle = value.Title;
+                CurrentViewModel   = _settingsViewModel;
+                CurrentTitle       = value.Title;
                 CurrentDescription = value.Description;
-                _ = _settingsViewModel.LoadAsync();
-                break;
+                _                  = _settingsViewModel.LoadAsync();
+            break;
         }
     }
 
@@ -153,9 +138,10 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         var detailViewModel = new TorrentDetailViewModel(_client, torrentId, ShowTorrents);
         CurrentTitle = "Torrent Detail";
-        CurrentDescription = "Runtime, transfer, category, callback lifecycle, and recent log diagnostics for the selected torrent.";
+        CurrentDescription =
+                "Runtime, transfer, category, callback lifecycle, and recent log diagnostics for the selected torrent.";
         CurrentViewModel = detailViewModel;
-        _ = detailViewModel.LoadAsync();
+        _                = detailViewModel.LoadAsync();
     }
 
     private void ShowTorrents()
@@ -165,9 +151,9 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        CurrentTitle = torrentsSection.Title;
+        CurrentTitle       = torrentsSection.Title;
         CurrentDescription = torrentsSection.Description;
-        CurrentViewModel = _torrentsViewModel;
+        CurrentViewModel   = _torrentsViewModel;
 
         if (!ReferenceEquals(SelectedSection, torrentsSection))
         {
@@ -186,10 +172,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task ApplyConnectionStatusAsync(TorrentCoreConnectionProbeResult probeResult)
     {
-        ServiceBaseUrl = probeResult.BaseUrl ?? _connectionManager.DefaultBaseUrl ?? "Not configured";
-        ServiceStatusSummary = probeResult.IsReachable
-            ? "Reachable"
-            : probeResult.ErrorMessage ?? "Unavailable";
+        ServiceBaseUrl       = probeResult.BaseUrl ?? _connectionManager.DefaultBaseUrl         ?? "Not configured";
+        ServiceStatusSummary = probeResult.IsReachable ? "Reachable" : probeResult.ErrorMessage ?? "Unavailable";
 
         if (!probeResult.IsReachable)
         {
@@ -199,9 +183,9 @@ public partial class MainWindowViewModel : ViewModelBase
                 SelectedSection = connectionSection;
             }
 
-            CurrentTitle = "Service Connection";
+            CurrentTitle       = "Service Connection";
             CurrentDescription = "Connect this desktop client to a TorrentCore service on the local network.";
-            CurrentViewModel = _connectionSetupViewModel;
+            CurrentViewModel   = _connectionSetupViewModel;
             await _connectionSetupViewModel.LoadAsync();
             return;
         }

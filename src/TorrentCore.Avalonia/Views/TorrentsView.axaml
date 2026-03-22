@@ -3,264 +3,280 @@
              xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
              x:Class="TorrentCore.Avalonia.Views.TorrentsView"
              x:DataType="vm:TorrentsViewModel">
-  <ScrollViewer VerticalScrollBarVisibility="Auto"
-                HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-        <StackPanel Spacing="4">
-          <TextBlock Text="Torrents" Classes="text-page-title" />
-          <TextBlock Text="Add magnets and manage active, queued, paused, completed, and errored torrents."
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-        </StackPanel>
-        <Button Grid.Column="1"
-                Classes="toolbar-action"
-                Content="Refresh"
-                Command="{Binding RefreshCommand}" />
-      </Grid>
-
-      <Border Classes="panel-card">
-        <StackPanel Spacing="12">
-          <TextBlock Text="Add Magnet" Classes="text-section-title" />
-          <Grid ColumnDefinitions="*,220" ColumnSpacing="12">
-            <TextBox x:Name="MagnetUriTextBox"
-                     Text="{Binding MagnetUri}"
-                     Watermark="magnet:?xt=urn:btih:..."
-                     TextWrapping="Wrap"
-                     KeyDown="MagnetUriTextBox_OnKeyDown" />
-            <StackPanel Grid.Column="1" Spacing="4">
-              <TextBlock Text="Category" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-              <ComboBox ItemsSource="{Binding AddCategoryOptions}"
-                        SelectedItem="{Binding SelectedAddCategory}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:TorrentCategoryOptionViewModel">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-          </Grid>
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Classes="toolbar-action"
-                    Content="Paste Magnet"
-                    Command="{Binding PasteMagnetCommand}" />
-            <Button Classes="toolbar-action accent"
-                    Content="Add Torrent"
-                    Command="{Binding AddMagnetCommand}" />
-            <TextBlock Text="{Binding SubmitMessage}"
-                       IsVisible="{Binding HasSubmitMessage}"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextSecondaryBrush}" />
-          </StackPanel>
-        </StackPanel>
-      </Border>
-
-      <Border Classes="panel-card">
-        <StackPanel Spacing="12">
-          <TextBlock Text="Filters And Bulk Actions" Classes="text-section-title" />
-          <WrapPanel Orientation="Horizontal" ItemWidth="220">
-            <StackPanel Spacing="4" Margin="0,0,18,10">
-              <TextBlock Text="Name Filter" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-              <TextBox Text="{Binding NameFilter}"
-                       Watermark="Filter by name" />
-            </StackPanel>
-            <StackPanel Spacing="4" Margin="0,0,18,10">
-              <TextBlock Text="Status" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-              <ComboBox ItemsSource="{Binding StatusOptions}"
-                        SelectedItem="{Binding SelectedStatus}" />
-            </StackPanel>
-            <StackPanel Spacing="4" Margin="0,0,18,10">
-              <TextBlock Text="Category" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-              <ComboBox ItemsSource="{Binding CategoryFilterOptions}"
-                        SelectedItem="{Binding SelectedCategoryFilter}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate x:DataType="vm:TorrentCategoryOptionViewModel">
-                    <TextBlock Text="{Binding DisplayName}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-            </StackPanel>
-            <StackPanel Spacing="4" Margin="0,0,18,10">
-              <TextBlock Text="Callback" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-              <ComboBox ItemsSource="{Binding CallbackStateOptions}"
-                        SelectedItem="{Binding SelectedCallbackState}" />
-            </StackPanel>
-            <StackPanel Spacing="4" Margin="0,0,18,10">
-              <TextBlock Text="Sort" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-              <ComboBox ItemsSource="{Binding SortOptions}"
-                        SelectedItem="{Binding SelectedSort}" />
-            </StackPanel>
-          </WrapPanel>
-          <WrapPanel Orientation="Horizontal">
-            <Button Margin="0,0,10,0"
-                    Classes="toolbar-action"
-                    Content="Pause Selected"
-                    Command="{Binding PauseSelectedCommand}"
-                    IsEnabled="{Binding CanRunBulkActions}" />
-            <Button Margin="0,0,10,0"
-                    Classes="toolbar-action"
-                    Content="Resume Selected"
-                    Command="{Binding ResumeSelectedCommand}"
-                    IsEnabled="{Binding CanRunBulkActions}" />
-            <Button Margin="0,0,10,0"
-                    Classes="toolbar-action danger"
-                    Content="Remove Selected"
-                    Command="{Binding RemoveSelectedCommand}"
-                    IsEnabled="{Binding CanRunBulkActions}" />
-            <Button Margin="0,0,10,0"
-                    Classes="toolbar-action"
-                    Content="Select Visible"
-                    Command="{Binding SelectVisibleCommand}" />
-            <Button Classes="toolbar-action"
-                    Content="Clear Selection"
-                    Command="{Binding ClearSelectionCommand}" />
-          </WrapPanel>
-          <TextBlock Text="{Binding TotalTorrentCount, StringFormat='Total: {0}'}"
-                     Classes="text-body-small"
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-          <TextBlock Text="{Binding VisibleTorrentCount, StringFormat='Visible: {0}'}"
-                     Classes="text-body-small"
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-          <TextBlock Text="{Binding SelectedTorrentCount, StringFormat='Selected: {0}'}"
-                     Classes="text-body-small"
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-          <TextBlock Text="{Binding ActionMessage}"
-                     IsVisible="{Binding HasActionMessage}"
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-          <TextBlock Text="{Binding ErrorMessage}"
-                     IsVisible="{Binding HasError}"
-                     Foreground="{DynamicResource ErrorTextBrush}"
-                     TextWrapping="Wrap" />
-        </StackPanel>
-      </Border>
-
-      <Border Classes="panel-card"
-              IsVisible="{Binding IsLoading}">
-        <TextBlock Text="Loading torrents..." />
-      </Border>
-
-      <ItemsControl ItemsSource="{Binding VisibleTorrents}"
-                    IsVisible="{Binding HasVisibleTorrents}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:TorrentListItemViewModel">
-            <Border Classes="panel-card" Margin="0,0,0,14">
-              <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                  <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top" />
-                  <StackPanel Grid.Column="1" Spacing="4">
-                    <TextBlock Text="{Binding Name}"
-                               Classes="text-panel-title"
-                               TextWrapping="Wrap" />
-                    <WrapPanel>
-                      <TextBlock Margin="0,0,12,0"
-                                 Text="{Binding State, StringFormat='State: {0}'}"
-                                 Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <TextBlock Margin="0,0,12,0"
-                                 Text="{Binding CategoryText, StringFormat='Category: {0}'}"
-                                 Foreground="{DynamicResource TextSecondaryBrush}" />
-                      <TextBlock Text="{Binding CompletionCallbackStateText, StringFormat='Callback: {0}'}"
-                                 Foreground="{DynamicResource TextSecondaryBrush}" />
-                    </WrapPanel>
-                  </StackPanel>
-                  <TextBlock Grid.Column="2"
-                             Text="{Binding ProgressText}"
-                             Classes="text-section-title"
-                             VerticalAlignment="Top" />
-                </Grid>
-
-                <Grid ColumnDefinitions="2*,*,*,Auto,Auto" ColumnSpacing="12">
-                  <StackPanel Spacing="3">
-                    <TextBlock Text="Wait" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding WaitAndQueueText}" TextWrapping="Wrap" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="3">
-                    <TextBlock Text="Down" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding DownloadRateText}" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="2" Spacing="3">
-                    <TextBlock Text="Up" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding UploadRateText}" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="3" Spacing="3">
-                    <TextBlock Text="Trackers" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding TrackerCount}" HorizontalAlignment="Center" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="4" Spacing="3">
-                    <TextBlock Text="Peers" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding ConnectedPeerCount}" HorizontalAlignment="Center" />
-                  </StackPanel>
-                </Grid>
-
-                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-                  <StackPanel Spacing="3">
-                    <TextBlock Text="Added" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding AddedAtLocalText}" Classes="text-body-small" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="3">
-                    <TextBlock Text="Last Activity" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding LastActivityAtLocalText}" Classes="text-body-small" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="2" Spacing="3">
-                    <TextBlock Text="Completed" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                    <TextBlock Text="{Binding CompletedAtLocalText}" Classes="text-body-small" />
-                  </StackPanel>
-                </Grid>
-
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Classes="toolbar-action"
-                          Content="Details"
-                          Command="{Binding OpenDetailCommand}" />
-                  <Button Classes="toolbar-action"
-                          Content="Pause"
-                          Command="{Binding PauseCommand}"
-                          IsEnabled="{Binding CanPause}" />
-                  <Button Classes="toolbar-action success"
-                          Content="Resume"
-                          Command="{Binding ResumeCommand}"
-                          IsEnabled="{Binding CanResume}" />
-                  <Button Classes="toolbar-action"
-                          Content="Refresh Metadata"
-                          Command="{Binding RefreshMetadataCommand}"
-                          IsEnabled="{Binding CanRefreshMetadata}"
-                          IsVisible="{Binding CanRefreshMetadata}" />
-                  <Button Classes="toolbar-action"
-                          Content="Reset Metadata"
-                          Command="{Binding ResetMetadataSessionCommand}"
-                          IsEnabled="{Binding CanRefreshMetadata}"
-                          IsVisible="{Binding CanRefreshMetadata}" />
-                  <Button Classes="toolbar-action danger"
-                          Content="Remove"
-                          Command="{Binding RemoveCommand}"
-                          IsEnabled="{Binding CanRemove}" />
-                  <Button Classes="toolbar-action danger"
-                          Content="Delete Data"
-                          Command="{Binding DeleteDataCommand}"
-                          IsEnabled="{Binding CanDeleteData}" 
-                          IsVisible="{Binding CanDeleteData}" />
-                  <Button Classes="toolbar-action"
-                          Content="Retry Callback"
-                          Command="{Binding RetryCompletionCallbackCommand}"
-                          IsEnabled="{Binding CanRetryCompletionCallback}"
-                          IsVisible="{Binding CanRetryCompletionCallback}" />
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Torrents" Classes="text-page-title" />
+                    <TextBlock Text="Add magnets and manage active, queued, paused, completed, and errored torrents."
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
+                <Button Grid.Column="1"
+                        Classes="toolbar-action"
+                        Content="Refresh"
+                        Command="{Binding RefreshCommand}" />
+            </Grid>
 
-                <TextBlock Text="{Binding CompletionCallbackLastError, StringFormat='Callback Error: {0}'}"
-                           IsVisible="{Binding HasCompletionCallbackLastError}"
-                           Foreground="{DynamicResource WarningTextBrush}"
-                           TextWrapping="Wrap" />
-
-                <TextBlock Text="{Binding ErrorMessage}"
-                           IsVisible="{Binding HasErrorMessage}"
-                           Foreground="{DynamicResource ErrorTextBrush}"
-                           TextWrapping="Wrap" />
-              </StackPanel>
+            <Border Classes="panel-card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Add Magnet" Classes="text-section-title" />
+                    <Grid ColumnDefinitions="*,220" ColumnSpacing="12">
+                        <TextBox x:Name="MagnetUriTextBox"
+                                 Text="{Binding MagnetUri}"
+                                 Watermark="magnet:?xt=urn:btih:..."
+                                 TextWrapping="Wrap"
+                                 KeyDown="MagnetUriTextBox_OnKeyDown" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Category" Classes="text-body-small"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ComboBox ItemsSource="{Binding AddCategoryOptions}"
+                                      SelectedItem="{Binding SelectedAddCategory}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TorrentCategoryOptionViewModel">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="toolbar-action"
+                                Content="Paste Magnet"
+                                Command="{Binding PasteMagnetCommand}" />
+                        <Button Classes="toolbar-action accent"
+                                Content="Add Torrent"
+                                Command="{Binding AddMagnetCommand}" />
+                        <TextBlock Text="{Binding SubmitMessage}"
+                                   IsVisible="{Binding HasSubmitMessage}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
             </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
 
-      <TextBlock Text="No torrents matched the current filters."
-                 IsVisible="{Binding HasNoVisibleTorrents}"
-                 Foreground="{DynamicResource TextSecondaryBrush}" />
-    </StackPanel>
-  </ScrollViewer>
+            <Border Classes="panel-card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Filters And Bulk Actions" Classes="text-section-title" />
+                    <WrapPanel Orientation="Horizontal" ItemWidth="220">
+                        <StackPanel Spacing="4" Margin="0,0,18,10">
+                            <TextBlock Text="Name Filter" Classes="text-body-small"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <TextBox Text="{Binding NameFilter}"
+                                     Watermark="Filter by name" />
+                        </StackPanel>
+                        <StackPanel Spacing="4" Margin="0,0,18,10">
+                            <TextBlock Text="Status" Classes="text-body-small"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ComboBox ItemsSource="{Binding StatusOptions}"
+                                      SelectedItem="{Binding SelectedStatus}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4" Margin="0,0,18,10">
+                            <TextBlock Text="Category" Classes="text-body-small"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ComboBox ItemsSource="{Binding CategoryFilterOptions}"
+                                      SelectedItem="{Binding SelectedCategoryFilter}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TorrentCategoryOptionViewModel">
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Spacing="4" Margin="0,0,18,10">
+                            <TextBlock Text="Callback" Classes="text-body-small"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ComboBox ItemsSource="{Binding CallbackStateOptions}"
+                                      SelectedItem="{Binding SelectedCallbackState}" />
+                        </StackPanel>
+                        <StackPanel Spacing="4" Margin="0,0,18,10">
+                            <TextBlock Text="Sort" Classes="text-body-small"
+                                       Foreground="{DynamicResource TextMutedBrush}" />
+                            <ComboBox ItemsSource="{Binding SortOptions}"
+                                      SelectedItem="{Binding SelectedSort}" />
+                        </StackPanel>
+                    </WrapPanel>
+                    <WrapPanel Orientation="Horizontal">
+                        <Button Margin="0,0,10,0"
+                                Classes="toolbar-action"
+                                Content="Pause Selected"
+                                Command="{Binding PauseSelectedCommand}"
+                                IsEnabled="{Binding CanRunBulkActions}" />
+                        <Button Margin="0,0,10,0"
+                                Classes="toolbar-action"
+                                Content="Resume Selected"
+                                Command="{Binding ResumeSelectedCommand}"
+                                IsEnabled="{Binding CanRunBulkActions}" />
+                        <Button Margin="0,0,10,0"
+                                Classes="toolbar-action danger"
+                                Content="Remove Selected"
+                                Command="{Binding RemoveSelectedCommand}"
+                                IsEnabled="{Binding CanRunBulkActions}" />
+                        <Button Margin="0,0,10,0"
+                                Classes="toolbar-action"
+                                Content="Select Visible"
+                                Command="{Binding SelectVisibleCommand}" />
+                        <Button Classes="toolbar-action"
+                                Content="Clear Selection"
+                                Command="{Binding ClearSelectionCommand}" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding TotalTorrentCount, StringFormat='Total: {0}'}"
+                               Classes="text-body-small"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding VisibleTorrentCount, StringFormat='Visible: {0}'}"
+                               Classes="text-body-small"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding SelectedTorrentCount, StringFormat='Selected: {0}'}"
+                               Classes="text-body-small"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding ActionMessage}"
+                               IsVisible="{Binding HasActionMessage}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               IsVisible="{Binding HasError}"
+                               Foreground="{DynamicResource ErrorTextBrush}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="panel-card"
+                    IsVisible="{Binding IsLoading}">
+                <TextBlock Text="Loading torrents..." />
+            </Border>
+
+            <ItemsControl ItemsSource="{Binding VisibleTorrents}"
+                          IsVisible="{Binding HasVisibleTorrents}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TorrentListItemViewModel">
+                        <Border Classes="panel-card" Margin="0,0,0,14">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                                    <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top" />
+                                    <StackPanel Grid.Column="1" Spacing="4">
+                                        <TextBlock Text="{Binding Name}"
+                                                   Classes="text-panel-title"
+                                                   TextWrapping="Wrap" />
+                                        <WrapPanel>
+                                            <TextBlock Margin="0,0,12,0"
+                                                       Text="{Binding State, StringFormat='State: {0}'}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            <TextBlock Margin="0,0,12,0"
+                                                       Text="{Binding CategoryText, StringFormat='Category: {0}'}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                            <TextBlock
+                                                Text="{Binding CompletionCallbackStateText, StringFormat='Callback: {0}'}"
+                                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding ProgressText}"
+                                               Classes="text-section-title"
+                                               VerticalAlignment="Top" />
+                                </Grid>
+
+                                <Grid ColumnDefinitions="2*,*,*,Auto,Auto" ColumnSpacing="12">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Wait" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding WaitAndQueueText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="3">
+                                        <TextBlock Text="Down" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding DownloadRateText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="3">
+                                        <TextBlock Text="Up" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding UploadRateText}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="3" Spacing="3">
+                                        <TextBlock Text="Trackers" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding TrackerCount}" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4" Spacing="3">
+                                        <TextBlock Text="Peers" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding ConnectedPeerCount}" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Added" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding AddedAtLocalText}" Classes="text-body-small" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="3">
+                                        <TextBlock Text="Last Activity" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding LastActivityAtLocalText}" Classes="text-body-small" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Spacing="3">
+                                        <TextBlock Text="Completed" Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextMutedBrush}" />
+                                        <TextBlock Text="{Binding CompletedAtLocalText}" Classes="text-body-small" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="toolbar-action"
+                                            Content="Details"
+                                            Command="{Binding OpenDetailCommand}" />
+                                    <Button Classes="toolbar-action"
+                                            Content="Pause"
+                                            Command="{Binding PauseCommand}"
+                                            IsEnabled="{Binding CanPause}" />
+                                    <Button Classes="toolbar-action success"
+                                            Content="Resume"
+                                            Command="{Binding ResumeCommand}"
+                                            IsEnabled="{Binding CanResume}" />
+                                    <Button Classes="toolbar-action"
+                                            Content="Refresh Metadata"
+                                            Command="{Binding RefreshMetadataCommand}"
+                                            IsEnabled="{Binding CanRefreshMetadata}"
+                                            IsVisible="{Binding CanRefreshMetadata}" />
+                                    <Button Classes="toolbar-action"
+                                            Content="Reset Metadata"
+                                            Command="{Binding ResetMetadataSessionCommand}"
+                                            IsEnabled="{Binding CanRefreshMetadata}"
+                                            IsVisible="{Binding CanRefreshMetadata}" />
+                                    <Button Classes="toolbar-action danger"
+                                            Content="Remove"
+                                            Command="{Binding RemoveCommand}"
+                                            IsEnabled="{Binding CanRemove}" />
+                                    <Button Classes="toolbar-action danger"
+                                            Content="Delete Data"
+                                            Command="{Binding DeleteDataCommand}"
+                                            IsEnabled="{Binding CanDeleteData}"
+                                            IsVisible="{Binding CanDeleteData}" />
+                                    <Button Classes="toolbar-action"
+                                            Content="Retry Callback"
+                                            Command="{Binding RetryCompletionCallbackCommand}"
+                                            IsEnabled="{Binding CanRetryCompletionCallback}"
+                                            IsVisible="{Binding CanRetryCompletionCallback}" />
+                                </StackPanel>
+
+                                <TextBlock
+                                    Text="{Binding CompletionCallbackLastError, StringFormat='Callback Error: {0}'}"
+                                    IsVisible="{Binding HasCompletionCallbackLastError}"
+                                    Foreground="{DynamicResource WarningTextBrush}"
+                                    TextWrapping="Wrap" />
+
+                                <TextBlock Text="{Binding ErrorMessage}"
+                                           IsVisible="{Binding HasErrorMessage}"
+                                           Foreground="{DynamicResource ErrorTextBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="No torrents matched the current filters."
+                       IsVisible="{Binding HasNoVisibleTorrents}"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

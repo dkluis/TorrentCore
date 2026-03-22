@@ -1,5 +1,3 @@
 namespace TorrentCore.Core;
 
-public static class CoreAssemblyMarker
-{
-}
+public static class CoreAssemblyMarker { }

@@ -1,15 +1,15 @@
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Hosting;
+#region
+
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Core.Categories;
 using TorrentCore.Service.Application;
 
+#endregion
+
 namespace TorrentCore.Service.Configuration;
 
-public sealed class TorrentCategoryService(
-    ITorrentCategoryStore torrentCategoryStore,
-    IHostEnvironment hostEnvironment,
-    ResolvedTorrentCoreServicePaths servicePaths) : ITorrentCategoryService
+public sealed class TorrentCategoryService(ITorrentCategoryStore torrentCategoryStore, IHostEnvironment hostEnvironment,
+    ResolvedTorrentCoreServicePaths                              servicePaths) : ITorrentCategoryService
 {
     public async Task EnsureDefaultCategoriesAsync(CancellationToken cancellationToken)
     {
@@ -33,7 +33,8 @@ public sealed class TorrentCategoryService(
         return categories.Select(MapDto).ToArray();
     }
 
-    public async Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request, CancellationToken cancellationToken)
+    public async Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request,
+        CancellationToken                                            cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
@@ -43,46 +44,40 @@ public sealed class TorrentCategoryService(
         if (category is null)
         {
             throw new ServiceOperationException(
-                "category_not_found",
-                $"Category '{key}' was not found.",
-                StatusCodes.Status404NotFound,
-                nameof(key));
+                "category_not_found", $"Category '{key}' was not found.", StatusCodes.Status404NotFound, nameof(key)
+            );
         }
 
         if (string.IsNullOrWhiteSpace(request.DisplayName))
         {
             throw new ServiceOperationException(
-                "invalid_category",
-                "DisplayName is required.",
-                StatusCodes.Status400BadRequest,
-                nameof(request.DisplayName));
+                "invalid_category", "DisplayName is required.", StatusCodes.Status400BadRequest,
+                nameof(request.DisplayName)
+            );
         }
 
         if (string.IsNullOrWhiteSpace(request.CallbackLabel))
         {
             throw new ServiceOperationException(
-                "invalid_category",
-                "CallbackLabel is required.",
-                StatusCodes.Status400BadRequest,
-                nameof(request.CallbackLabel));
+                "invalid_category", "CallbackLabel is required.", StatusCodes.Status400BadRequest,
+                nameof(request.CallbackLabel)
+            );
         }
 
         if (string.IsNullOrWhiteSpace(request.DownloadRootPath))
         {
             throw new ServiceOperationException(
-                "invalid_category",
-                "DownloadRootPath is required.",
-                StatusCodes.Status400BadRequest,
-                nameof(request.DownloadRootPath));
+                "invalid_category", "DownloadRootPath is required.", StatusCodes.Status400BadRequest,
+                nameof(request.DownloadRootPath)
+            );
         }
 
         if (request.SortOrder < 0)
         {
             throw new ServiceOperationException(
-                "invalid_category",
-                "SortOrder must be 0 or greater.",
-                StatusCodes.Status400BadRequest,
-                nameof(request.SortOrder));
+                "invalid_category", "SortOrder must be 0 or greater.", StatusCodes.Status400BadRequest,
+                nameof(request.SortOrder)
+            );
         }
 
         var resolvedDownloadRootPath = ResolveAbsolutePath(request.DownloadRootPath);
@@ -90,21 +85,22 @@ public sealed class TorrentCategoryService(
 
         var updated = new TorrentCategoryDefinition
         {
-            Key = category.Key,
-            DisplayName = request.DisplayName.Trim(),
-            CallbackLabel = request.CallbackLabel.Trim(),
-            DownloadRootPath = resolvedDownloadRootPath,
-            Enabled = request.Enabled,
+            Key                      = category.Key,
+            DisplayName              = request.DisplayName.Trim(),
+            CallbackLabel            = request.CallbackLabel.Trim(),
+            DownloadRootPath         = resolvedDownloadRootPath,
+            Enabled                  = request.Enabled,
             InvokeCompletionCallback = request.InvokeCompletionCallback,
-            SortOrder = request.SortOrder,
-            UpdatedAtUtc = DateTimeOffset.UtcNow,
+            SortOrder                = request.SortOrder,
+            UpdatedAtUtc             = DateTimeOffset.UtcNow,
         };
 
         await torrentCategoryStore.UpsertAsync(updated, cancellationToken);
         return MapDto(updated);
     }
 
-    public async Task<ResolvedTorrentCategorySelection> ResolveSelectionAsync(string? requestedCategoryKey, CancellationToken cancellationToken)
+    public async Task<ResolvedTorrentCategorySelection> ResolveSelectionAsync(string? requestedCategoryKey,
+        CancellationToken                                                             cancellationToken)
     {
         await EnsureDefaultCategoriesAsync(cancellationToken);
 
@@ -112,49 +108,46 @@ public sealed class TorrentCategoryService(
         {
             return new ResolvedTorrentCategorySelection
             {
-                CategoryKey = null,
-                DownloadRootPath = servicePaths.DownloadRootPath,
-                CompletionCallbackLabel = null,
+                CategoryKey              = null,
+                DownloadRootPath         = servicePaths.DownloadRootPath,
+                CompletionCallbackLabel  = null,
                 InvokeCompletionCallback = false,
             };
         }
 
         var normalizedKey = requestedCategoryKey.Trim();
-        var category = await torrentCategoryStore.GetAsync(normalizedKey, cancellationToken);
+        var category      = await torrentCategoryStore.GetAsync(normalizedKey, cancellationToken);
         if (category is null)
         {
             throw new ServiceOperationException(
-                "invalid_category",
-                $"Category '{normalizedKey}' was not found.",
-                StatusCodes.Status400BadRequest,
-                nameof(requestedCategoryKey));
+                "invalid_category", $"Category '{normalizedKey}' was not found.", StatusCodes.Status400BadRequest,
+                nameof(requestedCategoryKey)
+            );
         }
 
         if (!category.Enabled)
         {
             throw new ServiceOperationException(
-                "category_disabled",
-                $"Category '{normalizedKey}' is disabled.",
-                StatusCodes.Status400BadRequest,
-                nameof(requestedCategoryKey));
+                "category_disabled", $"Category '{normalizedKey}' is disabled.", StatusCodes.Status400BadRequest,
+                nameof(requestedCategoryKey)
+            );
         }
 
         Directory.CreateDirectory(category.DownloadRootPath);
 
         return new ResolvedTorrentCategorySelection
         {
-            CategoryKey = category.Key,
-            DownloadRootPath = category.DownloadRootPath,
-            CompletionCallbackLabel = category.CallbackLabel,
+            CategoryKey              = category.Key,
+            DownloadRootPath         = category.DownloadRootPath,
+            CompletionCallbackLabel  = category.CallbackLabel,
             InvokeCompletionCallback = category.InvokeCompletionCallback,
         };
     }
 
     private string ResolveAbsolutePath(string configuredPath)
     {
-        var path = Path.IsPathRooted(configuredPath)
-            ? configuredPath
-            : Path.Combine(hostEnvironment.ContentRootPath, configuredPath);
+        var path = Path.IsPathRooted(configuredPath) ? configuredPath :
+                Path.Combine(hostEnvironment.ContentRootPath, configuredPath);
 
         return Path.GetFullPath(path);
     }
@@ -163,13 +156,13 @@ public sealed class TorrentCategoryService(
     {
         return new TorrentCategoryDto
         {
-            Key = category.Key,
-            DisplayName = category.DisplayName,
-            CallbackLabel = category.CallbackLabel,
-            DownloadRootPath = category.DownloadRootPath,
-            Enabled = category.Enabled,
+            Key                      = category.Key,
+            DisplayName              = category.DisplayName,
+            CallbackLabel            = category.CallbackLabel,
+            DownloadRootPath         = category.DownloadRootPath,
+            Enabled                  = category.Enabled,
             InvokeCompletionCallback = category.InvokeCompletionCallback,
-            SortOrder = category.SortOrder,
+            SortOrder                = category.SortOrder,
         };
     }
 }

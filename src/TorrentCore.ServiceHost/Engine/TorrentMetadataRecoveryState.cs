@@ -2,12 +2,12 @@ namespace TorrentCore.Service.Engine;
 
 internal sealed class TorrentMetadataRecoveryState
 {
-    private readonly object _gate = new();
-    private DateTimeOffset? _resolvingSinceUtc;
-    private DateTimeOffset? _lastDiscoveryActivityAtUtc;
-    private DateTimeOffset? _lastRefreshAtUtc;
-    private DateTimeOffset? _lastRestartAtUtc;
-    private DateTimeOffset? _lastResetAtUtc;
+    private readonly object          _gate = new();
+    private          DateTimeOffset? _lastDiscoveryActivityAtUtc;
+    private          DateTimeOffset? _lastRefreshAtUtc;
+    private          DateTimeOffset? _lastResetAtUtc;
+    private          DateTimeOffset? _lastRestartAtUtc;
+    private          DateTimeOffset? _resolvingSinceUtc;
 
     public void Observe(DateTimeOffset now, bool isResolvingMetadata, bool hasMetadata, int openConnections)
     {
@@ -32,8 +32,8 @@ internal sealed class TorrentMetadataRecoveryState
     {
         lock (_gate)
         {
-            _resolvingSinceUtc ??= now;
-            _lastDiscoveryActivityAtUtc = now;
+            _resolvingSinceUtc          ??= now;
+            _lastDiscoveryActivityAtUtc =   now;
         }
     }
 
@@ -50,62 +50,42 @@ internal sealed class TorrentMetadataRecoveryState
             if (now - staleSinceUtc < TimeSpan.FromSeconds(staleSeconds))
             {
                 return new TorrentMetadataRecoveryDecision(
-                    MetadataRecoveryAction.None,
-                    _resolvingSinceUtc,
-                    _lastDiscoveryActivityAtUtc,
-                    _lastRefreshAtUtc,
-                    _lastRestartAtUtc,
-                    _lastResetAtUtc,
-                    staleSinceUtc);
+                    MetadataRecoveryAction.None, _resolvingSinceUtc, _lastDiscoveryActivityAtUtc, _lastRefreshAtUtc,
+                    _lastRestartAtUtc, _lastResetAtUtc, staleSinceUtc
+                );
             }
 
             if (_lastRefreshAtUtc is null || _lastRefreshAtUtc < staleSinceUtc)
             {
                 return new TorrentMetadataRecoveryDecision(
-                    MetadataRecoveryAction.Refresh,
-                    _resolvingSinceUtc,
-                    _lastDiscoveryActivityAtUtc,
-                    _lastRefreshAtUtc,
-                    _lastRestartAtUtc,
-                    _lastResetAtUtc,
-                    staleSinceUtc);
+                    MetadataRecoveryAction.Refresh, _resolvingSinceUtc, _lastDiscoveryActivityAtUtc, _lastRefreshAtUtc,
+                    _lastRestartAtUtc, _lastResetAtUtc, staleSinceUtc
+                );
             }
 
             if ((_lastRestartAtUtc is null || _lastRestartAtUtc < _lastRefreshAtUtc) &&
                 now - _lastRefreshAtUtc.Value >= TimeSpan.FromSeconds(restartDelaySeconds))
             {
                 return new TorrentMetadataRecoveryDecision(
-                    MetadataRecoveryAction.Restart,
-                    _resolvingSinceUtc,
-                    _lastDiscoveryActivityAtUtc,
-                    _lastRefreshAtUtc,
-                    _lastRestartAtUtc,
-                    _lastResetAtUtc,
-                    staleSinceUtc);
+                    MetadataRecoveryAction.Restart, _resolvingSinceUtc, _lastDiscoveryActivityAtUtc, _lastRefreshAtUtc,
+                    _lastRestartAtUtc, _lastResetAtUtc, staleSinceUtc
+                );
             }
 
             if ((_lastResetAtUtc is null || (_lastRestartAtUtc is not null && _lastResetAtUtc < _lastRestartAtUtc)) &&
-                _lastRestartAtUtc is not null &&
+                _lastRestartAtUtc is not null                                                                       &&
                 now - _lastRestartAtUtc.Value >= TimeSpan.FromSeconds(restartDelaySeconds))
             {
                 return new TorrentMetadataRecoveryDecision(
-                    MetadataRecoveryAction.Reset,
-                    _resolvingSinceUtc,
-                    _lastDiscoveryActivityAtUtc,
-                    _lastRefreshAtUtc,
-                    _lastRestartAtUtc,
-                    _lastResetAtUtc,
-                    staleSinceUtc);
+                    MetadataRecoveryAction.Reset, _resolvingSinceUtc, _lastDiscoveryActivityAtUtc, _lastRefreshAtUtc,
+                    _lastRestartAtUtc, _lastResetAtUtc, staleSinceUtc
+                );
             }
 
             return new TorrentMetadataRecoveryDecision(
-                MetadataRecoveryAction.None,
-                _resolvingSinceUtc,
-                _lastDiscoveryActivityAtUtc,
-                _lastRefreshAtUtc,
-                _lastRestartAtUtc,
-                _lastResetAtUtc,
-                staleSinceUtc);
+                MetadataRecoveryAction.None, _resolvingSinceUtc, _lastDiscoveryActivityAtUtc, _lastRefreshAtUtc,
+                _lastRestartAtUtc, _lastResetAtUtc, staleSinceUtc
+            );
         }
     }
 
@@ -114,7 +94,7 @@ internal sealed class TorrentMetadataRecoveryState
         lock (_gate)
         {
             _resolvingSinceUtc ??= now;
-            _lastRefreshAtUtc = now;
+            _lastRefreshAtUtc  =   now;
         }
     }
 
@@ -123,8 +103,8 @@ internal sealed class TorrentMetadataRecoveryState
         lock (_gate)
         {
             _resolvingSinceUtc ??= now;
-            _lastRestartAtUtc = now;
-            _lastRefreshAtUtc = now;
+            _lastRestartAtUtc  =   now;
+            _lastRefreshAtUtc  =   now;
         }
     }
 
@@ -133,9 +113,9 @@ internal sealed class TorrentMetadataRecoveryState
         lock (_gate)
         {
             _resolvingSinceUtc ??= now;
-            _lastResetAtUtc = now;
-            _lastRestartAtUtc = now;
-            _lastRefreshAtUtc = now;
+            _lastResetAtUtc    =   now;
+            _lastRestartAtUtc  =   now;
+            _lastRefreshAtUtc  =   now;
         }
     }
 
@@ -149,38 +129,27 @@ internal sealed class TorrentMetadataRecoveryState
 
     private void ResetUnsafe()
     {
-        _resolvingSinceUtc = null;
+        _resolvingSinceUtc          = null;
         _lastDiscoveryActivityAtUtc = null;
-        _lastRefreshAtUtc = null;
-        _lastRestartAtUtc = null;
-        _lastResetAtUtc = null;
+        _lastRefreshAtUtc           = null;
+        _lastRestartAtUtc           = null;
+        _lastResetAtUtc             = null;
     }
 }
-
 internal enum MetadataRecoveryAction
 {
-    None = 0,
+    None    = 0,
     Refresh = 1,
     Restart = 2,
-    Reset = 3,
+    Reset   = 3,
 }
-
-internal readonly record struct TorrentMetadataRecoveryDecision(
-    MetadataRecoveryAction Action,
-    DateTimeOffset? ResolvingSinceUtc,
-    DateTimeOffset? LastDiscoveryActivityAtUtc,
-    DateTimeOffset? LastRefreshAtUtc,
-    DateTimeOffset? LastRestartAtUtc,
-    DateTimeOffset? LastResetAtUtc,
-    DateTimeOffset StaleSinceUtc)
+internal readonly record struct TorrentMetadataRecoveryDecision(MetadataRecoveryAction Action,
+    DateTimeOffset? ResolvingSinceUtc, DateTimeOffset? LastDiscoveryActivityAtUtc, DateTimeOffset? LastRefreshAtUtc,
+    DateTimeOffset? LastRestartAtUtc, DateTimeOffset? LastResetAtUtc, DateTimeOffset StaleSinceUtc)
 {
-    public static TorrentMetadataRecoveryDecision None =>
-        new(
-            MetadataRecoveryAction.None,
-            null,
-            null,
-            null,
-            null,
-            null,
-            DateTimeOffset.MinValue);
+    public static TorrentMetadataRecoveryDecision None
+        => new(
+            MetadataRecoveryAction.None, null, null, null, null,
+            null, DateTimeOffset.MinValue
+        );
 }

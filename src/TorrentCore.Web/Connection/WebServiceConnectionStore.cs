@@ -1,4 +1,8 @@
+#region
+
 using System.Text.Json;
+
+#endregion
 
 namespace TorrentCore.Web.Connection;
 
@@ -8,8 +12,9 @@ public sealed class WebServiceConnectionStore(IHostEnvironment hostEnvironment)
     {
         WriteIndented = true,
     };
-
-    private readonly string _filePath = Path.Combine(hostEnvironment.ContentRootPath, "Config", "service-connection.json");
+    private readonly string _filePath = Path.Combine(
+        hostEnvironment.ContentRootPath, "Config", "service-connection.json"
+    );
 
     public async Task<WebServiceConnectionRecord?> LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -19,7 +24,9 @@ public sealed class WebServiceConnectionStore(IHostEnvironment hostEnvironment)
         }
 
         await using var stream = File.OpenRead(_filePath);
-        return await JsonSerializer.DeserializeAsync<WebServiceConnectionRecord>(stream, JsonOptions, cancellationToken);
+        return await JsonSerializer.DeserializeAsync<WebServiceConnectionRecord>(
+            stream, JsonOptions, cancellationToken
+        );
     }
 
     public async Task SaveAsync(WebServiceConnectionRecord record, CancellationToken cancellationToken = default)

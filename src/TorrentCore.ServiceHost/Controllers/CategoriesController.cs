@@ -1,6 +1,10 @@
+#region
+
 using Microsoft.AspNetCore.Mvc;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Service.Application;
+
+#endregion
 
 namespace TorrentCore.Service.Controllers;
 
@@ -18,13 +22,11 @@ public sealed class CategoriesController(ITorrentApplicationService torrentAppli
     }
 
     [HttpPut("{key}")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentCategoryDto))]
+    [ProducesResponseType(StatusCodes.Status200OK,         Type = typeof(TorrentCategoryDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
-    public async Task<ActionResult<TorrentCategoryDto>> Update(
-        string key,
-        [FromBody] UpdateTorrentCategoryRequest request,
-        CancellationToken cancellationToken)
+    [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ProblemDetails))]
+    public async Task<ActionResult<TorrentCategoryDto>> Update(string key,
+        [FromBody] UpdateTorrentCategoryRequest                       request, CancellationToken cancellationToken)
     {
         var category = await torrentApplicationService.UpdateCategoryAsync(key, request, cancellationToken);
         return Ok(category);

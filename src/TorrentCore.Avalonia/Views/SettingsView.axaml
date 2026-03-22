@@ -3,318 +3,356 @@
              xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
              x:Class="TorrentCore.Avalonia.Views.SettingsView"
              x:DataType="vm:SettingsViewModel">
-  <ScrollViewer VerticalScrollBarVisibility="Auto"
-                HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-        <StackPanel Spacing="4">
-          <TextBlock Text="Runtime Settings" Classes="text-page-title" />
-          <TextBlock Text="Operator settings for seeding policy, cleanup, queue concurrency, engine throttling, shared callback configuration, and category routing."
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-        </StackPanel>
-        <Button Grid.Column="1"
-                Classes="toolbar-action"
-                Content="Reload"
-                Command="{Binding RefreshCommand}" />
-        <Button Grid.Column="2"
-                Classes="toolbar-action accent"
-                Content="Save Settings"
-                Command="{Binding SaveCommand}" />
-      </Grid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Runtime Settings" Classes="text-page-title" />
+                    <TextBlock
+                        Text="Operator settings for seeding policy, cleanup, queue concurrency, engine throttling, shared callback configuration, and category routing."
+                        Foreground="{DynamicResource TextSecondaryBrush}" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Classes="toolbar-action"
+                        Content="Reload"
+                        Command="{Binding RefreshCommand}" />
+                <Button Grid.Column="2"
+                        Classes="toolbar-action accent"
+                        Content="Save Settings"
+                        Command="{Binding SaveCommand}" />
+            </Grid>
 
-      <TextBlock Text="{Binding Message}"
-                 IsVisible="{Binding HasMessage}"
-                 Foreground="{DynamicResource TextSecondaryBrush}" />
-      <TextBlock Text="{Binding ErrorMessage}"
-                 IsVisible="{Binding HasError}"
-                 Foreground="{DynamicResource ErrorTextBrush}"
-                 TextWrapping="Wrap" />
-
-      <WrapPanel Orientation="Horizontal" ItemWidth="310">
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="10">
-            <TextBlock Text="Current Engine Runtime" Classes="text-section-title" />
-            <TextBlock Text="{Binding EngineRuntime, StringFormat='Engine Runtime: {0}'}" />
-            <TextBlock Text="{Binding PartialFilesSummary, StringFormat='Partial Files: {0}'}" />
-            <TextBlock Text="{Binding SupportsLiveUpdates, StringFormat='Supports Live Updates: {0}'}" />
-            <TextBlock Text="{Binding PersistedOverridesSummary, StringFormat='Persisted Overrides: {0}'}" />
-            <TextBlock Text="{Binding UpdatedAtSummary, StringFormat='Last Updated: {0}'}" />
-            <TextBlock Text="{Binding RetrievedAtSummary, StringFormat='Retrieved At: {0}'}"
-                       Classes="text-body-small"
+            <TextBlock Text="{Binding Message}"
+                       IsVisible="{Binding HasMessage}"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
-          </StackPanel>
-        </Border>
+            <TextBlock Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding HasError}"
+                       Foreground="{DynamicResource ErrorTextBrush}"
+                       TextWrapping="Wrap" />
 
-        <Border Classes="panel-card" Margin="0,0,18,18">
-          <StackPanel Spacing="10">
-            <TextBlock Text="Applied Engine Throttles" Classes="text-section-title" />
-            <TextBlock Text="{Binding AppliedMaxConnections, StringFormat='Current Max Connections: {0}'}" />
-            <TextBlock Text="{Binding AppliedHalfOpenConnections, StringFormat='Current Half-Open Connections: {0}'}" />
-            <TextBlock Text="{Binding AppliedDownloadRateText, StringFormat='Current Max Download: {0}'}" />
-            <TextBlock Text="{Binding AppliedUploadRateText, StringFormat='Current Max Upload: {0}'}" />
-          </StackPanel>
-        </Border>
-      </WrapPanel>
+            <WrapPanel Orientation="Horizontal" ItemWidth="310">
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Current Engine Runtime" Classes="text-section-title" />
+                        <TextBlock Text="{Binding EngineRuntime, StringFormat='Engine Runtime: {0}'}" />
+                        <TextBlock Text="{Binding PartialFilesSummary, StringFormat='Partial Files: {0}'}" />
+                        <TextBlock Text="{Binding SupportsLiveUpdates, StringFormat='Supports Live Updates: {0}'}" />
+                        <TextBlock Text="{Binding PersistedOverridesSummary, StringFormat='Persisted Overrides: {0}'}" />
+                        <TextBlock Text="{Binding UpdatedAtSummary, StringFormat='Last Updated: {0}'}" />
+                        <TextBlock Text="{Binding RetrievedAtSummary, StringFormat='Retrieved At: {0}'}"
+                                   Classes="text-body-small"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
 
-      <StackPanel Spacing="12">
-        <TextBlock Text="Live Policy Settings" Classes="text-section-title" />
-        <TextBlock Text="These settings apply immediately without restarting the service."
-                   Foreground="{DynamicResource TextSecondaryBrush}" />
-        <WrapPanel Orientation="Horizontal" ItemWidth="360">
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Seeding Policy" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Seeding Stop Mode" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <ComboBox ItemsSource="{Binding SeedingModes}" SelectedItem="{Binding SeedingStopMode}" />
-              </StackPanel>
-              <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Seeding Stop Ratio" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding SeedingStopRatio}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="4">
-                  <TextBlock Text="Seeding Stop Minutes" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding SeedingStopMinutes}" />
-                </StackPanel>
-              </Grid>
-            </StackPanel>
-          </Border>
+                <Border Classes="panel-card" Margin="0,0,18,18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Applied Engine Throttles" Classes="text-section-title" />
+                        <TextBlock Text="{Binding AppliedMaxConnections, StringFormat='Current Max Connections: {0}'}" />
+                        <TextBlock
+                            Text="{Binding AppliedHalfOpenConnections, StringFormat='Current Half-Open Connections: {0}'}" />
+                        <TextBlock Text="{Binding AppliedDownloadRateText, StringFormat='Current Max Download: {0}'}" />
+                        <TextBlock Text="{Binding AppliedUploadRateText, StringFormat='Current Max Upload: {0}'}" />
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
 
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Cleanup Policy" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Completed Torrent Cleanup Mode" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <ComboBox ItemsSource="{Binding CleanupModes}" SelectedItem="{Binding CompletedTorrentCleanupMode}" />
-              </StackPanel>
-              <StackPanel Spacing="4">
-                <TextBlock Text="Completed Torrent Cleanup Minutes" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding CompletedTorrentCleanupMinutes}" />
-              </StackPanel>
-              <TextBlock Text="Automatic cleanup removes TorrentCore tracking only. It never deletes downloaded data."
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
-
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Queue Limits" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Max Active Metadata Resolutions" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding MaxActiveMetadataResolutions}" />
-              </StackPanel>
-              <TextBlock Text="New magnets are still accepted immediately. Extra unresolved torrents wait in queue until a metadata slot opens."
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Max Active Downloads" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding MaxActiveDownloads}" />
-              </StackPanel>
-              <TextBlock Text="Resolved torrents above this limit stay queued until a download slot opens."
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
-
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Metadata Recovery" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Refresh After Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding MetadataRefreshStaleSeconds}" />
-              </StackPanel>
-              <StackPanel Spacing="4">
-                <TextBlock Text="Restart Delay Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding MetadataRefreshRestartDelaySeconds}" />
-              </StackPanel>
-              <TextBlock Text="TorrentCore first requests a fresh DHT and tracker peer search, then escalates to a stop/start if metadata still stays cold."
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
-
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Log Throttling" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Connection Failure Burst Limit" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding EngineConnectionFailureLogBurstLimit}" />
-              </StackPanel>
-              <StackPanel Spacing="4">
-                <TextBlock Text="Connection Failure Window Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding EngineConnectionFailureLogWindowSeconds}" />
-              </StackPanel>
-            </StackPanel>
-          </Border>
-        </WrapPanel>
-      </StackPanel>
-
-      <StackPanel Spacing="12">
-        <TextBlock Text="Saved Engine Throttle Settings" Classes="text-section-title" />
-        <TextBlock Text="These values are saved immediately but only apply after TorrentCore.Service restarts."
-                   Foreground="{DynamicResource TextSecondaryBrush}" />
-        <WrapPanel Orientation="Horizontal" ItemWidth="360">
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Connection Limits" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Saved Max Connections" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding EngineMaximumConnections}" />
-              </StackPanel>
-              <StackPanel Spacing="4">
-                <TextBlock Text="Saved Max Half-Open Connections" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding EngineMaximumHalfOpenConnections}" />
-              </StackPanel>
-            </StackPanel>
-          </Border>
-
-          <Border Classes="panel-card" Margin="0,0,18,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Transfer Limits" Classes="text-panel-title" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Saved Max Download Rate" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding EngineMaximumDownloadRateBytesPerSecond}" />
-                <TextBlock Text="Use 0 for unlimited."
-                           Classes="text-body-small"
+            <StackPanel Spacing="12">
+                <TextBlock Text="Live Policy Settings" Classes="text-section-title" />
+                <TextBlock Text="These settings apply immediately without restarting the service."
                            Foreground="{DynamicResource TextSecondaryBrush}" />
-              </StackPanel>
-              <StackPanel Spacing="4">
-                <TextBlock Text="Saved Max Upload Rate" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding EngineMaximumUploadRateBytesPerSecond}" />
-                <TextBlock Text="Use 0 for unlimited."
-                           Classes="text-body-small"
-                           Foreground="{DynamicResource TextSecondaryBrush}" />
-              </StackPanel>
+                <WrapPanel Orientation="Horizontal" ItemWidth="360">
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Seeding Policy" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Seeding Stop Mode" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <ComboBox ItemsSource="{Binding SeedingModes}" SelectedItem="{Binding SeedingStopMode}" />
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Seeding Stop Ratio" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding SeedingStopRatio}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Seeding Stop Minutes" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding SeedingStopMinutes}" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Cleanup Policy" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Completed Torrent Cleanup Mode" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <ComboBox ItemsSource="{Binding CleanupModes}"
+                                          SelectedItem="{Binding CompletedTorrentCleanupMode}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Completed Torrent Cleanup Minutes" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding CompletedTorrentCleanupMinutes}" />
+                            </StackPanel>
+                            <TextBlock
+                                Text="Automatic cleanup removes TorrentCore tracking only. It never deletes downloaded data."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Queue Limits" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Max Active Metadata Resolutions" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding MaxActiveMetadataResolutions}" />
+                            </StackPanel>
+                            <TextBlock
+                                Text="New magnets are still accepted immediately. Extra unresolved torrents wait in queue until a metadata slot opens."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Max Active Downloads" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding MaxActiveDownloads}" />
+                            </StackPanel>
+                            <TextBlock
+                                Text="Resolved torrents above this limit stay queued until a download slot opens."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Metadata Recovery" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Refresh After Seconds" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding MetadataRefreshStaleSeconds}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Restart Delay Seconds" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding MetadataRefreshRestartDelaySeconds}" />
+                            </StackPanel>
+                            <TextBlock
+                                Text="TorrentCore first requests a fresh DHT and tracker peer search, then escalates to a stop/start if metadata still stays cold."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Log Throttling" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Connection Failure Burst Limit" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding EngineConnectionFailureLogBurstLimit}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Connection Failure Window Seconds" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding EngineConnectionFailureLogWindowSeconds}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
             </StackPanel>
-          </Border>
-        </WrapPanel>
-        <TextBlock Text="Saved engine throttle settings are pending. Restart TorrentCore.Service to apply them."
-                   IsVisible="{Binding EngineSettingsRequireRestart}"
-                   Foreground="{DynamicResource WarningTextBrush}" />
-      </StackPanel>
 
-      <StackPanel Spacing="12">
-        <TextBlock Text="Shared Callback Settings" Classes="text-section-title" />
-        <TextBlock Text="These settings describe the shared TVMaze callback entrypoint used after torrent completion. Most operators should only need to enable the callback, set the full script path, and keep the timeout values aligned with the environment."
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource TextSecondaryBrush}" />
-        <Grid ColumnDefinitions="3*,2*" ColumnSpacing="18">
-          <Border Classes="panel-card" Margin="0,0,0,18">
-            <StackPanel Spacing="10">
-              <TextBlock Text="Callback Runtime" Classes="text-panel-title" />
-              <CheckBox Content="Enable completion callback invocation"
-                        IsChecked="{Binding CompletionCallbackEnabled}" />
-              <StackPanel Spacing="4">
-                <TextBlock Text="Command Path" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                <TextBox Text="{Binding CompletionCallbackCommandPath}"
-                         Watermark="/Users/dick/TVMaze/Scripts/torrentcore-callback.zsh" />
-              </StackPanel>
-              <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Process Timeout Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding CompletionCallbackTimeoutSeconds}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Spacing="4">
-                  <TextBlock Text="Finalization Wait Seconds" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding CompletionCallbackFinalizationTimeoutSeconds}" />
-                </StackPanel>
-              </Grid>
-              <TextBlock Text="TorrentCore waits this long for the final visible payload before marking the callback timed out."
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
-
-          <Border Grid.Column="1" Classes="panel-card" Margin="0,0,0,18">
-            <Expander Header="Advanced Overrides"
-                      IsExpanded="{Binding IsCallbackAdvancedExpanded}">
-              <StackPanel Margin="0,12,0,0" Spacing="10">
-                <TextBlock Text="Leave these blank for the normal centrally managed TVMaze callback setup. They are only needed for unusual launcher or override scenarios."
-                           Classes="text-body-small"
-                           TextWrapping="Wrap"
+            <StackPanel Spacing="12">
+                <TextBlock Text="Saved Engine Throttle Settings" Classes="text-section-title" />
+                <TextBlock Text="These values are saved immediately but only apply after TorrentCore.Service restarts."
                            Foreground="{DynamicResource TextSecondaryBrush}" />
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Arguments" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding CompletionCallbackArguments}" />
-                </StackPanel>
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Working Directory" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding CompletionCallbackWorkingDirectory}" />
-                </StackPanel>
-                <StackPanel Spacing="4">
-                  <TextBlock Text="API Base URL Override" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding CompletionCallbackApiBaseUrlOverride}" />
-                </StackPanel>
-                <StackPanel Spacing="4">
-                  <TextBlock Text="API Key Override" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                  <TextBox Text="{Binding CompletionCallbackApiKeyOverride}" />
-                </StackPanel>
-              </StackPanel>
-            </Expander>
-          </Border>
-        </Grid>
-      </StackPanel>
+                <WrapPanel Orientation="Horizontal" ItemWidth="360">
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Connection Limits" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Saved Max Connections" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding EngineMaximumConnections}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Saved Max Half-Open Connections" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding EngineMaximumHalfOpenConnections}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
-      <StackPanel Spacing="12">
-        <TextBlock Text="Categories" Classes="text-section-title" />
-        <TextBlock Text="These definitions route future torrent adds. Editing a category does not move existing torrents that were already added."
-                   TextWrapping="Wrap"
-                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                    <Border Classes="panel-card" Margin="0,0,18,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Transfer Limits" Classes="text-panel-title" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Saved Max Download Rate" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding EngineMaximumDownloadRateBytesPerSecond}" />
+                                <TextBlock Text="Use 0 for unlimited."
+                                           Classes="text-body-small"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Saved Max Upload Rate" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding EngineMaximumUploadRateBytesPerSecond}" />
+                                <TextBlock Text="Use 0 for unlimited."
+                                           Classes="text-body-small"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+                <TextBlock
+                    Text="Saved engine throttle settings are pending. Restart TorrentCore.Service to apply them."
+                    IsVisible="{Binding EngineSettingsRequireRestart}"
+                    Foreground="{DynamicResource WarningTextBrush}" />
+            </StackPanel>
 
-        <ItemsControl ItemsSource="{Binding Categories}"
-                      IsVisible="{Binding HasCategories}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:EditableTorrentCategoryViewModel">
-              <Border Classes="panel-card" Margin="0,0,0,14">
-                <StackPanel Spacing="12">
-                  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                    <StackPanel Spacing="4">
-                      <TextBlock Text="{Binding Key}" Classes="text-panel-title" />
-                      <TextBlock Text="{Binding DisplayName, StringFormat='Display Name: {0}'}"
-                                 Classes="text-body-small"
-                                 Foreground="{DynamicResource TextSecondaryBrush}" />
-                    </StackPanel>
-                    <CheckBox Grid.Column="1"
-                              Content="Enabled"
-                              IsChecked="{Binding Enabled}"
-                              VerticalAlignment="Center" />
-                    <CheckBox Grid.Column="2"
-                              Content="Invoke Callback"
-                              IsChecked="{Binding InvokeCompletionCallback}"
-                              VerticalAlignment="Center" />
-                  </Grid>
+            <StackPanel Spacing="12">
+                <TextBlock Text="Shared Callback Settings" Classes="text-section-title" />
+                <TextBlock
+                    Text="These settings describe the shared TVMaze callback entrypoint used after torrent completion. Most operators should only need to enable the callback, set the full script path, and keep the timeout values aligned with the environment."
+                    TextWrapping="Wrap"
+                    Foreground="{DynamicResource TextSecondaryBrush}" />
+                <Grid ColumnDefinitions="3*,2*" ColumnSpacing="18">
+                    <Border Classes="panel-card" Margin="0,0,0,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Callback Runtime" Classes="text-panel-title" />
+                            <CheckBox Content="Enable completion callback invocation"
+                                      IsChecked="{Binding CompletionCallbackEnabled}" />
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Command Path" Classes="text-body-small"
+                                           Foreground="{DynamicResource TextMutedBrush}" />
+                                <TextBox Text="{Binding CompletionCallbackCommandPath}"
+                                         Watermark="/Users/dick/TVMaze/Scripts/torrentcore-callback.zsh" />
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Process Timeout Seconds" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding CompletionCallbackTimeoutSeconds}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Finalization Wait Seconds" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding CompletionCallbackFinalizationTimeoutSeconds}" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock
+                                Text="TorrentCore waits this long for the final visible payload before marking the callback timed out."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
 
-                  <Grid ColumnDefinitions="120,120,*,100" ColumnSpacing="10">
-                    <StackPanel Spacing="4">
-                      <TextBlock Text="Display Name" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                      <TextBox Text="{Binding DisplayName}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Spacing="4">
-                      <TextBlock Text="Callback Label" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                      <TextBox Text="{Binding CallbackLabel}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Spacing="4">
-                      <TextBlock Text="Download Root" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                      <TextBox Text="{Binding DownloadRootPath}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="3" Spacing="4">
-                      <TextBlock Text="Sort Order" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-                      <TextBox Text="{Binding SortOrder}" />
-                    </StackPanel>
-                  </Grid>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </StackPanel>
-    </StackPanel>
-  </ScrollViewer>
+                    <Border Grid.Column="1" Classes="panel-card" Margin="0,0,0,18">
+                        <Expander Header="Advanced Overrides"
+                                  IsExpanded="{Binding IsCallbackAdvancedExpanded}">
+                            <StackPanel Margin="0,12,0,0" Spacing="10">
+                                <TextBlock
+                                    Text="Leave these blank for the normal centrally managed TVMaze callback setup. They are only needed for unusual launcher or override scenarios."
+                                    Classes="text-body-small"
+                                    TextWrapping="Wrap"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" />
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Arguments" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding CompletionCallbackArguments}" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Working Directory" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding CompletionCallbackWorkingDirectory}" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="API Base URL Override" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding CompletionCallbackApiBaseUrlOverride}" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="API Key Override" Classes="text-body-small"
+                                               Foreground="{DynamicResource TextMutedBrush}" />
+                                    <TextBox Text="{Binding CompletionCallbackApiKeyOverride}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+                    </Border>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel Spacing="12">
+                <TextBlock Text="Categories" Classes="text-section-title" />
+                <TextBlock
+                    Text="These definitions route future torrent adds. Editing a category does not move existing torrents that were already added."
+                    TextWrapping="Wrap"
+                    Foreground="{DynamicResource TextSecondaryBrush}" />
+
+                <ItemsControl ItemsSource="{Binding Categories}"
+                              IsVisible="{Binding HasCategories}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:EditableTorrentCategoryViewModel">
+                            <Border Classes="panel-card" Margin="0,0,0,14">
+                                <StackPanel Spacing="12">
+                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Key}" Classes="text-panel-title" />
+                                            <TextBlock Text="{Binding DisplayName, StringFormat='Display Name: {0}'}"
+                                                       Classes="text-body-small"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="1"
+                                                  Content="Enabled"
+                                                  IsChecked="{Binding Enabled}"
+                                                  VerticalAlignment="Center" />
+                                        <CheckBox Grid.Column="2"
+                                                  Content="Invoke Callback"
+                                                  IsChecked="{Binding InvokeCompletionCallback}"
+                                                  VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <Grid ColumnDefinitions="120,120,*,100" ColumnSpacing="10">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Display Name" Classes="text-body-small"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                            <TextBox Text="{Binding DisplayName}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="Callback Label" Classes="text-body-small"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                            <TextBox Text="{Binding CallbackLabel}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Spacing="4">
+                                            <TextBlock Text="Download Root" Classes="text-body-small"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                            <TextBox Text="{Binding DownloadRootPath}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3" Spacing="4">
+                                            <TextBlock Text="Sort Order" Classes="text-body-small"
+                                                       Foreground="{DynamicResource TextMutedBrush}" />
+                                            <TextBox Text="{Binding SortOrder}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

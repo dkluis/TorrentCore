@@ -1,4 +1,8 @@
+#region
+
 using TorrentCore.Client;
+
+#endregion
 
 namespace TorrentCore.Avalonia.Models;
 

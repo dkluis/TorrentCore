@@ -1,16 +1,21 @@
+#region
+
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
 
+#endregion
+
 namespace TorrentCore.Service.Callbacks;
 
-public sealed class TorrentCompletionFinalizationChecker(
-    ResolvedTorrentCoreServicePaths servicePaths) : ITorrentCompletionFinalizationChecker
+public sealed class TorrentCompletionFinalizationChecker(ResolvedTorrentCoreServicePaths servicePaths)
+        : ITorrentCompletionFinalizationChecker
 {
-    public TorrentCompletionFinalizationCheckResult Check(TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings)
+    public TorrentCompletionFinalizationCheckResult Check(TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot                                           runtimeSettings)
     {
         var downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
         var finalPayloadPath = Path.Combine(downloadRootPath, snapshot.Name);
-        var partialSuffix = runtimeSettings.PartialFilesEnabled ? runtimeSettings.PartialFileSuffix : string.Empty;
+        var partialSuffix    = runtimeSettings.PartialFilesEnabled ? runtimeSettings.PartialFileSuffix : string.Empty;
 
         if (File.Exists(finalPayloadPath))
         {
@@ -35,7 +40,9 @@ public sealed class TorrentCompletionFinalizationChecker(
                 {
                     if (filePath.EndsWith(partialSuffix, StringComparison.Ordinal))
                     {
-                        return NotReady(finalPayloadPath, $"A partial file is still visible in the payload tree: '{filePath}'.");
+                        return NotReady(
+                            finalPayloadPath, $"A partial file is still visible in the payload tree: '{filePath}'."
+                        );
                     }
                 }
             }
@@ -55,19 +62,23 @@ public sealed class TorrentCompletionFinalizationChecker(
         return NotReady(finalPayloadPath, "The final payload path is not visible yet.");
     }
 
-    private static TorrentCompletionFinalizationCheckResult Ready(string finalPayloadPath) =>
-        new()
+    private static TorrentCompletionFinalizationCheckResult Ready(string finalPayloadPath)
+    {
+        return new TorrentCompletionFinalizationCheckResult
         {
-            IsReady = true,
+            IsReady          = true,
             FinalPayloadPath = finalPayloadPath,
-            PendingReason = null,
+            PendingReason    = null,
         };
+    }
 
-    private static TorrentCompletionFinalizationCheckResult NotReady(string finalPayloadPath, string reason) =>
-        new()
+    private static TorrentCompletionFinalizationCheckResult NotReady(string finalPayloadPath, string reason)
+    {
+        return new TorrentCompletionFinalizationCheckResult
         {
-            IsReady = false,
+            IsReady          = false,
             FinalPayloadPath = finalPayloadPath,
-            PendingReason = reason,
+            PendingReason    = reason,
         };
+    }
 }

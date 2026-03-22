@@ -1,46 +1,38 @@
+#region
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Avalonia.Infrastructure;
 using TorrentCore.Client;
 
+#endregion
+
 namespace TorrentCore.Avalonia.ViewModels;
 
-public partial class ConnectionSetupViewModel(
-    AvaloniaServiceConnectionManager connectionManager,
-    Func<Task> onConnectionSavedAsync) : ViewModelBase
+public partial class ConnectionSetupViewModel(AvaloniaServiceConnectionManager connectionManager,
+    Func<Task>                                                                 onConnectionSavedAsync) : ViewModelBase
 {
     [ObservableProperty]
-    private bool _isLoading;
-
-    [ObservableProperty]
-    private bool _isTesting;
-
-    [ObservableProperty]
-    private bool _isSaving;
-
-    [ObservableProperty]
     private string _baseUrl = string.Empty;
-
     [ObservableProperty]
     private string _configuredEndpoint = "Not configured";
-
-    [ObservableProperty]
-    private string _reachabilityStatus = "Unknown";
-
-    [ObservableProperty]
-    private string _lastCheckedSummary = "Not checked yet";
-
-    [ObservableProperty]
-    private string? _message;
-
     [ObservableProperty]
     private string? _errorMessage;
-
+    [ObservableProperty]
+    private bool _isLoading;
+    [ObservableProperty]
+    private bool _isSaving;
+    [ObservableProperty]
+    private bool _isTesting;
+    [ObservableProperty]
+    private string _lastCheckedSummary = "Not checked yet";
+    [ObservableProperty]
+    private string? _message;
+    [ObservableProperty]
+    private string _reachabilityStatus = "Unknown";
     public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-
-    public bool IsBusy => IsLoading || IsTesting || IsSaving;
+    public bool HasError   => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public bool IsBusy     => IsLoading || IsTesting || IsSaving;
 
     public async Task LoadAsync()
     {
@@ -49,8 +41,8 @@ public partial class ConnectionSetupViewModel(
             return;
         }
 
-        IsLoading = true;
-        Message = null;
+        IsLoading    = true;
+        Message      = null;
         ErrorMessage = null;
 
         try
@@ -67,7 +59,7 @@ public partial class ConnectionSetupViewModel(
     }
 
     [RelayCommand]
-    public async Task RefreshAsync() => await LoadAsync();
+    public async Task RefreshAsync() { await LoadAsync(); }
 
     [RelayCommand]
     public async Task TestAsync()
@@ -77,8 +69,8 @@ public partial class ConnectionSetupViewModel(
             return;
         }
 
-        IsTesting = true;
-        Message = null;
+        IsTesting    = true;
+        Message      = null;
         ErrorMessage = null;
 
         try
@@ -89,8 +81,7 @@ public partial class ConnectionSetupViewModel(
             if (probeResult.IsReachable)
             {
                 Message = "Connection test passed. Save this endpoint to use it on the next startup.";
-            }
-            else
+            } else
             {
                 ErrorMessage = probeResult.ErrorMessage ?? "The configured endpoint could not be reached.";
             }
@@ -110,8 +101,8 @@ public partial class ConnectionSetupViewModel(
             return;
         }
 
-        IsSaving = true;
-        Message = null;
+        IsSaving     = true;
+        Message      = null;
         ErrorMessage = null;
 
         try
@@ -136,11 +127,9 @@ public partial class ConnectionSetupViewModel(
         }
     }
 
-    partial void OnIsLoadingChanged(bool value) => OnPropertyChanged(nameof(IsBusy));
-
-    partial void OnIsTestingChanged(bool value) => OnPropertyChanged(nameof(IsBusy));
-
-    partial void OnIsSavingChanged(bool value) => OnPropertyChanged(nameof(IsBusy));
+    partial void OnIsLoadingChanged(bool value) { OnPropertyChanged(nameof(IsBusy)); }
+    partial void OnIsTestingChanged(bool value) { OnPropertyChanged(nameof(IsBusy)); }
+    partial void OnIsSavingChanged(bool  value) { OnPropertyChanged(nameof(IsBusy)); }
 
     private void ApplyStatus(TorrentCoreConnectionProbeResult probeResult)
     {

@@ -3,10 +3,8 @@ namespace TorrentCore.Client;
 public sealed class TorrentCoreClientOptions
 {
     public const string SectionName = "TorrentCoreService";
-
-    public string BaseUrl { get; init; } = string.Empty;
-
-    public Uri ToUri() => ParseBaseUrl(BaseUrl);
+    public       string BaseUrl { get; init; } = string.Empty;
+    public       Uri    ToUri() { return ParseBaseUrl(BaseUrl); }
 
     public static Uri ParseBaseUrl(string? baseUrl)
     {
@@ -20,8 +18,9 @@ public sealed class TorrentCoreClientOptions
             throw new InvalidOperationException($"TorrentCoreService:BaseUrl '{baseUrl}' is not a valid absolute URI.");
         }
 
-        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && !string.Equals(
+                    uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase
+                ))
         {
             throw new InvalidOperationException("TorrentCoreService:BaseUrl must use http or https.");
         }
@@ -29,5 +28,5 @@ public sealed class TorrentCoreClientOptions
         return uri;
     }
 
-    public static string NormalizeBaseUrl(string? baseUrl) => ParseBaseUrl(baseUrl).ToString();
+    public static string NormalizeBaseUrl(string? baseUrl) { return ParseBaseUrl(baseUrl).ToString(); }
 }

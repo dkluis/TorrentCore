@@ -1,4 +1,8 @@
+#region
+
 using System.Text.Json.Serialization;
+
+#endregion
 
 namespace TorrentCore.Contracts.Torrents;
 
@@ -6,9 +10,9 @@ namespace TorrentCore.Contracts.Torrents;
 public enum TorrentWaitReason
 {
     PendingMetadataDispatch = 0,
-    WaitingForMetadataSlot = 1,
+    WaitingForMetadataSlot  = 1,
     PendingDownloadDispatch = 2,
-    WaitingForDownloadSlot = 3,
-    PausedByOperator = 4,
-    BlockedByError = 5,
+    WaitingForDownloadSlot  = 3,
+    PausedByOperator        = 4,
+    BlockedByError          = 5,
 }

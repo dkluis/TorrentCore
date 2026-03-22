@@ -5,12 +5,11 @@ public static class TorrentDataPathCleanup
     public static void DeletePayloadArtifacts(string downloadRootPath, IEnumerable<string?> candidatePaths)
     {
         var normalizedDownloadRootPath = NormalizeDirectoryPath(downloadRootPath);
-        var normalizedCandidates = candidatePaths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Select(path => NormalizePath(path!))
-            .Distinct(StringComparer.Ordinal)
-            .OrderByDescending(path => path.Length)
-            .ToArray();
+        var normalizedCandidates = candidatePaths.Where(path => !string.IsNullOrWhiteSpace(path))
+                                                 .Select(path => NormalizePath(path!))
+                                                 .Distinct(StringComparer.Ordinal)
+                                                 .OrderByDescending(path => path.Length)
+                                                 .ToArray();
 
         foreach (var candidatePath in normalizedCandidates)
         {
@@ -21,12 +20,11 @@ public static class TorrentDataPathCleanup
     public static void DeleteEmptyDirectories(string downloadRootPath, IEnumerable<string?> candidatePaths)
     {
         var normalizedDownloadRootPath = NormalizeDirectoryPath(downloadRootPath);
-        var candidateDirectories = candidatePaths
-            .Where(path => !string.IsNullOrWhiteSpace(path))
-            .Select(path => NormalizePath(path!))
-            .Distinct(StringComparer.Ordinal)
-            .OrderByDescending(path => path.Length)
-            .ToArray();
+        var candidateDirectories = candidatePaths.Where(path => !string.IsNullOrWhiteSpace(path))
+                                                 .Select(path => NormalizePath(path!))
+                                                 .Distinct(StringComparer.Ordinal)
+                                                 .OrderByDescending(path => path.Length)
+                                                 .ToArray();
 
         foreach (var candidateDirectory in candidateDirectories)
         {
@@ -36,8 +34,9 @@ public static class TorrentDataPathCleanup
 
     private static void DeletePayloadArtifact(string candidatePath, string normalizedDownloadRootPath)
     {
-        if (!IsWithinOrEqual(candidatePath, normalizedDownloadRootPath) ||
-            string.Equals(candidatePath, normalizedDownloadRootPath, StringComparison.Ordinal))
+        if (!IsWithinOrEqual(candidatePath, normalizedDownloadRootPath) || string.Equals(
+                    candidatePath, normalizedDownloadRootPath, StringComparison.Ordinal
+                ))
         {
             return;
         }
@@ -50,7 +49,7 @@ public static class TorrentDataPathCleanup
 
         if (Directory.Exists(candidatePath))
         {
-            Directory.Delete(candidatePath, recursive: true);
+            Directory.Delete(candidatePath, true);
         }
     }
 
@@ -58,9 +57,10 @@ public static class TorrentDataPathCleanup
     {
         var currentDirectory = candidateDirectory;
 
-        while (!string.IsNullOrWhiteSpace(currentDirectory) &&
-               IsWithinOrEqual(currentDirectory, normalizedDownloadRootPath) &&
-               !string.Equals(currentDirectory, normalizedDownloadRootPath, StringComparison.Ordinal))
+        while (!string.IsNullOrWhiteSpace(currentDirectory)               &&
+            IsWithinOrEqual(currentDirectory, normalizedDownloadRootPath) && !string.Equals(
+                currentDirectory, normalizedDownloadRootPath, StringComparison.Ordinal
+            ))
         {
             if (!Directory.Exists(currentDirectory))
             {
@@ -78,15 +78,20 @@ public static class TorrentDataPathCleanup
         }
     }
 
-    private static string NormalizeDirectoryPath(string path) =>
-        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    private static string NormalizeDirectoryPath(string path)
+    {
+        return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
 
-    private static string NormalizePath(string path) =>
-        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    private static string NormalizePath(string path)
+    {
+        return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
 
     private static bool IsWithinOrEqual(string path, string rootPath)
     {
-        return string.Equals(path, rootPath, StringComparison.Ordinal) ||
-               path.StartsWith(rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+        return string.Equals(path, rootPath, StringComparison.Ordinal) || path.StartsWith(
+            rootPath + Path.DirectorySeparatorChar, StringComparison.Ordinal
+        );
     }
 }

@@ -1,17 +1,17 @@
-using Microsoft.Extensions.Logging;
+#region
+
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Persistence.Sqlite.Configuration;
 using TorrentCore.Persistence.Sqlite.Schema;
 
+#endregion
+
 namespace TorrentCore.Service.Configuration;
 
-public sealed class SqlitePersistenceInitializer(
-    ResolvedTorrentCoreServicePaths servicePaths,
-    SqliteSchemaMigrator sqliteSchemaMigrator,
-    SqliteRuntimeSettingsStore runtimeSettingsStore,
-    IActivityLogService activityLogService,
-    ITorrentStateStore torrentStateStore,
+public sealed class SqlitePersistenceInitializer(ResolvedTorrentCoreServicePaths servicePaths,
+    SqliteSchemaMigrator sqliteSchemaMigrator, SqliteRuntimeSettingsStore runtimeSettingsStore,
+    IActivityLogService activityLogService, ITorrentStateStore torrentStateStore,
     ILogger<SqlitePersistenceInitializer> logger) : IHostedService
 {
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -23,16 +23,19 @@ public sealed class SqlitePersistenceInitializer(
 
         logger.LogInformation(
             "TorrentCore SQLite persistence is ready. DatabaseFilePath={DatabaseFilePath}",
-            servicePaths.DatabaseFilePath);
+            servicePaths.DatabaseFilePath
+        );
 
-        await activityLogService.WriteAsync(new ActivityLogWriteRequest
-        {
-            Level = ActivityLogLevel.Information,
-            Category = "startup",
-            EventType = "service.persistence.ready",
-            Message = "SQLite persistence is initialized.",
-        }, cancellationToken);
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level     = ActivityLogLevel.Information,
+                Category  = "startup",
+                EventType = "service.persistence.ready",
+                Message   = "SQLite persistence is initialized.",
+            }, cancellationToken
+        );
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken) { return Task.CompletedTask; }
 }

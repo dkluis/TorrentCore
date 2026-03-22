@@ -1,18 +1,14 @@
+#region
+
 using Avalonia.Controls;
 using TorrentCore.Avalonia.ViewModels;
+
+#endregion
 
 namespace TorrentCore.Avalonia;
 
 public partial class MainWindow : Window
 {
-    public MainWindow()
-    {
-        InitializeComponent();
-    }
-
-    public MainWindow(MainWindowViewModel viewModel)
-        : this()
-    {
-        DataContext = viewModel;
-    }
+    public MainWindow() { InitializeComponent(); }
+    public MainWindow(MainWindowViewModel viewModel) : this() { DataContext = viewModel; }
 }

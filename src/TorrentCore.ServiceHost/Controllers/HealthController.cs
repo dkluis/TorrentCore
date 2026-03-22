@@ -1,5 +1,9 @@
+#region
+
 using Microsoft.AspNetCore.Mvc;
 using TorrentCore.Contracts.Diagnostics;
+
+#endregion
 
 namespace TorrentCore.Service.Controllers;
 
@@ -12,12 +16,14 @@ public sealed class HealthController : ControllerBase
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ServiceHealthDto))]
     public ActionResult<ServiceHealthDto> Get()
     {
-        return Ok(new ServiceHealthDto
-        {
-            ServiceName     = "TorrentCore.Service",
-            Status          = "ok",
-            EnvironmentName = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().EnvironmentName,
-            CheckedAtUtc    = DateTimeOffset.UtcNow,
-        });
+        return Ok(
+            new ServiceHealthDto
+            {
+                ServiceName     = "TorrentCore.Service",
+                Status          = "ok",
+                EnvironmentName = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().EnvironmentName,
+                CheckedAtUtc    = DateTimeOffset.UtcNow,
+            }
+        );
     }
 }

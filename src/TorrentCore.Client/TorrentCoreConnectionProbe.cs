@@ -4,9 +4,8 @@ public static class TorrentCoreConnectionProbe
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(2);
 
-    public static async Task<TorrentCoreConnectionProbeResult> CheckAsync(
-        string? baseUrl,
-        CancellationToken cancellationToken = default)
+    public static async Task<TorrentCoreConnectionProbeResult> CheckAsync(string? baseUrl,
+        CancellationToken                                                         cancellationToken = default)
     {
         var checkedAtUtc = DateTimeOffset.UtcNow;
 
@@ -14,9 +13,9 @@ public static class TorrentCoreConnectionProbe
         {
             return new TorrentCoreConnectionProbeResult
             {
-                BaseUrl = null,
+                BaseUrl      = null,
                 IsConfigured = false,
-                IsReachable = false,
+                IsReachable  = false,
                 ErrorMessage = "No TorrentCore service endpoint is configured.",
                 CheckedAtUtc = checkedAtUtc,
             };
@@ -31,9 +30,9 @@ public static class TorrentCoreConnectionProbe
         {
             return new TorrentCoreConnectionProbeResult
             {
-                BaseUrl = baseUrl.Trim(),
+                BaseUrl      = baseUrl.Trim(),
                 IsConfigured = true,
-                IsReachable = false,
+                IsReachable  = false,
                 ErrorMessage = exception.Message,
                 CheckedAtUtc = checkedAtUtc,
             };
@@ -42,7 +41,7 @@ public static class TorrentCoreConnectionProbe
         using var httpClient = new HttpClient
         {
             BaseAddress = baseUri,
-            Timeout = DefaultTimeout,
+            Timeout     = DefaultTimeout,
         };
 
         try
@@ -52,19 +51,19 @@ public static class TorrentCoreConnectionProbe
             {
                 return new TorrentCoreConnectionProbeResult
                 {
-                    BaseUrl = baseUri.ToString(),
+                    BaseUrl      = baseUri.ToString(),
                     IsConfigured = true,
-                    IsReachable = false,
-                    ErrorMessage = $"The service returned HTTP {(int)response.StatusCode}.",
+                    IsReachable  = false,
+                    ErrorMessage = $"The service returned HTTP {(int) response.StatusCode}.",
                     CheckedAtUtc = checkedAtUtc,
                 };
             }
 
             return new TorrentCoreConnectionProbeResult
             {
-                BaseUrl = baseUri.ToString(),
+                BaseUrl      = baseUri.ToString(),
                 IsConfigured = true,
-                IsReachable = true,
+                IsReachable  = true,
                 ErrorMessage = null,
                 CheckedAtUtc = checkedAtUtc,
             };
@@ -73,9 +72,9 @@ public static class TorrentCoreConnectionProbe
         {
             return new TorrentCoreConnectionProbeResult
             {
-                BaseUrl = baseUri.ToString(),
+                BaseUrl      = baseUri.ToString(),
                 IsConfigured = true,
-                IsReachable = false,
+                IsReachable  = false,
                 ErrorMessage = exception.Message,
                 CheckedAtUtc = checkedAtUtc,
             };

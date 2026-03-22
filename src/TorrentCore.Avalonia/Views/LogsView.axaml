@@ -3,129 +3,133 @@
              xmlns:vm="using:TorrentCore.Avalonia.ViewModels"
              x:Class="TorrentCore.Avalonia.Views.LogsView"
              x:DataType="vm:LogsViewModel">
-  <ScrollViewer VerticalScrollBarVisibility="Auto"
-                HorizontalScrollBarVisibility="Disabled">
-    <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="*,Auto,Auto,Auto" VerticalAlignment="Center" ColumnSpacing="10">
-        <StackPanel Spacing="4">
-          <TextBlock Text="Logs" Classes="text-page-title" />
-          <TextBlock Text="Persisted service, torrent, and engine events."
-                     Foreground="{DynamicResource TextSecondaryBrush}" />
-        </StackPanel>
-        <CheckBox Grid.Column="1"
-                  Content="Auto Refresh"
-                  IsChecked="{Binding AutoRefresh}"
-                  VerticalAlignment="Center" />
-        <Button Grid.Column="2"
-                Classes="toolbar-action"
-                Content="Clear Filters"
-                Command="{Binding ClearFiltersCommand}" />
-        <Button Grid.Column="3"
-                Classes="toolbar-action"
-                Content="Refresh"
-                Command="{Binding RefreshCommand}" />
-      </Grid>
-
-      <Border Classes="panel-card">
-        <WrapPanel Orientation="Horizontal" ItemWidth="220">
-          <StackPanel Spacing="4" Margin="0,0,18,10">
-            <TextBlock Text="Rows" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-            <ComboBox ItemsSource="{Binding TakeOptions}" SelectedItem="{Binding Take}" />
-          </StackPanel>
-          <StackPanel Spacing="4" Margin="0,0,18,10">
-            <TextBlock Text="Level" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-            <ComboBox ItemsSource="{Binding LevelOptions}" SelectedItem="{Binding Level}" />
-          </StackPanel>
-          <StackPanel Spacing="4" Margin="0,0,18,10">
-            <TextBlock Text="Category" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-            <ComboBox ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding Category}" />
-          </StackPanel>
-          <StackPanel Spacing="4" Margin="0,0,18,10">
-            <TextBlock Text="Event Type" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-            <TextBox Text="{Binding EventType}" Watermark="Exact event type" />
-          </StackPanel>
-          <StackPanel Spacing="4" Margin="0,0,18,10">
-            <TextBlock Text="Torrent Id" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
-            <TextBox Text="{Binding TorrentIdText}" Watermark="Exact torrent GUID" />
-          </StackPanel>
-        </WrapPanel>
-      </Border>
-
-      <TextBlock Text="{Binding LastRefreshedText, StringFormat='Last refreshed: {0}'}"
-                 IsVisible="{Binding HasLastRefreshed}"
-                 Classes="text-body-small"
-                 Foreground="{DynamicResource TextSecondaryBrush}" />
-
-      <Border Classes="panel-card"
-              IsVisible="{Binding IsLoading}">
-        <TextBlock Text="Loading logs..." />
-      </Border>
-
-      <Border Classes="panel-card"
-              IsVisible="{Binding HasError}">
-        <TextBlock Text="{Binding ErrorMessage}"
-                   Foreground="{DynamicResource ErrorTextBrush}"
-                   TextWrapping="Wrap" />
-      </Border>
-
-      <Border Classes="panel-card">
-        <ItemsControl ItemsSource="{Binding Entries}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:ActivityLogEntryItemViewModel">
-              <Border BorderBrush="{DynamicResource RowDividerBrush}"
-                      BorderThickness="0,0,0,1"
-                      Padding="0,0,0,10"
-                      Margin="0,0,0,10">
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" VerticalAlignment="Center" ColumnSpacing="10">
                 <StackPanel Spacing="4">
-                  <Grid ColumnDefinitions="140,100,140,*" ColumnSpacing="10">
-                    <TextBlock Text="{Binding OccurredAtLocalText}"
-                               Classes="text-body-small"
+                    <TextBlock Text="Logs" Classes="text-page-title" />
+                    <TextBlock Text="Persisted service, torrent, and engine events."
                                Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <TextBlock Grid.Column="1"
-                               Text="{Binding Level}"
-                               Classes="text-body-small" />
-                    <TextBlock Grid.Column="2"
-                               Text="{Binding Category}"
-                               Classes="text-body-small" />
-                    <TextBlock Grid.Column="3"
-                               Text="{Binding EventType}"
-                               Classes="text-body-small" />
-                  </Grid>
-                  <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
-                  <Button Content="Open Torrent"
-                          Command="{Binding OpenTorrentDetailCommand}"
-                          IsVisible="{Binding CanOpenTorrentDetail}"
-                          Classes="toolbar-action"
-                          HorizontalAlignment="Left" />
-                  <SelectableTextBlock Text="{Binding TorrentIdText, StringFormat='Torrent Id: {0}'}"
-                                       IsVisible="{Binding HasTorrentId}"
-                                       Classes="text-body-small"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" />
-                  <SelectableTextBlock Text="{Binding ServiceInstanceIdText, StringFormat='Service Instance: {0}'}"
-                                       IsVisible="{Binding HasServiceInstanceId}"
-                                       Classes="text-body-small"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" />
-                  <SelectableTextBlock Text="{Binding TraceIdText, StringFormat='Trace Id: {0}'}"
-                                       IsVisible="{Binding HasTraceId}"
-                                       Classes="text-body-small"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" />
-                  <SelectableTextBlock Text="{Binding DetailsJson}"
-                                       IsVisible="{Binding HasDetails}"
-                                       Classes="text-body-small"
-                                       TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" />
                 </StackPanel>
-              </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </Border>
+                <CheckBox Grid.Column="1"
+                          Content="Auto Refresh"
+                          IsChecked="{Binding AutoRefresh}"
+                          VerticalAlignment="Center" />
+                <Button Grid.Column="2"
+                        Classes="toolbar-action"
+                        Content="Clear Filters"
+                        Command="{Binding ClearFiltersCommand}" />
+                <Button Grid.Column="3"
+                        Classes="toolbar-action"
+                        Content="Refresh"
+                        Command="{Binding RefreshCommand}" />
+            </Grid>
 
-      <TextBlock Text="No log entries matched the current filters."
-                 IsVisible="{Binding HasNoEntries}" />
-    </StackPanel>
-  </ScrollViewer>
+            <Border Classes="panel-card">
+                <WrapPanel Orientation="Horizontal" ItemWidth="220">
+                    <StackPanel Spacing="4" Margin="0,0,18,10">
+                        <TextBlock Text="Rows" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                        <ComboBox ItemsSource="{Binding TakeOptions}" SelectedItem="{Binding Take}" />
+                    </StackPanel>
+                    <StackPanel Spacing="4" Margin="0,0,18,10">
+                        <TextBlock Text="Level" Classes="text-body-small" Foreground="{DynamicResource TextMutedBrush}" />
+                        <ComboBox ItemsSource="{Binding LevelOptions}" SelectedItem="{Binding Level}" />
+                    </StackPanel>
+                    <StackPanel Spacing="4" Margin="0,0,18,10">
+                        <TextBlock Text="Category" Classes="text-body-small"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                        <ComboBox ItemsSource="{Binding CategoryOptions}" SelectedItem="{Binding Category}" />
+                    </StackPanel>
+                    <StackPanel Spacing="4" Margin="0,0,18,10">
+                        <TextBlock Text="Event Type" Classes="text-body-small"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBox Text="{Binding EventType}" Watermark="Exact event type" />
+                    </StackPanel>
+                    <StackPanel Spacing="4" Margin="0,0,18,10">
+                        <TextBlock Text="Torrent Id" Classes="text-body-small"
+                                   Foreground="{DynamicResource TextMutedBrush}" />
+                        <TextBox Text="{Binding TorrentIdText}" Watermark="Exact torrent GUID" />
+                    </StackPanel>
+                </WrapPanel>
+            </Border>
+
+            <TextBlock Text="{Binding LastRefreshedText, StringFormat='Last refreshed: {0}'}"
+                       IsVisible="{Binding HasLastRefreshed}"
+                       Classes="text-body-small"
+                       Foreground="{DynamicResource TextSecondaryBrush}" />
+
+            <Border Classes="panel-card"
+                    IsVisible="{Binding IsLoading}">
+                <TextBlock Text="Loading logs..." />
+            </Border>
+
+            <Border Classes="panel-card"
+                    IsVisible="{Binding HasError}">
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="{DynamicResource ErrorTextBrush}"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <Border Classes="panel-card">
+                <ItemsControl ItemsSource="{Binding Entries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ActivityLogEntryItemViewModel">
+                            <Border BorderBrush="{DynamicResource RowDividerBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="0,0,0,10"
+                                    Margin="0,0,0,10">
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="140,100,140,*" ColumnSpacing="10">
+                                        <TextBlock Text="{Binding OccurredAtLocalText}"
+                                                   Classes="text-body-small"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding Level}"
+                                                   Classes="text-body-small" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Category}"
+                                                   Classes="text-body-small" />
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding EventType}"
+                                                   Classes="text-body-small" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+                                    <Button Content="Open Torrent"
+                                            Command="{Binding OpenTorrentDetailCommand}"
+                                            IsVisible="{Binding CanOpenTorrentDetail}"
+                                            Classes="toolbar-action"
+                                            HorizontalAlignment="Left" />
+                                    <SelectableTextBlock Text="{Binding TorrentIdText, StringFormat='Torrent Id: {0}'}"
+                                                         IsVisible="{Binding HasTorrentId}"
+                                                         Classes="text-body-small"
+                                                         TextWrapping="Wrap"
+                                                         Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <SelectableTextBlock
+                                        Text="{Binding ServiceInstanceIdText, StringFormat='Service Instance: {0}'}"
+                                        IsVisible="{Binding HasServiceInstanceId}"
+                                        Classes="text-body-small"
+                                        TextWrapping="Wrap"
+                                        Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <SelectableTextBlock Text="{Binding TraceIdText, StringFormat='Trace Id: {0}'}"
+                                                         IsVisible="{Binding HasTraceId}"
+                                                         Classes="text-body-small"
+                                                         TextWrapping="Wrap"
+                                                         Foreground="{DynamicResource TextSecondaryBrush}" />
+                                    <SelectableTextBlock Text="{Binding DetailsJson}"
+                                                         IsVisible="{Binding HasDetails}"
+                                                         Classes="text-body-small"
+                                                         TextWrapping="Wrap"
+                                                         Foreground="{DynamicResource TextSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <TextBlock Text="No log entries matched the current filters."
+                       IsVisible="{Binding HasNoEntries}" />
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

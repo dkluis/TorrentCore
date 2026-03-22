@@ -1,3 +1,5 @@
+#region
+
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -5,152 +7,104 @@ using TorrentCore.Client;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Host;
 
+#endregion
+
 namespace TorrentCore.Avalonia.ViewModels;
 
 public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
 {
     [ObservableProperty]
-    private bool _isLoading;
-
-    [ObservableProperty]
-    private bool _isSaving;
-
-    [ObservableProperty]
-    private string? _message;
-
-    [ObservableProperty]
-    private string? _errorMessage;
-
-    [ObservableProperty]
-    private string _engineRuntime = string.Empty;
-
-    [ObservableProperty]
-    private string _partialFilesSummary = string.Empty;
-
-    [ObservableProperty]
-    private string _persistedOverridesSummary = string.Empty;
-
-    [ObservableProperty]
-    private string _updatedAtSummary = string.Empty;
-
-    [ObservableProperty]
-    private string _retrievedAtSummary = string.Empty;
-
-    [ObservableProperty]
-    private bool _supportsLiveUpdates;
-
-    [ObservableProperty]
-    private string _seedingStopMode = "Unlimited";
-
-    [ObservableProperty]
-    private double _seedingStopRatio = 1.0;
-
-    [ObservableProperty]
-    private int _seedingStopMinutes = 60;
-
-    [ObservableProperty]
-    private string _completedTorrentCleanupMode = "Never";
-
-    [ObservableProperty]
-    private int _completedTorrentCleanupMinutes = 60;
-
-    [ObservableProperty]
-    private int _engineConnectionFailureLogBurstLimit = 5;
-
-    [ObservableProperty]
-    private int _engineConnectionFailureLogWindowSeconds = 60;
-
-    [ObservableProperty]
-    private int _engineMaximumConnections = 150;
-
-    [ObservableProperty]
-    private int _engineMaximumHalfOpenConnections = 8;
-
-    [ObservableProperty]
-    private int _engineMaximumDownloadRateBytesPerSecond;
-
-    [ObservableProperty]
-    private int _engineMaximumUploadRateBytesPerSecond;
-
-    [ObservableProperty]
-    private int _maxActiveMetadataResolutions = 4;
-
-    [ObservableProperty]
-    private int _maxActiveDownloads = 4;
-
-    [ObservableProperty]
-    private int _metadataRefreshStaleSeconds = 90;
-
-    [ObservableProperty]
-    private int _metadataRefreshRestartDelaySeconds = 30;
-
-    [ObservableProperty]
-    private bool _completionCallbackEnabled;
-
-    [ObservableProperty]
-    private string _completionCallbackCommandPath = string.Empty;
-
-    [ObservableProperty]
-    private string _completionCallbackArguments = string.Empty;
-
-    [ObservableProperty]
-    private string _completionCallbackWorkingDirectory = string.Empty;
-
-    [ObservableProperty]
-    private int _completionCallbackTimeoutSeconds = 30;
-
-    [ObservableProperty]
-    private int _completionCallbackFinalizationTimeoutSeconds = 120;
-
-    [ObservableProperty]
-    private string _completionCallbackApiBaseUrlOverride = string.Empty;
-
-    [ObservableProperty]
-    private string _completionCallbackApiKeyOverride = string.Empty;
-
-    [ObservableProperty]
-    private bool _isCallbackAdvancedExpanded;
-
-    [ObservableProperty]
-    private int _appliedMaxConnections = 150;
-
+    private int _appliedDownloadRateBytesPerSecond;
     [ObservableProperty]
     private int _appliedHalfOpenConnections = 8;
-
     [ObservableProperty]
-    private int _appliedDownloadRateBytesPerSecond;
-
+    private int _appliedMaxConnections = 150;
     [ObservableProperty]
     private int _appliedUploadRateBytesPerSecond;
-
+    [ObservableProperty]
+    private int _completedTorrentCleanupMinutes = 60;
+    [ObservableProperty]
+    private string _completedTorrentCleanupMode = "Never";
+    [ObservableProperty]
+    private string _completionCallbackApiBaseUrlOverride = string.Empty;
+    [ObservableProperty]
+    private string _completionCallbackApiKeyOverride = string.Empty;
+    [ObservableProperty]
+    private string _completionCallbackArguments = string.Empty;
+    [ObservableProperty]
+    private string _completionCallbackCommandPath = string.Empty;
+    [ObservableProperty]
+    private bool _completionCallbackEnabled;
+    [ObservableProperty]
+    private int _completionCallbackFinalizationTimeoutSeconds = 120;
+    [ObservableProperty]
+    private int _completionCallbackTimeoutSeconds = 30;
+    [ObservableProperty]
+    private string _completionCallbackWorkingDirectory = string.Empty;
+    [ObservableProperty]
+    private int _engineConnectionFailureLogBurstLimit = 5;
+    [ObservableProperty]
+    private int _engineConnectionFailureLogWindowSeconds = 60;
+    [ObservableProperty]
+    private int _engineMaximumConnections = 150;
+    [ObservableProperty]
+    private int _engineMaximumDownloadRateBytesPerSecond;
+    [ObservableProperty]
+    private int _engineMaximumHalfOpenConnections = 8;
+    [ObservableProperty]
+    private int _engineMaximumUploadRateBytesPerSecond;
+    [ObservableProperty]
+    private string _engineRuntime = string.Empty;
     [ObservableProperty]
     private bool _engineSettingsRequireRestart;
-
+    [ObservableProperty]
+    private string? _errorMessage;
+    [ObservableProperty]
+    private bool _isCallbackAdvancedExpanded;
+    [ObservableProperty]
+    private bool _isLoading;
+    [ObservableProperty]
+    private bool _isSaving;
+    [ObservableProperty]
+    private int _maxActiveDownloads = 4;
+    [ObservableProperty]
+    private int _maxActiveMetadataResolutions = 4;
+    [ObservableProperty]
+    private string? _message;
+    [ObservableProperty]
+    private int _metadataRefreshRestartDelaySeconds = 30;
+    [ObservableProperty]
+    private int _metadataRefreshStaleSeconds = 90;
+    [ObservableProperty]
+    private string _partialFilesSummary = string.Empty;
+    [ObservableProperty]
+    private string _persistedOverridesSummary = string.Empty;
+    [ObservableProperty]
+    private string _retrievedAtSummary = string.Empty;
+    [ObservableProperty]
+    private int _seedingStopMinutes = 60;
+    [ObservableProperty]
+    private string _seedingStopMode = "Unlimited";
+    [ObservableProperty]
+    private double _seedingStopRatio = 1.0;
+    [ObservableProperty]
+    private bool _supportsLiveUpdates;
+    [ObservableProperty]
+    private string _updatedAtSummary = string.Empty;
     public ObservableCollection<EditableTorrentCategoryViewModel> Categories { get; } = [];
-
     public IReadOnlyList<string> SeedingModes { get; } =
     [
-        "Unlimited",
-        "StopImmediately",
-        "StopAfterRatio",
-        "StopAfterTime",
-        "StopAfterRatioOrTime",
+        "Unlimited", "StopImmediately", "StopAfterRatio", "StopAfterTime", "StopAfterRatioOrTime",
     ];
-
-    public IReadOnlyList<string> CleanupModes { get; } =
-    [
-        "Never",
-        "AfterCompletedMinutes",
-    ];
-
-    public bool HasMessage => !string.IsNullOrWhiteSpace(Message);
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-    public bool HasCategories => Categories.Count > 0;
-    public string AppliedDownloadRateText => FormatRateLimit(AppliedDownloadRateBytesPerSecond);
-    public string AppliedUploadRateText => FormatRateLimit(AppliedUploadRateBytesPerSecond);
+    public IReadOnlyList<string> CleanupModes            { get; } = ["Never", "AfterCompletedMinutes"];
+    public bool                  HasMessage              => !string.IsNullOrWhiteSpace(Message);
+    public bool                  HasError                => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public bool                  HasCategories           => Categories.Count > 0;
+    public string                AppliedDownloadRateText => FormatRateLimit(AppliedDownloadRateBytesPerSecond);
+    public string                AppliedUploadRateText   => FormatRateLimit(AppliedUploadRateBytesPerSecond);
 
     [RelayCommand]
-    public async Task RefreshAsync() => await LoadAsync();
+    public async Task RefreshAsync() { await LoadAsync(); }
 
     [RelayCommand]
     public async Task SaveAsync()
@@ -160,58 +114,65 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
             return;
         }
 
-        IsSaving = true;
-        Message = null;
+        IsSaving     = true;
+        Message      = null;
         ErrorMessage = null;
 
         try
         {
-            var settings = await client.UpdateRuntimeSettingsAsync(new UpdateRuntimeSettingsRequest
-            {
-                SeedingStopMode = SeedingStopMode,
-                SeedingStopRatio = SeedingStopRatio,
-                SeedingStopMinutes = SeedingStopMinutes,
-                CompletedTorrentCleanupMode = CompletedTorrentCleanupMode,
-                CompletedTorrentCleanupMinutes = CompletedTorrentCleanupMinutes,
-                EngineConnectionFailureLogBurstLimit = EngineConnectionFailureLogBurstLimit,
-                EngineConnectionFailureLogWindowSeconds = EngineConnectionFailureLogWindowSeconds,
-                EngineMaximumConnections = EngineMaximumConnections,
-                EngineMaximumHalfOpenConnections = EngineMaximumHalfOpenConnections,
-                EngineMaximumDownloadRateBytesPerSecond = EngineMaximumDownloadRateBytesPerSecond,
-                EngineMaximumUploadRateBytesPerSecond = EngineMaximumUploadRateBytesPerSecond,
-                MaxActiveMetadataResolutions = MaxActiveMetadataResolutions,
-                MaxActiveDownloads = MaxActiveDownloads,
-                MetadataRefreshStaleSeconds = MetadataRefreshStaleSeconds,
-                MetadataRefreshRestartDelaySeconds = MetadataRefreshRestartDelaySeconds,
-                CompletionCallbackEnabled = CompletionCallbackEnabled,
-                CompletionCallbackCommandPath = CompletionCallbackCommandPath,
-                CompletionCallbackArguments = CompletionCallbackArguments,
-                CompletionCallbackWorkingDirectory = CompletionCallbackWorkingDirectory,
-                CompletionCallbackTimeoutSeconds = CompletionCallbackTimeoutSeconds,
-                CompletionCallbackFinalizationTimeoutSeconds = CompletionCallbackFinalizationTimeoutSeconds,
-                CompletionCallbackApiBaseUrlOverride = CompletionCallbackApiBaseUrlOverride,
-                CompletionCallbackApiKeyOverride = CompletionCallbackApiKeyOverride,
-            });
+            var settings = await client.UpdateRuntimeSettingsAsync(
+                new UpdateRuntimeSettingsRequest
+                {
+                    SeedingStopMode                              = SeedingStopMode,
+                    SeedingStopRatio                             = SeedingStopRatio,
+                    SeedingStopMinutes                           = SeedingStopMinutes,
+                    CompletedTorrentCleanupMode                  = CompletedTorrentCleanupMode,
+                    CompletedTorrentCleanupMinutes               = CompletedTorrentCleanupMinutes,
+                    EngineConnectionFailureLogBurstLimit         = EngineConnectionFailureLogBurstLimit,
+                    EngineConnectionFailureLogWindowSeconds      = EngineConnectionFailureLogWindowSeconds,
+                    EngineMaximumConnections                     = EngineMaximumConnections,
+                    EngineMaximumHalfOpenConnections             = EngineMaximumHalfOpenConnections,
+                    EngineMaximumDownloadRateBytesPerSecond      = EngineMaximumDownloadRateBytesPerSecond,
+                    EngineMaximumUploadRateBytesPerSecond        = EngineMaximumUploadRateBytesPerSecond,
+                    MaxActiveMetadataResolutions                 = MaxActiveMetadataResolutions,
+                    MaxActiveDownloads                           = MaxActiveDownloads,
+                    MetadataRefreshStaleSeconds                  = MetadataRefreshStaleSeconds,
+                    MetadataRefreshRestartDelaySeconds           = MetadataRefreshRestartDelaySeconds,
+                    CompletionCallbackEnabled                    = CompletionCallbackEnabled,
+                    CompletionCallbackCommandPath                = CompletionCallbackCommandPath,
+                    CompletionCallbackArguments                  = CompletionCallbackArguments,
+                    CompletionCallbackWorkingDirectory           = CompletionCallbackWorkingDirectory,
+                    CompletionCallbackTimeoutSeconds             = CompletionCallbackTimeoutSeconds,
+                    CompletionCallbackFinalizationTimeoutSeconds = CompletionCallbackFinalizationTimeoutSeconds,
+                    CompletionCallbackApiBaseUrlOverride         = CompletionCallbackApiBaseUrlOverride,
+                    CompletionCallbackApiKeyOverride             = CompletionCallbackApiKeyOverride,
+                }
+            );
 
             var updatedCategories = new List<TorrentCategoryDto>(Categories.Count);
-            foreach (var category in Categories.OrderBy(item => item.SortOrder).ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+            foreach (var category in Categories.OrderBy(item => item.SortOrder)
+                                               .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
             {
-                updatedCategories.Add(await client.UpdateCategoryAsync(category.Key, new UpdateTorrentCategoryRequest
-                {
-                    DisplayName = category.DisplayName,
-                    CallbackLabel = category.CallbackLabel,
-                    DownloadRootPath = category.DownloadRootPath,
-                    Enabled = category.Enabled,
-                    InvokeCompletionCallback = category.InvokeCompletionCallback,
-                    SortOrder = category.SortOrder,
-                }));
+                updatedCategories.Add(
+                    await client.UpdateCategoryAsync(
+                        category.Key, new UpdateTorrentCategoryRequest
+                        {
+                            DisplayName              = category.DisplayName,
+                            CallbackLabel            = category.CallbackLabel,
+                            DownloadRootPath         = category.DownloadRootPath,
+                            Enabled                  = category.Enabled,
+                            InvokeCompletionCallback = category.InvokeCompletionCallback,
+                            SortOrder                = category.SortOrder,
+                        }
+                    )
+                );
             }
 
             Apply(settings);
             ApplyCategories(updatedCategories);
-            Message = settings.EngineSettingsRequireRestart
-                ? "Runtime settings and categories saved. Restart TorrentCore.Service to apply engine throttle changes."
-                : "Runtime settings and categories saved.";
+            Message = settings.EngineSettingsRequireRestart ?
+                    "Runtime settings and categories saved. Restart TorrentCore.Service to apply engine throttle changes." :
+                    "Runtime settings and categories saved.";
         }
         catch (Exception exception)
         {
@@ -231,13 +192,13 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
             return;
         }
 
-        IsLoading = true;
-        Message = null;
+        IsLoading    = true;
+        Message      = null;
         ErrorMessage = null;
 
         try
         {
-            var settingsTask = client.GetRuntimeSettingsAsync();
+            var settingsTask   = client.GetRuntimeSettingsAsync();
             var categoriesTask = client.GetCategoriesAsync();
             await Task.WhenAll(settingsTask, categoriesTask);
             var settings = settingsTask.Result;
@@ -264,9 +225,7 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
     private void Apply(RuntimeSettingsDto settings)
     {
         EngineRuntime = settings.EngineRuntime;
-        PartialFilesSummary = settings.PartialFilesEnabled
-            ? $"Enabled ({settings.PartialFileSuffix})"
-            : "Disabled";
+        PartialFilesSummary = settings.PartialFilesEnabled ? $"Enabled ({settings.PartialFileSuffix})" : "Disabled";
         PersistedOverridesSummary = settings.UsesPersistedOverrides ? "Yes" : "No";
         SupportsLiveUpdates = settings.SupportsLiveUpdates;
         UpdatedAtSummary = settings.UpdatedAtUtc?.ToLocalTime().ToString("g") ?? "Not yet changed";
@@ -306,19 +265,20 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
     {
         Categories.Clear();
 
-        foreach (var category in categories
-                     .OrderBy(item => item.SortOrder)
-                     .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+        foreach (var category in categories.OrderBy(item => item.SortOrder)
+                                           .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
         {
-            Categories.Add(new EditableTorrentCategoryViewModel(category.Key)
-            {
-                DisplayName = category.DisplayName,
-                CallbackLabel = category.CallbackLabel,
-                DownloadRootPath = category.DownloadRootPath,
-                Enabled = category.Enabled,
-                InvokeCompletionCallback = category.InvokeCompletionCallback,
-                SortOrder = category.SortOrder,
-            });
+            Categories.Add(
+                new EditableTorrentCategoryViewModel(category.Key)
+                {
+                    DisplayName              = category.DisplayName,
+                    CallbackLabel            = category.CallbackLabel,
+                    DownloadRootPath         = category.DownloadRootPath,
+                    Enabled                  = category.Enabled,
+                    InvokeCompletionCallback = category.InvokeCompletionCallback,
+                    SortOrder                = category.SortOrder,
+                }
+            );
         }
 
         OnPropertyChanged(nameof(HasCategories));
@@ -333,6 +293,8 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
         OnPropertyChanged(nameof(AppliedUploadRateText));
     }
 
-    private static string FormatRateLimit(int bytesPerSecond) =>
-        bytesPerSecond <= 0 ? "Unlimited" : $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    private static string FormatRateLimit(int bytesPerSecond)
+    {
+        return bytesPerSecond <= 0 ? "Unlimited" : $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    }
 }

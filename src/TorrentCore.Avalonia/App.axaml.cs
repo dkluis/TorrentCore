@@ -1,3 +1,5 @@
+#region
+
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -6,19 +8,19 @@ using TorrentCore.Avalonia.Infrastructure;
 using TorrentCore.Avalonia.ViewModels;
 using TorrentCore.Client;
 
+#endregion
+
 namespace TorrentCore.Avalonia;
 
-public partial class App : Application
+public class App : Application
 {
-    private ServiceProvider? _services;
-
-    public override void Initialize() =>
-        AvaloniaXamlLoader.Load(this);
+    private         ServiceProvider? _services;
+    public override void             Initialize() { AvaloniaXamlLoader.Load(this); }
 
     public override void OnFrameworkInitializationCompleted()
     {
-        var configuration = AppConfigLoader.Load();
-        var clientOptions = configuration.TorrentCoreService;
+        var configuration    = AppConfigLoader.Load();
+        var clientOptions    = configuration.TorrentCoreService;
         var endpointProvider = new MutableTorrentCoreEndpointProvider(clientOptions.BaseUrl);
 
         var services = new ServiceCollection();
@@ -37,7 +39,7 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = _services.GetRequiredService<MainWindow>();
-            _ = _services.GetRequiredService<MainWindowViewModel>().InitializeAsync();
+            _                  = _services.GetRequiredService<MainWindowViewModel>().InitializeAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

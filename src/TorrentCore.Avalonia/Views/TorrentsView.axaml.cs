@@ -1,12 +1,16 @@
-using Avalonia.Input;
+#region
+
 using Avalonia.Controls;
+using Avalonia.Input;
 using TorrentCore.Avalonia.ViewModels;
+
+#endregion
 
 namespace TorrentCore.Avalonia.Views;
 
 public partial class TorrentsView : UserControl
 {
-    public TorrentsView() => InitializeComponent();
+    public TorrentsView() { InitializeComponent(); }
 
     private async void MagnetUriTextBox_OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -20,9 +24,9 @@ public partial class TorrentsView : UserControl
             return;
         }
 
-        var hasPasteModifier = e.Key == Key.V
-            ? e.KeyModifiers.HasFlag(KeyModifiers.Meta) || e.KeyModifiers.HasFlag(KeyModifiers.Control)
-            : e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var hasPasteModifier = e.Key == Key.V ?
+                e.KeyModifiers.HasFlag(KeyModifiers.Meta) || e.KeyModifiers.HasFlag(KeyModifiers.Control) :
+                e.KeyModifiers.HasFlag(KeyModifiers.Shift);
 
         if (!hasPasteModifier)
         {

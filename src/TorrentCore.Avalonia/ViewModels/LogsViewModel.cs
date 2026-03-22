@@ -1,7 +1,11 @@
+#region
+
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using TorrentCore.Client;
+
+#endregion
 
 namespace TorrentCore.Avalonia.ViewModels;
 
@@ -9,52 +13,42 @@ public partial class LogsViewModel(TorrentCoreClient client, Action<Guid> showTo
 {
     [ObservableProperty]
     private bool _autoRefresh = true;
-
-    [ObservableProperty]
-    private int _take = 100;
-
     [ObservableProperty]
     private string _category = string.Empty;
-
-    [ObservableProperty]
-    private string _eventType = string.Empty;
-
-    [ObservableProperty]
-    private string _level = string.Empty;
-
-    [ObservableProperty]
-    private string _torrentIdText = string.Empty;
-
-    [ObservableProperty]
-    private bool _isLoading;
-
     [ObservableProperty]
     private string? _errorMessage;
-
+    [ObservableProperty]
+    private string _eventType = string.Empty;
+    [ObservableProperty]
+    private bool _isLoading;
     [ObservableProperty]
     private string _lastRefreshedText = string.Empty;
-
+    [ObservableProperty]
+    private string _level = string.Empty;
+    [ObservableProperty]
+    private int _take = 100;
+    [ObservableProperty]
+    private string _torrentIdText = string.Empty;
     public ObservableCollection<ActivityLogEntryItemViewModel> Entries { get; } = [];
     public IReadOnlyList<int> TakeOptions { get; } = [20, 50, 100, 200];
     public IReadOnlyList<string> LevelOptions { get; } = ["", "Information", "Warning", "Error"];
     public IReadOnlyList<string> CategoryOptions { get; } = ["", "startup", "engine", "torrent", "runtime"];
-
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
     public bool HasEntries => Entries.Count > 0;
     public bool HasNoEntries => !IsLoading && !HasEntries && !HasError;
     public bool HasLastRefreshed => !string.IsNullOrWhiteSpace(LastRefreshedText);
 
     [RelayCommand]
-    public async Task RefreshAsync() => await LoadAsync();
+    public async Task RefreshAsync() { await LoadAsync(); }
 
     [RelayCommand]
     public async Task ClearFiltersAsync()
     {
-        Category = string.Empty;
-        EventType = string.Empty;
-        Level = string.Empty;
+        Category      = string.Empty;
+        EventType     = string.Empty;
+        Level         = string.Empty;
         TorrentIdText = string.Empty;
-        Take = 100;
+        Take          = 100;
         await LoadAsync();
     }
 
@@ -65,7 +59,7 @@ public partial class LogsViewModel(TorrentCoreClient client, Action<Guid> showTo
             return;
         }
 
-        IsLoading = true;
+        IsLoading    = true;
         ErrorMessage = null;
 
         try
@@ -83,11 +77,10 @@ public partial class LogsViewModel(TorrentCoreClient client, Action<Guid> showTo
             }
 
             var logs = await client.GetRecentLogsAsync(
-                take: Math.Max(Take, 1),
-                category: string.IsNullOrWhiteSpace(Category) ? null : Category,
-                eventType: string.IsNullOrWhiteSpace(EventType) ? null : EventType,
-                level: string.IsNullOrWhiteSpace(Level) ? null : Level,
-                torrentId: torrentId);
+                Math.Max(Take, 1), string.IsNullOrWhiteSpace(Category) ? null : Category,
+                string.IsNullOrWhiteSpace(EventType) ? null : EventType,
+                string.IsNullOrWhiteSpace(Level) ? null : Level, torrentId
+            );
 
             Entries.Clear();
             foreach (var entry in logs)

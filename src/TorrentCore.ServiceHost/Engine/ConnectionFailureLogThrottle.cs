@@ -1,4 +1,8 @@
+#region
+
 using System.Collections.Concurrent;
+
+#endregion
 
 namespace TorrentCore.Service.Engine;
 
@@ -6,7 +10,8 @@ public sealed class ConnectionFailureLogThrottle
 {
     private readonly ConcurrentDictionary<string, ConnectionFailureLogWindow> _windows = new();
 
-    public ConnectionFailureLogDecision RegisterAttempt(string key, DateTimeOffset now, int burstLimit, int windowSeconds)
+    public ConnectionFailureLogDecision RegisterAttempt(string key, DateTimeOffset now, int burstLimit,
+        int                                                    windowSeconds)
     {
         var window = _windows.GetOrAdd(key, _ => new ConnectionFailureLogWindow(now));
 
@@ -14,8 +19,8 @@ public sealed class ConnectionFailureLogThrottle
         {
             if ((now - window.WindowStartedAtUtc).TotalSeconds >= windowSeconds)
             {
-                window.WindowStartedAtUtc = now;
-                window.LoggedCount = 0;
+                window.WindowStartedAtUtc   = now;
+                window.LoggedCount          = 0;
                 window.ThrottleNoticeLogged = false;
             }
 
@@ -35,20 +40,18 @@ public sealed class ConnectionFailureLogThrottle
         }
     }
 
-    public void Clear() => _windows.Clear();
-
+    public void Clear() { _windows.Clear(); }
     private sealed class ConnectionFailureLogWindow(DateTimeOffset windowStartedAtUtc)
     {
-        public object SyncRoot { get; } = new();
-        public DateTimeOffset WindowStartedAtUtc { get; set; } = windowStartedAtUtc;
-        public int LoggedCount { get; set; }
-        public bool ThrottleNoticeLogged { get; set; }
+        public object         SyncRoot             { get; }      = new();
+        public DateTimeOffset WindowStartedAtUtc   { get; set; } = windowStartedAtUtc;
+        public int            LoggedCount          { get; set; }
+        public bool           ThrottleNoticeLogged { get; set; }
     }
 }
-
 public enum ConnectionFailureLogDecision
 {
-    Log = 0,
+    Log            = 0,
     ThrottleNotice = 1,
-    Suppress = 2,
+    Suppress       = 2,
 }

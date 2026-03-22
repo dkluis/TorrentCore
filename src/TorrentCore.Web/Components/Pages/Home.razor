@@ -1,8 +1,8 @@
 @page "/"
-@implements IAsyncDisposable
-@inject TorrentCoreClient TorrentCoreClient
 @using TorrentCore.Contracts.Host
 @using TorrentCore.Contracts.Torrents
+@implements IAsyncDisposable
+@inject TorrentCoreClient TorrentCoreClient
 
 <PageTitle>Dashboard</PageTitle>
 
@@ -13,12 +13,10 @@
 @if (_isLoading)
 {
     <p>Loading host status...</p>
-}
-else if (!string.IsNullOrWhiteSpace(_error))
+} else if (!string.IsNullOrWhiteSpace(_error))
 {
     <p>@_error</p>
-}
-else if (_hostStatus is not null)
+} else if (_hostStatus is not null)
 {
     <section class="mb-4">
         <div class="tc-section-header mb-3">
@@ -35,7 +33,8 @@ else if (_hostStatus is not null)
                         <p class="mb-1"><strong>Service:</strong> @_hostStatus.ServiceName</p>
                         <p class="mb-1"><strong>Version:</strong> @_hostStatus.ServiceVersion</p>
                         <p class="mb-1"><strong>Environment:</strong> @_hostStatus.EnvironmentName</p>
-                        <p class="mb-1"><strong>Service Instance:</strong> <span class="tc-break">@_hostStatus.ServiceInstanceId</span></p>
+                        <p class="mb-1"><strong>Service Instance:</strong>
+                            <span class="tc-break">@_hostStatus.ServiceInstanceId</span></p>
                         <p class="mb-0"><strong>Checked:</strong> @_hostStatus.CheckedAtUtc.ToLocalTime()</p>
                     </div>
                 </div>
@@ -49,14 +48,21 @@ else if (_hostStatus is not null)
                         <p class="mb-1"><strong>Listen Port:</strong> @_hostStatus.EngineListenPort</p>
                         <p class="mb-1"><strong>DHT Port:</strong> @_hostStatus.EngineDhtPort</p>
                         <p class="mb-1"><strong>Port Forwarding:</strong> @_hostStatus.EnginePortForwardingEnabled</p>
-                        <p class="mb-1"><strong>Local Peer Discovery:</strong> @_hostStatus.EngineLocalPeerDiscoveryEnabled</p>
+                        <p class="mb-1"><strong>Local Peer
+                                Discovery:</strong> @_hostStatus.EngineLocalPeerDiscoveryEnabled</p>
                         <p class="mb-1"><strong>Max Connections:</strong> @_hostStatus.EngineMaximumConnections</p>
-                        <p class="mb-1"><strong>Max Half-Open:</strong> @_hostStatus.EngineMaximumHalfOpenConnections</p>
+                        <p class="mb-1"><strong>Max Half-Open:</strong> @_hostStatus.EngineMaximumHalfOpenConnections
+                        </p>
                         <p class="mb-1"><strong>Connected Peers:</strong> @_hostStatus.CurrentConnectedPeerCount</p>
-                        <p class="mb-1"><strong>Current Download:</strong> @FormatRate(_hostStatus.CurrentDownloadRateBytesPerSecond)</p>
-                        <p class="mb-1"><strong>Current Upload:</strong> @FormatRate(_hostStatus.CurrentUploadRateBytesPerSecond)</p>
-                        <p class="mb-1"><strong>Max Download:</strong> @FormatRateLimit(_hostStatus.EngineMaximumDownloadRateBytesPerSecond)</p>
-                        <p class="mb-0"><strong>Max Upload:</strong> @FormatRateLimit(_hostStatus.EngineMaximumUploadRateBytesPerSecond)</p>
+                        <p class="mb-1"><strong>Current
+                                Download:</strong> @FormatRate(_hostStatus.CurrentDownloadRateBytesPerSecond)</p>
+                        <p class="mb-1"><strong>Current
+                                Upload:</strong> @FormatRate(_hostStatus.CurrentUploadRateBytesPerSecond)</p>
+                        <p class="mb-1"><strong>Max
+                                Download:</strong> @FormatRateLimit(_hostStatus.EngineMaximumDownloadRateBytesPerSecond)
+                        </p>
+                        <p class="mb-0"><strong>Max
+                                Upload:</strong> @FormatRateLimit(_hostStatus.EngineMaximumUploadRateBytesPerSecond)</p>
                     </div>
                 </div>
             </div>
@@ -66,9 +72,11 @@ else if (_hostStatus is not null)
                     <div class="card-body">
                         <h3 class="h6 card-title">Queue And Activity</h3>
                         <p class="mb-1"><strong>Total Torrents:</strong> @_hostStatus.TorrentCount</p>
-                        <p class="mb-1"><strong>Max Metadata Slots:</strong> @_hostStatus.MaxActiveMetadataResolutions</p>
+                        <p class="mb-1"><strong>Max Metadata Slots:</strong> @_hostStatus.MaxActiveMetadataResolutions
+                        </p>
                         <p class="mb-1"><strong>Max Download Slots:</strong> @_hostStatus.MaxActiveDownloads</p>
-                        <p class="mb-1"><strong>Open Metadata Slots:</strong> @_hostStatus.AvailableMetadataResolutionSlots</p>
+                        <p class="mb-1"><strong>Open Metadata
+                                Slots:</strong> @_hostStatus.AvailableMetadataResolutionSlots</p>
                         <p class="mb-1"><strong>Open Download Slots:</strong> @_hostStatus.AvailableDownloadSlots</p>
                         <p class="mb-1"><strong>Resolving Metadata:</strong> @_hostStatus.ResolvingMetadataCount</p>
                         <p class="mb-1"><strong>Queued For Metadata:</strong> @_hostStatus.MetadataQueueCount</p>
@@ -86,22 +94,30 @@ else if (_hostStatus is not null)
                 <div class="card h-100">
                     <div class="card-body">
                         <h3 class="h6 card-title">Policies And Storage</h3>
-                        <p class="mb-1"><strong>Partial Files:</strong> @(_hostStatus.PartialFilesEnabled ? "Enabled" : "Disabled")</p>
+                        <p class="mb-1"><strong>Partial
+                                Files:</strong> @(_hostStatus.PartialFilesEnabled ? "Enabled" : "Disabled")</p>
                         <p class="mb-1"><strong>Partial Suffix:</strong> @_hostStatus.PartialFileSuffix</p>
                         <p class="mb-1"><strong>Seeding Mode:</strong> @_hostStatus.SeedingStopMode</p>
-                        <p class="mb-1"><strong>Seeding Ratio:</strong> @_hostStatus.SeedingStopRatio.ToString("0.00")</p>
+                        <p class="mb-1"><strong>Seeding Ratio:</strong> @_hostStatus.SeedingStopRatio.ToString("0.00")
+                        </p>
                         <p class="mb-1"><strong>Seeding Minutes:</strong> @_hostStatus.SeedingStopMinutes</p>
                         <p class="mb-1"><strong>Cleanup Mode:</strong> @_hostStatus.CompletedTorrentCleanupMode</p>
-                        <p class="mb-1"><strong>Cleanup Minutes:</strong> @_hostStatus.CompletedTorrentCleanupMinutes</p>
+                        <p class="mb-1"><strong>Cleanup Minutes:</strong> @_hostStatus.CompletedTorrentCleanupMinutes
+                        </p>
                         <p class="mb-1"><strong>Persistent Storage:</strong> @_hostStatus.SupportsPersistentStorage</p>
                         <p class="mb-1"><strong>Startup Recovery:</strong> @_hostStatus.StartupRecoveryCompleted</p>
-                        <p class="mb-1"><strong>Recovered At Startup:</strong> @_hostStatus.StartupRecoveredTorrentCount</p>
-                        <p class="mb-1"><strong>Normalized At Startup:</strong> @_hostStatus.StartupNormalizedTorrentCount</p>
+                        <p class="mb-1"><strong>Recovered At Startup:</strong> @_hostStatus.StartupRecoveredTorrentCount
+                        </p>
+                        <p class="mb-1"><strong>Normalized At
+                                Startup:</strong> @_hostStatus.StartupNormalizedTorrentCount</p>
                         @if (_hostStatus.StartupRecoveryCompletedAtUtc is not null)
                         {
-                            <p class="mb-1"><strong>Recovery Completed:</strong> @_hostStatus.StartupRecoveryCompletedAtUtc.Value.ToLocalTime()</p>
+                            <p class="mb-1"><strong>Recovery
+                                    Completed:</strong> @_hostStatus.StartupRecoveryCompletedAtUtc.Value.ToLocalTime()
+                            </p>
                         }
-                        <p class="mb-0"><strong>Download Root:</strong> <span class="tc-break">@_hostStatus.DownloadRootPath</span></p>
+                        <p class="mb-0"><strong>Download Root:</strong>
+                            <span class="tc-break">@_hostStatus.DownloadRootPath</span></p>
                     </div>
                 </div>
             </div>
@@ -126,7 +142,9 @@ else if (_hostStatus is not null)
     <h2>Current Boundary</h2>
     <ul>
         <li>TorrentCore owns the engine, queueing, persistence, diagnostics, and operator-facing administration UI.</li>
-        <li>The Dashboard is for host and runtime visibility. Torrent submission and lifecycle operations now belong on the dedicated Torrents page.</li>
+        <li>The Dashboard is for host and runtime visibility. Torrent submission and lifecycle operations now belong on
+            the dedicated Torrents page.
+        </li>
         <li>TVMaze remains a lightweight client of TorrentCore rather than owning TorrentCore runtime behavior.</li>
     </ul>
 </section>
@@ -141,23 +159,23 @@ else if (_hostStatus is not null)
 </section>
 
 @code {
-    private EngineHostStatusDto? _hostStatus;
-    private IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
-    private string? _error;
-    private bool _isLoading = true;
-    private readonly SemaphoreSlim _loadGate = new(1, 1);
-    private CancellationTokenSource? _refreshLoopCts;
-    private Task? _refreshLoopTask;
-    private bool _isDisposed;
-    private int CallbackPendingCount => CountCallbackState("PendingFinalization");
-    private int CallbackInvokedCount => CountCallbackState("Invoked");
-    private int CallbackFailedCount => CountCallbackState("Failed");
-    private int CallbackTimedOutCount => CountCallbackState("TimedOut");
+    private          EngineHostStatusDto?             _hostStatus;
+    private          IReadOnlyList<TorrentSummaryDto> _torrents = Array.Empty<TorrentSummaryDto>();
+    private          string?                          _error;
+    private          bool                             _isLoading = true;
+    private readonly SemaphoreSlim                    _loadGate  = new(1, 1);
+    private          CancellationTokenSource?         _refreshLoopCts;
+    private          Task?                            _refreshLoopTask;
+    private          bool                             _isDisposed;
+    private          int                              CallbackPendingCount  => CountCallbackState("PendingFinalization");
+    private          int                              CallbackInvokedCount  => CountCallbackState("Invoked");
+    private          int                              CallbackFailedCount   => CountCallbackState("Failed");
+    private          int                              CallbackTimedOutCount => CountCallbackState("TimedOut");
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
-        _refreshLoopCts = new CancellationTokenSource();
+        _refreshLoopCts  = new CancellationTokenSource();
         _refreshLoopTask = RunRefreshLoopAsync(_refreshLoopCts.Token);
     }
 
@@ -179,10 +197,10 @@ else if (_hostStatus is not null)
 
             _error = null;
             var hostStatusTask = TorrentCoreClient.GetHostStatusAsync();
-            var torrentsTask = TorrentCoreClient.GetTorrentsAsync();
+            var torrentsTask   = TorrentCoreClient.GetTorrentsAsync();
             await Task.WhenAll(hostStatusTask, torrentsTask);
             _hostStatus = hostStatusTask.Result;
-            _torrents = torrentsTask.Result;
+            _torrents   = torrentsTask.Result;
         }
         catch (Exception exception)
         {
@@ -195,10 +213,7 @@ else if (_hostStatus is not null)
         }
     }
 
-    private async Task RefreshAsync()
-    {
-        await LoadAsync();
-    }
+    private async Task RefreshAsync() { await LoadAsync(); }
 
     private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
     {
@@ -207,26 +222,22 @@ else if (_hostStatus is not null)
         while (await timer.WaitForNextTickAsync(cancellationToken))
         {
             await InvokeAsync(async () =>
-            {
-                if (_isDisposed)
                 {
-                    return;
-                }
+                    if (_isDisposed)
+                    {
+                        return;
+                    }
 
-                await LoadAsync();
-                StateHasChanged();
-            });
+                    await LoadAsync();
+                    StateHasChanged();
+                }
+            );
         }
     }
 
-    private static string FormatRate(long bytesPerSecond) =>
-        $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
-
-    private static string FormatRateLimit(int bytesPerSecond) =>
-        bytesPerSecond <= 0 ? "Unlimited" : FormatRate(bytesPerSecond);
-
-    private int CountCallbackState(string state) =>
-        _torrents.Count(torrent => string.Equals(torrent.CompletionCallbackState, state, StringComparison.OrdinalIgnoreCase));
+    private static string FormatRate(long           bytesPerSecond) { return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s"; }
+    private static string FormatRateLimit(int       bytesPerSecond) { return bytesPerSecond <= 0 ? "Unlimited" : FormatRate(bytesPerSecond); }
+    private        int    CountCallbackState(string state)          { return _torrents.Count(torrent => string.Equals(torrent.CompletionCallbackState, state, StringComparison.OrdinalIgnoreCase)); }
 
     public async ValueTask DisposeAsync()
     {
@@ -244,9 +255,8 @@ else if (_hostStatus is not null)
             {
                 await _refreshLoopTask;
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
         }
     }
+
 }

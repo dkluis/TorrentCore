@@ -1,4 +1,8 @@
+#region
+
 using TorrentCore.Core.Categories;
+
+#endregion
 
 namespace TorrentCore.Service.Configuration;
 
@@ -10,10 +14,8 @@ public static class TorrentCategoryDefaults
 
         return
         [
-            Create("TV", 1, baseDownloadRootPath),
-            Create("Movie", 2, baseDownloadRootPath),
-            Create("Audiobook", 3, baseDownloadRootPath),
-            Create("Music", 4, baseDownloadRootPath),
+            Create("TV",        1, baseDownloadRootPath), Create("Movie", 2, baseDownloadRootPath),
+            Create("Audiobook", 3, baseDownloadRootPath), Create("Music", 4, baseDownloadRootPath),
         ];
     }
 
@@ -22,14 +24,14 @@ public static class TorrentCategoryDefaults
         var now = DateTimeOffset.UtcNow;
         return new TorrentCategoryDefinition
         {
-            Key = key,
-            DisplayName = key,
-            CallbackLabel = key,
-            DownloadRootPath = Path.Combine(baseDownloadRootPath, key),
-            Enabled = true,
+            Key                      = key,
+            DisplayName              = key,
+            CallbackLabel            = key,
+            DownloadRootPath         = Path.Combine(baseDownloadRootPath, key),
+            Enabled                  = true,
             InvokeCompletionCallback = true,
-            SortOrder = sortOrder,
-            UpdatedAtUtc = now,
+            SortOrder                = sortOrder,
+            UpdatedAtUtc             = now,
         };
     }
 }

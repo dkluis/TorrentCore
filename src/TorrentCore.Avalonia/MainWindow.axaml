@@ -11,120 +11,121 @@
         Height="900"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource AppBackgroundBrush}">
-  <Grid ColumnDefinitions="220,*,250">
-    <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}">
-      <Grid RowDefinitions="Auto,*,Auto">
-        <StackPanel Margin="16" Spacing="10">
-          <TextBlock Text="TorrentCore"
-                     Classes="text-brand-title"
-                     Foreground="{DynamicResource SidebarTextPrimaryBrush}" />
-          <TextBlock Text="Control Center"
-                     Foreground="{DynamicResource SidebarTextSecondaryBrush}" />
-        </StackPanel>
+    <Grid ColumnDefinitions="220,*,250">
+        <Border Grid.Column="0" Background="{DynamicResource SidebarBackgroundBrush}">
+            <Grid RowDefinitions="Auto,*,Auto">
+                <StackPanel Margin="16" Spacing="10">
+                    <TextBlock Text="TorrentCore"
+                               Classes="text-brand-title"
+                               Foreground="{DynamicResource SidebarTextPrimaryBrush}" />
+                    <TextBlock Text="Control Center"
+                               Foreground="{DynamicResource SidebarTextSecondaryBrush}" />
+                </StackPanel>
 
-        <ListBox Grid.Row="1"
-                 Margin="12,0,12,12"
-                 ItemsSource="{Binding Sections}"
-                 SelectedItem="{Binding SelectedSection}"
-                 IsEnabled="{Binding CanNavigate}"
-                 Background="Transparent"
-                 BorderThickness="0">
-          <ListBox.Styles>
-            <Style Selector="ListBoxItem">
-              <Setter Property="Padding" Value="10,8" />
-              <Setter Property="CornerRadius" Value="8" />
-              <Setter Property="Margin" Value="0,2" />
-            </Style>
-            <Style Selector="ListBoxItem:pointerover">
-              <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}" />
-            </Style>
-            <Style Selector="ListBoxItem:selected">
-              <Setter Property="Background" Value="{DynamicResource SidebarSelectedBrush}" />
-            </Style>
-          </ListBox.Styles>
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="models:NavigationSection">
-              <StackPanel Spacing="3">
-                <TextBlock Text="{Binding Title}"
-                           Classes="text-panel-title"
-                           Foreground="{DynamicResource SidebarTextPrimaryBrush}" />
-                <TextBlock Text="{Binding ShortDescription}"
-                           Classes="text-body-small"
-                           TextWrapping="Wrap"
-                           Foreground="{DynamicResource SidebarTextSecondaryBrush}" />
-              </StackPanel>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
+                <ListBox Grid.Row="1"
+                         Margin="12,0,12,12"
+                         ItemsSource="{Binding Sections}"
+                         SelectedItem="{Binding SelectedSection}"
+                         IsEnabled="{Binding CanNavigate}"
+                         Background="Transparent"
+                         BorderThickness="0">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="10,8" />
+                            <Setter Property="CornerRadius" Value="8" />
+                            <Setter Property="Margin" Value="0,2" />
+                        </Style>
+                        <Style Selector="ListBoxItem:pointerover">
+                            <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}" />
+                        </Style>
+                        <Style Selector="ListBoxItem:selected">
+                            <Setter Property="Background" Value="{DynamicResource SidebarSelectedBrush}" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:NavigationSection">
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="{Binding Title}"
+                                           Classes="text-panel-title"
+                                           Foreground="{DynamicResource SidebarTextPrimaryBrush}" />
+                                <TextBlock Text="{Binding ShortDescription}"
+                                           Classes="text-body-small"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource SidebarTextSecondaryBrush}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
 
-        <Border Grid.Row="2"
-                Margin="12"
-                Padding="12"
-                CornerRadius="8"
-                Background="#142129"
-                BorderBrush="{DynamicResource SidebarDividerBrush}"
-                BorderThickness="1">
-          <StackPanel Spacing="4">
-            <TextBlock Text="Desktop App"
-                       Classes="text-panel-title"
-                       Foreground="{DynamicResource SidebarTextPrimaryBrush}" />
-            <TextBlock Text="Avalonia admin shell for TorrentCore."
-                       Classes="text-body-small"
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource SidebarTextSecondaryBrush}" />
-          </StackPanel>
-        </Border>
-      </Grid>
-    </Border>
-
-    <Border Grid.Column="1"
-            Background="{DynamicResource ContentBackgroundBrush}">
-      <ContentControl Content="{Binding CurrentViewModel}" />
-    </Border>
-
-    <Border Grid.Column="2"
-            Background="{DynamicResource InspectorBackgroundBrush}"
-            Padding="16">
-      <ScrollViewer VerticalScrollBarVisibility="Auto"
-                    HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Spacing="14">
-          <TextBlock Text="Inspector" Classes="text-section-title" />
-
-          <Border Classes="panel-card">
-            <StackPanel Spacing="6">
-              <TextBlock Text="{Binding CurrentTitle}" Classes="text-panel-title" />
-              <TextBlock Text="{Binding CurrentDescription}"
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
-
-          <Border Classes="panel-card">
-            <StackPanel Spacing="6">
-              <TextBlock Text="Service Target" Classes="text-panel-title" />
-              <SelectableTextBlock Text="{Binding ServiceBaseUrl}"
+                <Border Grid.Row="2"
+                        Margin="12"
+                        Padding="12"
+                        CornerRadius="8"
+                        Background="#142129"
+                        BorderBrush="{DynamicResource SidebarDividerBrush}"
+                        BorderThickness="1">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Desktop App"
+                                   Classes="text-panel-title"
+                                   Foreground="{DynamicResource SidebarTextPrimaryBrush}" />
+                        <TextBlock Text="Avalonia admin shell for TorrentCore."
                                    Classes="text-body-small"
                                    TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" />
-              <TextBlock Text="{Binding ServiceStatusSummary}"
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
+                                   Foreground="{DynamicResource SidebarTextSecondaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
 
-          <Border Classes="panel-card">
-            <StackPanel Spacing="6">
-              <TextBlock Text="Desktop Scope" Classes="text-panel-title" />
-              <TextBlock Text="Connection, Dashboard, Torrents, Logs, Settings, and torrent detail are wired to the current service boundary."
-                         Classes="text-body-small"
-                         TextWrapping="Wrap"
-                         Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Border>
-        </StackPanel>
-      </ScrollViewer>
-    </Border>
-  </Grid>
+        <Border Grid.Column="1"
+                Background="{DynamicResource ContentBackgroundBrush}">
+            <ContentControl Content="{Binding CurrentViewModel}" />
+        </Border>
+
+        <Border Grid.Column="2"
+                Background="{DynamicResource InspectorBackgroundBrush}"
+                Padding="16">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Inspector" Classes="text-section-title" />
+
+                    <Border Classes="panel-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{Binding CurrentTitle}" Classes="text-panel-title" />
+                            <TextBlock Text="{Binding CurrentDescription}"
+                                       Classes="text-body-small"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Service Target" Classes="text-panel-title" />
+                            <SelectableTextBlock Text="{Binding ServiceBaseUrl}"
+                                                 Classes="text-body-small"
+                                                 TextWrapping="Wrap"
+                                                 Foreground="{DynamicResource TextSecondaryBrush}" />
+                            <TextBlock Text="{Binding ServiceStatusSummary}"
+                                       Classes="text-body-small"
+                                       TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Classes="panel-card">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Desktop Scope" Classes="text-panel-title" />
+                            <TextBlock
+                                Text="Connection, Dashboard, Torrents, Logs, Settings, and torrent detail are wired to the current service boundary."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
 </Window>

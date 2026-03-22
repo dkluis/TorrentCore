@@ -1,5 +1,3 @@
 namespace TorrentCore.Persistence.Sqlite;
 
-public static class SqlitePersistenceAssemblyMarker
-{
-}
+public static class SqlitePersistenceAssemblyMarker { }

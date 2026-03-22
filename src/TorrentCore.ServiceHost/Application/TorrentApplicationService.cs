@@ -1,38 +1,37 @@
+#region
+
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+
+#endregion
 
 namespace TorrentCore.Service.Application;
 
-public sealed class TorrentApplicationService(
-    IHostEnvironment hostEnvironment,
-    ResolvedTorrentCoreServicePaths servicePaths,
-    ITorrentEngineAdapter torrentEngineAdapter,
-    IActivityLogService activityLogService,
-    IOptions<TorrentCoreServiceOptions> serviceOptions,
-    IRuntimeSettingsService runtimeSettingsService,
-    ITorrentCategoryService torrentCategoryService,
-    AppliedEngineSettingsState appliedEngineSettingsState,
-    ServiceInstanceContext serviceInstanceContext,
-    StartupRecoveryState startupRecoveryState,
-    ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
+public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
+    ResolvedTorrentCoreServicePaths servicePaths, ITorrentEngineAdapter torrentEngineAdapter,
+    IActivityLogService activityLogService, IOptions<TorrentCoreServiceOptions> serviceOptions,
+    IRuntimeSettingsService runtimeSettingsService, ITorrentCategoryService torrentCategoryService,
+    AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
+    StartupRecoveryState startupRecoveryState, ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
 {
     public async Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken)
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
-        var torrents = await torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
+        var torrents        = await torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
 
         var resolvingMetadataCount = torrents.Count(torrent => torrent.State == TorrentState.ResolvingMetadata);
-        var metadataQueueCount = torrents.Count(torrent => torrent.State == TorrentState.Queued && torrent.TotalBytes is null);
+        var metadataQueueCount =
+                torrents.Count(torrent => torrent.State == TorrentState.Queued && torrent.TotalBytes is null);
         var downloadingCount = torrents.Count(torrent => torrent.State == TorrentState.Downloading);
-        var downloadQueueCount = torrents.Count(torrent => torrent.State == TorrentState.Queued && torrent.TotalBytes is not null);
+        var downloadQueueCount =
+                torrents.Count(torrent => torrent.State == TorrentState.Queued && torrent.TotalBytes is not null);
         var seedingCount = torrents.Count(torrent => torrent.State == TorrentState.Seeding);
         var pausedCount = torrents.Count(torrent => torrent.State == TorrentState.Paused);
         var completedCount = torrents.Count(torrent => torrent.State == TorrentState.Completed);
@@ -45,17 +44,18 @@ public sealed class TorrentApplicationService(
 
         return new EngineHostStatusDto
         {
-            ServiceName               = "TorrentCore.Service",
-            ServiceVersion            = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
-            ServiceInstanceId         = serviceInstanceContext.ServiceInstanceId,
-            EngineRuntime             = serviceOptions.Value.EngineMode.ToString(),
-            EngineListenPort          = serviceOptions.Value.EngineListenPort,
-            EngineDhtPort             = serviceOptions.Value.EngineDhtPort,
-            EnginePortForwardingEnabled = serviceOptions.Value.EngineAllowPortForwarding,
-            EngineLocalPeerDiscoveryEnabled = serviceOptions.Value.EngineAllowLocalPeerDiscovery,
-            EngineMaximumConnections = appliedEngineSettingsState.EngineMaximumConnections,
+            ServiceName                      = "TorrentCore.Service",
+            ServiceVersion                   = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
+            ServiceInstanceId                = serviceInstanceContext.ServiceInstanceId,
+            EngineRuntime                    = serviceOptions.Value.EngineMode.ToString(),
+            EngineListenPort                 = serviceOptions.Value.EngineListenPort,
+            EngineDhtPort                    = serviceOptions.Value.EngineDhtPort,
+            EnginePortForwardingEnabled      = serviceOptions.Value.EngineAllowPortForwarding,
+            EngineLocalPeerDiscoveryEnabled  = serviceOptions.Value.EngineAllowLocalPeerDiscovery,
+            EngineMaximumConnections         = appliedEngineSettingsState.EngineMaximumConnections,
             EngineMaximumHalfOpenConnections = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
-            EngineMaximumDownloadRateBytesPerSecond = appliedEngineSettingsState.EngineMaximumDownloadRateBytesPerSecond,
+            EngineMaximumDownloadRateBytesPerSecond =
+                    appliedEngineSettingsState.EngineMaximumDownloadRateBytesPerSecond,
             EngineMaximumUploadRateBytesPerSecond = appliedEngineSettingsState.EngineMaximumUploadRateBytesPerSecond,
             EngineConnectionFailureLogBurstLimit = runtimeSettings.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = runtimeSettings.EngineConnectionFailureLogWindowSeconds,
@@ -74,45 +74,57 @@ public sealed class TorrentApplicationService(
             CurrentConnectedPeerCount = currentConnectedPeerCount,
             CurrentDownloadRateBytesPerSecond = currentDownloadRateBytesPerSecond,
             CurrentUploadRateBytesPerSecond = currentUploadRateBytesPerSecond,
-            PartialFilesEnabled        = runtimeSettings.PartialFilesEnabled,
-            PartialFileSuffix          = runtimeSettings.PartialFileSuffix,
-            SeedingStopMode            = runtimeSettings.SeedingStopMode.ToString(),
-            SeedingStopRatio           = runtimeSettings.SeedingStopRatio,
-            SeedingStopMinutes         = runtimeSettings.SeedingStopMinutes,
+            PartialFilesEnabled = runtimeSettings.PartialFilesEnabled,
+            PartialFileSuffix = runtimeSettings.PartialFileSuffix,
+            SeedingStopMode = runtimeSettings.SeedingStopMode.ToString(),
+            SeedingStopRatio = runtimeSettings.SeedingStopRatio,
+            SeedingStopMinutes = runtimeSettings.SeedingStopMinutes,
             CompletedTorrentCleanupMode = runtimeSettings.CompletedTorrentCleanupMode.ToString(),
             CompletedTorrentCleanupMinutes = runtimeSettings.CompletedTorrentCleanupMinutes,
-            Status                    = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
-            EnvironmentName           = hostEnvironment.EnvironmentName,
-            DownloadRootPath          = servicePaths.DownloadRootPath,
-            TorrentCount              = torrents.Count,
-            SupportsMagnetAdds        = true,
-            SupportsPause             = true,
-            SupportsResume            = true,
-            SupportsRemove            = true,
+            Status = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
+            EnvironmentName = hostEnvironment.EnvironmentName,
+            DownloadRootPath = servicePaths.DownloadRootPath,
+            TorrentCount = torrents.Count,
+            SupportsMagnetAdds = true,
+            SupportsPause = true,
+            SupportsResume = true,
+            SupportsRemove = true,
             SupportsPersistentStorage = true,
-            SupportsMultiHost         = false,
-            StartupRecoveryCompleted  = startupRecoveryState.Completed,
+            SupportsMultiHost = false,
+            StartupRecoveryCompleted = startupRecoveryState.Completed,
             StartupRecoveredTorrentCount = startupRecoveryState.RecoveredTorrentCount,
             StartupNormalizedTorrentCount = startupRecoveryState.NormalizedTorrentCount,
             StartupRecoveryCompletedAtUtc = startupRecoveryState.CompletedAtUtc,
-            CheckedAtUtc              = DateTimeOffset.UtcNow,
+            CheckedAtUtc = DateTimeOffset.UtcNow,
         };
     }
 
-    public Task<RuntimeSettingsDto> GetRuntimeSettingsAsync(CancellationToken cancellationToken) =>
-        runtimeSettingsService.GetRuntimeSettingsDtoAsync(cancellationToken);
+    public Task<RuntimeSettingsDto> GetRuntimeSettingsAsync(CancellationToken cancellationToken)
+    {
+        return runtimeSettingsService.GetRuntimeSettingsDtoAsync(cancellationToken);
+    }
 
-    public Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken) =>
-        runtimeSettingsService.UpdateAsync(request, cancellationToken);
+    public Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request,
+        CancellationToken                                                                   cancellationToken)
+    {
+        return runtimeSettingsService.UpdateAsync(request, cancellationToken);
+    }
 
-    public Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken) =>
-        torrentCategoryService.GetCategoriesAsync(cancellationToken);
+    public Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken)
+    {
+        return torrentCategoryService.GetCategoriesAsync(cancellationToken);
+    }
 
-    public Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request, CancellationToken cancellationToken) =>
-        torrentCategoryService.UpdateCategoryAsync(key, request, cancellationToken);
+    public Task<TorrentCategoryDto> UpdateCategoryAsync(string key, UpdateTorrentCategoryRequest request,
+        CancellationToken                                      cancellationToken)
+    {
+        return torrentCategoryService.UpdateCategoryAsync(key, request, cancellationToken);
+    }
 
-    public Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken) =>
-        torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
+    public Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken)
+    {
+        return torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
+    }
 
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
@@ -131,39 +143,46 @@ public sealed class TorrentApplicationService(
     {
         try
         {
-            var categorySelection = await torrentCategoryService.ResolveSelectionAsync(request.CategoryKey, cancellationToken);
+            var categorySelection =
+                    await torrentCategoryService.ResolveSelectionAsync(request.CategoryKey, cancellationToken);
             var normalizedRequest = new AddMagnetRequest
             {
-                MagnetUri = request.MagnetUri,
+                MagnetUri   = request.MagnetUri,
                 CategoryKey = categorySelection.CategoryKey,
             };
 
-            var torrent = await torrentEngineAdapter.AddMagnetAsync(normalizedRequest, categorySelection, cancellationToken);
+            var torrent = await torrentEngineAdapter.AddMagnetAsync(
+                normalizedRequest, categorySelection, cancellationToken
+            );
 
             logger.LogInformation("Added torrent {TorrentId} named {TorrentName}", torrent.TorrentId, torrent.Name);
 
-            await activityLogService.WriteAsync(new ActivityLogWriteRequest
-            {
-                Level = ActivityLogLevel.Information,
-                Category = "torrent",
-                EventType = "torrent.added",
-                Message = $"Added torrent '{torrent.Name}'.",
-                TorrentId = torrent.TorrentId,
-                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                DetailsJson = JsonSerializer.Serialize(new
+            await activityLogService.WriteAsync(
+                new ActivityLogWriteRequest
                 {
-                    torrent.Name,
-                    torrent.CategoryKey,
-                    torrent.State,
-                    torrent.SavePath,
-                }),
-            }, cancellationToken);
+                    Level             = ActivityLogLevel.Information,
+                    Category          = "torrent",
+                    EventType         = "torrent.added",
+                    Message           = $"Added torrent '{torrent.Name}'.",
+                    TorrentId         = torrent.TorrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            torrent.Name,
+                            torrent.CategoryKey,
+                            torrent.State,
+                            torrent.SavePath,
+                        }
+                    ),
+                }, cancellationToken
+            );
 
             return torrent;
         }
         catch (ServiceOperationException exception)
         {
-            await LogFailureAsync("torrent", "torrent.add.failed", exception.Message, torrentId: null, cancellationToken);
+            await LogFailureAsync("torrent", "torrent.add.failed", exception.Message, null, cancellationToken);
             throw;
         }
     }
@@ -203,66 +222,88 @@ public sealed class TorrentApplicationService(
         try
         {
             var result = await torrentEngineAdapter.RefreshMetadataAsync(torrentId, cancellationToken);
-            await LogActionAsync("torrent.metadata.refresh_requested", "Requested metadata discovery refresh.", torrentId, result.State, cancellationToken);
+            await LogActionAsync(
+                "torrent.metadata.refresh_requested", "Requested metadata discovery refresh.", torrentId, result.State,
+                cancellationToken
+            );
             return result;
         }
         catch (ServiceOperationException exception)
         {
-            await LogFailureAsync("torrent", "torrent.metadata.refresh.failed", exception.Message, torrentId, cancellationToken);
+            await LogFailureAsync(
+                "torrent", "torrent.metadata.refresh.failed", exception.Message, torrentId, cancellationToken
+            );
             throw;
         }
     }
 
-    public async Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken)
+    public async Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId,
+        CancellationToken                                                    cancellationToken)
     {
         try
         {
             var result = await torrentEngineAdapter.ResetMetadataSessionAsync(torrentId, cancellationToken);
-            await LogActionAsync("torrent.metadata.reset_requested", "Recreated metadata discovery session.", torrentId, result.State, cancellationToken);
+            await LogActionAsync(
+                "torrent.metadata.reset_requested", "Recreated metadata discovery session.", torrentId, result.State,
+                cancellationToken
+            );
             return result;
         }
         catch (ServiceOperationException exception)
         {
-            await LogFailureAsync("torrent", "torrent.metadata.reset.failed", exception.Message, torrentId, cancellationToken);
+            await LogFailureAsync(
+                "torrent", "torrent.metadata.reset.failed", exception.Message, torrentId, cancellationToken
+            );
             throw;
         }
     }
 
-    public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
+    public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId,
+        CancellationToken                                                       cancellationToken)
     {
         try
         {
             var result = await torrentEngineAdapter.RetryCompletionCallbackAsync(torrentId, cancellationToken);
-            await LogActionAsync("torrent.callback.retry_requested", "Queued completion callback retry.", torrentId, result.State, cancellationToken);
+            await LogActionAsync(
+                "torrent.callback.retry_requested", "Queued completion callback retry.", torrentId, result.State,
+                cancellationToken
+            );
             return result;
         }
         catch (ServiceOperationException exception)
         {
-            await LogFailureAsync("torrent", "torrent.callback.retry.failed", exception.Message, torrentId, cancellationToken);
+            await LogFailureAsync(
+                "torrent", "torrent.callback.retry.failed", exception.Message, torrentId, cancellationToken
+            );
             throw;
         }
     }
 
-    public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
+    public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request,
+        CancellationToken                                      cancellationToken)
     {
         try
         {
             var result = await torrentEngineAdapter.RemoveAsync(torrentId, request, cancellationToken);
 
-            await activityLogService.WriteAsync(new ActivityLogWriteRequest
-            {
-                Level = ActivityLogLevel.Information,
-                Category = "torrent",
-                EventType = "torrent.removed",
-                Message = request.DeleteData ? "Removed torrent and requested data deletion." : "Removed torrent.",
-                TorrentId = torrentId,
-                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                DetailsJson = JsonSerializer.Serialize(new
+            await activityLogService.WriteAsync(
+                new ActivityLogWriteRequest
                 {
-                    result.State,
-                    request.DeleteData,
-                }),
-            }, cancellationToken);
+                    Level = ActivityLogLevel.Information,
+                    Category = "torrent",
+                    EventType = "torrent.removed",
+                    Message = request.DeleteData ? "Removed torrent and requested data deletion." : "Removed torrent.",
+                    TorrentId = torrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            result.State,
+                            request.DeleteData,
+                        }
+                    ),
+                }, cancellationToken
+            );
 
             return result;
         }
@@ -273,34 +314,40 @@ public sealed class TorrentApplicationService(
         }
     }
 
-    private async Task LogActionAsync(string eventType, string message, Guid torrentId, TorrentState state, CancellationToken cancellationToken)
+    private async Task LogActionAsync(string eventType, string message, Guid torrentId, TorrentState state,
+        CancellationToken                    cancellationToken)
     {
         logger.LogInformation("{Message} TorrentId={TorrentId} State={State}", message, torrentId, state);
 
-        await activityLogService.WriteAsync(new ActivityLogWriteRequest
-        {
-            Level = ActivityLogLevel.Information,
-            Category = "torrent",
-            EventType = eventType,
-            Message = message,
-            TorrentId = torrentId,
-            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-            DetailsJson = JsonSerializer.Serialize(new { state }),
-        }, cancellationToken);
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level             = ActivityLogLevel.Information,
+                Category          = "torrent",
+                EventType         = eventType,
+                Message           = message,
+                TorrentId         = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson       = JsonSerializer.Serialize(new {state}),
+            }, cancellationToken
+        );
     }
 
-    private async Task LogFailureAsync(string category, string eventType, string message, Guid? torrentId, CancellationToken cancellationToken)
+    private async Task LogFailureAsync(string category, string eventType, string message, Guid? torrentId,
+        CancellationToken                     cancellationToken)
     {
         logger.LogWarning("{EventType}: {Message} TorrentId={TorrentId}", eventType, message, torrentId);
 
-        await activityLogService.WriteAsync(new ActivityLogWriteRequest
-        {
-            Level = ActivityLogLevel.Warning,
-            Category = category,
-            EventType = eventType,
-            Message = message,
-            TorrentId = torrentId,
-            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-        }, cancellationToken);
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level             = ActivityLogLevel.Warning,
+                Category          = category,
+                EventType         = eventType,
+                Message           = message,
+                TorrentId         = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            }, cancellationToken
+        );
     }
 }

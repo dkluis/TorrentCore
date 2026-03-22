@@ -1,11 +1,10 @@
 @page "/torrents/{TorrentId:guid}"
+@using System.Globalization
+@using System.Text.Json
+@using TorrentCore.Contracts.Torrents
 @implements IAsyncDisposable
 @inject NavigationManager NavigationManager
 @inject TorrentCoreClient TorrentCoreClient
-@using System.Globalization
-@using System.Text.Json
-@using TorrentCore.Contracts.Diagnostics
-@using TorrentCore.Contracts.Torrents
 
 <PageTitle>Torrent Detail</PageTitle>
 
@@ -16,12 +15,10 @@
 @if (_isLoading)
 {
     <p>Loading torrent detail...</p>
-}
-else if (!string.IsNullOrWhiteSpace(_error))
+} else if (!string.IsNullOrWhiteSpace(_error))
 {
     <p>@_error</p>
-}
-else if (_torrent is not null)
+} else if (_torrent is not null)
 {
     <section class="mb-4">
         <div class="tc-section-header mb-3">
@@ -30,30 +27,45 @@ else if (_torrent is not null)
                 <p class="text-muted mb-0 tc-break">Torrent id: @_torrent.TorrentId</p>
             </div>
             <div class="tc-toolbar">
-                <button class="btn btn-secondary" type="button" @onclick="RefreshAsync" disabled="@_isBusy">Refresh</button>
+                <button class="btn btn-secondary" type="button" @onclick="RefreshAsync" disabled="@_isBusy">Refresh
+                </button>
                 @if (_torrent.CanPause)
                 {
-                    <button class="btn btn-outline-secondary" type="button" @onclick="PauseAsync" disabled="@_isBusy">Pause</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="PauseAsync" disabled="@_isBusy">
+                        Pause
+                    </button>
                 }
                 @if (_torrent.CanResume)
                 {
-                    <button class="btn btn-outline-secondary" type="button" @onclick="ResumeAsync" disabled="@_isBusy">Resume</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ResumeAsync" disabled="@_isBusy">
+                        Resume
+                    </button>
                 }
                 @if (_torrent.CanRefreshMetadata)
                 {
-                    <button class="btn btn-outline-secondary" type="button" @onclick="RefreshMetadataAsync" disabled="@_isBusy">Refresh Metadata</button>
-                    <button class="btn btn-outline-secondary" type="button" @onclick="ResetMetadataSessionAsync" disabled="@_isBusy">Reset Metadata</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="RefreshMetadataAsync" disabled="@_isBusy">
+                        Refresh Metadata
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ResetMetadataSessionAsync" disabled="@_isBusy">
+                        Reset Metadata
+                    </button>
                 }
                 @if (_torrent.CanRetryCompletionCallback)
                 {
-                    <button class="btn btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">Retry Callback</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">
+                        Retry Callback
+                    </button>
                 }
                 @if (_torrent.CanRemove)
                 {
-                    <button class="btn btn-outline-danger" type="button" @onclick="RemoveAsync" disabled="@_isBusy">Remove</button>
+                    <button class="btn btn-outline-danger" type="button" @onclick="RemoveAsync" disabled="@_isBusy">
+                        Remove
+                    </button>
                     @if (CanDeleteData(_torrent))
                     {
-                        <button class="btn btn-danger" type="button" @onclick="DeleteDataAsync" disabled="@_isBusy">Delete Data</button>
+                        <button class="btn btn-danger" type="button" @onclick="DeleteDataAsync" disabled="@_isBusy">
+                            Delete Data
+                        </button>
                     }
                 }
             </div>
@@ -72,9 +84,11 @@ else if (_torrent is not null)
                     <div class="card-body">
                         <h3 class="h6 card-title">Runtime</h3>
                         <p class="mb-1"><strong>Status:</strong> @_torrent.State</p>
-                        <p class="mb-1"><strong>Wait:</strong> @FormatWaitReason(_torrent.WaitReason, _torrent.QueuePosition)</p>
+                        <p class="mb-1">
+                            <strong>Wait:</strong> @FormatWaitReason(_torrent.WaitReason, _torrent.QueuePosition)</p>
                         <p class="mb-1"><strong>Progress:</strong> @_torrent.ProgressPercent.ToString("0.0")%</p>
-                        <p class="mb-1"><strong>Download Rate:</strong> @FormatRate(_torrent.DownloadRateBytesPerSecond)</p>
+                        <p class="mb-1"><strong>Download Rate:</strong> @FormatRate(_torrent.DownloadRateBytesPerSecond)
+                        </p>
                         <p class="mb-1"><strong>Upload Rate:</strong> @FormatRate(_torrent.UploadRateBytesPerSecond)</p>
                         <p class="mb-1"><strong>Peers:</strong> @_torrent.ConnectedPeerCount</p>
                         <p class="mb-0"><strong>Trackers:</strong> @_torrent.TrackerCount</p>
@@ -89,7 +103,9 @@ else if (_torrent is not null)
                         <p class="mb-1"><strong>Downloaded:</strong> @FormatBytes(_torrent.DownloadedBytes)</p>
                         <p class="mb-1"><strong>Total Size:</strong> @FormatOptionalBytes(_torrent.TotalBytes)</p>
                         <p class="mb-1"><strong>Magnet Resolved:</strong> @(_torrent.TotalBytes is not null)</p>
-                        <p class="mb-0"><strong>Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.ErrorMessage) ? "None" : _torrent.ErrorMessage)</p>
+                        <p class="mb-0">
+                            <strong>Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.ErrorMessage) ? "None" : _torrent.ErrorMessage)
+                        </p>
                     </div>
                 </div>
             </div>
@@ -98,8 +114,11 @@ else if (_torrent is not null)
                 <div class="card h-100">
                     <div class="card-body">
                         <h3 class="h6 card-title">Identity</h3>
-                        <p class="mb-1"><strong>Info Hash:</strong> <span class="tc-break">@(_torrent.InfoHash ?? "Pending metadata")</span></p>
-                        <p class="mb-1"><strong>Added:</strong> @_torrent.AddedAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)</p>
+                        <p class="mb-1"><strong>Info Hash:</strong>
+                            <span class="tc-break">@(_torrent.InfoHash ?? "Pending metadata")</span></p>
+                        <p class="mb-1">
+                            <strong>Added:</strong> @_torrent.AddedAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                        </p>
                         <p class="mb-1"><strong>Completed:</strong> @FormatLocalTime(_torrent.CompletedAtUtc)</p>
                         <p class="mb-1"><strong>Last Activity:</strong> @FormatLocalTime(_torrent.LastActivityAtUtc)</p>
                         <p class="mb-0"><strong>Save Path:</strong> <span class="tc-break">@_torrent.SavePath</span></p>
@@ -127,25 +146,43 @@ else if (_torrent is not null)
                             <h3 class="h6 card-title mb-0">Completion Callback</h3>
                             @if (_torrent.CanRetryCompletionCallback)
                             {
-                                <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">Retry</button>
+                                <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="RetryCompletionCallbackAsync" disabled="@_isBusy">
+                                    Retry
+                                </button>
                             }
                         </div>
-                        <p class="mb-1"><strong>Status:</strong> @FormatCompletionCallbackState(_torrent.CompletionCallbackState, _torrent.CompletedAtUtc)</p>
-                        <p class="mb-1"><strong>Pending Since:</strong> @FormatLocalTime(_torrent.CompletionCallbackPendingSinceUtc)</p>
-                        <p class="mb-1"><strong>Invoked:</strong> @FormatLocalTime(_torrent.CompletionCallbackInvokedAtUtc)</p>
-                        <p class="mb-1"><strong>Final Payload:</strong> <span class="tc-break">@(_torrent.CompletionCallbackFinalPayloadPath ?? "Not available")</span></p>
-                        <p class="mb-1"><strong>Pending Reason:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackPendingReason) ? "None" : _torrent.CompletionCallbackPendingReason)</p>
-                        <p class="mb-1"><strong>Last Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackLastError) ? "None" : _torrent.CompletionCallbackLastError)</p>
-                        <hr />
+                        <p class="mb-1">
+                            <strong>Status:</strong> @FormatCompletionCallbackState(_torrent.CompletionCallbackState, _torrent.CompletedAtUtc)
+                        </p>
+                        <p class="mb-1"><strong>Pending
+                                Since:</strong> @FormatLocalTime(_torrent.CompletionCallbackPendingSinceUtc)</p>
+                        <p class="mb-1">
+                            <strong>Invoked:</strong> @FormatLocalTime(_torrent.CompletionCallbackInvokedAtUtc)</p>
+                        <p class="mb-1"><strong>Final Payload:</strong>
+                            <span class="tc-break">@(_torrent.CompletionCallbackFinalPayloadPath ?? "Not available")</span>
+                        </p>
+                        <p class="mb-1"><strong>Pending
+                                Reason:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackPendingReason) ? "None" : _torrent.CompletionCallbackPendingReason)
+                        </p>
+                        <p class="mb-1"><strong>Last
+                                Error:</strong> @(string.IsNullOrWhiteSpace(_torrent.CompletionCallbackLastError) ? "None" : _torrent.CompletionCallbackLastError)
+                        </p>
+                        <hr/>
                         <p class="mb-1"><strong>Last Event:</strong> @FormatCallbackEvent(_latestCallbackLog)</p>
-                        <p class="mb-1"><strong>Last Event Time:</strong> @FormatCallbackEventTime(_latestCallbackLog)</p>
+                        <p class="mb-1"><strong>Last Event Time:</strong> @FormatCallbackEventTime(_latestCallbackLog)
+                        </p>
                         <p class="mb-1"><strong>Last Message:</strong> @(_latestCallbackLog?.Message ?? "Not yet")</p>
-                        <p class="mb-1"><strong>Process Id:</strong> @FormatNullableInt(_latestCallbackLog?.ProcessId)</p>
+                        <p class="mb-1"><strong>Process Id:</strong> @FormatNullableInt(_latestCallbackLog?.ProcessId)
+                        </p>
                         <p class="mb-1"><strong>Exit Code:</strong> @FormatNullableInt(_latestCallbackLog?.ExitCode)</p>
-                        <p class="mb-1"><strong>Command:</strong> <span class="tc-break">@(_latestCallbackLog?.CommandPath ?? "Not yet")</span></p>
-                        <p class="mb-1"><strong>Working Directory:</strong> <span class="tc-break">@(_latestCallbackLog?.WorkingDirectory ?? "Not yet")</span></p>
-                        <p class="mb-1"><strong>Process Timeout:</strong> @FormatTimeoutSeconds(_latestCallbackLog?.ProcessTimeoutSeconds)</p>
-                        <p class="mb-0"><strong>Finalization Wait:</strong> @FormatTimeoutSeconds(_latestCallbackLog?.FinalizationTimeoutSeconds)</p>
+                        <p class="mb-1"><strong>Command:</strong>
+                            <span class="tc-break">@(_latestCallbackLog?.CommandPath ?? "Not yet")</span></p>
+                        <p class="mb-1"><strong>Working Directory:</strong>
+                            <span class="tc-break">@(_latestCallbackLog?.WorkingDirectory ?? "Not yet")</span></p>
+                        <p class="mb-1"><strong>Process
+                                Timeout:</strong> @FormatTimeoutSeconds(_latestCallbackLog?.ProcessTimeoutSeconds)</p>
+                        <p class="mb-0"><strong>Finalization
+                                Wait:</strong> @FormatTimeoutSeconds(_latestCallbackLog?.FinalizationTimeoutSeconds)</p>
                     </div>
                 </div>
             </div>
@@ -161,8 +198,7 @@ else if (_torrent is not null)
         @if (_logs.Count == 0)
         {
             <p>No recent log entries for this torrent.</p>
-        }
-        else
+        } else
         {
             <div class="tc-table-wrap d-none d-md-block">
                 <table class="table table-sm align-middle">
@@ -234,23 +270,22 @@ else if (_torrent is not null)
 @code {
     [Parameter]
     public Guid TorrentId { get; set; }
-
-    private TorrentDetailDto? _torrent;
-    private IReadOnlyList<ActivityLogEntryDto> _logs = Array.Empty<ActivityLogEntryDto>();
-    private CallbackLogSummary? _latestCallbackLog;
-    private string? _error;
-    private string? _message;
-    private bool _isLoading = true;
-    private bool _isBusy;
-    private readonly SemaphoreSlim _loadGate = new(1, 1);
-    private CancellationTokenSource? _refreshLoopCts;
-    private Task? _refreshLoopTask;
-    private bool _isDisposed;
+    private          TorrentDetailDto?                  _torrent;
+    private          IReadOnlyList<ActivityLogEntryDto> _logs = Array.Empty<ActivityLogEntryDto>();
+    private          CallbackLogSummary?                _latestCallbackLog;
+    private          string?                            _error;
+    private          string?                            _message;
+    private          bool                               _isLoading = true;
+    private          bool                               _isBusy;
+    private readonly SemaphoreSlim                      _loadGate = new(1, 1);
+    private          CancellationTokenSource?           _refreshLoopCts;
+    private          Task?                              _refreshLoopTask;
+    private          bool                               _isDisposed;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
-        _refreshLoopCts = new CancellationTokenSource();
+        _refreshLoopCts  = new CancellationTokenSource();
         _refreshLoopTask = RunRefreshLoopAsync(_refreshLoopCts.Token);
     }
 
@@ -270,20 +305,18 @@ else if (_torrent is not null)
                 return;
             }
 
-            _error = null;
+            _error   = null;
             _torrent = await TorrentCoreClient.GetTorrentAsync(TorrentId);
 
             if (_torrent is null)
             {
-                _error = $"Torrent '{TorrentId}' was not found.";
-                _logs = Array.Empty<ActivityLogEntryDto>();
+                _error             = $"Torrent '{TorrentId}' was not found.";
+                _logs              = Array.Empty<ActivityLogEntryDto>();
                 _latestCallbackLog = null;
                 return;
             }
 
-            _logs = await TorrentCoreClient.GetRecentLogsAsync(
-                take: 20,
-                torrentId: TorrentId);
+            _logs              = await TorrentCoreClient.GetRecentLogsAsync(20, torrentId: TorrentId);
             _latestCallbackLog = GetLatestCallbackLog(_logs);
         }
         catch (TorrentCoreClientException exception)
@@ -301,10 +334,7 @@ else if (_torrent is not null)
         }
     }
 
-    private async Task RefreshAsync()
-    {
-        await LoadAsync();
-    }
+    private async Task RefreshAsync() { await LoadAsync(); }
 
     private async Task PauseAsync()
     {
@@ -314,10 +344,11 @@ else if (_torrent is not null)
         }
 
         await RunActionAsync(async () =>
-        {
-            var result = await TorrentCoreClient.PauseAsync(_torrent.TorrentId);
-            _message = $"Paused at {result.ProcessedAtUtc.ToLocalTime():g}.";
-        });
+            {
+                var result = await TorrentCoreClient.PauseAsync(_torrent.TorrentId);
+                _message = $"Paused at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     private async Task ResumeAsync()
@@ -328,10 +359,11 @@ else if (_torrent is not null)
         }
 
         await RunActionAsync(async () =>
-        {
-            var result = await TorrentCoreClient.ResumeAsync(_torrent.TorrentId);
-            _message = $"Resumed at {result.ProcessedAtUtc.ToLocalTime():g}.";
-        });
+            {
+                var result = await TorrentCoreClient.ResumeAsync(_torrent.TorrentId);
+                _message = $"Resumed at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     private async Task RefreshMetadataAsync()
@@ -342,10 +374,11 @@ else if (_torrent is not null)
         }
 
         await RunActionAsync(async () =>
-        {
-            var result = await TorrentCoreClient.RefreshMetadataAsync(_torrent.TorrentId);
-            _message = $"Requested metadata refresh at {result.ProcessedAtUtc.ToLocalTime():g}.";
-        });
+            {
+                var result = await TorrentCoreClient.RefreshMetadataAsync(_torrent.TorrentId);
+                _message = $"Requested metadata refresh at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     private async Task ResetMetadataSessionAsync()
@@ -356,10 +389,11 @@ else if (_torrent is not null)
         }
 
         await RunActionAsync(async () =>
-        {
-            var result = await TorrentCoreClient.ResetMetadataSessionAsync(_torrent.TorrentId);
-            _message = $"Recreated metadata session at {result.ProcessedAtUtc.ToLocalTime():g}.";
-        });
+            {
+                var result = await TorrentCoreClient.ResetMetadataSessionAsync(_torrent.TorrentId);
+                _message = $"Recreated metadata session at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     private async Task RetryCompletionCallbackAsync()
@@ -370,10 +404,11 @@ else if (_torrent is not null)
         }
 
         await RunActionAsync(async () =>
-        {
-            var result = await TorrentCoreClient.RetryCompletionCallbackAsync(_torrent.TorrentId);
-            _message = $"Queued completion callback retry at {result.ProcessedAtUtc.ToLocalTime():g}.";
-        });
+            {
+                var result = await TorrentCoreClient.RetryCompletionCallbackAsync(_torrent.TorrentId);
+                _message = $"Queued completion callback retry at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     private async Task RemoveAsync()
@@ -386,14 +421,16 @@ else if (_torrent is not null)
         await RunActionAsync(
             async () =>
             {
-                await TorrentCoreClient.RemoveAsync(_torrent.TorrentId, new RemoveTorrentRequest
-                {
-                    DeleteData = false,
-                });
+                await TorrentCoreClient.RemoveAsync(
+                    _torrent.TorrentId, new RemoveTorrentRequest
+                    {
+                        DeleteData = false,
+                    }
+                );
 
                 NavigationManager.NavigateTo("/torrents");
-            },
-            reloadAfter: false);
+            }, false
+        );
     }
 
     private async Task DeleteDataAsync()
@@ -406,14 +443,16 @@ else if (_torrent is not null)
         await RunActionAsync(
             async () =>
             {
-                await TorrentCoreClient.RemoveAsync(_torrent.TorrentId, new RemoveTorrentRequest
-                {
-                    DeleteData = true,
-                });
+                await TorrentCoreClient.RemoveAsync(
+                    _torrent.TorrentId, new RemoveTorrentRequest
+                    {
+                        DeleteData = true,
+                    }
+                );
 
                 NavigationManager.NavigateTo("/torrents");
-            },
-            reloadAfter: false);
+            }, false
+        );
     }
 
     private async Task RunActionAsync(Func<Task> action, bool reloadAfter = true)
@@ -423,9 +462,9 @@ else if (_torrent is not null)
             return;
         }
 
-        _isBusy = true;
+        _isBusy  = true;
         _message = null;
-        _error = null;
+        _error   = null;
 
         try
         {
@@ -461,144 +500,86 @@ else if (_torrent is not null)
             }
 
             await InvokeAsync(async () =>
-            {
-                if (_isDisposed)
                 {
-                    return;
-                }
+                    if (_isDisposed)
+                    {
+                        return;
+                    }
 
-                await LoadAsync();
-                StateHasChanged();
-            });
+                    await LoadAsync();
+                    StateHasChanged();
+                }
+            );
         }
     }
 
-    private static string FormatRate(long bytesPerSecond) =>
-        $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
-
-    private static string FormatBytes(long bytes) =>
-        $"{bytes / 1_000_000.0:0.00} MB";
-
-    private static string FormatOptionalBytes(long? bytes) =>
-        bytes is null ? "Unknown" : FormatBytes(bytes.Value);
-
-    private static string FormatLocalTime(DateTimeOffset? value) =>
-        value?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "Not yet";
-
-    private static string FormatCompletionCallbackState(string? state, DateTimeOffset? completedAtUtc) =>
-        !string.IsNullOrWhiteSpace(state)
-            ? state
-            : completedAtUtc is null
-                ? "Waiting for completion"
-                : "Not requested";
-
-    private static string FormatCallbackEvent(CallbackLogSummary? callbackLog) =>
-        callbackLog is null
-            ? "Not yet"
-            : FormatCallbackEventName(callbackLog.EventType);
-
-    private static string FormatCallbackEventTime(CallbackLogSummary? callbackLog) =>
-        callbackLog is null
-            ? "Not yet"
-            : callbackLog.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
-
-    private static string FormatNullableInt(int? value) =>
-        value?.ToString(CultureInfo.CurrentCulture) ?? "Not available";
-
-    private static string FormatTimeoutSeconds(int? value) =>
-        value is null ? "Not available" : $"{value.Value.ToString(CultureInfo.CurrentCulture)} seconds";
+    private static string FormatRate(long                             bytesPerSecond)                        { return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s"; }
+    private static string FormatBytes(long                            bytes)                                 { return $"{bytes          / 1_000_000.0:0.00} MB"; }
+    private static string FormatOptionalBytes(long?                   bytes)                                 { return bytes is null ? "Unknown" : FormatBytes(bytes.Value); }
+    private static string FormatLocalTime(DateTimeOffset?             value)                                 { return value?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "Not yet"; }
+    private static string FormatCompletionCallbackState(string?       state, DateTimeOffset? completedAtUtc) { return !string.IsNullOrWhiteSpace(state) ? state : completedAtUtc is null ? "Waiting for completion" : "Not requested"; }
+    private static string FormatCallbackEvent(CallbackLogSummary?     callbackLog) { return callbackLog is null ? "Not yet" : FormatCallbackEventName(callbackLog.EventType); }
+    private static string FormatCallbackEventTime(CallbackLogSummary? callbackLog) { return callbackLog is null ? "Not yet" : callbackLog.OccurredAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture); }
+    private static string FormatNullableInt(int?                      value)       { return value?.ToString(CultureInfo.CurrentCulture) ?? "Not available"; }
+    private static string FormatTimeoutSeconds(int?                   value)       { return value is null ? "Not available" : $"{value.Value.ToString(CultureInfo.CurrentCulture)} seconds"; }
 
     private static string FormatCallbackEventName(string eventType)
     {
-        const string prefix = "torrent.callback.";
-        var normalized = eventType.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
-            ? eventType[prefix.Length..]
-            : eventType;
-        var parts = normalized.Split('_', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length == 0
-            ? eventType
-            : string.Join(' ', parts.Select(static part => char.ToUpperInvariant(part[0]) + part[1..]));
+        const string prefix     = "torrent.callback.";
+        var          normalized = eventType.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? eventType[prefix.Length..] : eventType;
+        var          parts      = normalized.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? eventType : string.Join(' ', parts.Select(static part => char.ToUpperInvariant(part[0]) + part[1..]));
     }
 
     private static CallbackLogSummary? GetLatestCallbackLog(IReadOnlyList<ActivityLogEntryDto> logs)
     {
-        var callbackLog = logs
-            .Where(log => log.EventType.StartsWith("torrent.callback.", StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(log => log.OccurredAtUtc)
-            .FirstOrDefault();
+        var callbackLog = logs.Where(log => log.EventType.StartsWith("torrent.callback.", StringComparison.OrdinalIgnoreCase)).OrderByDescending(log => log.OccurredAtUtc).FirstOrDefault();
 
         if (callbackLog is null)
         {
             return null;
         }
 
-        string? commandPath = null;
-        string? workingDirectory = null;
-        int? processId = null;
-        int? exitCode = null;
-        int? processTimeoutSeconds = null;
-        int? finalizationTimeoutSeconds = null;
+        string? commandPath                = null;
+        string? workingDirectory           = null;
+        int?    processId                  = null;
+        int?    exitCode                   = null;
+        int?    processTimeoutSeconds      = null;
+        int?    finalizationTimeoutSeconds = null;
 
         if (!string.IsNullOrWhiteSpace(callbackLog.DetailsJson))
         {
             try
             {
                 using var document = JsonDocument.Parse(callbackLog.DetailsJson);
-                var root = document.RootElement;
-                commandPath = GetOptionalString(root, "CommandPath");
-                workingDirectory = GetOptionalString(root, "WorkingDirectory");
-                processId = GetOptionalInt32(root, "ProcessId");
-                exitCode = GetOptionalInt32(root, "ExitCode");
-                processTimeoutSeconds = GetOptionalInt32(root, "CompletionCallbackTimeoutSeconds");
+                var       root     = document.RootElement;
+                commandPath                = GetOptionalString(root, "CommandPath");
+                workingDirectory           = GetOptionalString(root, "WorkingDirectory");
+                processId                  = GetOptionalInt32(root, "ProcessId");
+                exitCode                   = GetOptionalInt32(root, "ExitCode");
+                processTimeoutSeconds      = GetOptionalInt32(root, "CompletionCallbackTimeoutSeconds");
                 finalizationTimeoutSeconds = GetOptionalInt32(root, "CompletionCallbackFinalizationTimeoutSeconds");
             }
-            catch (JsonException)
-            {
-            }
+            catch (JsonException) { }
         }
 
         return new CallbackLogSummary(
-            callbackLog.EventType,
-            callbackLog.OccurredAtUtc,
-            callbackLog.Message,
-            commandPath,
-            workingDirectory,
-            processId,
-            exitCode,
-            processTimeoutSeconds,
-            finalizationTimeoutSeconds);
+            callbackLog.EventType, callbackLog.OccurredAtUtc, callbackLog.Message, commandPath, workingDirectory,
+            processId, exitCode, processTimeoutSeconds, finalizationTimeoutSeconds
+        );
     }
 
-    private static string? GetOptionalString(JsonElement root, string propertyName) =>
-        root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
-            ? value.GetString()
-            : null;
-
-    private static int? GetOptionalInt32(JsonElement root, string propertyName) =>
-        root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number)
-            ? number
-            : null;
+    private static string? GetOptionalString(JsonElement root, string propertyName) { return root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null; }
+    private static int?    GetOptionalInt32(JsonElement  root, string propertyName) { return root.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) ? number : null; }
 
     private static string FormatWaitReason(TorrentWaitReason? waitReason, int? queuePosition)
     {
-        var text = waitReason switch
-        {
-            TorrentWaitReason.PendingMetadataDispatch => "Pending metadata dispatch",
-            TorrentWaitReason.WaitingForMetadataSlot => "Waiting for metadata slot",
-            TorrentWaitReason.PendingDownloadDispatch => "Pending download dispatch",
-            TorrentWaitReason.WaitingForDownloadSlot => "Waiting for download slot",
-            TorrentWaitReason.PausedByOperator => "Paused by operator",
-            TorrentWaitReason.BlockedByError => "Blocked by error",
-            _ => "Not waiting",
-        };
+        var text = waitReason switch {TorrentWaitReason.PendingMetadataDispatch => "Pending metadata dispatch", TorrentWaitReason.WaitingForMetadataSlot => "Waiting for metadata slot", TorrentWaitReason.PendingDownloadDispatch => "Pending download dispatch", TorrentWaitReason.WaitingForDownloadSlot => "Waiting for download slot", TorrentWaitReason.PausedByOperator => "Paused by operator", TorrentWaitReason.BlockedByError => "Blocked by error", _ => "Not waiting"};
 
-        return queuePosition is null || waitReason is null
-            ? text
-            : $"{text} (#{queuePosition.Value})";
+        return queuePosition is null || waitReason is null ? text : $"{text} (#{queuePosition.Value})";
     }
 
-    private static bool CanDeleteData(TorrentDetailDto torrent) =>
-        torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or TorrentState.Error or TorrentState.Paused;
+    private static bool CanDeleteData(TorrentDetailDto torrent) { return torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or TorrentState.Error or TorrentState.Paused; }
 
     public async ValueTask DisposeAsync()
     {
@@ -616,20 +597,10 @@ else if (_torrent is not null)
             {
                 await _refreshLoopTask;
             }
-            catch (OperationCanceledException)
-            {
-            }
+            catch (OperationCanceledException) { }
         }
     }
 
-    private sealed record CallbackLogSummary(
-        string EventType,
-        DateTimeOffset OccurredAtUtc,
-        string Message,
-        string? CommandPath,
-        string? WorkingDirectory,
-        int? ProcessId,
-        int? ExitCode,
-        int? ProcessTimeoutSeconds,
-        int? FinalizationTimeoutSeconds);
+    private sealed record CallbackLogSummary(string EventType, DateTimeOffset OccurredAtUtc, string Message,               string? CommandPath, string? WorkingDirectory,
+        int?                                        ProcessId, int?           ExitCode,      int?   ProcessTimeoutSeconds, int?    FinalizationTimeoutSeconds);
 }

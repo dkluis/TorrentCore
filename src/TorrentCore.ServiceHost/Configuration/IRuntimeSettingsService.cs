@@ -1,4 +1,8 @@
+#region
+
 using TorrentCore.Contracts.Host;
+
+#endregion
 
 namespace TorrentCore.Service.Configuration;
 

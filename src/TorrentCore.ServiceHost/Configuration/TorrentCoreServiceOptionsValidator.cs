@@ -1,8 +1,13 @@
+#region
+
 using Microsoft.Extensions.Options;
+
+#endregion
 
 namespace TorrentCore.Service.Configuration;
 
-public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvironment) : IValidateOptions<TorrentCoreServiceOptions>
+public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvironment)
+        : IValidateOptions<TorrentCoreServiceOptions>
 {
     public ValidateOptionsResult Validate(string? name, TorrentCoreServiceOptions options)
     {
@@ -55,12 +60,16 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
 
         if (options.EngineConnectionFailureLogBurstLimit < 1)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogBurstLimit must be 1 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogBurstLimit must be 1 or greater."
+            );
         }
 
         if (options.EngineConnectionFailureLogWindowSeconds < 1)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds must be 1 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds must be 1 or greater."
+            );
         }
 
         if (options.EngineMaximumConnections < 1)
@@ -70,17 +79,23 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
 
         if (options.EngineMaximumHalfOpenConnections < 1)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumHalfOpenConnections must be 1 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:EngineMaximumHalfOpenConnections must be 1 or greater."
+            );
         }
 
         if (options.EngineMaximumDownloadRateBytesPerSecond < 0)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumDownloadRateBytesPerSecond must be 0 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:EngineMaximumDownloadRateBytesPerSecond must be 0 or greater."
+            );
         }
 
         if (options.EngineMaximumUploadRateBytesPerSecond < 0)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:EngineMaximumUploadRateBytesPerSecond must be 0 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:EngineMaximumUploadRateBytesPerSecond must be 0 or greater."
+            );
         }
 
         if (options.SeedingStopRatio <= 0)
@@ -95,7 +110,9 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
 
         if (options.CompletedTorrentCleanupMinutes < 0)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletedTorrentCleanupMinutes must be 0 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:CompletedTorrentCleanupMinutes must be 0 or greater."
+            );
         }
 
         if (options.MaxActiveMetadataResolutions < 1)
@@ -115,37 +132,51 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
 
         if (options.MetadataRefreshRestartDelaySeconds < 1)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MetadataRefreshRestartDelaySeconds must be 1 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:MetadataRefreshRestartDelaySeconds must be 1 or greater."
+            );
         }
 
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackTimeoutSeconds must be 1 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackTimeoutSeconds must be 1 or greater."
+            );
         }
 
         if (options.CompletionCallbackFinalizationTimeoutSeconds < 1)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackFinalizationTimeoutSeconds must be 1 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackFinalizationTimeoutSeconds must be 1 or greater."
+            );
         }
 
         if (options.CompletionCallbackEnabled && string.IsNullOrWhiteSpace(options.CompletionCallbackCommandPath))
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackCommandPath is required when CompletionCallbackEnabled is true.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:CompletionCallbackCommandPath is required when CompletionCallbackEnabled is true."
+            );
         }
 
         if (options.RuntimeTickIntervalMilliseconds < 50)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:RuntimeTickIntervalMilliseconds must be 50 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:RuntimeTickIntervalMilliseconds must be 50 or greater."
+            );
         }
 
         if (options.MetadataResolutionDelayMilliseconds < 0)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionDelayMilliseconds must be 0 or greater.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionDelayMilliseconds must be 0 or greater."
+            );
         }
 
         if (options.DownloadProgressPercentPerTick <= 0 || options.DownloadProgressPercentPerTick > 100)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName}:DownloadProgressPercentPerTick must be greater than 0 and less than or equal to 100.");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:DownloadProgressPercentPerTick must be greater than 0 and less than or equal to 100."
+            );
         }
 
         try
@@ -153,20 +184,23 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             var resolvedPaths = TorrentCoreServicePathResolver.Resolve(hostEnvironment.ContentRootPath, options);
 
             if (string.Equals(
-                    resolvedPaths.DownloadRootPath,
-                    resolvedPaths.StorageRootPath,
-                    StringComparison.OrdinalIgnoreCase))
+                        resolvedPaths.DownloadRootPath, resolvedPaths.StorageRootPath,
+                        StringComparison.OrdinalIgnoreCase
+                    ))
             {
-                failures.Add($"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath and {TorrentCoreServiceOptions.SectionName}:StorageRootPath must resolve to different directories.");
+                failures.Add(
+                    $"{TorrentCoreServiceOptions.SectionName}:DownloadRootPath and {TorrentCoreServiceOptions.SectionName}:StorageRootPath must resolve to different directories."
+                );
             }
         }
-        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or
+                PathTooLongException)
         {
-            failures.Add($"{TorrentCoreServiceOptions.SectionName} contains an invalid path value: {exception.Message}");
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName} contains an invalid path value: {exception.Message}"
+            );
         }
 
-        return failures.Count > 0
-            ? ValidateOptionsResult.Fail(failures)
-            : ValidateOptionsResult.Success;
+        return failures.Count > 0 ? ValidateOptionsResult.Fail(failures) : ValidateOptionsResult.Success;
     }
 }

@@ -1,6 +1,10 @@
+#region
+
 using Microsoft.AspNetCore.Mvc;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Service.Application;
+
+#endregion
 
 namespace TorrentCore.Service.Controllers;
 
@@ -28,8 +32,7 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
     [HttpPut("runtime-settings")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RuntimeSettingsDto))]
     public async Task<ActionResult<RuntimeSettingsDto>> UpdateRuntimeSettings(
-        [FromBody] UpdateRuntimeSettingsRequest request,
-        CancellationToken cancellationToken)
+        [FromBody] UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken)
     {
         var settings = await torrentApplicationService.UpdateRuntimeSettingsAsync(request, cancellationToken);
         return Ok(settings);

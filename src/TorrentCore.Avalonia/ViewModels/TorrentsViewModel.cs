@@ -1,3 +1,5 @@
+#region
+
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -7,100 +9,70 @@ using TorrentCore.Client;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Torrents;
 
+#endregion
+
 namespace TorrentCore.Avalonia.ViewModels;
 
-public partial class TorrentsViewModel(
-    TorrentCoreClient client,
-    Action<Guid> showTorrentDetail,
-    IClipboardTextService clipboardTextService) : ViewModelBase
+public partial class TorrentsViewModel(TorrentCoreClient client, Action<Guid> showTorrentDetail,
+    IClipboardTextService                                clipboardTextService) : ViewModelBase
 {
-    private const string AllCategoryFilterKey = "__all";
-    private const string UncategorizedCategoryFilterKey = "__uncategorized";
+    private const    string                         AllCategoryFilterKey = "__all";
+    private const    string                         UncategorizedCategoryFilterKey = "__uncategorized";
     private readonly List<TorrentListItemViewModel> _allTorrents = [];
-    private readonly Dictionary<string, string> _categoryDisplayNames = new(StringComparer.OrdinalIgnoreCase);
-
-    [ObservableProperty]
-    private string _magnetUri = string.Empty;
-
-    [ObservableProperty]
-    private TorrentCategoryOptionViewModel? _selectedAddCategory;
-
-    [ObservableProperty]
-    private string _nameFilter = string.Empty;
-
-    [ObservableProperty]
-    private string _selectedStatus = "All";
-
-    [ObservableProperty]
-    private TorrentCategoryOptionViewModel? _selectedCategoryFilter;
-
-    [ObservableProperty]
-    private string _selectedCallbackState = "All";
-
-    [ObservableProperty]
-    private string _selectedSort = "Added (Newest)";
-
-    [ObservableProperty]
-    private bool _isLoading;
-
-    [ObservableProperty]
-    private bool _isBusy;
-
-    [ObservableProperty]
-    private string? _errorMessage;
-
-    [ObservableProperty]
-    private string? _submitMessage;
-
+    private readonly Dictionary<string, string>     _categoryDisplayNames = new(StringComparer.OrdinalIgnoreCase);
     [ObservableProperty]
     private string? _actionMessage;
-
+    [ObservableProperty]
+    private string? _errorMessage;
+    [ObservableProperty]
+    private bool _isBusy;
+    [ObservableProperty]
+    private bool _isLoading;
+    [ObservableProperty]
+    private string _magnetUri = string.Empty;
+    [ObservableProperty]
+    private string _nameFilter = string.Empty;
+    [ObservableProperty]
+    private TorrentCategoryOptionViewModel? _selectedAddCategory;
+    [ObservableProperty]
+    private string _selectedCallbackState = "All";
+    [ObservableProperty]
+    private TorrentCategoryOptionViewModel? _selectedCategoryFilter;
+    [ObservableProperty]
+    private string _selectedSort = "Added (Newest)";
+    [ObservableProperty]
+    private string _selectedStatus = "All";
+    [ObservableProperty]
+    private string? _submitMessage;
     public ObservableCollection<TorrentListItemViewModel> VisibleTorrents { get; } = [];
     public ObservableCollection<TorrentCategoryOptionViewModel> AddCategoryOptions { get; } = [];
     public ObservableCollection<TorrentCategoryOptionViewModel> CategoryFilterOptions { get; } = [];
-    public ObservableCollection<string> StatusOptions { get; } = new(
-    [
-        "All",
-        ..Enum.GetNames<TorrentState>(),
-    ]);
+    public ObservableCollection<string> StatusOptions { get; } = new(["All", ..Enum.GetNames<TorrentState>()]);
     public ObservableCollection<string> CallbackStateOptions { get; } = new(
-    [
-        "All",
-        "PendingFinalization",
-        "Invoked",
-        "Failed",
-        "TimedOut",
-    ]);
+        [
+            "All", "PendingFinalization", "Invoked", "Failed", "TimedOut",
+        ]
+    );
     public ObservableCollection<string> SortOptions { get; } = new(
-    [
-        "Added (Newest)",
-        "Name",
-        "State",
-        "Progress (High to Low)",
-    ]);
-
-    public int SelectedTorrentCount => _allTorrents.Count(item => item.IsSelected);
-    public int TotalTorrentCount => _allTorrents.Count;
-    public int VisibleTorrentCount => VisibleTorrents.Count;
-    public bool HasVisibleTorrents => VisibleTorrentCount > 0;
-    public bool HasNoVisibleTorrents => !IsLoading && !HasVisibleTorrents;
-
-    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-
-    public bool HasActionMessage => !string.IsNullOrWhiteSpace(ActionMessage);
-
-    public bool HasSubmitMessage => !string.IsNullOrWhiteSpace(SubmitMessage);
-
-    public bool CanRunBulkActions => !IsLoading && !IsBusy && SelectedTorrentCount > 0;
-
-    partial void OnNameFilterChanged(string value) => RebuildVisibleTorrents();
-    partial void OnSelectedStatusChanged(string value) => RebuildVisibleTorrents();
-    partial void OnSelectedCategoryFilterChanged(TorrentCategoryOptionViewModel? value) => RebuildVisibleTorrents();
-    partial void OnSelectedCallbackStateChanged(string value) => RebuildVisibleTorrents();
-    partial void OnSelectedSortChanged(string value) => RebuildVisibleTorrents();
+        ["Added (Newest)", "Name", "State", "Progress (High to Low)"]
+    );
+    public  int  SelectedTorrentCount => _allTorrents.Count(item => item.IsSelected);
+    public  int  TotalTorrentCount => _allTorrents.Count;
+    public  int  VisibleTorrentCount => VisibleTorrents.Count;
+    public  bool HasVisibleTorrents => VisibleTorrentCount > 0;
+    public  bool HasNoVisibleTorrents => !IsLoading && !HasVisibleTorrents;
+    public  bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+    public  bool HasActionMessage => !string.IsNullOrWhiteSpace(ActionMessage);
+    public  bool HasSubmitMessage => !string.IsNullOrWhiteSpace(SubmitMessage);
+    public  bool CanRunBulkActions => !IsLoading && !IsBusy && SelectedTorrentCount > 0;
+    partial void OnNameFilterChanged(string                                      value) { RebuildVisibleTorrents(); }
+    partial void OnSelectedStatusChanged(string                                  value) { RebuildVisibleTorrents(); }
+    partial void OnSelectedCategoryFilterChanged(TorrentCategoryOptionViewModel? value) { RebuildVisibleTorrents(); }
+    partial void OnSelectedCallbackStateChanged(string                           value) { RebuildVisibleTorrents(); }
+    partial void OnSelectedSortChanged(string                                    value) { RebuildVisibleTorrents(); }
 
     [RelayCommand]
-    public async Task RefreshAsync() => await LoadAsync();
+    public async Task RefreshAsync() { await LoadAsync(); }
 
     [RelayCommand]
     public async Task AddMagnetAsync()
@@ -110,20 +82,22 @@ public partial class TorrentsViewModel(
             return;
         }
 
-        IsBusy = true;
+        IsBusy        = true;
         SubmitMessage = null;
         ActionMessage = null;
-        ErrorMessage = null;
+        ErrorMessage  = null;
 
         try
         {
-            var detail = await client.AddMagnetAsync(new AddMagnetRequest
-            {
-                MagnetUri = MagnetUri.Trim(),
-                CategoryKey = string.IsNullOrWhiteSpace(SelectedAddCategory?.Key) ? null : SelectedAddCategory.Key,
-            });
-            SubmitMessage = $"Added torrent '{detail.Name}' in state '{detail.State}'.";
-            MagnetUri = string.Empty;
+            var detail = await client.AddMagnetAsync(
+                new AddMagnetRequest
+                {
+                    MagnetUri   = MagnetUri.Trim(),
+                    CategoryKey = string.IsNullOrWhiteSpace(SelectedAddCategory?.Key) ? null : SelectedAddCategory.Key,
+                }
+            );
+            SubmitMessage       = $"Added torrent '{detail.Name}' in state '{detail.State}'.";
+            MagnetUri           = string.Empty;
             SelectedAddCategory = ResolveDefaultAddCategory();
             await LoadAsync();
         }
@@ -152,7 +126,7 @@ public partial class TorrentsViewModel(
 
         SubmitMessage = null;
         ActionMessage = null;
-        ErrorMessage = null;
+        ErrorMessage  = null;
 
         try
         {
@@ -163,7 +137,7 @@ public partial class TorrentsViewModel(
                 return;
             }
 
-            MagnetUri = clipboardText.Trim();
+            MagnetUri     = clipboardText.Trim();
             SubmitMessage = "Pasted magnet text from the clipboard.";
         }
         catch (Exception exception)
@@ -179,28 +153,22 @@ public partial class TorrentsViewModel(
     [RelayCommand]
     public async Task PauseSelectedAsync()
     {
-        await RunBulkActionAsync(
-            "Pause selected",
-            item => item.CanPause,
-            item => client.PauseAsync(item.TorrentId));
+        await RunBulkActionAsync("Pause selected", item => item.CanPause, item => client.PauseAsync(item.TorrentId));
     }
 
     [RelayCommand]
     public async Task ResumeSelectedAsync()
     {
-        await RunBulkActionAsync(
-            "Resume selected",
-            item => item.CanResume,
-            item => client.ResumeAsync(item.TorrentId));
+        await RunBulkActionAsync("Resume selected", item => item.CanResume, item => client.ResumeAsync(item.TorrentId));
     }
 
     [RelayCommand]
     public async Task RemoveSelectedAsync()
     {
         await RunBulkActionAsync(
-            "Remove selected",
-            item => item.CanRemove,
-            item => client.RemoveAsync(item.TorrentId, new RemoveTorrentRequest { DeleteData = false }));
+            "Remove selected", item => item.CanRemove,
+            item => client.RemoveAsync(item.TorrentId, new RemoveTorrentRequest {DeleteData = false})
+        );
     }
 
     [RelayCommand]
@@ -234,12 +202,12 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
                 var result = await client.PauseAsync(torrent.TorrentId);
                 ActionMessage = $"Paused '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
-            });
+            }
+        );
     }
 
     [RelayCommand]
@@ -251,12 +219,12 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
                 var result = await client.ResumeAsync(torrent.TorrentId);
                 ActionMessage = $"Resumed '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
-            });
+            }
+        );
     }
 
     [RelayCommand]
@@ -268,12 +236,13 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
                 var result = await client.RefreshMetadataAsync(torrent.TorrentId);
-                ActionMessage = $"Requested metadata refresh for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
-            });
+                ActionMessage =
+                        $"Requested metadata refresh for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     [RelayCommand]
@@ -285,12 +254,13 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
                 var result = await client.ResetMetadataSessionAsync(torrent.TorrentId);
-                ActionMessage = $"Recreated metadata session for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
-            });
+                ActionMessage =
+                        $"Recreated metadata session for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     [RelayCommand]
@@ -302,12 +272,12 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
-                await client.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest { DeleteData = false });
+                await client.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest {DeleteData = false});
                 ActionMessage = $"Removed '{torrent.Name}'.";
-            });
+            }
+        );
     }
 
     [RelayCommand]
@@ -319,12 +289,12 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
-                await client.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest { DeleteData = true });
+                await client.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest {DeleteData = true});
                 ActionMessage = $"Removed '{torrent.Name}' and deleted its data.";
-            });
+            }
+        );
     }
 
     [RelayCommand]
@@ -336,12 +306,13 @@ public partial class TorrentsViewModel(
         }
 
         await RunItemActionAsync(
-            torrent,
-            async () =>
+            torrent, async () =>
             {
                 var result = await client.RetryCompletionCallbackAsync(torrent.TorrentId);
-                ActionMessage = $"Queued completion callback retry for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
-            });
+                ActionMessage =
+                        $"Queued completion callback retry for '{torrent.Name}' at {result.ProcessedAtUtc.ToLocalTime():g}.";
+            }
+        );
     }
 
     [RelayCommand]
@@ -362,7 +333,7 @@ public partial class TorrentsViewModel(
             return;
         }
 
-        IsLoading = true;
+        IsLoading    = true;
         ErrorMessage = null;
 
         try
@@ -377,7 +348,7 @@ public partial class TorrentsViewModel(
 
             _allTorrents.Clear();
             var categoriesTask = client.GetCategoriesAsync();
-            var torrentsTask = client.GetTorrentsAsync();
+            var torrentsTask   = client.GetTorrentsAsync();
             await Task.WhenAll(categoriesTask, torrentsTask);
 
             ApplyCategoryOptions(categoriesTask.Result, selectedAddCategoryKey, selectedCategoryFilterKey);
@@ -386,16 +357,10 @@ public partial class TorrentsViewModel(
             foreach (var torrent in torrents.OrderByDescending(item => item.AddedAtUtc))
             {
                 var item = new TorrentListItemViewModel(
-                    torrent,
-                    OpenDetail,
-                    PauseAsync,
-                    ResumeAsync,
-                    RefreshMetadataAsync,
-                    ResetMetadataSessionAsync,
-                    RemoveAsync,
-                    DeleteDataAsync,
-                    RetryCompletionCallbackAsync,
-                    FormatCategory(torrent.CategoryKey))
+                    torrent, OpenDetail, PauseAsync, ResumeAsync, RefreshMetadataAsync,
+                    ResetMetadataSessionAsync, RemoveAsync, DeleteDataAsync, RetryCompletionCallbackAsync,
+                    FormatCategory(torrent.CategoryKey)
+                )
                 {
                     IsSelected = selectedIds.Contains(torrent.TorrentId),
                 };
@@ -418,9 +383,9 @@ public partial class TorrentsViewModel(
 
     private async Task RunItemActionAsync(TorrentListItemViewModel torrent, Func<Task> action)
     {
-        IsBusy = true;
-        ErrorMessage = null;
-        ActionMessage = null;
+        IsBusy         = true;
+        ErrorMessage   = null;
+        ActionMessage  = null;
         torrent.IsBusy = true;
 
         try
@@ -435,12 +400,13 @@ public partial class TorrentsViewModel(
         finally
         {
             torrent.IsBusy = false;
-            IsBusy = false;
+            IsBusy         = false;
             RaiseComputedState();
         }
     }
 
-    private async Task RunBulkActionAsync(string label, Func<TorrentListItemViewModel, bool> predicate, Func<TorrentListItemViewModel, Task> action)
+    private async Task RunBulkActionAsync(string label, Func<TorrentListItemViewModel, bool> predicate,
+        Func<TorrentListItemViewModel, Task>     action)
     {
         var selected = _allTorrents.Where(item => item.IsSelected && predicate(item)).ToArray();
         if (selected.Length == 0)
@@ -448,12 +414,12 @@ public partial class TorrentsViewModel(
             return;
         }
 
-        IsBusy = true;
-        ErrorMessage = null;
+        IsBusy        = true;
+        ErrorMessage  = null;
         ActionMessage = null;
 
         var succeeded = 0;
-        var failed = 0;
+        var failed    = 0;
 
         try
         {
@@ -492,19 +458,31 @@ public partial class TorrentsViewModel(
     private void RebuildVisibleTorrents()
     {
         var filtered = _allTorrents
-            .Where(item => string.IsNullOrWhiteSpace(NameFilter) || item.Name.Contains(NameFilter, StringComparison.OrdinalIgnoreCase))
-            .Where(item => string.Equals(SelectedStatus, "All", StringComparison.OrdinalIgnoreCase) ||
-                           string.Equals(item.State.ToString(), SelectedStatus, StringComparison.OrdinalIgnoreCase))
-            .Where(MatchesCategoryFilter)
-            .Where(item => string.Equals(SelectedCallbackState, "All", StringComparison.OrdinalIgnoreCase) ||
-                           string.Equals(item.CompletionCallbackState, SelectedCallbackState, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+                      .Where(item => string.IsNullOrWhiteSpace(NameFilter) || item.Name.Contains(
+                                   NameFilter, StringComparison.OrdinalIgnoreCase
+                               )
+                       )
+                      .Where(item => string.Equals(SelectedStatus,  "All", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(item.State.ToString(), SelectedStatus, StringComparison.OrdinalIgnoreCase)
+                       )
+                      .Where(MatchesCategoryFilter)
+                      .Where(item => string.Equals(SelectedCallbackState, "All", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(
+                                   item.CompletionCallbackState, SelectedCallbackState,
+                                   StringComparison.OrdinalIgnoreCase
+                               )
+                       )
+                      .ToArray();
 
         filtered = SelectedSort switch
         {
             "Name" => filtered.OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
-            "State" => filtered.OrderBy(item => item.State.ToString(), StringComparer.OrdinalIgnoreCase).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
-            "Progress (High to Low)" => filtered.OrderByDescending(item => item.ProgressPercent).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray(),
+            "State" => filtered.OrderBy(item => item.State.ToString(), StringComparer.OrdinalIgnoreCase)
+                               .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                               .ToArray(),
+            "Progress (High to Low)" => filtered.OrderByDescending(item => item.ProgressPercent)
+                                                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                                                .ToArray(),
             _ => filtered.OrderByDescending(item => item.AddedAtUtc).ToArray(),
         };
 
@@ -538,56 +516,64 @@ public partial class TorrentsViewModel(
         OnPropertyChanged(nameof(HasSubmitMessage));
     }
 
-    private void ApplyCategoryOptions(
-        IReadOnlyList<TorrentCategoryDto> categories,
-        string? selectedAddCategoryKey,
-        string? selectedCategoryFilterKey)
+    private void ApplyCategoryOptions(IReadOnlyList<TorrentCategoryDto> categories, string? selectedAddCategoryKey,
+        string?                                                         selectedCategoryFilterKey)
     {
         _categoryDisplayNames.Clear();
         AddCategoryOptions.Clear();
         CategoryFilterOptions.Clear();
 
-        AddCategoryOptions.Add(new TorrentCategoryOptionViewModel
-        {
-            Key = string.Empty,
-            DisplayName = "Uncategorized",
-        });
+        AddCategoryOptions.Add(
+            new TorrentCategoryOptionViewModel
+            {
+                Key         = string.Empty,
+                DisplayName = "Uncategorized",
+            }
+        );
 
-        CategoryFilterOptions.Add(new TorrentCategoryOptionViewModel
-        {
-            Key = AllCategoryFilterKey,
-            DisplayName = "All",
-        });
-        CategoryFilterOptions.Add(new TorrentCategoryOptionViewModel
-        {
-            Key = UncategorizedCategoryFilterKey,
-            DisplayName = "Uncategorized",
-        });
+        CategoryFilterOptions.Add(
+            new TorrentCategoryOptionViewModel
+            {
+                Key         = AllCategoryFilterKey,
+                DisplayName = "All",
+            }
+        );
+        CategoryFilterOptions.Add(
+            new TorrentCategoryOptionViewModel
+            {
+                Key         = UncategorizedCategoryFilterKey,
+                DisplayName = "Uncategorized",
+            }
+        );
 
-        foreach (var category in categories
-                     .OrderBy(item => item.SortOrder)
-                     .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase))
+        foreach (var category in categories.OrderBy(item => item.SortOrder)
+                                           .ThenBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase))
         {
             _categoryDisplayNames[category.Key] = category.DisplayName;
 
             if (category.Enabled)
             {
-                AddCategoryOptions.Add(new TorrentCategoryOptionViewModel
-                {
-                    Key = category.Key,
-                    DisplayName = category.DisplayName,
-                });
+                AddCategoryOptions.Add(
+                    new TorrentCategoryOptionViewModel
+                    {
+                        Key         = category.Key,
+                        DisplayName = category.DisplayName,
+                    }
+                );
             }
 
-            CategoryFilterOptions.Add(new TorrentCategoryOptionViewModel
-            {
-                Key = category.Key,
-                DisplayName = category.DisplayName,
-            });
+            CategoryFilterOptions.Add(
+                new TorrentCategoryOptionViewModel
+                {
+                    Key         = category.Key,
+                    DisplayName = category.DisplayName,
+                }
+            );
         }
 
         SelectedAddCategory = ResolveAddCategoryByKey(selectedAddCategoryKey) ?? ResolveDefaultAddCategory();
-        SelectedCategoryFilter = ResolveCategoryFilterByKey(selectedCategoryFilterKey) ?? CategoryFilterOptions.FirstOrDefault();
+        SelectedCategoryFilter = ResolveCategoryFilterByKey(selectedCategoryFilterKey) ??
+                CategoryFilterOptions.FirstOrDefault();
     }
 
     private bool MatchesCategoryFilter(TorrentListItemViewModel item)
@@ -606,9 +592,13 @@ public partial class TorrentsViewModel(
         return string.Equals(item.CategoryKey, selectedKey, StringComparison.OrdinalIgnoreCase);
     }
 
-    private TorrentCategoryOptionViewModel ResolveDefaultAddCategory() =>
-        AddCategoryOptions.FirstOrDefault(option => string.Equals(option.Key, "TV", StringComparison.OrdinalIgnoreCase))
-        ?? AddCategoryOptions.First();
+    private TorrentCategoryOptionViewModel ResolveDefaultAddCategory()
+    {
+        return AddCategoryOptions.FirstOrDefault(option => string.Equals(
+                    option.Key, "TV", StringComparison.OrdinalIgnoreCase
+                )
+        ) ?? AddCategoryOptions.First();
+    }
 
     private TorrentCategoryOptionViewModel? ResolveAddCategoryByKey(string? key)
     {
@@ -617,7 +607,10 @@ public partial class TorrentsViewModel(
             return null;
         }
 
-        return AddCategoryOptions.FirstOrDefault(option => string.Equals(option.Key, key, StringComparison.OrdinalIgnoreCase));
+        return AddCategoryOptions.FirstOrDefault(option => string.Equals(
+                    option.Key, key, StringComparison.OrdinalIgnoreCase
+                )
+        );
     }
 
     private TorrentCategoryOptionViewModel? ResolveCategoryFilterByKey(string? key)
@@ -627,7 +620,10 @@ public partial class TorrentsViewModel(
             return null;
         }
 
-        return CategoryFilterOptions.FirstOrDefault(option => string.Equals(option.Key, key, StringComparison.OrdinalIgnoreCase));
+        return CategoryFilterOptions.FirstOrDefault(option => string.Equals(
+                    option.Key, key, StringComparison.OrdinalIgnoreCase
+                )
+        );
     }
 
     private string FormatCategory(string? categoryKey)
@@ -637,8 +633,6 @@ public partial class TorrentsViewModel(
             return "Uncategorized";
         }
 
-        return _categoryDisplayNames.TryGetValue(categoryKey, out var displayName)
-            ? displayName
-            : categoryKey;
+        return _categoryDisplayNames.TryGetValue(categoryKey, out var displayName) ? displayName : categoryKey;
     }
 }

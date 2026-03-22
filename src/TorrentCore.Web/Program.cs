@@ -1,14 +1,18 @@
-using TorrentCore.Web.Components;
+#region
+
 using TorrentCore.Client;
+using TorrentCore.Web.Components;
 using TorrentCore.Web.Connection;
 
+#endregion
+
 var builder = WebApplication.CreateBuilder(args);
-var clientOptions = builder.Configuration.GetSection(TorrentCoreClientOptions.SectionName).Get<TorrentCoreClientOptions>() ??
-                    new TorrentCoreClientOptions();
+var clientOptions =
+        builder.Configuration.GetSection(TorrentCoreClientOptions.SectionName).Get<TorrentCoreClientOptions>() ??
+        new TorrentCoreClientOptions();
 var endpointProvider = new MutableTorrentCoreEndpointProvider(clientOptions.BaseUrl);
 
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddSingleton(clientOptions);
 builder.Services.AddSingleton(endpointProvider);
 builder.Services.AddSingleton<ITorrentCoreEndpointProvider>(endpointProvider);
@@ -20,14 +24,13 @@ var app = builder.Build();
 
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    app.UseExceptionHandler("/Error", true);
     app.UseHsts();
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseAntiforgery();
 app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();
