@@ -240,6 +240,73 @@ public sealed class AvaloniaTorrentsViewModelTests
     }
 
     [Fact]
+    public async Task ResetMetadataSessionAsync_PostsResetEndpoint()
+    {
+        var categories = CreateCategories();
+        var resettableTorrent = new TorrentSummaryDto
+        {
+            TorrentId = Guid.Parse("45454545-4545-4545-4545-454545454545"),
+            Name = "Resettable Magnet",
+            CategoryKey = "TV",
+            State = TorrentState.ResolvingMetadata,
+            ProgressPercent = 0,
+            DownloadedBytes = 0,
+            TotalBytes = null,
+            DownloadRateBytesPerSecond = 0,
+            UploadRateBytesPerSecond = 0,
+            TrackerCount = 2,
+            ConnectedPeerCount = 0,
+            WaitReason = null,
+            QueuePosition = null,
+            AddedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10),
+            CompletedAtUtc = null,
+            LastActivityAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1),
+            CompletionCallbackState = null,
+            CompletionCallbackPendingSinceUtc = null,
+            CompletionCallbackInvokedAtUtc = null,
+            CompletionCallbackLastError = null,
+            ErrorMessage = null,
+            CanRefreshMetadata = true,
+            CanRetryCompletionCallback = false,
+            CanPause = true,
+            CanResume = false,
+            CanRemove = true,
+        };
+        var torrents = new[] { resettableTorrent };
+        var capturedRequests = new ConcurrentQueue<CapturedRequest>();
+
+        var torrentCoreClient = CreateClient(async (request, body) =>
+        {
+            capturedRequests.Enqueue(new CapturedRequest(request.Method.Method, request.RequestUri!.AbsolutePath, body));
+
+            return request.RequestUri!.AbsolutePath switch
+            {
+                "/api/categories" => CreateJsonResponse(categories),
+                "/api/torrents" when request.Method == HttpMethod.Get => CreateJsonResponse(torrents),
+                var path when path == $"/api/torrents/{resettableTorrent.TorrentId:D}/metadata/reset" =>
+                    CreateJsonResponse(new TorrentActionResultDto
+                    {
+                        TorrentId = resettableTorrent.TorrentId,
+                        Action = "reset_metadata_session",
+                        State = TorrentState.ResolvingMetadata,
+                        ProcessedAtUtc = DateTimeOffset.UtcNow,
+                    }),
+                _ => throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}"),
+            };
+        });
+        var viewModel = new TorrentsViewModel(torrentCoreClient, _ => { }, new TestClipboardTextService());
+        await viewModel.LoadAsync();
+
+        var torrent = Assert.Single(viewModel.VisibleTorrents, item => item.TorrentId == resettableTorrent.TorrentId);
+        await viewModel.ResetMetadataSessionAsync(torrent);
+
+        Assert.Contains(
+            capturedRequests,
+            item => item.Method == "POST" && item.Path == $"/api/torrents/{resettableTorrent.TorrentId:D}/metadata/reset");
+        Assert.Contains("Recreated metadata session", viewModel.ActionMessage);
+    }
+
+    [Fact]
     public async Task PasteMagnetAsync_LoadsClipboardText_AndTrimsIt()
     {
         var torrentCoreClient = CreateClient((request, _) => Task.FromResult(CreateJsonResponse(Array.Empty<TorrentSummaryDto>())));

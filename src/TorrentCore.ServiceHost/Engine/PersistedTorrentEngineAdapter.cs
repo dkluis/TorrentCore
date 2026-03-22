@@ -246,6 +246,34 @@ public sealed class PersistedTorrentEngineAdapter(
         };
     }
 
+    public async Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
+
+        if (!CanRefreshMetadata(torrent.State))
+        {
+            throw new ServiceOperationException(
+                "invalid_state",
+                $"Torrent '{torrent.Name}' cannot reset metadata while in state '{torrent.State}'.",
+                StatusCodes.Status409Conflict,
+                nameof(torrentId));
+        }
+
+        torrent.LastActivityAtUtc = DateTimeOffset.UtcNow;
+        torrent.ErrorMessage = null;
+
+        await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+
+        return new TorrentActionResultDto
+        {
+            TorrentId = torrent.TorrentId,
+            Action = "reset_metadata_session",
+            State = torrent.State,
+            ProcessedAtUtc = torrent.LastActivityAtUtc.Value,
+            DataDeleted = false,
+        };
+    }
+
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);

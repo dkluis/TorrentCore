@@ -107,20 +107,29 @@ If a public magnet stays in `ResolvingMetadata`, TorrentCore now has both automa
 What TorrentCore does automatically:
 - After `Metadata Refresh Stale Seconds`, TorrentCore requests a DHT announce and a forced tracker announce for the torrent.
 - If the torrent still stays cold through `Metadata Refresh Restart Delay Seconds`, TorrentCore restarts the torrent manager and immediately refreshes peer discovery again.
+- If the torrent still stays cold after that restart window, TorrentCore recreates the MonoTorrent manager from the saved magnet and immediately refreshes peer discovery on the new session.
 
 When to use `Refresh Metadata` manually:
 - The torrent is still in `ResolvingMetadata` after the automatic windows have already elapsed.
 - The torrent detail view or list still shows no useful peer activity.
 - You want to force a fresh discovery attempt immediately instead of waiting for the next automatic recovery window.
 
+When to use `Reset Metadata` manually:
+- `Refresh Metadata` has already been tried and the torrent is still stuck in `ResolvingMetadata`.
+- The same magnet resolves immediately in another client on the same host, suggesting the current TorrentCore metadata session has gone stale.
+- You want a stronger recovery than refresh or stop/start without deleting and re-adding the torrent record.
+
 What to check:
 - `torrent.metadata.refresh_requested` confirms a manual or automatic discovery refresh was issued.
 - `torrent.metadata.restart_requested` confirms TorrentCore escalated from refresh to stop/start recovery.
+- `torrent.metadata.reset_requested` confirms TorrentCore recreated the metadata session from the saved magnet.
 - `torrent.engine.peers_found` shows whether the swarm is returning candidate peers.
 - `torrent.engine.connection_failed` helps distinguish "no peers discovered" from "peers discovered but connections failed."
 
 Operator guidance:
 - `Refresh Metadata` is most useful for public magnets that appear stuck after a quiet period or after a weak first discovery pass.
+- `Reset Metadata` is the stronger operator nudge and is the closest built-in equivalent to deleting and re-adding the same magnet.
+- If your goal is only to recover a stuck metadata session, prefer `Reset Metadata` over `Delete Data` plus re-add so TorrentCore keeps the existing torrent record and logs.
 - Weak or dead swarms may still never resolve metadata even after refresh and restart if no reachable peers exist.
 - If the same magnet resolves immediately in another client on the same host, compare TorrentCore's recent log events and current runtime settings before changing global limits again.
 

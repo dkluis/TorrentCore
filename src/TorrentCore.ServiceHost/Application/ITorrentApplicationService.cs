@@ -17,6 +17,7 @@ public interface ITorrentApplicationService
     Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken);
 }

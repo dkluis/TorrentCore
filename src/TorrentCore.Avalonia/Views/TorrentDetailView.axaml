@@ -6,7 +6,7 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto"
                 HorizontalScrollBarVisibility="Disabled">
     <StackPanel Margin="{DynamicResource PagePadding}" Spacing="18">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10">
         <Button Classes="toolbar-action"
                 Content="Back"
                 Command="{Binding BackCommand}" />
@@ -41,16 +41,22 @@
                 IsVisible="{Binding CanRefreshMetadata}" />
         <Button Grid.Column="6"
                 Classes="toolbar-action"
+                Content="Reset Metadata"
+                Command="{Binding ResetMetadataSessionCommand}"
+                IsEnabled="{Binding CanRefreshMetadata}"
+                IsVisible="{Binding CanRefreshMetadata}" />
+        <Button Grid.Column="7"
+                Classes="toolbar-action"
                 Content="Retry Callback"
                 Command="{Binding RetryCompletionCallbackCommand}"
                 IsEnabled="{Binding CanRetryCompletionCallback}"
                 IsVisible="{Binding CanRetryCompletionCallback}" />
-        <Button Grid.Column="7"
+        <Button Grid.Column="8"
                 Classes="toolbar-action danger"
                 Content="Remove"
                 Command="{Binding RemoveCommand}"
                 IsEnabled="{Binding Torrent.CanRemove}" />
-        <Button Grid.Column="8"
+        <Button Grid.Column="9"
                 Classes="toolbar-action danger"
                 Content="Delete Data"
                 Command="{Binding DeleteDataCommand}"

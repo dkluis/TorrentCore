@@ -42,6 +42,7 @@ else if (_torrent is not null)
                 @if (_torrent.CanRefreshMetadata)
                 {
                     <button class="btn btn-outline-secondary" type="button" @onclick="RefreshMetadataAsync" disabled="@_isBusy">Refresh Metadata</button>
+                    <button class="btn btn-outline-secondary" type="button" @onclick="ResetMetadataSessionAsync" disabled="@_isBusy">Reset Metadata</button>
                 }
                 @if (_torrent.CanRetryCompletionCallback)
                 {
@@ -344,6 +345,20 @@ else if (_torrent is not null)
         {
             var result = await TorrentCoreClient.RefreshMetadataAsync(_torrent.TorrentId);
             _message = $"Requested metadata refresh at {result.ProcessedAtUtc.ToLocalTime():g}.";
+        });
+    }
+
+    private async Task ResetMetadataSessionAsync()
+    {
+        if (_torrent is null)
+        {
+            return;
+        }
+
+        await RunActionAsync(async () =>
+        {
+            var result = await TorrentCoreClient.ResetMetadataSessionAsync(_torrent.TorrentId);
+            _message = $"Recreated metadata session at {result.ProcessedAtUtc.ToLocalTime():g}.";
         });
     }
 

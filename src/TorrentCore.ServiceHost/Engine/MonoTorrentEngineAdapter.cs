@@ -488,6 +488,45 @@ public sealed class MonoTorrentEngineAdapter(
         }
     }
 
+    public async Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+
+        if (!CanRefreshMetadata(snapshot.State))
+        {
+            throw new ServiceOperationException(
+                "invalid_state",
+                $"Torrent '{snapshot.Name}' cannot reset metadata while in state '{snapshot.State}'.",
+                StatusCodes.Status409Conflict,
+                nameof(torrentId));
+        }
+
+        await _synchronizationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
+            var now = DateTimeOffset.UtcNow;
+            var recreatedManager = await ResetMetadataSessionCoreAsync(currentSnapshot, manager, now, "manual", cancellationToken);
+            await RequestMetadataDiscoveryRefreshAsync(currentSnapshot, recreatedManager, now, "manual_reset", cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken);
+
+            var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? CreateUpdatedSnapshot(currentSnapshot, recreatedManager, now);
+
+            return new TorrentActionResultDto
+            {
+                TorrentId = torrentId,
+                Action = "reset_metadata_session",
+                State = persistedSnapshot.State,
+                ProcessedAtUtc = now,
+                DataDeleted = false,
+            };
+        }
+        finally
+        {
+            _synchronizationGate.Release();
+        }
+    }
+
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
@@ -1223,6 +1262,9 @@ public sealed class MonoTorrentEngineAdapter(
                 case MetadataRecoveryAction.Restart:
                     await RestartMetadataResolutionAsync(currentSnapshot, manager, now, runtimeSettings, cancellationToken, decision);
                     break;
+                case MetadataRecoveryAction.Reset:
+                    await ResetMetadataResolutionAsync(currentSnapshot, manager, now, runtimeSettings, cancellationToken, decision);
+                    break;
             }
         }
     }
@@ -1270,6 +1312,8 @@ public sealed class MonoTorrentEngineAdapter(
                         decision.Value.ResolvingSinceUtc,
                         decision.Value.LastDiscoveryActivityAtUtc,
                         decision.Value.LastRefreshAtUtc,
+                        decision.Value.LastRestartAtUtc,
+                        decision.Value.LastResetAtUtc,
                         decision.Value.StaleSinceUtc,
                     },
             }),
@@ -1302,6 +1346,8 @@ public sealed class MonoTorrentEngineAdapter(
                 decision.ResolvingSinceUtc,
                 decision.LastDiscoveryActivityAtUtc,
                 decision.LastRefreshAtUtc,
+                decision.LastRestartAtUtc,
+                decision.LastResetAtUtc,
                 decision.StaleSinceUtc,
                 runtimeSettings.MetadataRefreshStaleSeconds,
                 runtimeSettings.MetadataRefreshRestartDelaySeconds,
@@ -1311,6 +1357,102 @@ public sealed class MonoTorrentEngineAdapter(
         await EnsureManagerStoppedAsync(manager, cancellationToken);
         await EnsureManagerStartedAsync(manager, cancellationToken);
         await RequestMetadataDiscoveryRefreshAsync(snapshot, manager, now, "automatic_stale_restart", cancellationToken, decision);
+    }
+
+    private async Task ResetMetadataResolutionAsync(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        DateTimeOffset now,
+        RuntimeSettingsSnapshot runtimeSettings,
+        CancellationToken cancellationToken,
+        TorrentMetadataRecoveryDecision decision)
+    {
+        var recreatedManager = await ResetMetadataSessionCoreAsync(snapshot, manager, now, "automatic_stale_reset", cancellationToken, decision);
+        await RequestMetadataDiscoveryRefreshAsync(snapshot, recreatedManager, now, "automatic_stale_reset", cancellationToken, decision);
+
+        await activityLogService.WriteAsync(new ActivityLogWriteRequest
+        {
+            Level = ActivityLogLevel.Warning,
+            Category = "engine",
+            EventType = "torrent.metadata.reset_applied",
+            Message = "Recreated metadata discovery session after refresh and restart were not enough.",
+            TorrentId = snapshot.TorrentId,
+            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                snapshot.State,
+                decision.ResolvingSinceUtc,
+                decision.LastDiscoveryActivityAtUtc,
+                decision.LastRefreshAtUtc,
+                decision.LastRestartAtUtc,
+                decision.LastResetAtUtc,
+                decision.StaleSinceUtc,
+                runtimeSettings.MetadataRefreshStaleSeconds,
+                runtimeSettings.MetadataRefreshRestartDelaySeconds,
+            }),
+        }, cancellationToken);
+    }
+
+    private async Task<TorrentManager> ResetMetadataSessionCoreAsync(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        DateTimeOffset now,
+        string origin,
+        CancellationToken cancellationToken,
+        TorrentMetadataRecoveryDecision? decision = null)
+    {
+        var recoveryState = _metadataRecoveryStates.GetOrAdd(snapshot.TorrentId, _ => new TorrentMetadataRecoveryState());
+        recoveryState.MarkReset(now);
+
+        await activityLogService.WriteAsync(new ActivityLogWriteRequest
+        {
+            Level = ActivityLogLevel.Warning,
+            Category = "engine",
+            EventType = "torrent.metadata.reset_requested",
+            Message = $"Recreating metadata discovery session ({origin}).",
+            TorrentId = snapshot.TorrentId,
+            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            DetailsJson = JsonSerializer.Serialize(new
+            {
+                Origin = origin,
+                snapshot.State,
+                manager.OpenConnections,
+                TrackerCount = CountTrackers(manager),
+                decision = decision is null
+                    ? null
+                    : new
+                    {
+                        decision.Value.ResolvingSinceUtc,
+                        decision.Value.LastDiscoveryActivityAtUtc,
+                        decision.Value.LastRefreshAtUtc,
+                        decision.Value.LastRestartAtUtc,
+                        decision.Value.LastResetAtUtc,
+                        decision.Value.StaleSinceUtc,
+                    },
+            }),
+        }, cancellationToken);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await EnsureManagerStoppedAsync(manager, cancellationToken);
+            await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly);
+
+            _managers.Remove(snapshot.TorrentId);
+            _observedTorrentIds.Remove(snapshot.TorrentId);
+            _observedUploadedSessionBytes.TryRemove(snapshot.TorrentId, out _);
+
+            var magnet = MagnetLink.Parse(snapshot.MagnetUri);
+            var downloadRootPath = MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
+            var recreatedManager = await _engine.AddAsync(magnet, downloadRootPath);
+            RegisterManager(snapshot.TorrentId, recreatedManager);
+            _managers[snapshot.TorrentId] = recreatedManager;
+            return recreatedManager;
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     private void NoteMetadataDiscoveryActivity(Guid torrentId, DateTimeOffset now)

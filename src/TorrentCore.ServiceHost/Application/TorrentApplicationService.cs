@@ -213,6 +213,21 @@ public sealed class TorrentApplicationService(
         }
     }
 
+    public async Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await torrentEngineAdapter.ResetMetadataSessionAsync(torrentId, cancellationToken);
+            await LogActionAsync("torrent.metadata.reset_requested", "Recreated metadata discovery session.", torrentId, result.State, cancellationToken);
+            return result;
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.metadata.reset.failed", exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
     public async Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         try

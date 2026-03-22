@@ -116,6 +116,21 @@ public partial class TorrentDetailViewModel(TorrentCoreClient client, Guid torre
     }
 
     [RelayCommand]
+    public async Task ResetMetadataSessionAsync()
+    {
+        if (Torrent is null || !CanRefreshMetadata)
+        {
+            return;
+        }
+
+        await RunActionAsync(async () =>
+        {
+            var result = await client.ResetMetadataSessionAsync(Torrent.TorrentId);
+            ActionMessage = $"Recreated metadata session at {result.ProcessedAtUtc.ToLocalTime():g}.";
+        });
+    }
+
+    [RelayCommand]
     public async Task RetryCompletionCallbackAsync()
     {
         if (Torrent is null || !CanRetryCompletionCallback)

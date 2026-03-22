@@ -222,6 +222,11 @@
                           Command="{Binding RefreshMetadataCommand}"
                           IsEnabled="{Binding CanRefreshMetadata}"
                           IsVisible="{Binding CanRefreshMetadata}" />
+                  <Button Classes="toolbar-action"
+                          Content="Reset Metadata"
+                          Command="{Binding ResetMetadataSessionCommand}"
+                          IsEnabled="{Binding CanRefreshMetadata}"
+                          IsVisible="{Binding CanRefreshMetadata}" />
                   <Button Classes="toolbar-action danger"
                           Content="Remove"
                           Command="{Binding RemoveCommand}"

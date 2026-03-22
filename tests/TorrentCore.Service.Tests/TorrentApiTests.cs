@@ -1113,7 +1113,52 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
-    public async Task MonoTorrentEngine_AutomaticMetadataRecovery_RefreshesAndRestartsStaleResolution()
+    public async Task MonoTorrentEngine_ResetMetadataSession_RecreatesManager_AndWritesEngineLog()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-metadata-reset");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50);
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(httpClient, "9494949494949494949494949494949494949494", "MonoTorrent Metadata Reset");
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        var resolvingTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.ResolvingMetadata && torrent.CanRefreshMetadata,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(resolvingTorrent);
+
+        var resetResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/metadata/reset", content: null);
+        resetResponse.EnsureSuccessStatusCode();
+
+        var resetResult = await resetResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
+        Assert.NotNull(resetResult);
+        Assert.Equal("reset_metadata_session", resetResult.Action);
+
+        var logs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=150&torrentId={addedTorrent.TorrentId}"),
+            entries => entries is not null &&
+                       entries.Any(log => log.EventType == "torrent.metadata.reset_requested" &&
+                                          log.Category == "engine" &&
+                                          log.DetailsJson?.Contains("\"Origin\":\"manual\"", StringComparison.Ordinal) == true) &&
+                       entries.Any(log => log.EventType == "torrent.metadata.refresh_requested" &&
+                                          log.Category == "engine" &&
+                                          log.DetailsJson?.Contains("\"Origin\":\"manual_reset\"", StringComparison.Ordinal) == true),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(logs);
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_AutomaticMetadataRecovery_RefreshesRestartsAndResetsStaleResolution()
     {
         var rootPath = CreateTempRootPath("torrentcore-monotorrent-metadata-autorecovery");
         var downloadPath = Path.Combine(rootPath, "downloads");
@@ -1145,8 +1190,14 @@ public sealed class TorrentApiTests
                        entries.Any(log => log.EventType == "torrent.metadata.restart_requested" && log.Category == "engine") &&
                        entries.Any(log => log.EventType == "torrent.metadata.refresh_requested" &&
                                           log.Category == "engine" &&
-                                          log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_restart\"", StringComparison.Ordinal) == true),
-            timeout: TimeSpan.FromSeconds(10));
+                                          log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_restart\"", StringComparison.Ordinal) == true) &&
+                       entries.Any(log => log.EventType == "torrent.metadata.reset_requested" &&
+                                          log.Category == "engine" &&
+                                          log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_reset\"", StringComparison.Ordinal) == true) &&
+                       entries.Any(log => log.EventType == "torrent.metadata.refresh_requested" &&
+                                          log.Category == "engine" &&
+                                          log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_reset\"", StringComparison.Ordinal) == true),
+            timeout: TimeSpan.FromSeconds(15));
 
         Assert.NotNull(logs);
     }

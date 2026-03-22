@@ -12,6 +12,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
         Func<TorrentListItemViewModel, Task> pause,
         Func<TorrentListItemViewModel, Task> resume,
         Func<TorrentListItemViewModel, Task> refreshMetadata,
+        Func<TorrentListItemViewModel, Task> resetMetadataSession,
         Func<TorrentListItemViewModel, Task> remove,
         Func<TorrentListItemViewModel, Task> deleteData,
         Func<TorrentListItemViewModel, Task> retryCompletionCallback,
@@ -22,6 +23,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
         PauseCommand = new AsyncRelayCommand(() => pause(this));
         ResumeCommand = new AsyncRelayCommand(() => resume(this));
         RefreshMetadataCommand = new AsyncRelayCommand(() => refreshMetadata(this));
+        ResetMetadataSessionCommand = new AsyncRelayCommand(() => resetMetadataSession(this));
         RemoveCommand = new AsyncRelayCommand(() => remove(this));
         DeleteDataCommand = new AsyncRelayCommand(() => deleteData(this));
         RetryCompletionCallbackCommand = new AsyncRelayCommand(() => retryCompletionCallback(this));
@@ -33,6 +35,7 @@ public partial class TorrentListItemViewModel : ViewModelBase
     public IAsyncRelayCommand PauseCommand { get; }
     public IAsyncRelayCommand ResumeCommand { get; }
     public IAsyncRelayCommand RefreshMetadataCommand { get; }
+    public IAsyncRelayCommand ResetMetadataSessionCommand { get; }
     public IAsyncRelayCommand RemoveCommand { get; }
     public IAsyncRelayCommand DeleteDataCommand { get; }
     public IAsyncRelayCommand RetryCompletionCallbackCommand { get; }
