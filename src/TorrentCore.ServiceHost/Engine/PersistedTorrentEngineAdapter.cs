@@ -283,6 +283,13 @@ public sealed class PersistedTorrentEngineAdapter(
         var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
         await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
 
+        if (request.DeleteData)
+        {
+            var downloadRootPath = torrent.DownloadRootPath ?? servicePaths.DownloadRootPath;
+            TorrentDataPathCleanup.DeletePayloadArtifacts(downloadRootPath, [torrent.SavePath]);
+            TorrentDataPathCleanup.DeleteEmptyDirectories(downloadRootPath, [torrent.SavePath]);
+        }
+
         return new TorrentActionResultDto
         {
             TorrentId = torrent.TorrentId,

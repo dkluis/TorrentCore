@@ -2,6 +2,22 @@ namespace TorrentCore.Service.Engine;
 
 public static class TorrentDataPathCleanup
 {
+    public static void DeletePayloadArtifacts(string downloadRootPath, IEnumerable<string?> candidatePaths)
+    {
+        var normalizedDownloadRootPath = NormalizeDirectoryPath(downloadRootPath);
+        var normalizedCandidates = candidatePaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => NormalizePath(path!))
+            .Distinct(StringComparer.Ordinal)
+            .OrderByDescending(path => path.Length)
+            .ToArray();
+
+        foreach (var candidatePath in normalizedCandidates)
+        {
+            DeletePayloadArtifact(candidatePath, normalizedDownloadRootPath);
+        }
+    }
+
     public static void DeleteEmptyDirectories(string downloadRootPath, IEnumerable<string?> candidatePaths)
     {
         var normalizedDownloadRootPath = NormalizeDirectoryPath(downloadRootPath);
@@ -15,6 +31,26 @@ public static class TorrentDataPathCleanup
         foreach (var candidateDirectory in candidateDirectories)
         {
             DeleteEmptyDirectoryChain(candidateDirectory, normalizedDownloadRootPath);
+        }
+    }
+
+    private static void DeletePayloadArtifact(string candidatePath, string normalizedDownloadRootPath)
+    {
+        if (!IsWithinOrEqual(candidatePath, normalizedDownloadRootPath) ||
+            string.Equals(candidatePath, normalizedDownloadRootPath, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (File.Exists(candidatePath))
+        {
+            File.Delete(candidatePath);
+            return;
+        }
+
+        if (Directory.Exists(candidatePath))
+        {
+            Directory.Delete(candidatePath, recursive: true);
         }
     }
 

@@ -535,8 +535,8 @@ public sealed class MonoTorrentEngineAdapter(
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request, CancellationToken cancellationToken)
     {
         var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
-        var cleanupCandidateDirectories = request.DeleteData
-            ? GetCleanupCandidateDirectories(snapshot, manager)
+        var cleanupCandidatePaths = request.DeleteData
+            ? GetCleanupCandidatePaths(manager)
             : Array.Empty<string>();
 
         await _gate.WaitAsync(cancellationToken);
@@ -562,7 +562,9 @@ public sealed class MonoTorrentEngineAdapter(
 
         if (request.DeleteData)
         {
-            TorrentDataPathCleanup.DeleteEmptyDirectories(snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath, cleanupCandidateDirectories);
+            var downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
+            TorrentDataPathCleanup.DeletePayloadArtifacts(downloadRootPath, cleanupCandidatePaths);
+            TorrentDataPathCleanup.DeleteEmptyDirectories(downloadRootPath, cleanupCandidatePaths);
         }
 
         await SynchronizeAsync(cancellationToken);
@@ -577,42 +579,28 @@ public sealed class MonoTorrentEngineAdapter(
         };
     }
 
-    private static IReadOnlyList<string> GetCleanupCandidateDirectories(TorrentSnapshot snapshot, TorrentManager manager)
+    private static IReadOnlyList<string> GetCleanupCandidatePaths(TorrentManager manager)
     {
-        var directories = new HashSet<string>(StringComparer.Ordinal);
-
-        if (!string.IsNullOrWhiteSpace(manager.ContainingDirectory))
-        {
-            directories.Add(Path.GetFullPath(manager.ContainingDirectory));
-        }
+        var paths = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var file in manager.Files)
         {
-            AddParentDirectory(directories, file.DownloadCompleteFullPath);
-            AddParentDirectory(directories, file.DownloadIncompleteFullPath);
-            AddParentDirectory(directories, file.FullPath);
+            AddPath(paths, file.DownloadCompleteFullPath);
+            AddPath(paths, file.DownloadIncompleteFullPath);
+            AddPath(paths, file.FullPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(snapshot.SavePath))
-        {
-            directories.Add(Path.GetFullPath(snapshot.SavePath));
-        }
-
-        return directories.ToArray();
+        return paths.ToArray();
     }
 
-    private static void AddParentDirectory(ISet<string> directories, string? filePath)
+    private static void AddPath(ISet<string> paths, string? path)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
+        if (string.IsNullOrWhiteSpace(path))
         {
             return;
         }
 
-        var parentDirectory = Path.GetDirectoryName(Path.GetFullPath(filePath));
-        if (!string.IsNullOrWhiteSpace(parentDirectory))
-        {
-            directories.Add(parentDirectory);
-        }
+        paths.Add(Path.GetFullPath(path));
     }
 
     private async Task EnsureInitializedAsync(CancellationToken cancellationToken)

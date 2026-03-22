@@ -420,6 +420,41 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task RemoveTorrent_WithDeleteData_RemovesPersistedPayloadPath()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-delete-data");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(httpClient, "B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2", "Delete Data Torrent");
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
+
+        var payloadDirectory = addedTorrent.SavePath;
+        Directory.CreateDirectory(payloadDirectory);
+        var payloadFile = Path.Combine(payloadDirectory, "payload.bin");
+        File.WriteAllText(payloadFile, "payload");
+
+        var removeResponse = await httpClient.PostAsJsonAsync(
+            $"api/torrents/{addedTorrent.TorrentId}/remove",
+            new RemoveTorrentRequest { DeleteData = true });
+        var actionResult = await removeResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.Equal(HttpStatusCode.OK, removeResponse.StatusCode);
+        Assert.NotNull(actionResult);
+        Assert.Equal("remove", actionResult.Action);
+        Assert.True(actionResult.DataDeleted);
+        Assert.False(File.Exists(payloadFile));
+        Assert.False(Directory.Exists(payloadDirectory));
+        Assert.NotNull(torrents);
+        Assert.DoesNotContain(torrents, torrent => torrent.TorrentId == addedTorrent.TorrentId);
+    }
+
+    [Fact]
     public async Task MonoTorrentEngine_AddMagnet_UsesRealEngineRuntime()
     {
         await using var factory = CreateFactory(engineMode: TorrentEngineMode.MonoTorrent);
