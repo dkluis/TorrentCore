@@ -28,10 +28,15 @@ internal sealed class TorrentMetadataRecoveryState
         }
     }
 
-    public void NoteDiscoveryActivity(DateTimeOffset now)
+    public void NoteDiscoveryActivity(DateTimeOffset now, int openConnections)
     {
         lock (_gate)
         {
+            if (openConnections <= 0)
+            {
+                return;
+            }
+
             _resolvingSinceUtc          ??= now;
             _lastDiscoveryActivityAtUtc =   now;
         }

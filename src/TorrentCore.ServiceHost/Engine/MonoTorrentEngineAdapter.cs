@@ -1224,7 +1224,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
-            NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
+            NoteMetadataDiscoveryActivity(
+                torrentId, DateTimeOffset.UtcNow, eventArgs.TorrentManager.OpenConnections
+            );
 
             await activityLogService.WriteAsync(
                 new ActivityLogWriteRequest
@@ -1513,9 +1515,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
     }
 
-    private void NoteMetadataDiscoveryActivity(Guid torrentId, DateTimeOffset now)
+    private void NoteMetadataDiscoveryActivity(Guid torrentId, DateTimeOffset now, int openConnections)
     {
-        _metadataRecoveryStates.GetOrAdd(torrentId, _ => new TorrentMetadataRecoveryState()).NoteDiscoveryActivity(now);
+        _metadataRecoveryStates.GetOrAdd(torrentId, _ => new TorrentMetadataRecoveryState())
+                               .NoteDiscoveryActivity(now, openConnections);
     }
 
     private void ResetMetadataRecoveryState(Guid torrentId)
@@ -1771,7 +1774,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await manager.StopAsync();
+        await manager.StopAsync(TimeSpan.FromSeconds(2));
     }
 
     private static async Task EnsureManagerStartedAsync(TorrentManager manager, CancellationToken cancellationToken)
