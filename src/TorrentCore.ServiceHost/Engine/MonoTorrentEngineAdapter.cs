@@ -680,6 +680,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
             var engineSettingsBuilder = new EngineSettingsBuilder
             {
+                AllowedEncryption            = MonoTorrentConnectionPolicy.CreateAllowedEncryption(),
                 AllowLocalPeerDiscovery        = _serviceOptions.EngineAllowLocalPeerDiscovery,
                 AllowPortForwarding            = _serviceOptions.EngineAllowPortForwarding,
                 CacheDirectory                 = cacheDirectory,
@@ -691,10 +692,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 MaximumDownloadRate            = runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
                 MaximumUploadRate              = runtimeSettings.EngineMaximumUploadRateBytesPerSecond,
                 DhtEndPoint                    = new IPEndPoint(IPAddress.Any, _serviceOptions.EngineDhtPort),
-                ListenEndPoints = new Dictionary<string, IPEndPoint>
-                {
-                    ["ipv4"] = new(IPAddress.Any, _serviceOptions.EngineListenPort),
-                },
+                ListenEndPoints                = MonoTorrentConnectionPolicy.CreateListenEndPoints(_serviceOptions.EngineListenPort),
             };
 
             _engine = new ClientEngine(engineSettingsBuilder.ToSettings());
@@ -723,6 +721,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                             _serviceOptions.EngineDhtPort,
                             _serviceOptions.EngineAllowPortForwarding,
                             _serviceOptions.EngineAllowLocalPeerDiscovery,
+                            AllowedEncryption = engineSettingsBuilder.AllowedEncryption.Select(item => item.ToString()).ToArray(),
+                            ListenEndPoints = engineSettingsBuilder.ListenEndPoints.ToDictionary(
+                                item => item.Key, item => item.Value.ToString()
+                            ),
                             runtimeSettings.EngineMaximumConnections,
                             runtimeSettings.EngineMaximumHalfOpenConnections,
                             runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
@@ -879,7 +881,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             {
                 if (IsManagerRunning(entry.Value))
                 {
-                    await EnsureManagerStoppedAsync(entry.Value, cancellationToken);
+                    await EnsureManagerPausedAsync(entry.Value, cancellationToken);
                 }
 
                 updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(snapshot, entry.Value, now), now);
@@ -1176,6 +1178,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         manager.TorrentStateChanged += (_, eventArgs) => _ = HandleTorrentStateChangedAsync(torrentId, eventArgs);
         manager.PeersFound          += (_, eventArgs) => _ = HandlePeersFoundAsync(torrentId, eventArgs);
+        manager.PeerConnected       += (_, eventArgs) => _ = HandlePeerConnectedAsync(torrentId, eventArgs);
+        manager.PeerDisconnected    += (_, eventArgs) => _ = HandlePeerDisconnectedAsync(torrentId, eventArgs);
         manager.ConnectionAttemptFailed +=
                 (_, eventArgs) => _ = HandleConnectionAttemptFailedAsync(torrentId, eventArgs);
     }
@@ -1251,6 +1255,80 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             logger.LogDebug(
                 exception, "Failed handling MonoTorrent peers-found event for torrent {TorrentId}", torrentId
+            );
+        }
+    }
+
+    private async Task HandlePeerConnectedAsync(Guid torrentId, PeerConnectedEventArgs eventArgs)
+    {
+        try
+        {
+            NoteMetadataDiscoveryActivity(
+                torrentId, DateTimeOffset.UtcNow, eventArgs.TorrentManager.OpenConnections
+            );
+
+            await activityLogService.WriteAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level             = ActivityLogLevel.Information,
+                    Category          = "engine",
+                    EventType         = "torrent.engine.peer_connected",
+                    Message           = "MonoTorrent established a peer connection.",
+                    TorrentId         = torrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            Direction = eventArgs.Direction.ToString(),
+                            PeerUri = eventArgs.Peer.Uri.ToString(),
+                            Client = eventArgs.Peer.ClientApp.ToString(),
+                            Encryption = eventArgs.Peer.EncryptionType.ToString(),
+                            eventArgs.TorrentManager.OpenConnections,
+                            eventArgs.TorrentManager.HasMetadata,
+                        }
+                    ),
+                }, CancellationToken.None
+            );
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(
+                exception, "Failed handling MonoTorrent peer-connected event for torrent {TorrentId}", torrentId
+            );
+        }
+    }
+
+    private async Task HandlePeerDisconnectedAsync(Guid torrentId, PeerDisconnectedEventArgs eventArgs)
+    {
+        try
+        {
+            await activityLogService.WriteAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level             = ActivityLogLevel.Information,
+                    Category          = "engine",
+                    EventType         = "torrent.engine.peer_disconnected",
+                    Message           = "MonoTorrent closed a peer connection.",
+                    TorrentId         = torrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            Direction = eventArgs.Peer.ConnectionDirection.ToString(),
+                            PeerUri = eventArgs.Peer.Uri.ToString(),
+                            Client = eventArgs.Peer.ClientApp.ToString(),
+                            Encryption = eventArgs.Peer.EncryptionType.ToString(),
+                            eventArgs.TorrentManager.OpenConnections,
+                            eventArgs.TorrentManager.HasMetadata,
+                        }
+                    ),
+                }, CancellationToken.None
+            );
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(
+                exception, "Failed handling MonoTorrent peer-disconnected event for torrent {TorrentId}", torrentId
             );
         }
     }
@@ -1775,6 +1853,19 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         cancellationToken.ThrowIfCancellationRequested();
         await manager.StopAsync(TimeSpan.FromSeconds(2));
+    }
+
+    private static async Task EnsureManagerPausedAsync(TorrentManager manager, CancellationToken cancellationToken)
+    {
+        await WaitForManagerToBecomeRestartableAsync(manager, cancellationToken);
+
+        if (manager.State is MonoTorrent.Client.TorrentState.Paused or MonoTorrent.Client.TorrentState.Stopped)
+        {
+            return;
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        await manager.PauseAsync();
     }
 
     private static async Task EnsureManagerStartedAsync(TorrentManager manager, CancellationToken cancellationToken)

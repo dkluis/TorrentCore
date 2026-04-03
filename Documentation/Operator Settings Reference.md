@@ -76,6 +76,8 @@ Meaning:
 Practical interpretation:
 - This is the idle window before TorrentCore sends an explicit metadata-discovery nudge.
 - When the threshold is reached, TorrentCore asks MonoTorrent to do a DHT announce and a forced tracker announce for that torrent.
+- TorrentCore now treats only live peer connectivity as meaningful metadata activity; peer-discovery callbacks with zero open connections do not reset the stale window by themselves.
+- TorrentCore now prefers plaintext outgoing peer handshakes first and keeps RC4 as fallback, which reduces the amount of metadata time spent burning the first connection attempt on encrypted negotiation before retrying the same peer in plaintext.
 - Lower values make TorrentCore react sooner to a cold magnet, but also increase how often it prods trackers and DHT for weak swarms.
 
 Unit:
@@ -124,13 +126,17 @@ What to check:
 - `torrent.metadata.restart_requested` confirms TorrentCore escalated from refresh to stop/start recovery.
 - `torrent.metadata.reset_requested` confirms TorrentCore recreated the metadata session from the saved magnet.
 - `torrent.engine.peers_found` shows whether the swarm is returning candidate peers.
+- `torrent.engine.peers_found` with `OpenConnections = 0` means peers were discovered but TorrentCore still had no live peer connections at that moment.
+- `torrent.engine.peer_connected` and `torrent.engine.peer_disconnected` show whether MonoTorrent ever completed a full handshake, which peer/client it talked to, and which encryption mode the session used.
 - `torrent.engine.connection_failed` helps distinguish "no peers discovered" from "peers discovered but connections failed."
+- repeated `EncryptionNegiotiationFailed` or `HandshakeFailed` against discovered peers means the swarm exists but MonoTorrent is not turning those candidate peers into stable sessions.
 
 Operator guidance:
 - `Refresh Metadata` is most useful for public magnets that appear stuck after a quiet period or after a weak first discovery pass.
 - `Reset Metadata` is the stronger operator nudge and is the closest built-in equivalent to deleting and re-adding the same magnet.
 - If your goal is only to recover a stuck metadata session, prefer `Reset Metadata` over `Delete Data` plus re-add so TorrentCore keeps the existing torrent record and logs.
 - Weak or dead swarms may still never resolve metadata even after refresh and restart if no reachable peers exist.
+- If another client on the same host resolves the same magnet faster, compare whether TorrentCore is reaching `peer_connected` at all before assuming the issue is only DHT or tracker discovery.
 - If the same magnet resolves immediately in another client on the same host, compare TorrentCore's recent log events and current runtime settings before changing global limits again.
 
 ## MonoTorrent Engine Throttle Settings
