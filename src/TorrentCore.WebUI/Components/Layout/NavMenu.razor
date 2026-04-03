@@ -1,0 +1,19 @@
+@if (Sections.Count > 0)
+{
+    <MudNavMenu Class="shell-nav">
+        @foreach (var navSection in Sections)
+        {
+            <MudNavLink Href="@navSection.Href"
+                        Match="@(navSection.MatchAll ? NavLinkMatch.All : NavLinkMatch.Prefix)"
+                        Icon="@navSection.Icon"
+                        Class="shell-nav-link">
+                <span class="shell-nav-title">@navSection.Title</span>
+            </MudNavLink>
+        }
+    </MudNavMenu>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<NavigationSection> Sections { get; set; } = [];
+}

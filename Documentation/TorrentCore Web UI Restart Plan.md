@@ -4,7 +4,7 @@
 
 Active planning document.
 
-Current status: `Phase 0 Complete`, `Phase 1 Pending`
+Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Pending`
 
 Last updated: `2026-04-03`
 
@@ -12,11 +12,13 @@ Current checkpoint:
 
 - ground rules are agreed for a full web UI restart
 - target direction is a new parallel TorrentCore web UI project with TVMazeWeb-aligned design language and MudBlazor usage
-- current `TorrentCore.Web` remains the live operator UI until cutover criteria are met
+- current `TorrentCore.Web` remains available as a reference implementation during restart delivery
 - TVMazeWeb baseline conventions have been captured from live source files to guide Phase 1 implementation
 - project naming direction is now `TorrentCore.WebUI`
 - visual baseline should stay as close as practical to TVMazeWeb, with TorrentCore-specific favicon/brand assets
 - side-by-side runtime hosting is not required because Avalonia remains available during web restart delivery
+- `src/TorrentCore.WebUI` has been created and added to `TorrentCore.sln`
+- `TorrentCore.WebUI` now has MudBlazor, TVMaze-aligned shell/theme baseline, client-boundary DI wiring, and initial route placeholders
 
 ## Purpose
 
@@ -62,12 +64,12 @@ The following are fixed decisions:
 7. Build responsive behavior from the first slices, not as later polish.
 8. Use shared interaction patterns for loading, errors, confirmations, and action feedback.
 9. Add web-specific tests for client boundary and component behavior.
-10. Cut over only when acceptance criteria pass; keep the old web UI available until then.
+10. Cut over only when acceptance criteria pass; old web runtime can be disabled during restart while Avalonia remains fallback.
 
 ## Working Assumptions
 
 - Working project name is `TorrentCore.WebUI`.
-- Existing `TorrentCore.Web` remains maintenance-only during restart implementation.
+- Existing `TorrentCore.Web` remains reference/maintenance-only during restart implementation.
 - Existing `TorrentCore.Client` and `TorrentCore.Contracts` remain the primary service boundary for web UI calls.
 - If a needed workflow is not available through current contracts, extend service/contracts instead of leaking logic into
   the UI.
@@ -96,7 +98,7 @@ covering current TorrentCore functionality and enabling additional workflows wit
 
 ## Success Criteria
 
-- a new web project exists and runs independently alongside current `TorrentCore.Web`
+- a new web project exists and runs independently with no dependency on `TorrentCore.Web` runtime hosting
 - shell and page patterns align with TVMazeWeb style and MudBlazor usage
 - current functional coverage is preserved across:
   - dashboard/host visibility
@@ -188,9 +190,9 @@ Post-parity expansion targets (candidate):
 
 ## Delivery Strategy
 
-Use a parallel-run migration:
+Use a parallel-project migration:
 
-- build and validate new web project alongside current UI
+- build and validate the new web project as a separate deployment unit
 - port by workflow slice
 - verify each slice against functional + responsive + test gates
 - complete cutover only after acceptance checklist passes
@@ -263,7 +265,7 @@ Verify:
 
 Status:
 
-`Pending`
+`Complete`
 
 ### Phase 2 - Shared UI Infrastructure
 
@@ -480,3 +482,4 @@ captured directly from TVMazeWeb:
 
 - `2026-04-03`: agreed to full restart, parallel project, TVMazeWeb design/framework parity, and parity-plus scope
 - `2026-04-03`: locked 10 ground rules as non-negotiable restart constraints
+- `2026-04-03`: created `TorrentCore.WebUI` foundation and completed Phase 1 baseline implementation

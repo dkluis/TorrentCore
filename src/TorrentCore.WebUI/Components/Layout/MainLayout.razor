@@ -1,0 +1,141 @@
+@inherits LayoutComponentBase
+@inject IOptions<TorrentCoreClientOptions> ClientOptionsAccessor
+@inject IHostEnvironment HostEnvironment
+@inject NavigationManager NavigationManager
+
+<MudThemeProvider Theme="_theme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
+<MudLayout Class="shell-layout">
+    <MudAppBar Elevation="0" Dense="true" Class="shell-appbar">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Edge="Edge.Start"
+                       Color="Color.Inherit"
+                       OnClick="ToggleDrawer" />
+
+        <div class="shell-brand">
+            <p class="shell-brand-title">TorrentCore Web UI</p>
+        </div>
+
+        <MudSpacer />
+
+        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Download"
+                       Class="shell-appbar-action"
+                       OnClick="OpenTorrents">
+                Add Magnet
+            </MudButton>
+        </MudHidden>
+
+        <MudHidden Breakpoint="Breakpoint.MdAndUp">
+            <MudIconButton Icon="@Icons.Material.Filled.Download"
+                           Color="Color.Inherit"
+                           Class="shell-appbar-icon-action"
+                           OnClick="OpenTorrents"
+                           aria-label="Open Torrents" />
+        </MudHidden>
+
+        <MudHidden Breakpoint="Breakpoint.MdAndDown">
+            <div class="shell-status-cluster">
+                <div class="shell-status-pill">
+                    <span class="shell-status-label">Environment</span>
+                    <span class="shell-status-value">@HostEnvironment.EnvironmentName</span>
+                </div>
+                <div class="shell-status-pill">
+                    <span class="shell-status-label">API</span>
+                    <span class="shell-status-value">@ClientOptionsAccessor.Value.BaseUrl</span>
+                </div>
+            </div>
+        </MudHidden>
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen"
+               Variant="DrawerVariant.Responsive"
+               Breakpoint="Breakpoint.Md"
+               Width="10.75rem"
+               Elevation="0"
+               ClipMode="DrawerClipMode.Always"
+               Class="shell-drawer">
+        <div class="shell-drawer-top">
+            <p class="shell-drawer-title">TorrentCore</p>
+        </div>
+
+        <NavMenu Sections="NavigationSectionCatalog.All" />
+    </MudDrawer>
+
+    <MudMainContent Class="shell-main">
+        <div class="shell-canvas">
+            @Body
+        </div>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">x</span>
+</div>
+
+@code {
+    private bool _drawerOpen = true;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#a84d20",
+            Secondary = "#335c67",
+            Background = "#f2ede1",
+            Surface = "#fffaf2",
+            AppbarBackground = "#12202a",
+            AppbarText = "#f8f4ec",
+            DrawerBackground = "#15252f",
+            DrawerText = "#f2ede1",
+            DrawerIcon = "#d7c6ad",
+            TextPrimary = "#16232d",
+            TextSecondary = "#5a6770",
+        },
+        Typography = new Typography
+        {
+            Default = new DefaultTypography
+            {
+                FontFamily = ["Avenir Next", "Segoe UI", "sans-serif"],
+            },
+            H1 = new H1Typography
+            {
+                FontFamily = ["Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Georgia", "serif"],
+                FontWeight = "600",
+                LineHeight = "1.05",
+            },
+            H2 = new H2Typography
+            {
+                FontFamily = ["Iowan Old Style", "Palatino Linotype", "Book Antiqua", "Georgia", "serif"],
+                FontWeight = "600",
+                LineHeight = "1.15",
+            },
+            Body1 = new Body1Typography
+            {
+                FontFamily = ["Avenir Next", "Segoe UI", "sans-serif"],
+            }
+        },
+        LayoutProperties = new LayoutProperties
+        {
+            DefaultBorderRadius = "12px"
+        }
+    };
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void OpenTorrents()
+    {
+        NavigationManager.NavigateTo("/torrents");
+    }
+}
