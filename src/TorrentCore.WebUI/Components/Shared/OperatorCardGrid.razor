@@ -1,0 +1,16 @@
+<div class="@GetGridClass()">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string GetGridClass()
+    {
+        return string.IsNullOrWhiteSpace(Class) ? "section-grid" : $"section-grid {Class}";
+    }
+}

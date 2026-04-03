@@ -1,17 +1,353 @@
 @page "/torrents"
+@inject ITorrentCoreApiAdapter Api
+@inject IOperatorFeedbackService Feedback
+@inject IPageStateStore PageStateStore
 
 <PageTitle>Torrents</PageTitle>
 
-<section class="section-page">
-    <header class="section-hero">
-        <div>
-            <h1>Torrents</h1>
-            <p class="section-statusline">Planned: magnet intake, list/grid actions, and bulk operations.</p>
-        </div>
-    </header>
+<OperatorPage Kicker="Workflow"
+              Title="Torrents"
+              Summary="Shared table, filter, and page-state primitives with live data from TorrentCore service."
+              StatusLine="List persistence is circuit-scoped for this operator session.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   Disabled="_isRefreshing"
+                   OnClick="RefreshAsync">
+            Refresh
+        </MudButton>
+    </HeaderActions>
 
-    <MudPaper Class="section-card" Elevation="0">
-        <h2>Slice Status</h2>
-        <p>Phase 4 pending implementation in the restart plan.</p>
-    </MudPaper>
-</section>
+    <ChildContent>
+        <StateView Mode="@_mode"
+                   Title="Torrent list unavailable"
+                   Message="@_errorMessage"
+                   ActionText="Retry"
+                   OnAction="RefreshAsync">
+            <OperatorCard Class="dashboard-panel">
+                <div class="dashboard-panel-header">
+                    <div>
+                        <h2>Filters</h2>
+                        <p class="dashboard-panel-copy">Search and sort settings persist while this browser session stays connected.</p>
+                    </div>
+                </div>
+
+                <div class="operations-filters">
+                    <MudTextField T="string"
+                                  Label="Name"
+                                  Value="_state.SearchText"
+                                  ValueChanged="OnSearchChanged"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true" />
+
+                    <MudSelect T="string"
+                               Label="State"
+                               Value="_state.PrimaryFilter"
+                               ValueChanged="OnStateFilterChanged"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Dense="true">
+                    <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+                    @foreach (var torrentState in Enum.GetValues<TorrentState>())
+                    {
+                        <MudSelectItem T="string" Value="@torrentState.ToString()">@torrentState</MudSelectItem>
+                    }
+                    </MudSelect>
+
+                    <MudSelect T="string"
+                               Label="Sort"
+                               Value="_state.SortBy"
+                               ValueChanged="OnSortChanged"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Dense="true">
+                        <MudSelectItem T="string" Value="@("added")">Added (Newest)</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("name")">Name</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("state")">State</MudSelectItem>
+                        <MudSelectItem T="string" Value="@("progress")">Progress (High to Low)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudSelect T="int"
+                               Label="Page Size"
+                               Value="_state.PageSize"
+                               ValueChanged="OnPageSizeChanged"
+                               Variant="Variant.Outlined"
+                               Margin="Margin.Dense"
+                               Dense="true">
+                        <MudSelectItem T="int" Value="10">10</MudSelectItem>
+                        <MudSelectItem T="int" Value="25">25</MudSelectItem>
+                        <MudSelectItem T="int" Value="50">50</MudSelectItem>
+                    </MudSelect>
+                </div>
+            </OperatorCard>
+
+            <OperatorCard Class="dashboard-panel dashboard-panel--client-grid">
+                <div class="dashboard-panel-header">
+                    <div>
+                        <h2>Current Torrents</h2>
+                        <p class="dashboard-panel-copy">@FilteredTorrents.Count result(s), page @(_state.PageIndex + 1) of @PageCount.</p>
+                    </div>
+                    <div class="dashboard-inline-actions dashboard-inline-actions--compact">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Disabled="@(_state.PageIndex <= 0)"
+                                   OnClick="PreviousPage">
+                            Previous
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Disabled="@(_state.PageIndex >= PageCount - 1)"
+                                   OnClick="NextPage">
+                            Next
+                        </MudButton>
+                    </div>
+                </div>
+
+                <OperatorTableShell>
+                    <MudTable Items="VisibleRows"
+                              Dense="true"
+                              Hover="true"
+                              Bordered="true"
+                              Striped="true"
+                              Class="operations-table"
+                              Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Name</MudTh>
+                            <MudTh>Category</MudTh>
+                            <MudTh>State</MudTh>
+                            <MudTh>Progress</MudTh>
+                            <MudTh>Down</MudTh>
+                            <MudTh>Up</MudTh>
+                            <MudTh>Peers</MudTh>
+                            <MudTh>Wait</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Name" Class="operations-table-wrap">@context.Name</MudTd>
+                            <MudTd DataLabel="Category">@FormatCategory(context.CategoryKey)</MudTd>
+                            <MudTd DataLabel="State">@context.State</MudTd>
+                            <MudTd DataLabel="Progress">@context.ProgressPercent.ToString("0.0")%</MudTd>
+                            <MudTd DataLabel="Down">@FormatRate(context.DownloadRateBytesPerSecond)</MudTd>
+                            <MudTd DataLabel="Up">@FormatRate(context.UploadRateBytesPerSecond)</MudTd>
+                            <MudTd DataLabel="Peers">@context.ConnectedPeerCount</MudTd>
+                            <MudTd DataLabel="Wait" Class="operations-table-wrap">@FormatWaitReason(context)</MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent>
+                            <MudText Typo="Typo.body2">No torrents match the current filters.</MudText>
+                        </NoRecordsContent>
+                    </MudTable>
+                </OperatorTableShell>
+            </OperatorCard>
+        </StateView>
+    </ChildContent>
+</OperatorPage>
+
+@code {
+    private const string StateKey = "torrents:list";
+
+    private readonly List<TorrentSummaryDto> _allTorrents = [];
+    private StandardListPageState _state = new()
+    {
+        SortBy = "added",
+        PageSize = 25,
+    };
+    private StateViewMode _mode = StateViewMode.Loading;
+    private bool _isRefreshing;
+    private string? _errorMessage;
+
+    private IReadOnlyList<TorrentSummaryDto> FilteredTorrents
+    {
+        get
+        {
+            IEnumerable<TorrentSummaryDto> query = _allTorrents;
+
+            if (!string.IsNullOrWhiteSpace(_state.SearchText))
+            {
+                query = query.Where(
+                    torrent => torrent.Name.Contains(_state.SearchText, StringComparison.OrdinalIgnoreCase)
+                );
+            }
+
+            if (!string.IsNullOrWhiteSpace(_state.PrimaryFilter))
+            {
+                query = query.Where(
+                    torrent => string.Equals(
+                        torrent.State.ToString(),
+                        _state.PrimaryFilter,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                );
+            }
+
+            query = _state.SortBy switch
+            {
+                "name" => query.OrderBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+                "state" => query.OrderBy(torrent => torrent.State.ToString(), StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+                "progress" => query.OrderByDescending(torrent => torrent.ProgressPercent)
+                    .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+                _ => query.OrderByDescending(torrent => torrent.AddedAtUtc)
+                    .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase),
+            };
+
+            return query.ToArray();
+        }
+    }
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(FilteredTorrents.Count / (double)_state.PageSize));
+
+    private IReadOnlyList<TorrentSummaryDto> VisibleRows
+    {
+        get
+        {
+            var pageIndex = Math.Clamp(_state.PageIndex, 0, PageCount - 1);
+            return FilteredTorrents.Skip(pageIndex * _state.PageSize).Take(_state.PageSize).ToArray();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _state = PageStateStore.GetOrCreate(
+            StateKey,
+            () => new StandardListPageState
+            {
+                SortBy = "added",
+                PageSize = 25,
+            }
+        );
+
+        await LoadAsync(showSuccessToast: false);
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync(showSuccessToast: true);
+    }
+
+    private async Task LoadAsync(bool showSuccessToast)
+    {
+        _isRefreshing = true;
+        _mode = StateViewMode.Loading;
+        _errorMessage = null;
+
+        var torrentsResult = await Api.GetTorrentsAsync();
+        if (!torrentsResult.IsSuccess)
+        {
+            _errorMessage = torrentsResult.ErrorMessage ?? "Torrent list request failed.";
+            _mode = StateViewMode.Error;
+            _isRefreshing = false;
+            return;
+        }
+
+        _allTorrents.Clear();
+        if (torrentsResult.Value is not null)
+        {
+            _allTorrents.AddRange(torrentsResult.Value);
+        }
+
+        ClampPageIndex();
+        _mode = _allTorrents.Count == 0 ? StateViewMode.Empty : StateViewMode.Ready;
+        _isRefreshing = false;
+
+        if (showSuccessToast)
+        {
+            Feedback.Success("Torrent list refreshed.");
+        }
+    }
+
+    private Task OnSearchChanged(string value)
+    {
+        _state.SearchText = value.Trim();
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnStateFilterChanged(string value)
+    {
+        _state.PrimaryFilter = value;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSortChanged(string value)
+    {
+        _state.SortBy = value;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnPageSizeChanged(int value)
+    {
+        _state.PageSize = value;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private void PreviousPage()
+    {
+        if (_state.PageIndex <= 0)
+        {
+            return;
+        }
+
+        _state.PageIndex--;
+        PersistState();
+    }
+
+    private void NextPage()
+    {
+        if (_state.PageIndex >= PageCount - 1)
+        {
+            return;
+        }
+
+        _state.PageIndex++;
+        PersistState();
+    }
+
+    private void ClampPageIndex()
+    {
+        _state.PageIndex = Math.Clamp(_state.PageIndex, 0, PageCount - 1);
+        PersistState();
+    }
+
+    private void PersistState()
+    {
+        PageStateStore.Save(StateKey, _state);
+    }
+
+    private static string FormatCategory(string? categoryKey)
+    {
+        return string.IsNullOrWhiteSpace(categoryKey) ? "Uncategorized" : categoryKey;
+    }
+
+    private static string FormatRate(long bytesPerSecond)
+    {
+        return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    }
+
+    private static string FormatWaitReason(TorrentSummaryDto torrent)
+    {
+        var waitReason = torrent.WaitReason switch
+        {
+            TorrentWaitReason.PendingMetadataDispatch => "Pending metadata dispatch",
+            TorrentWaitReason.WaitingForMetadataSlot => "Waiting for metadata slot",
+            TorrentWaitReason.PendingDownloadDispatch => "Pending download dispatch",
+            TorrentWaitReason.WaitingForDownloadSlot => "Waiting for download slot",
+            TorrentWaitReason.PausedByOperator => "Paused by operator",
+            TorrentWaitReason.BlockedByError => "Blocked by error",
+            _ => string.Empty,
+        };
+
+        return torrent.QueuePosition is null || string.IsNullOrWhiteSpace(waitReason)
+            ? waitReason
+            : $"{waitReason} (#{torrent.QueuePosition.Value})";
+    }
+}

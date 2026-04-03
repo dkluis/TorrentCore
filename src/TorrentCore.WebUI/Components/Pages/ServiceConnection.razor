@@ -1,17 +1,199 @@
 @page "/service-connection"
+@inject WebServiceConnectionManager ConnectionManager
+@inject IOperatorFeedbackService Feedback
 
 <PageTitle>Service Connection</PageTitle>
 
-<section class="section-page">
-    <header class="section-hero">
-        <div>
-            <h1>Service Connection</h1>
-            <p class="section-statusline">Planned: endpoint test/save and startup recovery flow.</p>
-        </div>
-    </header>
+<OperatorPage Kicker="Connectivity"
+              Title="Service Connection"
+              Summary="Shared endpoint persistence for TorrentCore.WebUI with test/save/recheck actions."
+              StatusLine="Endpoint is stored in Config/service-connection.json for this host.">
+    <ChildContent>
+        <StateView Mode="@_mode"
+                   Title="Service connection unavailable"
+                   Message="@_errorMessage"
+                   ActionText="Retry"
+                   OnAction="LoadAsync">
+            <OperatorCardGrid>
+                <OperatorCard>
+                    <p class="section-card-eyebrow">Current Endpoint</p>
+                    <h2 class="tc-break">@(_status?.BaseUrl ?? "Not configured")</h2>
+                    <p>
+                        Reachability:
+                        <span class="@GetReachabilityClass(_status)">
+                            @GetReachabilityText(_status)
+                        </span>
+                    </p>
+                    <p>Last checked: @GetCheckedAtText(_status)</p>
+                    @if (!string.IsNullOrWhiteSpace(_status?.ErrorMessage))
+                    {
+                        <p class="dashboard-panel-copy">@_status.ErrorMessage</p>
+                    }
+                </OperatorCard>
 
-    <MudPaper Class="section-card" Elevation="0">
-        <h2>Slice Status</h2>
-        <p>Phase 7 pending implementation in the restart plan.</p>
-    </MudPaper>
-</section>
+                <OperatorCard>
+                    <p class="section-card-eyebrow">Update Endpoint</p>
+                    <MudTextField T="string"
+                                  Label="Service Base URL"
+                                  Value="_baseUrl"
+                                  ValueChanged="OnBaseUrlChanged"
+                                  Variant="Variant.Outlined"
+                                  Margin="Margin.Dense"
+                                  Immediate="true"
+                                  Placeholder="http://torrentcore-service.local:5078/" />
+                    <p class="dashboard-panel-copy">Use the host/IP for the machine running `TorrentCore.Service`.</p>
+
+                    <div class="dashboard-inline-actions dashboard-inline-actions--compact">
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Disabled="@(_isTesting || _isSaving)"
+                                   OnClick="TestAsync">
+                            Test
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   Disabled="@(_isTesting || _isSaving)"
+                                   OnClick="SaveAsync">
+                            Save
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Secondary"
+                                   Size="Size.Small"
+                                   Disabled="@(_isTesting || _isSaving)"
+                                   OnClick="RefreshStatusAsync">
+                            Recheck
+                        </MudButton>
+                    </div>
+                </OperatorCard>
+            </OperatorCardGrid>
+        </StateView>
+    </ChildContent>
+</OperatorPage>
+
+@code {
+    private bool _isTesting;
+    private bool _isSaving;
+    private string _baseUrl = string.Empty;
+    private string? _errorMessage;
+    private StateViewMode _mode = StateViewMode.Loading;
+    private TorrentCoreConnectionProbeResult? _status;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _mode = StateViewMode.Loading;
+        _errorMessage = null;
+
+        try
+        {
+            _status = await ConnectionManager.GetStatusAsync();
+            _baseUrl = _status.BaseUrl ?? ConnectionManager.DefaultBaseUrl ?? string.Empty;
+            _mode = StateViewMode.Ready;
+        }
+        catch (Exception exception)
+        {
+            _errorMessage = exception.Message;
+            _mode = StateViewMode.Error;
+        }
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        _status = await ConnectionManager.RefreshAsync();
+        Feedback.Info("Service connection status refreshed.");
+    }
+
+    private async Task TestAsync()
+    {
+        _isTesting = true;
+        try
+        {
+            var result = await ConnectionManager.TestAsync(_baseUrl);
+            _status = result;
+
+            if (result.IsReachable)
+            {
+                Feedback.Success("Connection test passed.");
+                return;
+            }
+
+            Feedback.Error(result.ErrorMessage ?? "Connection test failed.");
+        }
+        finally
+        {
+            _isTesting = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var confirmed = await Feedback.ConfirmAsync(
+            "Save shared endpoint",
+            "Switch TorrentCore.WebUI to the configured service endpoint?",
+            "Save endpoint"
+        );
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var result = await ConnectionManager.SaveAsync(_baseUrl);
+            _status = result;
+
+            if (!result.IsReachable)
+            {
+                Feedback.Error(result.ErrorMessage ?? "Configured endpoint is unreachable.");
+                return;
+            }
+
+            _baseUrl = result.BaseUrl ?? _baseUrl;
+            Feedback.Success("Shared endpoint saved and applied.");
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private Task OnBaseUrlChanged(string value)
+    {
+        _baseUrl = value.Trim();
+        return Task.CompletedTask;
+    }
+
+    private static string GetReachabilityClass(TorrentCoreConnectionProbeResult? status)
+    {
+        if (status is null)
+        {
+            return "dashboard-status-pill dashboard-status-pill--unknown";
+        }
+
+        return status.IsReachable
+            ? "dashboard-status-pill dashboard-status-pill--healthy"
+            : "dashboard-status-pill dashboard-status-pill--unhealthy";
+    }
+
+    private static string GetReachabilityText(TorrentCoreConnectionProbeResult? status)
+    {
+        if (status is null)
+        {
+            return "Unknown";
+        }
+
+        return status.IsReachable ? "Reachable" : "Unavailable";
+    }
+
+    private static string GetCheckedAtText(TorrentCoreConnectionProbeResult? status)
+    {
+        return status?.CheckedAtUtc.LocalDateTime.ToString("g") ?? "Not checked yet";
+    }
+}

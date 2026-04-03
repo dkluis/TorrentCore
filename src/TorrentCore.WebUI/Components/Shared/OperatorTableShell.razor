@@ -1,0 +1,16 @@
+<div class="@GetFrameClass()">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string GetFrameClass()
+    {
+        return string.IsNullOrWhiteSpace(Class) ? "operations-table-frame" : $"operations-table-frame {Class}";
+    }
+}

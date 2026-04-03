@@ -1,18 +1,114 @@
 @page "/"
 @page "/dashboard"
+@inject ITorrentCoreApiAdapter Api
+@inject IOperatorFeedbackService Feedback
 
 <PageTitle>Dashboard</PageTitle>
 
-<section class="section-page">
-    <header class="section-hero">
-        <div>
-            <h1>Dashboard</h1>
-            <p class="section-statusline">TorrentCore WebUI restart foundation is active.</p>
-        </div>
-    </header>
+<OperatorPage Kicker="Operator"
+              Title="Dashboard"
+              Summary="Host visibility baseline using shared state, request, and feedback primitives."
+              StatusLine="Phase 2 shared infrastructure is active.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   Disabled="_isRefreshing"
+                   OnClick="RefreshAsync">
+            Refresh
+        </MudButton>
+    </HeaderActions>
 
-    <MudPaper Class="section-card" Elevation="0">
-        <h2>Phase 1 Foundation</h2>
-        <p>Shell, navigation, MudBlazor baseline theme, and client-boundary wiring are in place.</p>
-    </MudPaper>
-</section>
+    <ChildContent>
+        <StateView Mode="@_mode"
+                   Title="Dashboard unavailable"
+                   Message="@_errorMessage"
+                   ActionText="Retry"
+                   OnAction="RefreshAsync">
+            <OperatorCardGrid>
+                <OperatorCard>
+                    <p class="section-card-eyebrow">Service</p>
+                    <h2>@(_health?.ServiceName ?? "TorrentCore Service")</h2>
+                    <p>Status: @(_health?.Status ?? "Unknown")</p>
+                    <p>Environment: @(_health?.EnvironmentName ?? "Unknown")</p>
+                </OperatorCard>
+
+                <OperatorCard>
+                    <p class="section-card-eyebrow">Host Runtime</p>
+                    <h2>@(_hostStatus?.EngineRuntime ?? "Unavailable")</h2>
+                    <p>Torrents: @(_hostStatus?.TorrentCount ?? 0)</p>
+                    <p>Instance: @(_hostStatus?.ServiceInstanceId.ToString("D") ?? "Unknown")</p>
+                </OperatorCard>
+
+                <OperatorCard>
+                    <p class="section-card-eyebrow">Queue</p>
+                    <h2>@(_hostStatus?.ResolvingMetadataCount ?? 0) Metadata</h2>
+                    <p>Queued metadata: @(_hostStatus?.MetadataQueueCount ?? 0)</p>
+                    <p>Queued downloads: @(_hostStatus?.DownloadQueueCount ?? 0)</p>
+                </OperatorCard>
+
+                <OperatorCard>
+                    <p class="section-card-eyebrow">Transfer</p>
+                    <h2>@FormatRate(_hostStatus?.CurrentDownloadRateBytesPerSecond ?? 0)</h2>
+                    <p>Upload: @FormatRate(_hostStatus?.CurrentUploadRateBytesPerSecond ?? 0)</p>
+                    <p>Peers: @(_hostStatus?.CurrentConnectedPeerCount ?? 0)</p>
+                </OperatorCard>
+            </OperatorCardGrid>
+        </StateView>
+    </ChildContent>
+</OperatorPage>
+
+@code {
+    private StateViewMode _mode = StateViewMode.Loading;
+    private bool _isRefreshing;
+    private string? _errorMessage;
+    private ServiceHealthDto? _health;
+    private EngineHostStatusDto? _hostStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(showSuccessToast: false);
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync(showSuccessToast: true);
+    }
+
+    private async Task LoadAsync(bool showSuccessToast)
+    {
+        _isRefreshing = true;
+        _mode = StateViewMode.Loading;
+        _errorMessage = null;
+
+        var healthTask = Api.GetHealthAsync();
+        var hostTask = Api.GetHostStatusAsync();
+        await Task.WhenAll(healthTask, hostTask);
+
+        var healthResult = healthTask.Result;
+        var hostResult = hostTask.Result;
+
+        if (!healthResult.IsSuccess || !hostResult.IsSuccess)
+        {
+            _errorMessage = healthResult.ErrorMessage ?? hostResult.ErrorMessage ?? "Dashboard data could not be loaded.";
+            _mode = StateViewMode.Error;
+            _isRefreshing = false;
+            return;
+        }
+
+        _health = healthResult.Value;
+        _hostStatus = hostResult.Value;
+        _mode = _health is null && _hostStatus is null ? StateViewMode.Empty : StateViewMode.Ready;
+        _isRefreshing = false;
+
+        if (showSuccessToast)
+        {
+            Feedback.Success("Dashboard refreshed.");
+        }
+    }
+
+    private static string FormatRate(long bytesPerSecond)
+    {
+        return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    }
+}

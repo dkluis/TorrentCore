@@ -1,0 +1,16 @@
+<MudPaper Class="@GetCardClass()" Elevation="0">
+    @ChildContent
+</MudPaper>
+
+@code {
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string GetCardClass()
+    {
+        return string.IsNullOrWhiteSpace(Class) ? "section-card" : $"section-card {Class}";
+    }
+}

@@ -1,17 +1,108 @@
 @page "/settings"
+@inject ITorrentCoreApiAdapter Api
+@inject IOperatorFeedbackService Feedback
 
 <PageTitle>Settings</PageTitle>
 
-<section class="section-page">
-    <header class="section-hero">
-        <div>
-            <h1>Settings</h1>
-            <p class="section-statusline">Planned: runtime policies, throttles, categories, and callback settings.</p>
-        </div>
-    </header>
+<OperatorPage Kicker="Administration"
+              Title="Settings"
+              Summary="Runtime settings snapshot using shared API and state feedback wrappers."
+              StatusLine="Update flows will be added in the settings feature slice.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   Disabled="_isRefreshing"
+                   OnClick="RefreshAsync">
+            Refresh
+        </MudButton>
+    </HeaderActions>
 
-    <MudPaper Class="section-card" Elevation="0">
-        <h2>Slice Status</h2>
-        <p>Phase 7 pending implementation in the restart plan.</p>
-    </MudPaper>
-</section>
+    <ChildContent>
+        <StateView Mode="@_mode"
+                   Title="Runtime settings unavailable"
+                   Message="@_errorMessage"
+                   ActionText="Retry"
+                   OnAction="RefreshAsync">
+            @if (_runtime is not null)
+            {
+                <OperatorCardGrid>
+                    <OperatorCard>
+                        <p class="section-card-eyebrow">Engine Limits</p>
+                        <h2>@_runtime.EngineRuntime</h2>
+                        <p>Max metadata sessions: @_runtime.MaxActiveMetadataResolutions</p>
+                        <p>Max downloads: @_runtime.MaxActiveDownloads</p>
+                    </OperatorCard>
+
+                    <OperatorCard>
+                        <p class="section-card-eyebrow">Bandwidth</p>
+                        <h2>@FormatRate(_runtime.EngineMaximumDownloadRateBytesPerSecond)</h2>
+                        <p>Upload cap: @FormatRate(_runtime.EngineMaximumUploadRateBytesPerSecond)</p>
+                        <p>Connections: @_runtime.EngineMaximumConnections</p>
+                    </OperatorCard>
+
+                    <OperatorCard>
+                        <p class="section-card-eyebrow">Completion Callback</p>
+                        <h2>@(_runtime.CompletionCallbackEnabled ? "Enabled" : "Disabled")</h2>
+                        <p>Timeout: @_runtime.CompletionCallbackTimeoutSeconds sec</p>
+                        <p>Finalize timeout: @_runtime.CompletionCallbackFinalizationTimeoutSeconds sec</p>
+                    </OperatorCard>
+
+                    <OperatorCard>
+                        <p class="section-card-eyebrow">Engine Apply State</p>
+                        <h2>@(_runtime.EngineSettingsRequireRestart ? "Restart Required" : "Applied")</h2>
+                        <p>Persisted overrides: @(_runtime.UsesPersistedOverrides ? "Yes" : "No")</p>
+                        <p>Retrieved: @_runtime.RetrievedAtUtc.LocalDateTime.ToString("g")</p>
+                    </OperatorCard>
+                </OperatorCardGrid>
+            }
+        </StateView>
+    </ChildContent>
+</OperatorPage>
+
+@code {
+    private StateViewMode _mode = StateViewMode.Loading;
+    private bool _isRefreshing;
+    private string? _errorMessage;
+    private RuntimeSettingsDto? _runtime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(showSuccessToast: false);
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync(showSuccessToast: true);
+    }
+
+    private async Task LoadAsync(bool showSuccessToast)
+    {
+        _isRefreshing = true;
+        _mode = StateViewMode.Loading;
+        _errorMessage = null;
+
+        var runtimeResult = await Api.GetRuntimeSettingsAsync();
+        if (!runtimeResult.IsSuccess)
+        {
+            _errorMessage = runtimeResult.ErrorMessage ?? "Runtime settings request failed.";
+            _mode = StateViewMode.Error;
+            _isRefreshing = false;
+            return;
+        }
+
+        _runtime = runtimeResult.Value;
+        _mode = _runtime is null ? StateViewMode.Empty : StateViewMode.Ready;
+        _isRefreshing = false;
+
+        if (showSuccessToast)
+        {
+            Feedback.Success("Runtime settings refreshed.");
+        }
+    }
+
+    private static string FormatRate(int bytesPerSecond)
+    {
+        return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    }
+}

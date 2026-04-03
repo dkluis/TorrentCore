@@ -47,6 +47,11 @@ a {
     color: inherit;
 }
 
+.tc-break {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 h1:focus {
     outline: none;
 }
@@ -279,6 +284,10 @@ h1:focus {
 .section-card p {
     margin: 0;
     color: var(--tvz-muted);
+}
+
+.section-card p + p {
+    margin-top: 0.2rem;
 }
 
 .section-card-eyebrow {

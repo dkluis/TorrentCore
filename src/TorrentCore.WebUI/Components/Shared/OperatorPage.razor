@@ -1,0 +1,56 @@
+<section class="@GetSectionClass()">
+    <header class="section-hero">
+        <div>
+            @if (!string.IsNullOrWhiteSpace(Kicker))
+            {
+                <p class="section-kicker">@Kicker</p>
+            }
+            <h1>@Title</h1>
+            @if (!string.IsNullOrWhiteSpace(Summary))
+            {
+                <p class="section-summary">@Summary</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(StatusLine))
+            {
+                <p class="section-statusline">@StatusLine</p>
+            }
+        </div>
+
+        @if (HeaderActions is not null)
+        {
+            <div class="dashboard-hero-actions">
+                @HeaderActions
+            </div>
+        }
+    </header>
+
+    @ChildContent
+</section>
+
+@code {
+    [Parameter]
+    public string? Kicker { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Summary { get; set; }
+
+    [Parameter]
+    public string? StatusLine { get; set; }
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public RenderFragment? HeaderActions { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string GetSectionClass()
+    {
+        return string.IsNullOrWhiteSpace(Class) ? "section-page" : $"section-page {Class}";
+    }
+}

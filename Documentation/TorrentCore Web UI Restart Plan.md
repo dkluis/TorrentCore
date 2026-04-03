@@ -4,7 +4,7 @@
 
 Active planning document.
 
-Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Pending`
+Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phase 3 Pending`
 
 Last updated: `2026-04-03`
 
@@ -19,6 +19,13 @@ Current checkpoint:
 - side-by-side runtime hosting is not required because Avalonia remains available during web restart delivery
 - `src/TorrentCore.WebUI` has been created and added to `TorrentCore.sln`
 - `TorrentCore.WebUI` now has MudBlazor, TVMaze-aligned shell/theme baseline, client-boundary DI wiring, and initial route placeholders
+- Phase 2 shared infrastructure is now in place:
+  - `ITorrentCoreApiAdapter` wraps `TorrentCoreClient` calls with consistent result/error contracts
+  - shared loading/error/empty rendering uses reusable `StateView` component patterns
+  - shared toast/confirm patterns are centralized through `IOperatorFeedbackService`
+  - shared card/grid/table composition wrappers are available for data-heavy pages
+  - circuit-scoped page-state persistence (`IPageStateStore`) now backs list filter/sort/page behavior
+- dashboard, torrents, logs, settings, and service-connection pages now consume the shared primitives
 
 ## Purpose
 
@@ -288,7 +295,7 @@ Verify:
 
 Status:
 
-`Pending`
+`Complete`
 
 ### Phase 3 - Dashboard Slice
 
@@ -483,3 +490,4 @@ captured directly from TVMazeWeb:
 - `2026-04-03`: agreed to full restart, parallel project, TVMazeWeb design/framework parity, and parity-plus scope
 - `2026-04-03`: locked 10 ground rules as non-negotiable restart constraints
 - `2026-04-03`: created `TorrentCore.WebUI` foundation and completed Phase 1 baseline implementation
+- `2026-04-03`: completed Phase 2 shared UI infrastructure and rewired page implementations to shared request/state/feedback primitives

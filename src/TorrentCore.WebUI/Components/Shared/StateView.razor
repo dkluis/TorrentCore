@@ -1,0 +1,85 @@
+@if (Mode is StateViewMode.Ready)
+{
+    @ChildContent
+}
+else
+{
+    <MudPaper Class="@GetContainerClass()" Elevation="0">
+        @if (Mode is StateViewMode.Loading)
+        {
+            <MudProgressCircular Class="state-shell-spinner"
+                                Size="Size.Medium"
+                                Color="Color.Primary"
+                                Indeterminate="true" />
+        }
+
+        <div class="state-shell-copy">
+            <h2>@GetTitle()</h2>
+            @if (!string.IsNullOrWhiteSpace(Message))
+            {
+                <p>@Message</p>
+            }
+        </div>
+
+        @if (OnAction.HasDelegate && !string.IsNullOrWhiteSpace(ActionText))
+        {
+            <MudButton Variant="Variant.Filled"
+                       Color="@GetActionColor()"
+                       Size="Size.Small"
+                       OnClick="OnAction">
+                @ActionText
+            </MudButton>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter]
+    public StateViewMode Mode { get; set; } = StateViewMode.Loading;
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public string? ActionText { get; set; }
+
+    [Parameter]
+    public EventCallback OnAction { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string GetContainerClass()
+    {
+        return Mode switch
+        {
+            StateViewMode.Error => "state-shell state-shell--error",
+            StateViewMode.Empty => "state-shell state-shell--empty",
+            _ => "state-shell",
+        };
+    }
+
+    private string GetTitle()
+    {
+        if (!string.IsNullOrWhiteSpace(Title))
+        {
+            return Title;
+        }
+
+        return Mode switch
+        {
+            StateViewMode.Loading => "Loading",
+            StateViewMode.Error => "Something went wrong",
+            StateViewMode.Empty => "No results",
+            _ => "Ready",
+        };
+    }
+
+    private Color GetActionColor()
+    {
+        return Mode is StateViewMode.Error ? Color.Error : Color.Primary;
+    }
+}
