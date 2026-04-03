@@ -219,16 +219,26 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             _gate.Release();
         }
 
-        await SynchronizeAsync(cancellationToken);
+        await SynchronizeWithoutAutomaticRecoveryAsync(cancellationToken);
         return recoveryResult!;
     }
 
     public async Task SynchronizeAsync(CancellationToken cancellationToken)
     {
+        await SynchronizeInternalAsync(cancellationToken, includeAutomaticRecovery: true);
+    }
+
+    private async Task SynchronizeWithoutAutomaticRecoveryAsync(CancellationToken cancellationToken)
+    {
+        await SynchronizeInternalAsync(cancellationToken, includeAutomaticRecovery: false);
+    }
+
+    private async Task SynchronizeInternalAsync(CancellationToken cancellationToken, bool includeAutomaticRecovery)
+    {
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
-            await SynchronizeCoreAsync(cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery);
         }
         finally
         {
@@ -342,7 +352,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             _gate.Release();
         }
 
-        await SynchronizeAsync(cancellationToken);
+        await SynchronizeWithoutAutomaticRecoveryAsync(cancellationToken);
 
         var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
         return MapDetail(persistedSnapshot, new TorrentQueueDiagnostic(null, null), null);
@@ -368,7 +378,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
 
-            await SynchronizeCoreAsync(cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
             return new TorrentActionResultDto
             {
@@ -406,7 +416,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             queuedSnapshot.ErrorMessage = null;
             await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
 
-            await SynchronizeCoreAsync(cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
             var updatedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? queuedSnapshot;
 
@@ -444,7 +454,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             await RequestMetadataDiscoveryRefreshAsync(currentSnapshot, manager, now, "manual", cancellationToken);
-            await SynchronizeCoreAsync(cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
             var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? currentSnapshot;
 
@@ -487,7 +497,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             await RequestMetadataDiscoveryRefreshAsync(
                 currentSnapshot, recreatedManager, now, "manual_reset", cancellationToken
             );
-            await SynchronizeCoreAsync(cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
             var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ??
                     CreateUpdatedSnapshot(currentSnapshot, recreatedManager, now);
@@ -533,7 +543,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             updatedSnapshot.CompletionCallbackLastError       = null;
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
 
-            await SynchronizeCoreAsync(cancellationToken);
+            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
             var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? updatedSnapshot;
 
@@ -587,7 +597,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             TorrentDataPathCleanup.DeleteEmptyDirectories(downloadRootPath, cleanupCandidatePaths);
         }
 
-        await SynchronizeAsync(cancellationToken);
+        await SynchronizeWithoutAutomaticRecoveryAsync(cancellationToken);
 
         return new TorrentActionResultDto
         {
@@ -845,7 +855,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return managedTorrents;
     }
 
-    private async Task SynchronizeCoreAsync(CancellationToken cancellationToken)
+    private async Task SynchronizeCoreAsync(CancellationToken cancellationToken, bool includeAutomaticRecovery = true)
     {
         await EnsureInitializedAsync(cancellationToken);
 
@@ -912,8 +922,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         await ReconcileRuntimeQueueAsync(cancellationToken);
-        await ProcessMetadataRecoveryAsync(runtimeSettings, now, cancellationToken);
-        await ProcessDownloadRecoveryAsync(runtimeSettings, now, cancellationToken);
+        if (includeAutomaticRecovery)
+        {
+            await ProcessMetadataRecoveryAsync(runtimeSettings, now, cancellationToken);
+            await ProcessDownloadRecoveryAsync(runtimeSettings, now, cancellationToken);
+        }
 
         foreach (var callbackSnapshot in pendingCallbackSnapshots)
         {
