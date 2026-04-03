@@ -66,7 +66,9 @@ Applies:
 
 ## Metadata Recovery
 
-These settings control how TorrentCore tries to wake up a public magnet that is stuck in `ResolvingMetadata` without any useful peer activity.
+These settings control how TorrentCore tries to wake up a public torrent when MonoTorrent is cold:
+- while it is stuck in `ResolvingMetadata` without any useful peer activity
+- while it is already in `Downloading` but still has zero open peers and zero payload progress
 
 ### Metadata Refresh Stale Seconds
 
@@ -76,6 +78,7 @@ Meaning:
 Practical interpretation:
 - This is the idle window before TorrentCore sends an explicit metadata-discovery nudge.
 - When the threshold is reached, TorrentCore asks MonoTorrent to do a DHT announce and a forced tracker announce for that torrent.
+- TorrentCore currently reuses this same stale window for `Downloading` torrents that already have metadata but still show zero open peer sessions and zero payload progress.
 - TorrentCore now treats only live peer connectivity as meaningful metadata activity; peer-discovery callbacks with zero open connections do not reset the stale window by themselves.
 - TorrentCore now prefers plaintext outgoing peer handshakes first and keeps RC4 as fallback, which reduces the amount of metadata time spent burning the first connection attempt on encrypted negotiation before retrying the same peer in plaintext.
 - Lower values make TorrentCore react sooner to a cold magnet, but also increase how often it prods trackers and DHT for weak swarms.
@@ -94,6 +97,7 @@ Meaning:
 Practical interpretation:
 - TorrentCore first tries a non-destructive peer-discovery refresh.
 - If the torrent still shows no meaningful metadata progress after this additional delay, TorrentCore performs a stop/start and immediately asks for fresh peers again.
+- TorrentCore currently reuses this same restart window for `Downloading` torrents that still have zero open peer sessions and no payload progress after a download-stage DHT/tracker refresh.
 - Lower values make recovery more aggressive, but can create extra churn for magnets that only need a little more time.
 
 Unit:
@@ -125,11 +129,14 @@ What to check:
 - `torrent.metadata.refresh_requested` confirms a manual or automatic discovery refresh was issued.
 - `torrent.metadata.restart_requested` confirms TorrentCore escalated from refresh to stop/start recovery.
 - `torrent.metadata.reset_requested` confirms TorrentCore recreated the metadata session from the saved magnet.
+- `torrent.download.refresh_requested` confirms TorrentCore nudged DHT and trackers for a torrent that already had metadata but was still in `Downloading` with zero useful activity.
+- `torrent.download.restart_requested` confirms TorrentCore escalated that zero-peer download stall to a stop/start plus fresh DHT/tracker announce.
 - `torrent.engine.peers_found` shows whether the swarm is returning candidate peers.
 - `torrent.engine.peers_found` with `OpenConnections = 0` means peers were discovered but TorrentCore still had no live peer connections at that moment.
 - `torrent.engine.peer_connected` and `torrent.engine.peer_disconnected` show whether MonoTorrent ever completed a full handshake, which peer/client it talked to, and which encryption mode the session used.
 - `torrent.engine.connection_failed` helps distinguish "no peers discovered" from "peers discovered but connections failed."
 - repeated `EncryptionNegiotiationFailed` or `HandshakeFailed` against discovered peers means the swarm exists but MonoTorrent is not turning those candidate peers into stable sessions.
+- repeated IPv6 route failures can be noise when the host has IPv6 enabled but the active VPN path does not carry IPv6; successful IPv4 peer sessions can still be enough for a healthy download.
 
 Operator guidance:
 - `Refresh Metadata` is most useful for public magnets that appear stuck after a quiet period or after a weak first discovery pass.
@@ -138,6 +145,20 @@ Operator guidance:
 - Weak or dead swarms may still never resolve metadata even after refresh and restart if no reachable peers exist.
 - If another client on the same host resolves the same magnet faster, compare whether TorrentCore is reaching `peer_connected` at all before assuming the issue is only DHT or tracker discovery.
 - If the same magnet resolves immediately in another client on the same host, compare TorrentCore's recent log events and current runtime settings before changing global limits again.
+
+## Troubleshooting: Downloading But No Peers
+
+If a torrent already resolved metadata, entered `Downloading`, and then sits with zero peers and no payload progress, TorrentCore now treats that as a second stale-recovery case.
+
+What TorrentCore does automatically:
+- After `Metadata Refresh Stale Seconds`, TorrentCore requests a DHT announce and a forced tracker announce for that torrent.
+- If the torrent still shows zero open peer sessions and zero payload progress through `Metadata Refresh Restart Delay Seconds`, TorrentCore performs a stop/start and immediately asks for fresh peers again.
+- If the download begins moving or any live peer session opens, the stale-recovery cycle is cleared and TorrentCore starts over from a clean slate on any later stall.
+
+What to compare against another client:
+- whether TorrentCore logs `torrent.engine.peers_found` without ever reaching `torrent.engine.peer_connected`
+- whether TorrentCore reaches `torrent.download.refresh_requested` or `torrent.download.restart_requested`
+- whether the other client is succeeding over IPv4 even while both clients log IPv6 route failures on the same VPN path
 
 ## MonoTorrent Engine Throttle Settings
 

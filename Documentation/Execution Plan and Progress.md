@@ -141,8 +141,10 @@ Current service configuration section:
 - MonoTorrent torrents stuck in `ResolvingMetadata` can now be nudged manually through `refresh_metadata` and the stronger `reset_metadata_session` action in the API and both UIs, and the engine now performs throttled automatic stale-metadata recovery by issuing a DHT/tracker refresh first, then stop/start, and finally a full manager recreation if discovery still stays cold
 - stale-metadata recovery now ignores peer-discovery callbacks that still have zero open connections, so empty `PeersFound` noise no longer keeps a dead metadata session looking healthy
 - MonoTorrent outbound peer policy now prefers plaintext first with RC4 fallback, restores IPv6 listening when the host supports it, and logs explicit `peer_connected` / `peer_disconnected` events with peer URI, client, direction, and encryption so live metadata stalls can be distinguished from connection-establishment failures
+- MonoTorrent stale recovery now also covers a narrower post-metadata failure mode: torrents already in `Downloading` but still showing zero open peers and zero payload progress now get an automatic DHT/tracker refresh first and then a stop/start recovery pass if the zero-peer stall continues
 - `Delete Data` now explicitly removes torrent payload files/directories before pruning empty parent folders, so operator data deletion matches the UI action label instead of only removing TorrentCore tracking state
 - the operator settings reference now includes a short troubleshooting guide for magnets stuck in `ResolvingMetadata`, covering the automatic recovery sequence, when to use `refresh_metadata`, and which engine events to inspect
+- the operator settings reference now also documents the automatic zero-peer download recovery path and calls out that IPv6 route failures can be incidental when the active VPN path only carries IPv4
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories
