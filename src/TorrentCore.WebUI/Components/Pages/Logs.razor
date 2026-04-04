@@ -101,7 +101,8 @@
                     }
 
                     <div class="operations-table-frame logs-table-frame">
-                            <MudTable Items="FilteredLogs"
+                            <MudTable T="ActivityLogEntryDto"
+                                      Items="FilteredLogs"
                                       Dense="true"
                                       Hover="true"
                                       Bordered="true"
@@ -115,11 +116,21 @@
                                       Class="operations-table logs-table"
                                       Elevation="0">
                                 <HeaderContent>
-                                    <MudTh>When</MudTh>
-                                    <MudTh>Level</MudTh>
-                                    <MudTh>Category</MudTh>
-                                    <MudTh>Event</MudTh>
-                                    <MudTh>Message</MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.OccurredAtUtc)">When</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.Level)">Level</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.Category)">Category</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.EventType)">Event</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.Message)">Message</MudTableSortLabel>
+                                    </MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
                                     <MudTd DataLabel="When">@context.OccurredAtUtc.LocalDateTime.ToString("g")</MudTd>

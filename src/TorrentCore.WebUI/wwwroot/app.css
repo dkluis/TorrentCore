@@ -1453,6 +1453,81 @@ h1:focus {
     grid-template-columns: 1fr;
 }
 
+.torrents-page {
+    height: 100%;
+    min-height: 0;
+}
+
+.torrents-tab-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.torrents-grid {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 0;
+    min-width: 0;
+}
+
+.torrents-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.torrents-panel--table {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.torrents-panel--detail {
+    overflow: auto;
+}
+
+.torrents-table-frame {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.torrents-table {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.torrents-table .mud-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    height: auto !important;
+}
+
+.torrents-table .mud-table-pagination {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--tvz-surface);
+}
+
+.torrents-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: flex-end;
+}
+
 .logs-page {
     height: 100%;
     min-height: 0;

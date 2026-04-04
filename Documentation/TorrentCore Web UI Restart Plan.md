@@ -26,6 +26,7 @@ Current checkpoint:
   - shared card/grid/table composition wrappers are available for data-heavy pages
   - circuit-scoped page-state persistence (`IPageStateStore`) now backs list filter/sort/page behavior
 - dashboard, torrents, logs, settings, and service-connection pages now consume the shared primitives
+- torrents page now follows the locked “single grid + selected detail panel” pattern with 5-second auto-refresh and row-level action execution from the detail panel
 
 ## Purpose
 
