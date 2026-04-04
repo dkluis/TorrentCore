@@ -59,12 +59,6 @@ public static class TorrentCoreConnectionProbe
             lastError = candidateResult.ErrorMessage;
         }
 
-        if (string.Equals(baseUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-        {
-            var httpsHint = new UriBuilder(baseUri) { Scheme = Uri.UriSchemeHttps }.Uri;
-            lastError = $"{lastError} Try '{httpsHint}' if the service is using TLS.";
-        }
-
         return new TorrentCoreConnectionProbeResult
         {
             BaseUrl = baseUri.ToString(),
@@ -82,22 +76,10 @@ public static class TorrentCoreConnectionProbe
 
         AddCandidate(baseUri);
 
-        if (string.Equals(baseUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-        {
-            var httpsCandidate = new UriBuilder(baseUri) { Scheme = Uri.UriSchemeHttps }.Uri;
-            AddCandidate(httpsCandidate);
-        }
-
         if (string.Equals(baseUri.Host, "127.0.0.1", StringComparison.OrdinalIgnoreCase))
         {
             var localhostCandidate = new UriBuilder(baseUri) { Host = "localhost" }.Uri;
             AddCandidate(localhostCandidate);
-
-            if (string.Equals(localhostCandidate.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-            {
-                var localhostHttps = new UriBuilder(localhostCandidate) { Scheme = Uri.UriSchemeHttps }.Uri;
-                AddCandidate(localhostHttps);
-            }
         }
 
         return candidates;

@@ -18,11 +18,9 @@ public sealed class TorrentCoreClientOptions
             throw new InvalidOperationException($"TorrentCoreService:BaseUrl '{baseUrl}' is not a valid absolute URI.");
         }
 
-        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) && !string.Equals(
-                    uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase
-                ))
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("TorrentCoreService:BaseUrl must use http or https.");
+            throw new InvalidOperationException("TorrentCoreService:BaseUrl must use http.");
         }
 
         return uri;
