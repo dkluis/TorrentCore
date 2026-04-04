@@ -40,7 +40,7 @@
                                   Variant="Variant.Outlined"
                                   Margin="Margin.Dense"
                                   Immediate="true"
-                                  Placeholder="http://torrentcore-service.local:5078/" />
+                                  Placeholder="http://torrentcore-service.local:5050/" />
                     <p class="dashboard-panel-copy">Use the host/IP for the machine running `TorrentCore.Service`.</p>
 
                     <div class="dashboard-inline-actions dashboard-inline-actions--compact">
@@ -49,14 +49,14 @@
                                    Size="Size.Small"
                                    Disabled="@(_isTesting || _isSaving)"
                                    OnClick="TestAsync">
-                            Test
+                            @(_isTesting ? "Testing..." : "Test")
                         </MudButton>
                         <MudButton Variant="Variant.Filled"
                                    Color="Color.Primary"
                                    Size="Size.Small"
                                    Disabled="@(_isTesting || _isSaving)"
                                    OnClick="SaveAsync">
-                            Save
+                            @(_isSaving ? "Saving..." : "Save")
                         </MudButton>
                         <MudButton Variant="Variant.Outlined"
                                    Color="Color.Secondary"
@@ -66,6 +66,11 @@
                             Recheck
                         </MudButton>
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_actionMessage))
+                    {
+                        <p class="@GetActionMessageClass()">@_actionMessage</p>
+                    }
                 </OperatorCard>
             </OperatorCardGrid>
         </StateView>
@@ -77,6 +82,8 @@
     private bool _isSaving;
     private string _baseUrl = string.Empty;
     private string? _errorMessage;
+    private string? _actionMessage;
+    private bool _actionIsError;
     private StateViewMode _mode = StateViewMode.Loading;
     private TorrentCoreConnectionProbeResult? _status;
 
@@ -105,13 +112,40 @@
 
     private async Task RefreshStatusAsync()
     {
-        _status = await ConnectionManager.RefreshAsync();
-        Feedback.Info("Service connection status refreshed.");
+        _actionMessage = null;
+        _actionIsError = false;
+        _actionMessage = "Rechecking current endpoint...";
+        try
+        {
+            _status = await ConnectionManager.RefreshAsync();
+            _actionIsError = !_status.IsReachable;
+            _actionMessage = _status.IsReachable
+                ? "Recheck complete: current endpoint is reachable."
+                : _status.ErrorMessage ?? "Recheck complete: endpoint is unavailable.";
+
+            if (_status.IsReachable)
+            {
+                Feedback.Success("Recheck complete.");
+            }
+            else
+            {
+                Feedback.Warning("Recheck complete: endpoint unavailable.");
+            }
+        }
+        catch (Exception exception)
+        {
+            _actionIsError = true;
+            _actionMessage = $"Recheck failed: {exception.Message}";
+            Feedback.Error(_actionMessage);
+        }
     }
 
     private async Task TestAsync()
     {
         _isTesting = true;
+        _actionMessage = null;
+        _actionIsError = false;
+        _actionMessage = "Testing endpoint...";
         try
         {
             var result = await ConnectionManager.TestAsync(_baseUrl);
@@ -119,11 +153,21 @@
 
             if (result.IsReachable)
             {
+                _actionIsError = false;
+                _actionMessage = $"Test passed for {result.BaseUrl}.";
                 Feedback.Success("Connection test passed.");
                 return;
             }
 
-            Feedback.Error(result.ErrorMessage ?? "Connection test failed.");
+            _actionIsError = true;
+            _actionMessage = result.ErrorMessage ?? "Connection test failed.";
+            Feedback.Error(_actionMessage);
+        }
+        catch (Exception exception)
+        {
+            _actionIsError = true;
+            _actionMessage = $"Connection test failed: {exception.Message}";
+            Feedback.Error(_actionMessage);
         }
         finally
         {
@@ -133,17 +177,10 @@
 
     private async Task SaveAsync()
     {
-        var confirmed = await Feedback.ConfirmAsync(
-            "Save shared endpoint",
-            "Switch TorrentCore.WebUI to the configured service endpoint?",
-            "Save endpoint"
-        );
-        if (!confirmed)
-        {
-            return;
-        }
-
         _isSaving = true;
+        _actionMessage = null;
+        _actionIsError = false;
+        _actionMessage = "Saving endpoint...";
         try
         {
             var result = await ConnectionManager.SaveAsync(_baseUrl);
@@ -151,12 +188,22 @@
 
             if (!result.IsReachable)
             {
-                Feedback.Error(result.ErrorMessage ?? "Configured endpoint is unreachable.");
+                _actionIsError = true;
+                _actionMessage = result.ErrorMessage ?? "Configured endpoint is unreachable.";
+                Feedback.Error(_actionMessage);
                 return;
             }
 
             _baseUrl = result.BaseUrl ?? _baseUrl;
+            _actionIsError = false;
+            _actionMessage = $"Saved endpoint: {_baseUrl}";
             Feedback.Success("Shared endpoint saved and applied.");
+        }
+        catch (Exception exception)
+        {
+            _actionIsError = true;
+            _actionMessage = $"Save failed: {exception.Message}";
+            Feedback.Error(_actionMessage);
         }
         finally
         {
@@ -195,5 +242,10 @@
     private static string GetCheckedAtText(TorrentCoreConnectionProbeResult? status)
     {
         return status?.CheckedAtUtc.LocalDateTime.ToString("g") ?? "Not checked yet";
+    }
+
+    private string GetActionMessageClass()
+    {
+        return _actionIsError ? "dashboard-panel-copy tc-error-text" : "dashboard-panel-copy";
     }
 }

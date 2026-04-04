@@ -7,7 +7,8 @@
 
 <OperatorPage Kicker="Diagnostics"
               Title="Logs"
-              Summary="Shared diagnostics table with consistent loading/error/empty and persisted filters."
+              Summary="TVMaze-style diagnostics table with one pager, explicit filter actions, and grid-contained scrolling."
+              Class="logs-page"
               StatusLine="Shows recent activity from the current TorrentCore endpoint.">
     <HeaderActions>
         <MudButton Variant="Variant.Filled"
@@ -25,112 +26,120 @@
                    Message="@_errorMessage"
                    ActionText="Retry"
                    OnAction="RefreshAsync">
-            <OperatorCard Class="dashboard-panel">
-                <div class="dashboard-panel-header">
-                    <div>
-                        <h2>Filters</h2>
-                        <p class="dashboard-panel-copy">Server-side level/category filtering with local text search and paging.</p>
+            <div class="dashboard-tab-content logs-tab-content">
+                <div class="logs-grid">
+                <OperatorCard Class="section-card logs-panel logs-panel--filters">
+                    <div class="dashboard-panel-header">
+                        <div>
+                            <h2>Filters</h2>
+                            <p class="dashboard-panel-copy">Refresh applies current filters. Clear resets inputs and reloads unfiltered logs.</p>
+                        </div>
+                        <div class="dashboard-inline-actions dashboard-inline-actions--compact">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Disabled="_isRefreshing"
+                                       OnClick="RefreshAsync">
+                                Refresh
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       Disabled="_isRefreshing"
+                                       OnClick="ClearFiltersAsync">
+                                Clear
+                            </MudButton>
+                        </div>
                     </div>
-                </div>
 
-                <div class="operations-filters">
-                    <MudTextField T="string"
-                                  Label="Search Message"
-                                  Value="_state.SearchText"
-                                  ValueChanged="OnSearchChanged"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense"
-                                  Immediate="true" />
+                    <div class="operations-filters">
+                        <MudTextField T="string"
+                                      Label="Search Message"
+                                      Value="_state.SearchText"
+                                      ValueChanged="OnSearchChanged"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true" />
 
-                    <MudSelect T="string"
-                               Label="Level"
-                               Value="_state.PrimaryFilter"
-                               ValueChanged="OnLevelChanged"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Dense="true">
-                    <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Trace")">Trace</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Debug")">Debug</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Information")">Information</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Warning")">Warning</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Error")">Error</MudSelectItem>
-                    <MudSelectItem T="string" Value="@("Critical")">Critical</MudSelectItem>
-                </MudSelect>
+                        <MudSelect T="string"
+                                   Label="Level"
+                                   Value="_state.PrimaryFilter"
+                                   ValueChanged="OnLevelChanged"
+                                   Variant="Variant.Outlined"
+                                   Margin="Margin.Dense"
+                                   Dense="true">
+                            <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Trace")">Trace</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Debug")">Debug</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Information")">Information</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Warning")">Warning</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Error")">Error</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Critical")">Critical</MudSelectItem>
+                        </MudSelect>
 
-                    <MudTextField T="string"
-                                  Label="Category"
-                                  Value="_state.SecondaryFilter"
-                                  ValueChanged="OnCategoryChanged"
-                                  Variant="Variant.Outlined"
-                                  Margin="Margin.Dense" />
-
-                    <MudSelect T="int"
-                               Label="Page Size"
-                               Value="_state.PageSize"
-                               ValueChanged="OnPageSizeChanged"
-                               Variant="Variant.Outlined"
-                               Margin="Margin.Dense"
-                               Dense="true">
-                        <MudSelectItem T="int" Value="25">25</MudSelectItem>
-                        <MudSelectItem T="int" Value="50">50</MudSelectItem>
-                        <MudSelectItem T="int" Value="100">100</MudSelectItem>
-                    </MudSelect>
-                </div>
-            </OperatorCard>
-
-            <OperatorCard Class="dashboard-panel dashboard-panel--client-grid">
-                <div class="dashboard-panel-header">
-                    <div>
-                        <h2>Recent Activity</h2>
-                        <p class="dashboard-panel-copy">@FilteredLogs.Count result(s), page @(_state.PageIndex + 1) of @PageCount.</p>
+                        <MudTextField T="string"
+                                      Label="Category"
+                                      Value="_state.SecondaryFilter"
+                                      ValueChanged="OnCategoryChanged"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true" />
                     </div>
-                    <div class="dashboard-inline-actions dashboard-inline-actions--compact">
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   Disabled="@(_state.PageIndex <= 0)"
-                                   OnClick="PreviousPage">
-                            Previous
-                        </MudButton>
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   Disabled="@(_state.PageIndex >= PageCount - 1)"
-                                   OnClick="NextPage">
-                            Next
-                        </MudButton>
-                    </div>
-                </div>
+                </OperatorCard>
 
-                <OperatorTableShell>
-                    <MudTable Items="VisibleRows"
-                              Dense="true"
-                              Hover="true"
-                              Bordered="true"
-                              Striped="true"
-                              Class="operations-table"
-                              Elevation="0">
-                        <HeaderContent>
-                            <MudTh>When</MudTh>
-                            <MudTh>Level</MudTh>
-                            <MudTh>Category</MudTh>
-                            <MudTh>Event</MudTh>
-                            <MudTh>Message</MudTh>
-                        </HeaderContent>
-                        <RowTemplate>
-                            <MudTd DataLabel="When">@context.OccurredAtUtc.LocalDateTime.ToString("g")</MudTd>
-                            <MudTd DataLabel="Level">@context.Level</MudTd>
-                            <MudTd DataLabel="Category">@context.Category</MudTd>
-                            <MudTd DataLabel="Event">@context.EventType</MudTd>
-                            <MudTd DataLabel="Message" Class="operations-table-wrap">@context.Message</MudTd>
-                        </RowTemplate>
-                        <NoRecordsContent>
-                            <MudText Typo="Typo.body2">No logs match the current filters.</MudText>
-                        </NoRecordsContent>
-                    </MudTable>
-                </OperatorTableShell>
-            </OperatorCard>
+                <OperatorCard Class="section-card logs-panel logs-panel--table">
+                    <div class="dashboard-panel-header">
+                        <div>
+                            <h2>Recent Activity</h2>
+                            <p class="dashboard-panel-copy">@FilteredLogs.Count result(s)</p>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_actionMessage))
+                    {
+                        <p class="@GetActionMessageClass()">@_actionMessage</p>
+                    }
+
+                    <div class="operations-table-frame logs-table-frame">
+                            <MudTable Items="FilteredLogs"
+                                      Dense="true"
+                                      Hover="true"
+                                      Bordered="true"
+                                      Striped="true"
+                                      FixedHeader="true"
+                                      Loading="_isRefreshing"
+                                      Breakpoint="Breakpoint.Md"
+                                      Height="100%"
+                                      RowsPerPage="@_state.PageSize"
+                                      RowsPerPageChanged="OnRowsPerPageChanged"
+                                      Class="operations-table logs-table"
+                                      Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>When</MudTh>
+                                    <MudTh>Level</MudTh>
+                                    <MudTh>Category</MudTh>
+                                    <MudTh>Event</MudTh>
+                                    <MudTh>Message</MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="When">@context.OccurredAtUtc.LocalDateTime.ToString("g")</MudTd>
+                                    <MudTd DataLabel="Level">@context.Level</MudTd>
+                                    <MudTd DataLabel="Category">@context.Category</MudTd>
+                                    <MudTd DataLabel="Event">@context.EventType</MudTd>
+                                    <MudTd DataLabel="Message" Class="operations-table-wrap">@context.Message</MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>
+                                    <MudText Typo="Typo.body2">No logs match the current filters.</MudText>
+                                </NoRecordsContent>
+                                <PagerContent>
+                                    <MudTablePager PageSizeOptions="new[] { 25, 50, 100, 250 }"
+                                                   RowsPerPageString="Rows" />
+                                </PagerContent>
+                            </MudTable>
+                    </div>
+                </OperatorCard>
+                </div>
+            </div>
         </StateView>
     </ChildContent>
 </OperatorPage>
@@ -141,11 +150,13 @@
     private readonly List<ActivityLogEntryDto> _allLogs = [];
     private StandardListPageState _state = new()
     {
-        PageSize = 50,
+        PageSize = 25,
     };
     private StateViewMode _mode = StateViewMode.Loading;
     private bool _isRefreshing;
     private string? _errorMessage;
+    private string? _actionMessage;
+    private bool _actionIsError;
 
     private IReadOnlyList<ActivityLogEntryDto> FilteredLogs
     {
@@ -161,20 +172,19 @@
                 );
             }
 
+            if (!string.IsNullOrWhiteSpace(_state.PrimaryFilter))
+            {
+                query = query.Where(log => string.Equals(log.Level, _state.PrimaryFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(_state.SecondaryFilter))
+            {
+                query = query.Where(log => log.Category.Contains(_state.SecondaryFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
             return query
                 .OrderByDescending(log => log.OccurredAtUtc)
                 .ToArray();
-        }
-    }
-
-    private int PageCount => Math.Max(1, (int)Math.Ceiling(FilteredLogs.Count / (double)_state.PageSize));
-
-    private IReadOnlyList<ActivityLogEntryDto> VisibleRows
-    {
-        get
-        {
-            var pageIndex = Math.Clamp(_state.PageIndex, 0, PageCount - 1);
-            return FilteredLogs.Skip(pageIndex * _state.PageSize).Take(_state.PageSize).ToArray();
         }
     }
 
@@ -184,35 +194,49 @@
             StateKey,
             () => new StandardListPageState
             {
-                PageSize = 50,
+                PageSize = 25,
             }
         );
 
-        await LoadAsync(showSuccessToast: false);
+        if (_state.PageSize <= 0)
+        {
+            _state.PageSize = 25;
+        }
+
+        await LoadAsync(showSuccessToast: false, showLoadingState: true);
     }
 
     private async Task RefreshAsync()
     {
-        await LoadAsync(showSuccessToast: true);
+        await LoadAsync(showSuccessToast: true, showLoadingState: false);
     }
 
-    private async Task LoadAsync(bool showSuccessToast)
+    private async Task LoadAsync(bool showSuccessToast, bool showLoadingState)
     {
         _isRefreshing = true;
-        _mode = StateViewMode.Loading;
+        if (showLoadingState)
+        {
+            _mode = StateViewMode.Loading;
+        }
+
         _errorMessage = null;
+        _actionMessage = null;
+        _actionIsError = false;
+        PersistState();
 
         var logsResult = await Api.GetRecentLogsAsync(
-            take: 400,
-            category: NormalizeFilter(_state.SecondaryFilter),
-            level: NormalizeFilter(_state.PrimaryFilter)
+            take: int.MaxValue
         );
 
         if (!logsResult.IsSuccess)
         {
-            _errorMessage = logsResult.ErrorMessage ?? "Unable to load recent logs.";
-            _mode = StateViewMode.Error;
+            var errorMessage = logsResult.ErrorMessage ?? "Unable to load recent logs.";
+            _errorMessage = errorMessage;
+            _actionIsError = true;
+            _actionMessage = errorMessage;
+            _mode = _allLogs.Count == 0 ? StateViewMode.Error : StateViewMode.Ready;
             _isRefreshing = false;
+            Feedback.Error(errorMessage);
             return;
         }
 
@@ -222,7 +246,6 @@
             _allLogs.AddRange(logsResult.Value);
         }
 
-        ClampPageIndex();
         _mode = _allLogs.Count == 0 ? StateViewMode.Empty : StateViewMode.Ready;
         _isRefreshing = false;
 
@@ -230,66 +253,29 @@
         {
             Feedback.Success("Logs refreshed.");
         }
+
+        _actionMessage = $"Last refresh: {DateTimeOffset.Now.LocalDateTime:g}";
     }
 
-    private Task OnSearchChanged(string value)
-    {
-        _state.SearchText = value.Trim();
-        _state.PageIndex = 0;
-        PersistState();
-        return Task.CompletedTask;
-    }
-
-    private async Task OnLevelChanged(string value)
-    {
-        _state.PrimaryFilter = value;
-        _state.PageIndex = 0;
-        PersistState();
-        await LoadAsync(showSuccessToast: false);
-    }
-
-    private async Task OnCategoryChanged(string value)
-    {
-        _state.SecondaryFilter = value.Trim();
-        _state.PageIndex = 0;
-        PersistState();
-        await LoadAsync(showSuccessToast: false);
-    }
-
-    private Task OnPageSizeChanged(int value)
+    private Task OnRowsPerPageChanged(int value)
     {
         _state.PageSize = value;
-        _state.PageIndex = 0;
         PersistState();
+        _actionMessage = $"Rows per page: {value}";
+        _actionIsError = false;
         return Task.CompletedTask;
     }
 
-    private void PreviousPage()
+    private async Task ClearFiltersAsync()
     {
-        if (_state.PageIndex <= 0)
-        {
-            return;
-        }
-
-        _state.PageIndex--;
+        _state.SearchText = string.Empty;
+        _state.PrimaryFilter = string.Empty;
+        _state.SecondaryFilter = string.Empty;
         PersistState();
-    }
-
-    private void NextPage()
-    {
-        if (_state.PageIndex >= PageCount - 1)
-        {
-            return;
-        }
-
-        _state.PageIndex++;
-        PersistState();
-    }
-
-    private void ClampPageIndex()
-    {
-        _state.PageIndex = Math.Clamp(_state.PageIndex, 0, PageCount - 1);
-        PersistState();
+        await LoadAsync(showSuccessToast: false, showLoadingState: false);
+        Feedback.Info("Filters cleared.");
+        _actionMessage = "Filters cleared.";
+        _actionIsError = false;
     }
 
     private void PersistState()
@@ -297,8 +283,29 @@
         PageStateStore.Save(StateKey, _state);
     }
 
-    private static string? NormalizeFilter(string value)
+    private Task OnSearchChanged(string value)
     {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        _state.SearchText = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnLevelChanged(string value)
+    {
+        _state.PrimaryFilter = value;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnCategoryChanged(string value)
+    {
+        _state.SecondaryFilter = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private string GetActionMessageClass()
+    {
+        return _actionIsError ? "dashboard-panel-copy tc-error-text" : "dashboard-panel-copy";
     }
 }

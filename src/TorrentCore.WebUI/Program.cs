@@ -1,3 +1,4 @@
+using MudBlazor;
 using MudBlazor.Services;
 using TorrentCore.Client;
 using TorrentCore.WebUI.Components;
@@ -14,7 +15,13 @@ var endpointProvider = new MutableTorrentCoreEndpointProvider(clientOptions.Base
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
-builder.Services.AddMudServices();
+builder.Services.AddMudServices(configuration =>
+{
+    configuration.SnackbarConfiguration.PositionClass = Defaults.Classes.Position.TopRight;
+    configuration.SnackbarConfiguration.PreventDuplicates = true;
+    configuration.SnackbarConfiguration.MaxDisplayedSnackbars = 4;
+    configuration.SnackbarConfiguration.ShowCloseIcon = true;
+});
 builder.Services.AddSingleton(clientOptions);
 builder.Services.AddSingleton(endpointProvider);
 builder.Services.AddSingleton<ITorrentCoreEndpointProvider>(endpointProvider);

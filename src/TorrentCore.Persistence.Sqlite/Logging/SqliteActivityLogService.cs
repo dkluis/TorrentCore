@@ -103,7 +103,7 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        var boundedTake = Math.Clamp(query.Take, 1, 500);
+        var boundedTake = Math.Max(1, query.Take);
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);

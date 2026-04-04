@@ -12,6 +12,7 @@
 
 html {
     box-sizing: border-box;
+    height: 100%;
     min-height: 100%;
 }
 
@@ -24,6 +25,7 @@ html {
 html,
 body {
     margin: 0;
+    height: 100%;
     min-height: 100%;
     background:
         radial-gradient(circle at top right, rgba(196, 128, 57, 0.18), transparent 28rem),
@@ -34,6 +36,7 @@ body {
 
 body {
     line-height: 1.35;
+    overflow: hidden;
 }
 
 h1,
@@ -50,6 +53,10 @@ a {
 .tc-break {
     overflow-wrap: anywhere;
     word-break: break-word;
+}
+
+.tc-error-text {
+    color: #8f1818 !important;
 }
 
 h1:focus {
@@ -69,7 +76,9 @@ h1:focus {
 }
 
 .shell-layout {
+    height: 100dvh;
     min-height: 100vh;
+    overflow: hidden;
 }
 
 .shell-appbar {
@@ -184,10 +193,18 @@ h1:focus {
 
 .shell-main {
     background: transparent;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .shell-canvas {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
     padding: 0.75rem;
 }
 
@@ -205,7 +222,9 @@ h1:focus {
 .section-page {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     gap: 0.75rem;
+    min-height: 0;
     min-width: 0;
 }
 
@@ -1434,6 +1453,76 @@ h1:focus {
     grid-template-columns: 1fr;
 }
 
+.logs-page {
+    height: 100%;
+    min-height: 0;
+}
+
+.logs-tab-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.logs-grid {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+}
+
+.logs-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.logs-panel--filters {
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.logs-panel--table {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.logs-table-frame {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.logs-table {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.logs-table .mud-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    height: auto !important;
+}
+
+.logs-table .mud-table-pagination {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--tvz-surface);
+}
+
+
 .operations-filter-actions {
     display: flex;
     flex-wrap: wrap;
@@ -2054,6 +2143,7 @@ h1:focus {
     .operations-detail-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+
 }
 
 @media (min-width: 72rem) {
@@ -2113,6 +2203,7 @@ h1:focus {
     .operations-detail-grid {
         grid-template-columns: repeat(6, minmax(0, 1fr));
     }
+
 }
 
 @media (min-width: 90rem) {
@@ -2144,4 +2235,5 @@ h1:focus {
     .operations-filters {
         grid-template-columns: repeat(8, minmax(0, 1fr));
     }
+
 }
