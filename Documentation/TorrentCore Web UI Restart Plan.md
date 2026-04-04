@@ -6,7 +6,7 @@ Active planning document.
 
 Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phase 3 Pending`
 
-Last updated: `2026-04-03`
+Last updated: `2026-04-04`
 
 Current checkpoint:
 
@@ -129,6 +129,24 @@ Expected parity areas:
 - consistent table/grid and actions model
 - viewport-fit behavior for dense data screens
 - consistent feedback model for async operations and failures
+
+## Locked UI Standards (2026-04-04)
+
+These are now mandatory defaults for all new/reworked TorrentCore.WebUI pages.
+
+- Toast/snackbar placement uses top-right to match TVMaze behavior.
+- MudBlazor runtime script must be loaded in `Components/App.razor` (`MudBlazor.min.js`).
+- Dense data pages must be viewport-fit: browser window should not scroll during normal operation.
+- Only grid/table containers scroll for dense views; pager must remain visible/clickable inside the table shell.
+- Grid height must be based on available container space, not inferred from row count/page size.
+- Default rows-per-page for operator tables is `25` unless a page has a documented exception.
+- Do not hard-cap API retrieval counts in UI code for grid/list pages.
+- Do not hard-cap API retrieval counts in service query handlers unless a cap is explicitly documented and approved.
+- For logs specifically, the prior `500` query clamp is removed; retention is controlled by configured max log entries.
+
+Application rule:
+
+- If any future page violates these standards, fix the shared shell/CSS/component pattern first, then page-specific code.
 
 ## TVMaze Baseline Conventions (Captured)
 
