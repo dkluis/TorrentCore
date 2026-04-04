@@ -27,6 +27,8 @@ Current checkpoint:
   - circuit-scoped page-state persistence (`IPageStateStore`) now backs list filter/sort/page behavior
 - dashboard, torrents, logs, settings, and service-connection pages now consume the shared primitives
 - torrents page now follows the locked “single grid + selected detail panel” pattern with 5-second auto-refresh and row-level action execution from the detail panel
+- torrents and logs tables now use MudBlazor header-based sorting (`MudTableSortLabel`) instead of separate sort selectors
+- shell app bar `Add Magnet` now opens a global add dialog and submits directly through shared API adapter/service feedback patterns
 
 ## Purpose
 
@@ -141,6 +143,7 @@ These are now mandatory defaults for all new/reworked TorrentCore.WebUI pages.
 - Only grid/table containers scroll for dense views; pager must remain visible/clickable inside the table shell.
 - Grid height must be based on available container space, not inferred from row count/page size.
 - Default rows-per-page for operator tables is `25` unless a page has a documented exception.
+- Table sorting should be provided through grid header sort controls (`MudTableSortLabel`) rather than external sort dropdowns.
 - Do not hard-cap API retrieval counts in UI code for grid/list pages.
 - Do not hard-cap API retrieval counts in service query handlers unless a cap is explicitly documented and approved.
 - For logs specifically, the prior `500` query clamp is removed; retention is controlled by configured max log entries.

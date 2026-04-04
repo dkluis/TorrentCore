@@ -1,0 +1,123 @@
+@using TorrentCore.Contracts.Categories
+@inject ITorrentCoreApiAdapter Api
+
+<MudDialog>
+    <DialogContent>
+        <div class="add-magnet-dialog-shell">
+            <MudTextField T="string"
+                          Label="Magnet URI"
+                          Value="_magnetUri"
+                          ValueChanged="OnMagnetChanged"
+                          Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          Lines="4"
+                          Immediate="true"
+                          Class="add-magnet-dialog-field" />
+
+            <MudSelect T="string"
+                       Label="Category"
+                       Value="_selectedCategoryKey"
+                       ValueChanged="OnCategoryChanged"
+                       Variant="Variant.Outlined"
+                       Margin="Margin.Dense"
+                       Dense="true"
+                       Class="add-magnet-dialog-field">
+                <MudSelectItem T="string" Value="@string.Empty">Uncategorized</MudSelectItem>
+                @foreach (var category in _categories)
+                {
+                    <MudSelectItem T="string" Value="@category.Key">@category.DisplayName</MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   Size="Size.Small"
+                   OnClick="Cancel">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   Disabled="_isLoading"
+                   OnClick="SubmitAsync">
+            Add
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private readonly List<TorrentCategoryDto> _categories = [];
+    private bool _isLoading;
+    private string _magnetUri = string.Empty;
+    private string _selectedCategoryKey = string.Empty;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+
+        var categoriesResult = await Api.GetCategoriesAsync();
+        if (categoriesResult.IsSuccess && categoriesResult.Value is not null)
+        {
+            _categories.Clear();
+            _categories.AddRange(
+                categoriesResult.Value
+                    .Where(category => category.Enabled)
+                    .OrderBy(category => category.SortOrder)
+                    .ThenBy(category => category.DisplayName, StringComparer.OrdinalIgnoreCase)
+            );
+        }
+
+        _isLoading = false;
+    }
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private Task OnMagnetChanged(string value)
+    {
+        _magnetUri = value;
+        _errorMessage = null;
+        return Task.CompletedTask;
+    }
+
+    private Task OnCategoryChanged(string value)
+    {
+        _selectedCategoryKey = value;
+        return Task.CompletedTask;
+    }
+
+    private Task SubmitAsync()
+    {
+        var magnetUri = _magnetUri.Trim();
+        if (string.IsNullOrWhiteSpace(magnetUri))
+        {
+            _errorMessage = "Magnet URI is required.";
+            return Task.CompletedTask;
+        }
+
+        MudDialog.Close(
+            DialogResult.Ok(
+                new AddMagnetRequest
+                {
+                    MagnetUri = magnetUri,
+                    CategoryKey = string.IsNullOrWhiteSpace(_selectedCategoryKey) ? null : _selectedCategoryKey,
+                }
+            )
+        );
+
+        return Task.CompletedTask;
+    }
+}

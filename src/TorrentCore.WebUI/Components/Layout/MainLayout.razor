@@ -2,6 +2,9 @@
 @inject IOptions<TorrentCoreClientOptions> ClientOptionsAccessor
 @inject IHostEnvironment HostEnvironment
 @inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ITorrentCoreApiAdapter Api
+@inject IOperatorFeedbackService Feedback
 
 <MudThemeProvider Theme="_theme" />
 <MudDialogProvider />
@@ -27,7 +30,7 @@
                        Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Download"
                        Class="shell-appbar-action"
-                       OnClick="OpenTorrents">
+                       OnClick="OpenAddMagnetAsync">
                 Add Magnet
             </MudButton>
         </MudHidden>
@@ -36,7 +39,7 @@
             <MudIconButton Icon="@Icons.Material.Filled.Download"
                            Color="Color.Inherit"
                            Class="shell-appbar-icon-action"
-                           OnClick="OpenTorrents"
+                           OnClick="OpenAddMagnetAsync"
                            aria-label="Open Torrents" />
         </MudHidden>
 
@@ -134,8 +137,40 @@
         _drawerOpen = !_drawerOpen;
     }
 
-    private void OpenTorrents()
+    private async Task OpenAddMagnetAsync()
     {
+        var dialog = await DialogService.ShowAsync<AddMagnetDialog>(
+            "Add Magnet",
+            new DialogOptions
+            {
+                CloseButton = true,
+                CloseOnEscapeKey = true,
+                BackdropClick = false,
+                FullWidth = true,
+                MaxWidth = MaxWidth.Medium,
+            }
+        );
+
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not AddMagnetRequest request)
+        {
+            return;
+        }
+
+        var addResult = await Api.AddMagnetAsync(request);
+        if (!addResult.IsSuccess)
+        {
+            Feedback.Error(addResult.ErrorMessage ?? "Add magnet failed.");
+            return;
+        }
+
+        var addedName = addResult.Value?.Name;
+        Feedback.Success(
+            string.IsNullOrWhiteSpace(addedName)
+                ? "Magnet submitted."
+                : $"Magnet submitted: {addedName}"
+        );
+
         NavigationManager.NavigateTo("/torrents");
     }
 }
