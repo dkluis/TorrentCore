@@ -42,8 +42,8 @@ fi
 tc_log_info "Publishing TorrentCore.Service for ${TORRENTCORE_PUBLISH_RUNTIME}."
 tc_publish_project "src/TorrentCore.ServiceHost/TorrentCore.Service.csproj" "${SERVICE_PUBLISH_DIR}"
 
-tc_log_info "Publishing TorrentCore.Web for ${TORRENTCORE_PUBLISH_RUNTIME}."
-tc_publish_project "src/TorrentCore.Web/TorrentCore.Web.csproj" "${WEBUI_PUBLISH_DIR}"
+tc_log_info "Publishing TorrentCore.WebUI for ${TORRENTCORE_PUBLISH_RUNTIME}."
+tc_publish_project "src/TorrentCore.WebUI/TorrentCore.WebUI.csproj" "${WEBUI_PUBLISH_DIR}"
 
 tc_log_info "Syncing service publish output."
 tc_sync_directory "${SERVICE_PUBLISH_DIR}" "${TORRENTCORE_DEPLOY_BASE}/Service"

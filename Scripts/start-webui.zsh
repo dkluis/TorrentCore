@@ -11,11 +11,22 @@ tc_log_webui_runtime_configuration
 APP_DIR="${TORRENTCORE_BASE_DIR}/WebUI"
 PID_FILE="${TORRENTCORE_RUN_DIR}/webui.pid"
 LOG_FILE="${TORRENTCORE_LOG_DIR}/webui.log"
+WEBUI_DLL="${TORRENTCORE_WEBUI_DLL:-}"
+
+if [[ -z "${WEBUI_DLL}" ]]; then
+  if [[ -f "${APP_DIR}/TorrentCore.WebUI.dll" ]]; then
+    WEBUI_DLL="TorrentCore.WebUI.dll"
+  elif [[ -f "${APP_DIR}/TorrentCore.Web.dll" ]]; then
+    WEBUI_DLL="TorrentCore.Web.dll"
+  else
+    WEBUI_DLL="TorrentCore.WebUI.dll"
+  fi
+fi
 
 tc_start_dotnet_app \
   "TorrentCore.WebUI" \
   "${APP_DIR}" \
-  "TorrentCore.Web.dll" \
+  "${WEBUI_DLL}" \
   "${PID_FILE}" \
   "${LOG_FILE}" \
   "ASPNETCORE_ENVIRONMENT=${TORRENTCORE_ASPNETCORE_ENVIRONMENT}" \

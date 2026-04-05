@@ -32,8 +32,8 @@ if [[ "${RESTART_AFTER_DEPLOY}" == true && -x "${TARGET_SCRIPT_DIR}/stop-webui.z
   "${TARGET_SCRIPT_DIR}/stop-webui.zsh"
 fi
 
-tc_log_info "Publishing TorrentCore.Web for ${TORRENTCORE_PUBLISH_RUNTIME}."
-tc_publish_project "src/TorrentCore.Web/TorrentCore.Web.csproj" "${PUBLISH_DIR}"
+tc_log_info "Publishing TorrentCore.WebUI for ${TORRENTCORE_PUBLISH_RUNTIME}."
+tc_publish_project "src/TorrentCore.WebUI/TorrentCore.WebUI.csproj" "${PUBLISH_DIR}"
 
 tc_log_info "Syncing web publish output to ${TARGET_WEBUI_DIR}."
 tc_sync_directory "${PUBLISH_DIR}" "${TARGET_WEBUI_DIR}"

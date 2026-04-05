@@ -2,6 +2,7 @@
 @inject ITorrentCoreApiAdapter Api
 @inject IOperatorFeedbackService Feedback
 @inject IPageStateStore PageStateStore
+@inject NavigationManager NavigationManager
 
 <PageTitle>Logs</PageTitle>
 
@@ -84,14 +85,43 @@
                                       Variant="Variant.Outlined"
                                       Margin="Margin.Dense"
                                       Immediate="true" />
+
+                        <MudTextField T="string"
+                                      Label="Torrent Id"
+                                      Value="_torrentIdFilter"
+                                      ValueChanged="OnTorrentIdChanged"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true" />
+
+                        <MudTextField T="string"
+                                      Label="From (Local Date/Time)"
+                                      Value="_fromLocalFilter"
+                                      ValueChanged="OnFromLocalChanged"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true" />
+
+                        <MudTextField T="string"
+                                      Label="To (Local Date/Time)"
+                                      Value="_toLocalFilter"
+                                      ValueChanged="OnToLocalChanged"
+                                      Variant="Variant.Outlined"
+                                      Margin="Margin.Dense"
+                                      Immediate="true" />
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_filterValidationMessage))
+                    {
+                        <p class="dashboard-panel-copy tc-error-text">@_filterValidationMessage</p>
+                    }
                 </OperatorCard>
 
                 <OperatorCard Class="section-card logs-panel logs-panel--table">
                     <div class="dashboard-panel-header">
                         <div>
                             <h2>Recent Activity</h2>
-                            <p class="dashboard-panel-copy">@FilteredLogs.Count result(s)</p>
+                            <p class="dashboard-panel-copy">@FilteredLogs.Count result(s) of @_allLogs.Count loaded</p>
                         </div>
                     </div>
 
@@ -113,6 +143,8 @@
                                       Height="100%"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
+                                      OnRowClick="OnLogRowClickAsync"
+                                      RowClassFunc="GetLogRowClass"
                                       Class="operations-table logs-table"
                                       Elevation="0">
                                 <HeaderContent>
@@ -149,6 +181,72 @@
                             </MudTable>
                     </div>
                 </OperatorCard>
+
+                <OperatorCard Class="section-card logs-panel logs-panel--detail">
+                    <div class="dashboard-panel-header">
+                        <div>
+                            <h2>Selected Log Entry</h2>
+                            <p class="dashboard-panel-copy">@BuildSelectionSummary()</p>
+                        </div>
+                    </div>
+
+                    @if (SelectedLog is null)
+                    {
+                        <div class="dashboard-callout">
+                            <p class="dashboard-callout-title">No log selected</p>
+                            <p class="dashboard-callout-copy">Click a log row to inspect full details.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="dashboard-detail-grid">
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Log Entry Id</p>
+                                <p class="dashboard-detail-value">@SelectedLog.LogEntryId</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Occurred (Local)</p>
+                                <p class="dashboard-detail-value">@SelectedLog.OccurredAtUtc.LocalDateTime.ToString("G")</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Occurred (UTC)</p>
+                                <p class="dashboard-detail-value">@SelectedLog.OccurredAtUtc.ToString("O")</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Level</p>
+                                <p class="dashboard-detail-value">@SelectedLog.Level</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Category</p>
+                                <p class="dashboard-detail-value">@SelectedLog.Category</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Event</p>
+                                <p class="dashboard-detail-value">@SelectedLog.EventType</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Torrent Id</p>
+                                <p class="dashboard-detail-value">@FormatGuid(SelectedLog.TorrentId)</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Service Instance Id</p>
+                                <p class="dashboard-detail-value">@FormatGuid(SelectedLog.ServiceInstanceId)</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Trace Id</p>
+                                <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(SelectedLog.TraceId)</p>
+                            </div>
+                            <div class="dashboard-detail-item">
+                                <p class="dashboard-detail-label">Message</p>
+                                <p class="dashboard-detail-value dashboard-detail-value--wrap">@SelectedLog.Message</p>
+                            </div>
+                            <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                <p class="dashboard-detail-label">Details JSON</p>
+                                <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(SelectedLog.DetailsJson)</p>
+                            </div>
+                        </div>
+                    }
+                </OperatorCard>
                 </div>
             </div>
         </StateView>
@@ -157,6 +255,10 @@
 
 @code {
     private const string StateKey = "logs:list";
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "torrentId")]
+    public string? TorrentId { get; set; }
 
     private readonly List<ActivityLogEntryDto> _allLogs = [];
     private StandardListPageState _state = new()
@@ -168,6 +270,19 @@
     private string? _errorMessage;
     private string? _actionMessage;
     private bool _actionIsError;
+    private string _torrentIdFilter = string.Empty;
+    private string _fromLocalFilter = string.Empty;
+    private string _toLocalFilter = string.Empty;
+    private string? _filterValidationMessage;
+    private long? _selectedLogEntryId;
+    private ActivityLogEntryDto? _selectedLog;
+    private bool _suppressFilterInputCallbacks;
+    private string _appliedSearchText = string.Empty;
+    private string _appliedLevelFilter = string.Empty;
+    private string _appliedCategoryFilter = string.Empty;
+    private string _appliedTorrentIdFilter = string.Empty;
+    private string _appliedFromLocalFilter = string.Empty;
+    private string _appliedToLocalFilter = string.Empty;
 
     private IReadOnlyList<ActivityLogEntryDto> FilteredLogs
     {
@@ -175,22 +290,37 @@
         {
             IEnumerable<ActivityLogEntryDto> query = _allLogs;
 
-            if (!string.IsNullOrWhiteSpace(_state.SearchText))
+            if (!string.IsNullOrWhiteSpace(_appliedSearchText))
             {
                 query = query.Where(
-                    log => log.Message.Contains(_state.SearchText, StringComparison.OrdinalIgnoreCase) ||
-                           log.EventType.Contains(_state.SearchText, StringComparison.OrdinalIgnoreCase)
+                    log => log.Message.Contains(_appliedSearchText, StringComparison.OrdinalIgnoreCase) ||
+                           log.EventType.Contains(_appliedSearchText, StringComparison.OrdinalIgnoreCase)
                 );
             }
 
-            if (!string.IsNullOrWhiteSpace(_state.PrimaryFilter))
+            if (!string.IsNullOrWhiteSpace(_appliedLevelFilter))
             {
-                query = query.Where(log => string.Equals(log.Level, _state.PrimaryFilter, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(log => string.Equals(log.Level, _appliedLevelFilter, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrWhiteSpace(_state.SecondaryFilter))
+            if (!string.IsNullOrWhiteSpace(_appliedCategoryFilter))
             {
-                query = query.Where(log => log.Category.Contains(_state.SecondaryFilter, StringComparison.OrdinalIgnoreCase));
+                query = query.Where(log => log.Category.Contains(_appliedCategoryFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (TryGetTorrentIdFilter(_appliedTorrentIdFilter, out var torrentIdFilter, out _) && torrentIdFilter is not null)
+            {
+                query = query.Where(log => log.TorrentId == torrentIdFilter);
+            }
+
+            if (TryGetDateTimeFilter(_appliedFromLocalFilter, out var fromUtcFilter, out _))
+            {
+                query = query.Where(log => log.OccurredAtUtc >= fromUtcFilter);
+            }
+
+            if (TryGetDateTimeFilter(_appliedToLocalFilter, out var toUtcFilter, out _))
+            {
+                query = query.Where(log => log.OccurredAtUtc <= toUtcFilter);
             }
 
             return query
@@ -214,11 +344,27 @@
             _state.PageSize = 25;
         }
 
+        _suppressFilterInputCallbacks = true;
+        ResetFilters(includeTorrentIdQuery: true);
+        ApplyDraftFilters();
+        PersistState();
+        ValidateFilters();
         await LoadAsync(showSuccessToast: false, showLoadingState: true);
+        _suppressFilterInputCallbacks = false;
     }
 
     private async Task RefreshAsync()
     {
+        ValidateFilters();
+        if (!string.IsNullOrWhiteSpace(_filterValidationMessage))
+        {
+            Feedback.Error(_filterValidationMessage);
+            _actionMessage = _filterValidationMessage;
+            _actionIsError = true;
+            return;
+        }
+
+        ApplyDraftFilters();
         await LoadAsync(showSuccessToast: true, showLoadingState: false);
     }
 
@@ -257,7 +403,16 @@
             _allLogs.AddRange(logsResult.Value);
         }
 
-        _mode = _allLogs.Count == 0 ? StateViewMode.Empty : StateViewMode.Ready;
+        if (_selectedLogEntryId is not null)
+        {
+            _selectedLog = _allLogs.FirstOrDefault(log => log.LogEntryId == _selectedLogEntryId.Value);
+            if (_selectedLog is null)
+            {
+                _selectedLogEntryId = null;
+            }
+        }
+
+        _mode = StateViewMode.Ready;
         _isRefreshing = false;
 
         if (showSuccessToast)
@@ -265,7 +420,7 @@
             Feedback.Success("Logs refreshed.");
         }
 
-        _actionMessage = $"Last refresh: {DateTimeOffset.Now.LocalDateTime:g}";
+        _actionMessage = $"Last refresh: {DateTimeOffset.Now.LocalDateTime:g} | Loaded {_allLogs.Count:n0} row(s).";
     }
 
     private Task OnRowsPerPageChanged(int value)
@@ -279,11 +434,21 @@
 
     private async Task ClearFiltersAsync()
     {
-        _state.SearchText = string.Empty;
-        _state.PrimaryFilter = string.Empty;
-        _state.SecondaryFilter = string.Empty;
+        _suppressFilterInputCallbacks = true;
+        ResetFilters(includeTorrentIdQuery: false);
+        ApplyDraftFilters();
         PersistState();
+        NavigationManager.NavigateTo("/logs", replace: true);
         await LoadAsync(showSuccessToast: false, showLoadingState: false);
+
+        // Enforce an explicit post-refresh reset to avoid stale input events
+        // reapplying date values while Clear is processing.
+        ResetFilters(includeTorrentIdQuery: false);
+        ApplyDraftFilters();
+        PersistState();
+        ValidateFilters();
+        _suppressFilterInputCallbacks = false;
+
         Feedback.Info("Filters cleared.");
         _actionMessage = "Filters cleared.";
         _actionIsError = false;
@@ -296,6 +461,11 @@
 
     private Task OnSearchChanged(string value)
     {
+        if (_suppressFilterInputCallbacks)
+        {
+            return Task.CompletedTask;
+        }
+
         _state.SearchText = value.Trim();
         PersistState();
         return Task.CompletedTask;
@@ -303,6 +473,11 @@
 
     private Task OnLevelChanged(string value)
     {
+        if (_suppressFilterInputCallbacks)
+        {
+            return Task.CompletedTask;
+        }
+
         _state.PrimaryFilter = value;
         PersistState();
         return Task.CompletedTask;
@@ -310,13 +485,212 @@
 
     private Task OnCategoryChanged(string value)
     {
+        if (_suppressFilterInputCallbacks)
+        {
+            return Task.CompletedTask;
+        }
+
         _state.SecondaryFilter = value.Trim();
         PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnTorrentIdChanged(string value)
+    {
+        if (_suppressFilterInputCallbacks)
+        {
+            return Task.CompletedTask;
+        }
+
+        _torrentIdFilter = value.Trim();
+        ValidateFilters();
+        return Task.CompletedTask;
+    }
+
+    private Task OnFromLocalChanged(string value)
+    {
+        if (_suppressFilterInputCallbacks)
+        {
+            return Task.CompletedTask;
+        }
+
+        _fromLocalFilter = value.Trim();
+        ValidateFilters();
+        return Task.CompletedTask;
+    }
+
+    private Task OnToLocalChanged(string value)
+    {
+        if (_suppressFilterInputCallbacks)
+        {
+            return Task.CompletedTask;
+        }
+
+        _toLocalFilter = value.Trim();
+        ValidateFilters();
+        return Task.CompletedTask;
+    }
+
+    private void ResetFilters(bool includeTorrentIdQuery)
+    {
+        _state.SearchText = string.Empty;
+        _state.PrimaryFilter = string.Empty;
+        _state.SecondaryFilter = string.Empty;
+        _torrentIdFilter = includeTorrentIdQuery ? (TorrentId ?? string.Empty).Trim() : string.Empty;
+        _fromLocalFilter = string.Empty;
+        _toLocalFilter = string.Empty;
+        _filterValidationMessage = null;
+        _selectedLogEntryId = null;
+        _selectedLog = null;
+    }
+
+    private void ApplyDraftFilters()
+    {
+        _appliedSearchText = _state.SearchText;
+        _appliedLevelFilter = _state.PrimaryFilter;
+        _appliedCategoryFilter = _state.SecondaryFilter;
+        _appliedTorrentIdFilter = _torrentIdFilter;
+        _appliedFromLocalFilter = _fromLocalFilter;
+        _appliedToLocalFilter = _toLocalFilter;
+    }
+
+    private Task OnLogRowClickAsync(TableRowClickEventArgs<ActivityLogEntryDto> args)
+    {
+        if (args.Item is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _selectedLogEntryId = args.Item.LogEntryId;
+        _selectedLog = args.Item;
         return Task.CompletedTask;
     }
 
     private string GetActionMessageClass()
     {
         return _actionIsError ? "dashboard-panel-copy tc-error-text" : "dashboard-panel-copy";
+    }
+
+    private string GetLogRowClass(ActivityLogEntryDto log, int rowNumber)
+    {
+        return _selectedLogEntryId == log.LogEntryId ? "operations-table-row--selected" : string.Empty;
+    }
+
+    private ActivityLogEntryDto? SelectedLog => _selectedLog;
+
+    private string BuildSelectionSummary()
+    {
+        if (SelectedLog is null)
+        {
+            return "No active selection.";
+        }
+
+        return $"{SelectedLog.Level} | {SelectedLog.Category} | {SelectedLog.EventType}";
+    }
+
+    private static string ValueOrNotAvailable(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "N/A" : value;
+    }
+
+    private static string FormatGuid(Guid? value)
+    {
+        return value?.ToString("D") ?? "N/A";
+    }
+
+    private bool TryGetTorrentIdFilter(out Guid? torrentIdFilter)
+    {
+        return TryGetTorrentIdFilter(_torrentIdFilter, out torrentIdFilter, out _);
+    }
+
+    private bool TryGetTorrentIdFilter(out Guid? torrentIdFilter, out string? errorMessage)
+    {
+        return TryGetTorrentIdFilter(_torrentIdFilter, out torrentIdFilter, out errorMessage);
+    }
+
+    private static bool TryGetTorrentIdFilter(string value, out Guid? torrentIdFilter, out string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            torrentIdFilter = null;
+            errorMessage = null;
+            return true;
+        }
+
+        if (Guid.TryParse(value, out var parsed))
+        {
+            torrentIdFilter = parsed;
+            errorMessage = null;
+            return true;
+        }
+
+        torrentIdFilter = null;
+        errorMessage = "Torrent Id filter must be a valid GUID.";
+        return false;
+    }
+
+    private bool TryGetFromUtcFilter(out DateTimeOffset fromUtc)
+    {
+        return TryGetDateTimeFilter(_fromLocalFilter, out fromUtc, out _);
+    }
+
+    private bool TryGetToUtcFilter(out DateTimeOffset toUtc)
+    {
+        return TryGetDateTimeFilter(_toLocalFilter, out toUtc, out _);
+    }
+
+    private static bool TryGetDateTimeFilter(string value, out DateTimeOffset utcValue, out string? errorMessage)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            utcValue = default;
+            errorMessage = null;
+            return false;
+        }
+
+        if (DateTimeOffset.TryParse(
+                value,
+                System.Globalization.CultureInfo.CurrentCulture,
+                System.Globalization.DateTimeStyles.AllowWhiteSpaces | System.Globalization.DateTimeStyles.AssumeLocal,
+                out var parsed))
+        {
+            utcValue = parsed.ToUniversalTime();
+            errorMessage = null;
+            return true;
+        }
+
+        utcValue = default;
+        errorMessage = "Date/time filters must be valid local date-time values.";
+        return false;
+    }
+
+    private void ValidateFilters()
+    {
+        _filterValidationMessage = null;
+
+        if (!TryGetTorrentIdFilter(out _, out var torrentIdError))
+        {
+            _filterValidationMessage = torrentIdError;
+            return;
+        }
+
+        var hasFrom = TryGetDateTimeFilter(_fromLocalFilter, out var fromUtc, out var fromError);
+        if (fromError is not null)
+        {
+            _filterValidationMessage = fromError;
+            return;
+        }
+
+        var hasTo = TryGetDateTimeFilter(_toLocalFilter, out var toUtc, out var toError);
+        if (toError is not null)
+        {
+            _filterValidationMessage = toError;
+            return;
+        }
+
+        if (hasFrom && hasTo && fromUtc > toUtc)
+        {
+            _filterValidationMessage = "'From' must be earlier than or equal to 'To'.";
+        }
     }
 }

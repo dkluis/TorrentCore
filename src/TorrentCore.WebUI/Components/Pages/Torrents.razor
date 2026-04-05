@@ -3,6 +3,7 @@
 @inject ITorrentCoreApiAdapter Api
 @inject IOperatorFeedbackService Feedback
 @inject IPageStateStore PageStateStore
+@inject NavigationManager NavigationManager
 
 <PageTitle>Torrents</PageTitle>
 
@@ -233,6 +234,13 @@
                                             Retry Callback
                                         </MudButton>
                                     }
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               Disabled="@DisableSelectedActions"
+                                               OnClick="OpenSelectedLogDetails">
+                                        Log Details
+                                    </MudButton>
                                     @if (_selectedTorrentDetail.CanRemove)
                                     {
                                         <MudButton Variant="Variant.Filled"
@@ -665,6 +673,17 @@
     private async Task RetryCallbackSelectedAsync()
     {
         await RunSelectedActionAsync("Retry callback", torrentId => Api.RetryCompletionCallbackAsync(torrentId));
+    }
+
+    private Task OpenSelectedLogDetails()
+    {
+        if (_selectedTorrentId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        NavigationManager.NavigateTo($"/logs?torrentId={_selectedTorrentId.Value:D}");
+        return Task.CompletedTask;
     }
 
     private async Task RemoveSelectedAsync()
