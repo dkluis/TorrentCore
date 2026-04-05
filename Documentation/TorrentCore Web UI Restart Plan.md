@@ -152,6 +152,18 @@ Application rule:
 
 - If any future page violates these standards, fix the shared shell/CSS/component pattern first, then page-specific code.
 
+## Logs Filtering Rules (2026-04-05)
+
+These rules are now explicit for `TorrentCore.WebUI` logs behavior:
+
+- The logs page always requests all available rows from the service (`take = int.MaxValue`), with no server-side filter parameters.
+- All logs filtering is local in the browser/UI.
+- `Torrent Id` filtering must only apply when the field contains a valid GUID.
+- Empty `Torrent Id` means no torrent-id filter (do not interpret empty as `NULL`).
+- `From` and `To` date fields apply only when they contain parseable date/time values.
+- `Refresh` applies the currently entered filter values.
+- `Clear` resets all filter inputs and query-string filter context.
+
 ## TVMaze Baseline Conventions (Captured)
 
 These conventions are now treated as the implementation baseline for TorrentCore web restart.
@@ -513,3 +525,5 @@ captured directly from TVMazeWeb:
 - `2026-04-03`: locked 10 ground rules as non-negotiable restart constraints
 - `2026-04-03`: created `TorrentCore.WebUI` foundation and completed Phase 1 baseline implementation
 - `2026-04-03`: completed Phase 2 shared UI infrastructure and rewired page implementations to shared request/state/feedback primitives
+- `2026-04-05`: fixed logs-page false row reduction where empty `Torrent Id` was incorrectly treated as `torrent_id IS NULL`; empty now means no torrent-id filter.
+- `2026-04-05`: reaffirmed logs retrieval/filter boundary: fetch all rows from API, apply filters only in UI, and avoid implicit server-side narrowing.
