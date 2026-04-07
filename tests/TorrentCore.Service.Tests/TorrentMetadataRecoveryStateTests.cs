@@ -5,13 +5,13 @@ namespace TorrentCore.Service.Tests;
 public sealed class TorrentMetadataRecoveryStateTests
 {
     [Fact]
-    public void NoteDiscoveryActivity_IgnoresZeroOpenConnections()
+    public void Observe_DoesNotTreatLingeringOpenConnectionsAsUsefulDiscoveryActivity()
     {
         var state = new TorrentMetadataRecoveryState();
         var start = new DateTimeOffset(2026, 4, 3, 9, 53, 48, TimeSpan.Zero);
 
-        state.Observe(start, isResolvingMetadata: true, hasMetadata: false, openConnections: 0);
-        state.NoteDiscoveryActivity(start.AddSeconds(45), openConnections: 0);
+        state.Observe(start, isResolvingMetadata: true, hasMetadata: false);
+        state.Observe(start.AddSeconds(45), isResolvingMetadata: true, hasMetadata: false);
 
         var decision = state.Evaluate(start.AddSeconds(61), staleSeconds: 60, restartDelaySeconds: 15);
 
@@ -26,8 +26,8 @@ public sealed class TorrentMetadataRecoveryStateTests
         var state = new TorrentMetadataRecoveryState();
         var start = new DateTimeOffset(2026, 4, 3, 9, 53, 48, TimeSpan.Zero);
 
-        state.Observe(start, isResolvingMetadata: true, hasMetadata: false, openConnections: 0);
-        state.NoteDiscoveryActivity(start.AddSeconds(45), openConnections: 3);
+        state.Observe(start, isResolvingMetadata: true, hasMetadata: false);
+        state.NoteDiscoveryActivity(start.AddSeconds(45));
 
         var decision = state.Evaluate(start.AddSeconds(61), staleSeconds: 60, restartDelaySeconds: 15);
 
@@ -41,7 +41,7 @@ public sealed class TorrentMetadataRecoveryStateTests
         var state = new TorrentMetadataRecoveryState();
         var start = new DateTimeOffset(2026, 4, 3, 9, 53, 48, TimeSpan.Zero);
 
-        state.Observe(start, isResolvingMetadata: true, hasMetadata: false, openConnections: 0);
+        state.Observe(start, isResolvingMetadata: true, hasMetadata: false);
 
         var refreshDecision = state.Evaluate(start.AddSeconds(61), staleSeconds: 60, restartDelaySeconds: 15);
         Assert.Equal(MetadataRecoveryAction.Refresh, refreshDecision.Action);

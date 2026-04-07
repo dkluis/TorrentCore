@@ -352,7 +352,37 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             _gate.Release();
         }
 
-        await SynchronizeWithoutAutomaticRecoveryAsync(cancellationToken);
+        await _synchronizationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+            var snapshots       = await torrentStateStore.ListAsync(cancellationToken);
+            var activeMetadataResolutions = snapshots.Count(existing =>
+                existing.TorrentId != snapshot.TorrentId &&
+                existing.DesiredState == TorrentDesiredState.Runnable &&
+                existing.State == ContractTorrentState.ResolvingMetadata
+            );
+
+            if (!manager.HasMetadata && !manager.Complete &&
+                activeMetadataResolutions < runtimeSettings.MaxActiveMetadataResolutions)
+            {
+                await EnsureManagerStartedAsync(manager, cancellationToken);
+
+                var dispatchedSnapshot = CreateUpdatedSnapshot(snapshot, manager, DateTimeOffset.UtcNow);
+                dispatchedSnapshot.State             = ContractTorrentState.ResolvingMetadata;
+                dispatchedSnapshot.ErrorMessage      = null;
+                dispatchedSnapshot.LastActivityAtUtc ??= DateTimeOffset.UtcNow;
+                await torrentStateStore.UpdateAsync(dispatchedSnapshot, cancellationToken);
+            }
+            else
+            {
+                await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
+            }
+        }
+        finally
+        {
+            _synchronizationGate.Release();
+        }
 
         var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
         return MapDetail(persistedSnapshot, new TorrentQueueDiagnostic(null, null), null);
@@ -454,9 +484,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             await RequestMetadataDiscoveryRefreshAsync(currentSnapshot, manager, now, "manual", cancellationToken);
-            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
-
-            var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? currentSnapshot;
+            var persistedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
+            await torrentStateStore.UpdateAsync(persistedSnapshot, cancellationToken);
 
             return new TorrentActionResultDto
             {
@@ -497,10 +526,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             await RequestMetadataDiscoveryRefreshAsync(
                 currentSnapshot, recreatedManager, now, "manual_reset", cancellationToken
             );
-            await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
-
-            var persistedSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ??
-                    CreateUpdatedSnapshot(currentSnapshot, recreatedManager, now);
+            var persistedSnapshot = CreateUpdatedSnapshot(currentSnapshot, recreatedManager, now);
+            await torrentStateStore.UpdateAsync(persistedSnapshot, cancellationToken);
 
             return new TorrentActionResultDto
             {
@@ -1245,9 +1272,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
-            NoteMetadataDiscoveryActivity(
-                torrentId, DateTimeOffset.UtcNow, eventArgs.TorrentManager.OpenConnections
-            );
+            if (eventArgs.NewPeers > 0)
+            {
+                NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
+            }
 
             await activityLogService.WriteAsync(
                 new ActivityLogWriteRequest
@@ -1280,9 +1308,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
-            NoteMetadataDiscoveryActivity(
-                torrentId, DateTimeOffset.UtcNow, eventArgs.TorrentManager.OpenConnections
-            );
+            NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
 
             await activityLogService.WriteAsync(
                 new ActivityLogWriteRequest
@@ -1374,9 +1400,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var recoveryState = _metadataRecoveryStates.GetOrAdd(
                 currentSnapshot.TorrentId, _ => new TorrentMetadataRecoveryState()
             );
-            recoveryState.Observe(
-                now, isResolvingMetadata, manager.HasMetadata || manager.Complete, manager.OpenConnections
-            );
+            recoveryState.Observe(now, isResolvingMetadata, manager.HasMetadata || manager.Complete);
 
             if (!isResolvingMetadata)
             {
@@ -1768,10 +1792,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
     }
 
-    private void NoteMetadataDiscoveryActivity(Guid torrentId, DateTimeOffset now, int openConnections)
+    private void NoteMetadataDiscoveryActivity(Guid torrentId, DateTimeOffset now)
     {
         _metadataRecoveryStates.GetOrAdd(torrentId, _ => new TorrentMetadataRecoveryState())
-                               .NoteDiscoveryActivity(now, openConnections);
+                               .NoteDiscoveryActivity(now);
     }
 
     private void ResetMetadataRecoveryState(Guid torrentId)

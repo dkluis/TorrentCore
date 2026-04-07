@@ -9,7 +9,7 @@ internal sealed class TorrentMetadataRecoveryState
     private          DateTimeOffset? _lastRestartAtUtc;
     private          DateTimeOffset? _resolvingSinceUtc;
 
-    public void Observe(DateTimeOffset now, bool isResolvingMetadata, bool hasMetadata, int openConnections)
+    public void Observe(DateTimeOffset now, bool isResolvingMetadata, bool hasMetadata)
     {
         lock (_gate)
         {
@@ -20,23 +20,13 @@ internal sealed class TorrentMetadataRecoveryState
             }
 
             _resolvingSinceUtc ??= now;
-
-            if (openConnections > 0)
-            {
-                _lastDiscoveryActivityAtUtc = now;
-            }
         }
     }
 
-    public void NoteDiscoveryActivity(DateTimeOffset now, int openConnections)
+    public void NoteDiscoveryActivity(DateTimeOffset now)
     {
         lock (_gate)
         {
-            if (openConnections <= 0)
-            {
-                return;
-            }
-
             _resolvingSinceUtc          ??= now;
             _lastDiscoveryActivityAtUtc =   now;
         }
