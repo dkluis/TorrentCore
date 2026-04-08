@@ -1,0 +1,60 @@
+@using TorrentCore.WebUI.Components.Pages
+@inject IDialogService DialogService
+
+@if (IconOnly)
+{
+    <MudTooltip Text="@Content.Summary">
+        <MudIconButton Icon="@Icons.Material.Outlined.Info"
+                       Size="Size.Small"
+                       Variant="Variant.Text"
+                       Color="Color.Default"
+                       Class="settings-help-button"
+                       OnClick="OpenDialogAsync"
+                       aria-label="@($"Help for {Content.Label}")" />
+    </MudTooltip>
+}
+else
+{
+    <div class="settings-field-labelrow">
+        <span class="settings-field-label">@Content.Label</span>
+
+        <MudTooltip Text="@Content.Summary">
+            <MudIconButton Icon="@Icons.Material.Outlined.Info"
+                           Size="Size.Small"
+                           Variant="Variant.Text"
+                           Color="Color.Default"
+                           Class="settings-help-button"
+                           OnClick="OpenDialogAsync"
+                           aria-label="@($"Help for {Content.Label}")" />
+        </MudTooltip>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public SettingHelpContent Content { get; set; } = default!;
+
+    [Parameter]
+    public bool IconOnly { get; set; }
+
+    private async Task OpenDialogAsync()
+    {
+        await DialogService.ShowAsync<SettingHelpDialog>(
+            "Setting Help",
+            new DialogParameters
+            {
+                [nameof(SettingHelpDialog.Title)] = Content.Label,
+                [nameof(SettingHelpDialog.Summary)] = Content.Summary,
+                [nameof(SettingHelpDialog.Detail)] = Content.Detail,
+            },
+            new DialogOptions
+            {
+                CloseButton = true,
+                CloseOnEscapeKey = true,
+                BackdropClick = true,
+                FullWidth = true,
+                MaxWidth = MaxWidth.Small,
+            }
+        );
+    }
+}

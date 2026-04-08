@@ -123,6 +123,8 @@ Current service configuration section:
 - host-level callback invocation settings now exist in the runtime settings contract and persistence model so the shared TVMaze callback entrypoint can be wired in a later slice without inventing a second callback configuration system
 - the Web UI now exposes category administration and shared callback settings under `Settings`, and the `Torrents` page now supports category selection on add plus category filtering/display for current torrents
 - the restarted WebUI `Settings` page now uses compact grouped edit cards with per-group save/discard actions, toast feedback on save/discard, and a guarded dirty-section workflow that blocks cross-section editing until the active group is saved or discarded
+- the restarted WebUI `Settings` page now also exposes per-setting operator guidance through shared help icons: hover/focus shows a short summary and click/tap opens a fuller paragraph, with text aligned to the operator settings reference
+- the WebUI settings-help icon pattern has now been operator-reviewed and accepted as the default guidance model for future admin-style pages
 - resolved callback routing data is now persisted per torrent at add time, so later category edits affect future torrents without silently changing callback labels or invoke behavior for existing torrents
 - completed torrents now invoke the shared TVMaze callback entrypoint once using Transmission-compatible environment variables, and callback diagnostics are written to the activity log
 - service-level regression coverage now verifies the callback environment contract and that restart/recovery does not re-fire the completion callback for an already-completed torrent

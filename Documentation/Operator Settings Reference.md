@@ -350,6 +350,185 @@ Important rules:
 Applies:
 - Live.
 
+## Completion Callback Settings
+
+These settings control the shared TVMaze-style completion callback entrypoint TorrentCore invokes after a torrent finishes and downstream-visible finalization is confirmed.
+
+### Enable Completion Callback Invocation
+
+Meaning:
+- Controls whether TorrentCore launches the configured shared completion callback after eligible torrent completion.
+
+Practical interpretation:
+- When enabled, TorrentCore invokes the shared callback entrypoint after the torrent has completed and the final visible payload path is ready.
+- When disabled, TorrentCore completes the torrent lifecycle without launching the external callback process.
+
+Applies:
+- Live.
+
+### Command Path
+
+Meaning:
+- The full executable or script path TorrentCore launches for the shared completion callback.
+
+Practical interpretation:
+- In the normal setup this points to the shared TVMaze callback launcher script.
+- Keep it as a full absolute path so callback execution does not depend on shell lookup behavior or current working directory.
+
+Applies:
+- Live.
+
+### Arguments
+
+Meaning:
+- Optional command-line arguments passed to the callback process.
+
+Practical interpretation:
+- Most operators can leave this blank in the standard setup.
+- Use it only when the callback launcher requires additional static arguments.
+
+Applies:
+- Live.
+
+### Working Directory
+
+Meaning:
+- Optional working directory used when TorrentCore launches the callback process.
+
+Practical interpretation:
+- Leave this blank unless the callback depends on a specific current directory to resolve relative files or tools.
+- If used, prefer an absolute path.
+
+Applies:
+- Live.
+
+### Process Timeout Seconds
+
+Meaning:
+- How long TorrentCore waits for the callback process itself to finish.
+
+Practical interpretation:
+- If the launched callback process exceeds this runtime, TorrentCore marks the callback attempt as timed out.
+- This timeout is about process execution time, not the pre-launch finalization wait.
+
+Applies:
+- Live.
+
+### Finalization Wait Seconds
+
+Meaning:
+- How long TorrentCore waits for the final visible payload path before it gives up on callback finalization.
+
+Practical interpretation:
+- TorrentCore does not fire the shared callback on the engine's first internal completed edge alone.
+- It waits until the final payload is visible and incomplete-suffix files are no longer the active payload.
+- If that readiness window exceeds this value, TorrentCore marks the callback path as timed out.
+
+Applies:
+- Live.
+
+### API Base URL Override
+
+Meaning:
+- Optional override for the API base URL exposed to the callback environment.
+
+Practical interpretation:
+- Leave this blank for the normal centrally managed setup.
+- Use it only if the shared callback must target a different API base URL than the default runtime context would provide.
+
+Applies:
+- Live.
+
+### API Key Override
+
+Meaning:
+- Optional override for the API key exposed to the callback environment.
+
+Practical interpretation:
+- Leave this blank for the normal centrally managed setup.
+- Use it only when the shared callback must authenticate with a different API key than the default runtime context.
+
+Applies:
+- Live.
+
+## Category Routing Settings
+
+These settings control how TorrentCore resolves future torrent adds into operator-facing category names, callback labels, and download-root paths.
+
+Important rule:
+- Category edits affect future torrents only. Existing torrents keep the routing values that were resolved and persisted when they were added.
+
+### Enabled
+
+Meaning:
+- Controls whether the category is available for future torrent adds.
+
+Practical interpretation:
+- Disabled categories remain in configuration for reference, but operators should not use them for new intake.
+
+Applies:
+- Live.
+
+### Invoke Callback
+
+Meaning:
+- Controls whether future torrents added under this category are configured to invoke the shared completion callback.
+
+Practical interpretation:
+- This only affects future torrents that resolve their routing from this category.
+- Existing torrents keep their already-persisted callback-routing values.
+
+Applies:
+- Live.
+
+### Display Name
+
+Meaning:
+- The operator-facing name shown for the category in UI selectors, filters, and displays.
+
+Practical interpretation:
+- Changing it affects presentation for operators.
+- It does not change the stable category key used by clients.
+
+Applies:
+- Live.
+
+### Callback Label
+
+Meaning:
+- The stable category label TorrentCore passes to the shared callback boundary for future torrents in this category.
+
+Practical interpretation:
+- Keep this aligned with downstream TVMaze or shared-callback route expectations.
+- Changing it affects future torrents only.
+
+Applies:
+- Live.
+
+### Download Root
+
+Meaning:
+- The root directory TorrentCore resolves for future torrents added under this category.
+
+Practical interpretation:
+- This path should stay aligned with the downstream route expectations for the same callback label/category.
+- Changing it affects future torrents only.
+
+Applies:
+- Live.
+
+### Sort Order
+
+Meaning:
+- Controls how the category is ordered in operator-facing lists and selectors.
+
+Practical interpretation:
+- Lower values appear earlier.
+- Use it to keep the most common intake categories near the top without changing their stable keys or routing behavior.
+
+Applies:
+- Live.
+
 ## Partial Files
 
 TorrentCore currently uses MonoTorrent partial-file behavior:

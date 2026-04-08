@@ -36,6 +36,7 @@ Current checkpoint:
 - the settings page now uses compact grouped edit cards with per-group save/discard actions for lifecycle, queue/recovery, engine throttles, callback settings, and categories
 - the settings page now blocks cross-section editing when one group is dirty; clicking another section opens a `Save / Discard / Cancel` decision dialog for the dirty group
 - runtime settings updates now flow through the shared WebUI API adapter, and successful group saves surface toast feedback instead of inline page-only messages
+- the per-setting help icon pattern on the settings page has now been operator-reviewed and is considered part of the current WebUI baseline
 
 ## Purpose
 
@@ -214,6 +215,10 @@ These rules are now explicit for `TorrentCore.WebUI` settings behavior:
 - Engine throttle saves remain restart-required service settings even though the save interaction is now group-scoped.
 - Top-of-page runtime/apply informational content should stay compact. Prefer one summary strip or chips row instead of large overview cards when the data is not directly edited in that area.
 - The settings page must have its own internal content scroll path so lower groups remain reachable even though the shell/browser window itself does not scroll.
+- Each editable setting should expose operator guidance through a shared help affordance:
+  - short hover/focus summary via `MudTooltip`
+  - fuller paragraph via click/tap dialog or popover
+  - help text should be sourced from operator documentation language, not invented ad hoc per field
 
 ## TVMaze Baseline Conventions (Captured)
 

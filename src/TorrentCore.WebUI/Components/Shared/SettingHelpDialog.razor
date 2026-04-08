@@ -1,0 +1,37 @@
+<MudDialog>
+    <DialogContent>
+        <div class="settings-help-dialog">
+            <p class="section-card-eyebrow">Setting Help</p>
+            <h2>@Title</h2>
+            <p class="dashboard-panel-copy">@Summary</p>
+            <p class="settings-help-dialog-detail">@Detail</p>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Summary { get; set; } = string.Empty;
+
+    [Parameter]
+    public string Detail { get; set; } = string.Empty;
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+}

@@ -653,6 +653,40 @@ h1:focus {
     grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
 }
 
+.settings-field-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    min-width: 0;
+}
+
+.settings-field-block--toggle {
+    justify-content: flex-end;
+}
+
+.settings-field-labelrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.settings-field-label {
+    color: var(--tvz-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.settings-help-button {
+    width: 1.6rem;
+    height: 1.6rem;
+    margin: 0;
+    color: var(--tvz-brand) !important;
+}
+
 .settings-field-stack {
     display: flex;
     flex-direction: column;
@@ -717,6 +751,12 @@ h1:focus {
     justify-content: flex-end;
 }
 
+.settings-category-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
 .settings-category-fields {
     display: grid;
     gap: 0.6rem;
@@ -754,6 +794,24 @@ h1:focus {
     display: flex;
     flex-direction: column;
     gap: 0.4rem;
+}
+
+.settings-help-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.settings-help-dialog h2 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.settings-help-dialog-detail {
+    margin: 0;
+    color: var(--tvz-ink);
+    font-size: 0.9rem;
+    line-height: 1.45;
 }
 
 .dashboard-torrent-submit-grid {

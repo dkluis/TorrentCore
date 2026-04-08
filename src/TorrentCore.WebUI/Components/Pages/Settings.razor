@@ -98,68 +98,80 @@
                                 </div>
 
                                 <div class="settings-field-grid">
-                                    <MudSelect T="string"
-                                               Label="Seeding Stop Mode"
-                                               Value="_lifecycle.SeedingStopMode"
-                                               ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopMode = next)"
-                                               Variant="Variant.Outlined"
-                                               Margin="Margin.Dense"
-                                               Dense="true">
-                                        @foreach (var seedingMode in SeedingModes)
-                                        {
-                                            <MudSelectItem T="string" Value="@seedingMode">@seedingMode</MudSelectItem>
-                                        }
-                                    </MudSelect>
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.SeedingStopMode" />
+                                        <MudSelect T="string"
+                                                   Value="_lifecycle.SeedingStopMode"
+                                                   ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopMode = next)"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Dense="true">
+                                            @foreach (var seedingMode in SeedingModes)
+                                            {
+                                                <MudSelectItem T="string" Value="@seedingMode">@seedingMode</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
 
-                                    <MudNumericField T="double"
-                                                     Label="Seeding Stop Ratio"
-                                                     Value="_lifecycle.SeedingStopRatio"
-                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopRatio = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="0.01"
-                                                     Step="0.01"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.SeedingStopRatio" />
+                                        <MudNumericField T="double"
+                                                         Value="_lifecycle.SeedingStopRatio"
+                                                         ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopRatio = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="0.01"
+                                                         Step="0.01"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Seeding Stop Minutes"
-                                                     Value="_lifecycle.SeedingStopMinutes"
-                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopMinutes = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.SeedingStopMinutes" />
+                                        <MudNumericField T="int"
+                                                         Value="_lifecycle.SeedingStopMinutes"
+                                                         ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopMinutes = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudSelect T="string"
-                                               Label="Completed Torrent Cleanup Mode"
-                                               Value="_lifecycle.CompletedTorrentCleanupMode"
-                                               ValueChanged="value => UpdateLifecycle(value, (group, next) => group.CompletedTorrentCleanupMode = next)"
-                                               Variant="Variant.Outlined"
-                                               Margin="Margin.Dense"
-                                               Dense="true">
-                                        @foreach (var cleanupMode in CleanupModes)
-                                        {
-                                            <MudSelectItem T="string" Value="@cleanupMode">@cleanupMode</MudSelectItem>
-                                        }
-                                    </MudSelect>
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletedTorrentCleanupMode" />
+                                        <MudSelect T="string"
+                                                   Value="_lifecycle.CompletedTorrentCleanupMode"
+                                                   ValueChanged="value => UpdateLifecycle(value, (group, next) => group.CompletedTorrentCleanupMode = next)"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Dense="true">
+                                            @foreach (var cleanupMode in CleanupModes)
+                                            {
+                                                <MudSelectItem T="string" Value="@cleanupMode">@cleanupMode</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Completed Torrent Cleanup Minutes"
-                                                     Value="_lifecycle.CompletedTorrentCleanupMinutes"
-                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.CompletedTorrentCleanupMinutes = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="0"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletedTorrentCleanupMinutes" />
+                                        <MudNumericField T="int"
+                                                         Value="_lifecycle.CompletedTorrentCleanupMinutes"
+                                                         ValueChanged="value => UpdateLifecycle(value, (group, next) => group.CompletedTorrentCleanupMinutes = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="0"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudCheckBox T="bool"
-                                                 Value="_lifecycle.DeleteLogsForCompletedTorrents"
-                                                 ValueChanged="value => UpdateLifecycle(value, (group, next) => group.DeleteLogsForCompletedTorrents = next)"
-                                                 Label="Delete Log Entries For Completed Torrents"
-                                                 Dense="true"
-                                                 Color="Color.Primary" />
+                                    <div class="settings-field-block settings-field-block--toggle">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.DeleteLogsForCompletedTorrents" />
+                                        <MudCheckBox T="bool"
+                                                     Value="_lifecycle.DeleteLogsForCompletedTorrents"
+                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.DeleteLogsForCompletedTorrents = next)"
+                                                     Dense="true"
+                                                     Color="Color.Primary" />
+                                    </div>
                                 </div>
 
                                 <p class="dashboard-panel-copy">
@@ -206,65 +218,77 @@
                                 </div>
 
                                 <div class="settings-field-grid">
-                                    <MudNumericField T="int"
-                                                     Label="Max Active Metadata Resolutions"
-                                                     Value="_queue.MaxActiveMetadataResolutions"
-                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MaxActiveMetadataResolutions = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.MaxActiveMetadataResolutions" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.MaxActiveMetadataResolutions"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.MaxActiveMetadataResolutions = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Max Active Downloads"
-                                                     Value="_queue.MaxActiveDownloads"
-                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MaxActiveDownloads = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.MaxActiveDownloads" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.MaxActiveDownloads"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.MaxActiveDownloads = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Refresh After Seconds"
-                                                     Value="_queue.MetadataRefreshStaleSeconds"
-                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataRefreshStaleSeconds = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.MetadataRefreshStaleSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.MetadataRefreshStaleSeconds"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataRefreshStaleSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Restart Delay Seconds"
-                                                     Value="_queue.MetadataRefreshRestartDelaySeconds"
-                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataRefreshRestartDelaySeconds = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.MetadataRefreshRestartDelaySeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.MetadataRefreshRestartDelaySeconds"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataRefreshRestartDelaySeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Connection Failure Burst Limit"
-                                                     Value="_queue.EngineConnectionFailureLogBurstLimit"
-                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.EngineConnectionFailureLogBurstLimit = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineConnectionFailureLogBurstLimit" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.EngineConnectionFailureLogBurstLimit"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.EngineConnectionFailureLogBurstLimit = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Connection Failure Window Seconds"
-                                                     Value="_queue.EngineConnectionFailureLogWindowSeconds"
-                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.EngineConnectionFailureLogWindowSeconds = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineConnectionFailureLogWindowSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.EngineConnectionFailureLogWindowSeconds"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.EngineConnectionFailureLogWindowSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
                                 </div>
 
                                 <p class="dashboard-panel-copy">
@@ -330,45 +354,53 @@
                                 </div>
 
                                 <div class="settings-field-grid">
-                                    <MudNumericField T="int"
-                                                     Label="Saved Max Connections"
-                                                     Value="_engine.EngineMaximumConnections"
-                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumConnections = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineMaximumConnections" />
+                                        <MudNumericField T="int"
+                                                         Value="_engine.EngineMaximumConnections"
+                                                         ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumConnections = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Saved Max Half-Open Connections"
-                                                     Value="_engine.EngineMaximumHalfOpenConnections"
-                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumHalfOpenConnections = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="1"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineMaximumHalfOpenConnections" />
+                                        <MudNumericField T="int"
+                                                         Value="_engine.EngineMaximumHalfOpenConnections"
+                                                         ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumHalfOpenConnections = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Saved Max Download Rate"
-                                                     Value="_engine.EngineMaximumDownloadRateBytesPerSecond"
-                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumDownloadRateBytesPerSecond = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="0"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineMaximumDownloadRateBytesPerSecond" />
+                                        <MudNumericField T="int"
+                                                         Value="_engine.EngineMaximumDownloadRateBytesPerSecond"
+                                                         ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumDownloadRateBytesPerSecond = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="0"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
 
-                                    <MudNumericField T="int"
-                                                     Label="Saved Max Upload Rate"
-                                                     Value="_engine.EngineMaximumUploadRateBytesPerSecond"
-                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumUploadRateBytesPerSecond = next)"
-                                                     Variant="Variant.Outlined"
-                                                     Margin="Margin.Dense"
-                                                     Min="0"
-                                                     Step="1"
-                                                     Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineMaximumUploadRateBytesPerSecond" />
+                                        <MudNumericField T="int"
+                                                         Value="_engine.EngineMaximumUploadRateBytesPerSecond"
+                                                         ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumUploadRateBytesPerSecond = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="0"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
                                 </div>
 
                                 <p class="dashboard-panel-copy">
@@ -414,75 +446,91 @@
                                     </div>
                                 </div>
 
-                                <MudCheckBox T="bool"
-                                             Value="_callback.CompletionCallbackEnabled"
-                                             ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackEnabled = next)"
-                                             Label="Enable completion callback invocation"
-                                             Dense="true"
-                                             Color="Color.Primary" />
+                                <div class="settings-field-block settings-field-block--toggle">
+                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackEnabled" />
+                                    <MudCheckBox T="bool"
+                                                 Value="_callback.CompletionCallbackEnabled"
+                                                 ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackEnabled = next)"
+                                                 Dense="true"
+                                                 Color="Color.Primary" />
+                                </div>
 
                                 <div class="settings-field-stack">
-                                    <MudTextField T="string"
-                                                  Label="Command Path"
-                                                  Value="_callback.CompletionCallbackCommandPath"
-                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackCommandPath = next)"
-                                                  Variant="Variant.Outlined"
-                                                  Margin="Margin.Dense"
-                                                  Immediate="true" />
-
-                                    <div class="settings-field-grid settings-field-grid--pair">
-                                        <MudNumericField T="int"
-                                                         Label="Process Timeout Seconds"
-                                                         Value="_callback.CompletionCallbackTimeoutSeconds"
-                                                         ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackTimeoutSeconds = next)"
-                                                         Variant="Variant.Outlined"
-                                                         Margin="Margin.Dense"
-                                                         Min="1"
-                                                         Step="1"
-                                                         Immediate="true" />
-
-                                        <MudNumericField T="int"
-                                                         Label="Finalization Wait Seconds"
-                                                         Value="_callback.CompletionCallbackFinalizationTimeoutSeconds"
-                                                         ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackFinalizationTimeoutSeconds = next)"
-                                                         Variant="Variant.Outlined"
-                                                         Margin="Margin.Dense"
-                                                         Min="1"
-                                                         Step="1"
-                                                         Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackCommandPath" />
+                                        <MudTextField T="string"
+                                                      Value="_callback.CompletionCallbackCommandPath"
+                                                      ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackCommandPath = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true" />
                                     </div>
 
-                                    <MudTextField T="string"
-                                                  Label="Arguments"
-                                                  Value="_callback.CompletionCallbackArguments"
-                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackArguments = next)"
-                                                  Variant="Variant.Outlined"
-                                                  Margin="Margin.Dense"
-                                                  Immediate="true" />
+                                    <div class="settings-field-grid settings-field-grid--pair">
+                                        <div class="settings-field-block">
+                                            <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackTimeoutSeconds" />
+                                            <MudNumericField T="int"
+                                                             Value="_callback.CompletionCallbackTimeoutSeconds"
+                                                             ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackTimeoutSeconds = next)"
+                                                             Variant="Variant.Outlined"
+                                                             Margin="Margin.Dense"
+                                                             Min="1"
+                                                             Step="1"
+                                                             Immediate="true" />
+                                        </div>
 
-                                    <MudTextField T="string"
-                                                  Label="Working Directory"
-                                                  Value="_callback.CompletionCallbackWorkingDirectory"
-                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackWorkingDirectory = next)"
-                                                  Variant="Variant.Outlined"
-                                                  Margin="Margin.Dense"
-                                                  Immediate="true" />
+                                        <div class="settings-field-block">
+                                            <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackFinalizationTimeoutSeconds" />
+                                            <MudNumericField T="int"
+                                                             Value="_callback.CompletionCallbackFinalizationTimeoutSeconds"
+                                                             ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackFinalizationTimeoutSeconds = next)"
+                                                             Variant="Variant.Outlined"
+                                                             Margin="Margin.Dense"
+                                                             Min="1"
+                                                             Step="1"
+                                                             Immediate="true" />
+                                        </div>
+                                    </div>
 
-                                    <MudTextField T="string"
-                                                  Label="API Base URL Override"
-                                                  Value="_callback.CompletionCallbackApiBaseUrlOverride"
-                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackApiBaseUrlOverride = next)"
-                                                  Variant="Variant.Outlined"
-                                                  Margin="Margin.Dense"
-                                                  Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackArguments" />
+                                        <MudTextField T="string"
+                                                      Value="_callback.CompletionCallbackArguments"
+                                                      ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackArguments = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true" />
+                                    </div>
 
-                                    <MudTextField T="string"
-                                                  Label="API Key Override"
-                                                  Value="_callback.CompletionCallbackApiKeyOverride"
-                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackApiKeyOverride = next)"
-                                                  Variant="Variant.Outlined"
-                                                  Margin="Margin.Dense"
-                                                  Immediate="true" />
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackWorkingDirectory" />
+                                        <MudTextField T="string"
+                                                      Value="_callback.CompletionCallbackWorkingDirectory"
+                                                      ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackWorkingDirectory = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackApiBaseUrlOverride" />
+                                        <MudTextField T="string"
+                                                      Value="_callback.CompletionCallbackApiBaseUrlOverride"
+                                                      ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackApiBaseUrlOverride = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CompletionCallbackApiKeyOverride" />
+                                        <MudTextField T="string"
+                                                      Value="_callback.CompletionCallbackApiKeyOverride"
+                                                      ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackApiKeyOverride = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true" />
+                                    </div>
                                 </div>
 
                                 <p class="dashboard-panel-copy">
@@ -538,55 +586,69 @@
                                                     <p class="dashboard-panel-copy">Display: @category.DisplayName</p>
                                                 </div>
                                                 <div class="settings-category-toggles">
-                                                    <MudCheckBox T="bool"
-                                                                 Value="category.Enabled"
-                                                                 ValueChanged="value => UpdateCategory(value, category, (item, next) => item.Enabled = next)"
-                                                                 Label="Enabled"
-                                                                 Dense="true"
-                                                                 Color="Color.Primary" />
-                                                    <MudCheckBox T="bool"
-                                                                 Value="category.InvokeCompletionCallback"
-                                                                 ValueChanged="value => UpdateCategory(value, category, (item, next) => item.InvokeCompletionCallback = next)"
-                                                                 Label="Invoke Callback"
-                                                                 Dense="true"
-                                                                 Color="Color.Primary" />
+                                                    <div class="settings-category-toggle">
+                                                        <MudCheckBox T="bool"
+                                                                     Value="category.Enabled"
+                                                                     ValueChanged="value => UpdateCategory(value, category, (item, next) => item.Enabled = next)"
+                                                                     Label="Enabled"
+                                                                     Dense="true"
+                                                                     Color="Color.Primary" />
+                                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryEnabled" IconOnly="true" />
+                                                    </div>
+                                                    <div class="settings-category-toggle">
+                                                        <MudCheckBox T="bool"
+                                                                     Value="category.InvokeCompletionCallback"
+                                                                     ValueChanged="value => UpdateCategory(value, category, (item, next) => item.InvokeCompletionCallback = next)"
+                                                                     Label="Invoke Callback"
+                                                                     Dense="true"
+                                                                     Color="Color.Primary" />
+                                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryInvokeCompletionCallback" IconOnly="true" />
+                                                    </div>
                                                 </div>
                                             </div>
 
                                             <div class="settings-category-fields">
-                                                <MudTextField T="string"
-                                                              Label="Display Name"
-                                                              Value="category.DisplayName"
-                                                              ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DisplayName = next)"
-                                                              Variant="Variant.Outlined"
-                                                              Margin="Margin.Dense"
-                                                              Immediate="true" />
+                                                <div class="settings-field-block">
+                                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryDisplayName" />
+                                                    <MudTextField T="string"
+                                                                  Value="category.DisplayName"
+                                                                  ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DisplayName = next)"
+                                                                  Variant="Variant.Outlined"
+                                                                  Margin="Margin.Dense"
+                                                                  Immediate="true" />
+                                                </div>
 
-                                                <MudTextField T="string"
-                                                              Label="Callback Label"
-                                                              Value="category.CallbackLabel"
-                                                              ValueChanged="value => UpdateCategory(value, category, (item, next) => item.CallbackLabel = next)"
-                                                              Variant="Variant.Outlined"
-                                                              Margin="Margin.Dense"
-                                                              Immediate="true" />
+                                                <div class="settings-field-block">
+                                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryCallbackLabel" />
+                                                    <MudTextField T="string"
+                                                                  Value="category.CallbackLabel"
+                                                                  ValueChanged="value => UpdateCategory(value, category, (item, next) => item.CallbackLabel = next)"
+                                                                  Variant="Variant.Outlined"
+                                                                  Margin="Margin.Dense"
+                                                                  Immediate="true" />
+                                                </div>
 
-                                                <MudTextField T="string"
-                                                              Label="Download Root"
-                                                              Value="category.DownloadRootPath"
-                                                              ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DownloadRootPath = next)"
-                                                              Variant="Variant.Outlined"
-                                                              Margin="Margin.Dense"
-                                                              Immediate="true" />
+                                                <div class="settings-field-block">
+                                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryDownloadRootPath" />
+                                                    <MudTextField T="string"
+                                                                  Value="category.DownloadRootPath"
+                                                                  ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DownloadRootPath = next)"
+                                                                  Variant="Variant.Outlined"
+                                                                  Margin="Margin.Dense"
+                                                                  Immediate="true" />
+                                                </div>
 
-                                                <MudNumericField T="int"
-                                                                 Label="Sort Order"
-                                                                 Value="category.SortOrder"
-                                                                 ValueChanged="value => UpdateCategory(value, category, (item, next) => item.SortOrder = next)"
-                                                                 Variant="Variant.Outlined"
-                                                                 Margin="Margin.Dense"
-                                                                 Min="0"
-                                                                 Step="1"
-                                                                 Immediate="true" />
+                                                <div class="settings-field-block">
+                                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CategorySortOrder" />
+                                                    <MudNumericField T="int"
+                                                                     Value="category.SortOrder"
+                                                                     ValueChanged="value => UpdateCategory(value, category, (item, next) => item.SortOrder = next)"
+                                                                     Variant="Variant.Outlined"
+                                                                     Margin="Margin.Dense"
+                                                                     Min="0"
+                                                                     Step="1"
+                                                                     Immediate="true" />
+                                                </div>
                                             </div>
                                         </div>
                                     }
