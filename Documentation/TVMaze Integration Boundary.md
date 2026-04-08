@@ -93,6 +93,8 @@ Finalization check guidance:
 
 - if `Path.Combine(TR_TORRENT_DIR, TR_TORRENT_NAME)` resolves to a file, TorrentCore should wait until the final-name file exists and the partial-suffix sibling is gone
 - if it resolves to a directory, TorrentCore should recursively scan that subtree and wait until no partial-suffix files remain
+- when MonoTorrent exposes exact per-file complete/incomplete paths for the active torrent, TorrentCore should prefer those engine-reported paths over a reconstructed `TR_TORRENT_NAME` guess when deciding whether a single-file payload is really finalized
+- when MonoTorrent also reports that the file's current active path is already the complete path, a leftover `.!mt` sibling should be treated as stale cleanup residue rather than proof that the payload is still incomplete
 - TorrentCore should persist a generic callback lifecycle state such as `PendingFinalization`, `Invoked`, `Failed`, or `TimedOut` so restart recovery does not confuse transfer state with callback state
 - TorrentCore should not persist TVMaze-specific outcome states; TVMaze ownership remains outside the TorrentCore boundary
 

@@ -10,8 +10,10 @@ namespace TorrentCore.Service.Callbacks;
 public interface ITorrentCompletionCallbackProcessor
 {
     Task<bool> MarkPendingIfTriggeredAsync(DateTimeOffset? previousCompletedAtUtc, TorrentSnapshot snapshot,
-        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken);
+        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken,
+        TorrentCompletionFinalizationCheckResult? finalizationResult = null);
 
     Task<bool> ProcessPendingAsync(TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings,
-        DateTimeOffset                             now,      CancellationToken       cancellationToken);
+        DateTimeOffset now, CancellationToken cancellationToken,
+        TorrentCompletionFinalizationCheckResult? finalizationResult = null);
 }

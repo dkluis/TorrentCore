@@ -256,17 +256,18 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
-        var torrents = await GetProjectedSnapshotsAsync(cancellationToken);
-        var torrent  = torrents.SingleOrDefault(snapshot => snapshot.TorrentId == torrentId);
+        var torrents         = await GetProjectedSnapshotsAsync(cancellationToken);
+        var torrent          = torrents.SingleOrDefault(snapshot => snapshot.TorrentId == torrentId);
+        var runtimeSettings  = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var queueDiagnostics = TorrentQueueDiagnostics.Create(torrents, runtimeSettings);
+        var manager          = await TryGetManagerAsync(torrentId, cancellationToken);
+
         return torrent is null ?
                 throw new ServiceOperationException(
                     "torrent_not_found", $"Torrent '{torrentId}' was not found.", StatusCodes.Status404NotFound,
                     nameof(torrentId)
                 ) : MapDetail(
-                    torrent,
-                    TorrentQueueDiagnostics.Create(
-                        torrents, await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken)
-                    )[torrent.TorrentId], await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken)
+                    torrent, queueDiagnostics[torrent.TorrentId], runtimeSettings, manager
                 );
     }
 
@@ -448,10 +449,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 dispatchedSnapshot.ErrorMessage      = null;
                 dispatchedSnapshot.LastActivityAtUtc ??= DateTimeOffset.UtcNow;
                 await torrentStateStore.UpdateAsync(dispatchedSnapshot, cancellationToken);
-            }
-            else
-            {
-                await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
             }
         }
         finally
@@ -1012,9 +1009,21 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             var previousCompletedAtUtc = snapshot.CompletedAtUtc;
+            var observedFiles = GetObservedFilePaths(entry.Value);
+            await TryDeleteStalePartialFilesAsync(updatedSnapshot, observedFiles, cancellationToken);
+            var finalizationResult = CreateFinalizationCheckResult(updatedSnapshot, runtimeSettings, observedFiles);
             await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
-                previousCompletedAtUtc, updatedSnapshot, runtimeSettings, now, cancellationToken
+                previousCompletedAtUtc, updatedSnapshot, runtimeSettings, now, cancellationToken, finalizationResult
             );
+
+            if (ShouldAutoRequeueFinalizationTimeout(updatedSnapshot, finalizationResult))
+            {
+                updatedSnapshot.CompletionCallbackState           = TorrentCompletionCallbackState.PendingFinalization;
+                updatedSnapshot.CompletionCallbackPendingSinceUtc = now;
+                updatedSnapshot.CompletionCallbackInvokedAtUtc    = null;
+                updatedSnapshot.CompletionCallbackLastError       = null;
+            }
+
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
 
             if (updatedSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
@@ -1032,8 +1041,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         foreach (var callbackSnapshot in pendingCallbackSnapshots)
         {
+            var manager = managers.FirstOrDefault(entry => entry.Key == callbackSnapshot.TorrentId).Value;
+            var observedFiles = GetObservedFilePaths(manager);
+            await TryDeleteStalePartialFilesAsync(callbackSnapshot, observedFiles, cancellationToken);
             if (!await completionCallbackProcessor.ProcessPendingAsync(
-                        callbackSnapshot, runtimeSettings, now, cancellationToken
+                        callbackSnapshot, runtimeSettings, now, cancellationToken,
+                        CreateFinalizationCheckResult(callbackSnapshot, runtimeSettings, observedFiles)
                     ))
             {
                 continue;
@@ -2231,7 +2244,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     }
 
     private TorrentDetailDto MapDetail(TorrentSnapshot snapshot, TorrentQueueDiagnostic diagnostic,
-        RuntimeSettingsSnapshot?                       runtimeSettings)
+        RuntimeSettingsSnapshot?                       runtimeSettings, TorrentManager? manager = null)
     {
         var callbackFinalPayloadPath = Path.Combine(
             snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath, snapshot.Name
@@ -2241,7 +2254,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             snapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
                     TorrentCompletionCallbackState.TimedOut)
         {
-            var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
+            var finalizationResult = CreateFinalizationCheckResult(snapshot, runtimeSettings, manager);
             callbackFinalPayloadPath = finalizationResult.FinalPayloadPath;
             callbackPendingReason    = finalizationResult.IsReady ? null : finalizationResult.PendingReason;
         }
@@ -2290,5 +2303,134 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     private static bool CanRetryCompletionCallback(TorrentCompletionCallbackState? callbackState)
     {
         return callbackState is TorrentCompletionCallbackState.Failed or TorrentCompletionCallbackState.TimedOut;
+    }
+
+    private TorrentCompletionFinalizationCheckResult CreateFinalizationCheckResult(TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot runtimeSettings, TorrentManager? manager)
+    {
+        return CreateFinalizationCheckResult(snapshot, runtimeSettings, GetObservedFilePaths(manager));
+    }
+
+    private TorrentCompletionFinalizationCheckResult CreateFinalizationCheckResult(TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot runtimeSettings, IReadOnlyList<TorrentCompletionObservedFilePaths>? observedFiles)
+    {
+        return finalizationChecker.Check(snapshot, runtimeSettings, observedFiles);
+    }
+
+    private static IReadOnlyList<TorrentCompletionObservedFilePaths>? GetObservedFilePaths(TorrentManager? manager)
+    {
+        var observedFiles = manager is null || manager.Files.Count == 0
+                ? null
+                : manager.Files
+                         .Where(file => !string.IsNullOrWhiteSpace(file.DownloadCompleteFullPath))
+                         .Select(
+                              file => new TorrentCompletionObservedFilePaths
+                              {
+                                  CompletePath = Path.GetFullPath(file.DownloadCompleteFullPath),
+                                  ActivePath = Path.GetFullPath(file.FullPath),
+                                  IncompletePath = string.IsNullOrWhiteSpace(file.DownloadIncompleteFullPath)
+                                          ? null
+                                          : Path.GetFullPath(file.DownloadIncompleteFullPath),
+                              }
+                          )
+                         .ToArray();
+
+        return observedFiles;
+    }
+
+    private async Task TryDeleteStalePartialFilesAsync(TorrentSnapshot snapshot,
+        IReadOnlyList<TorrentCompletionObservedFilePaths>? observedFiles, CancellationToken cancellationToken)
+    {
+        if (!snapshot.InvokeCompletionCallback || observedFiles is not { Count: > 0 })
+        {
+            return;
+        }
+
+        foreach (var observedFile in observedFiles)
+        {
+            if (string.IsNullOrWhiteSpace(observedFile.IncompletePath) ||
+                PathsEqual(observedFile.CompletePath, observedFile.IncompletePath) ||
+                !PathsEqual(observedFile.ActivePath, observedFile.CompletePath) ||
+                !File.Exists(observedFile.CompletePath) ||
+                !File.Exists(observedFile.IncompletePath))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(observedFile.IncompletePath);
+
+                await activityLogService.WriteAsync(
+                    new ActivityLogWriteRequest
+                    {
+                        Level             = ActivityLogLevel.Information,
+                        Category          = "torrent",
+                        EventType         = "torrent.callback.stale_partial_deleted",
+                        Message           = $"Deleted stale partial file after MonoTorrent promoted the final payload for torrent '{snapshot.Name}'.",
+                        TorrentId         = snapshot.TorrentId,
+                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                        DetailsJson = JsonSerializer.Serialize(
+                            new
+                            {
+                                snapshot.Name,
+                                observedFile.ActivePath,
+                                observedFile.CompletePath,
+                                observedFile.IncompletePath,
+                            }
+                        ),
+                    }, cancellationToken
+                );
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Failed deleting stale partial file for torrent {TorrentId} ({TorrentName}) at {PartialPath}",
+                    snapshot.TorrentId,
+                    snapshot.Name,
+                    observedFile.IncompletePath
+                );
+            }
+        }
+    }
+
+    private static bool ShouldAutoRequeueFinalizationTimeout(TorrentSnapshot snapshot,
+        TorrentCompletionFinalizationCheckResult finalizationResult)
+    {
+        return snapshot.CompletionCallbackState == TorrentCompletionCallbackState.TimedOut &&
+               snapshot.CompletionCallbackInvokedAtUtc is null &&
+               !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLastError) &&
+               snapshot.CompletionCallbackLastError.StartsWith(
+                   "Timed out waiting for final payload visibility at '", StringComparison.Ordinal
+               ) &&
+               finalizationResult.IsReady;
+    }
+
+    private static bool PathsEqual(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+
+        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), comparison);
+    }
+
+    private async Task<TorrentManager?> TryGetManagerAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            return _managers.GetValueOrDefault(torrentId);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 }

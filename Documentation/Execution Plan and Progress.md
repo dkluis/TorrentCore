@@ -144,6 +144,9 @@ Current service configuration section:
 - stale-metadata recovery now ignores peer-discovery callbacks that still have zero open connections, so empty `PeersFound` noise no longer keeps a dead metadata session looking healthy
 - metadata recovery no longer treats a merely open connection as useful discovery progress, so stale metadata sessions can still escalate even when MonoTorrent is stuck holding an unproductive peer
 - manual `refresh_metadata` and `reset_metadata_session` now persist the affected torrent directly instead of forcing a full immediate engine-wide synchronize, which reduces how long the Web and Avalonia UIs stay blocked after those actions
+- MonoTorrent add-magnet admission no longer forces an immediate engine-wide synchronize when metadata capacity is already full; new magnets are persisted and returned promptly in queued state so burst intake does not stall behind scheduler work
+- completion-callback finalization now prefers MonoTorrent's exact per-file complete/incomplete paths when the runtime exposes them, which hardens single-file rename visibility checks and blocks callback invocation while a matching `.!mt` sibling is still present
+- completion-callback finalization now also considers MonoTorrent's current active file path (`ITorrentManagerFile.FullPath`): if MonoTorrent has already promoted a file to its complete path, a lingering `.!mt` sibling is treated as stale instead of still-active, TorrentCore attempts to delete that stale sibling, and timed-out finalization can auto-requeue once readiness becomes true
 - MonoTorrent outbound peer policy now prefers plaintext first with RC4 fallback, restores IPv6 listening when the host supports it, and logs explicit `peer_connected` / `peer_disconnected` events with peer URI, client, direction, and encryption so live metadata stalls can be distinguished from connection-establishment failures
 - MonoTorrent stale recovery now also covers a narrower post-metadata failure mode: torrents already in `Downloading` but still showing zero open peers and zero payload progress now get an automatic DHT/tracker refresh first and then a stop/start recovery pass if the zero-peer stall continues
 - `Delete Data` now explicitly removes torrent payload files/directories before pruning empty parent folders, so operator data deletion matches the UI action label instead of only removing TorrentCore tracking state
@@ -423,6 +426,7 @@ Reviewed and accepted on March 10, 2026:
 - remove remains split between remove-only and remove-with-data
 - queue position is deferred from v1
 - bursty intake from TVMaze should be handled by accepting and persisting magnets immediately, then queueing execution behind runtime limits instead of rejecting requests when capacity is full
+- bursty intake should not trigger a full engine-wide reconcile from the add-request path just to prove capacity is already full; request admission and background scheduling stay separate concerns
 - initial list behavior will later support sorting by progress, status, and name
 - initial list behavior will later support filtering by name and status
 - torrent state names remain:

@@ -9,5 +9,6 @@ namespace TorrentCore.Service.Callbacks;
 
 public interface ITorrentCompletionFinalizationChecker
 {
-    TorrentCompletionFinalizationCheckResult Check(TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings);
+    TorrentCompletionFinalizationCheckResult Check(TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings,
+        IReadOnlyList<TorrentCompletionObservedFilePaths>? observedFiles = null);
 }

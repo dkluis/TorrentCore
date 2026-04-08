@@ -16,7 +16,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
 {
     public async Task<bool> MarkPendingIfTriggeredAsync(DateTimeOffset? previousCompletedAtUtc,
         TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, TorrentCompletionFinalizationCheckResult? finalizationResult = null)
     {
         if (previousCompletedAtUtc is not null || snapshot.CompletedAtUtc is null ||
             snapshot.State is not TorrentState.Completed and not TorrentState.Seeding ||
@@ -30,13 +30,16 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         snapshot.CompletionCallbackPendingSinceUtc = now;
         snapshot.CompletionCallbackInvokedAtUtc    = null;
         snapshot.CompletionCallbackLastError       = null;
-        var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
-        await WritePendingFinalizationLogAsync(snapshot, runtimeSettings, finalizationResult, cancellationToken);
+        var resolvedFinalizationResult = finalizationResult ?? finalizationChecker.Check(snapshot, runtimeSettings);
+        await WritePendingFinalizationLogAsync(
+            snapshot, runtimeSettings, resolvedFinalizationResult, cancellationToken
+        );
         return true;
     }
 
     public async Task<bool> ProcessPendingAsync(TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings,
-        DateTimeOffset                                          now,      CancellationToken       cancellationToken)
+        DateTimeOffset now, CancellationToken cancellationToken,
+        TorrentCompletionFinalizationCheckResult? finalizationResult = null)
     {
         if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.PendingFinalization)
         {
@@ -51,8 +54,8 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             changed                                    = true;
         }
 
-        var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
-        if (!finalizationResult.IsReady)
+        var resolvedFinalizationResult = finalizationResult ?? finalizationChecker.Check(snapshot, runtimeSettings);
+        if (!resolvedFinalizationResult.IsReady)
         {
             if (now - pendingSinceUtc <
                 TimeSpan.FromSeconds(runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds))
@@ -62,8 +65,10 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
 
             snapshot.CompletionCallbackState = TorrentCompletionCallbackState.TimedOut;
             snapshot.CompletionCallbackLastError =
-                    $"Timed out waiting for final payload visibility at '{finalizationResult.FinalPayloadPath}'. {finalizationResult.PendingReason}";
-            await WriteFinalizationTimeoutLogAsync(snapshot, runtimeSettings, finalizationResult, cancellationToken);
+                    $"Timed out waiting for final payload visibility at '{resolvedFinalizationResult.FinalPayloadPath}'. {resolvedFinalizationResult.PendingReason}";
+            await WriteFinalizationTimeoutLogAsync(
+                snapshot, runtimeSettings, resolvedFinalizationResult, cancellationToken
+            );
             return true;
         }
 
