@@ -32,6 +32,7 @@ Current checkpoint:
 - selected torrent actions now include `Peers` and `Trackers` dialogs backed by dedicated service endpoints instead of overloading the main details panel
 - peer diagnostics use a compact paged grid with live auto-refresh while the dialog is open
 - tracker diagnostics use a paged read-only grid with manual refresh and no tracker-URL column in the operator view
+- the peer/tracker dialog slice has now been operator-tested and is behaving as expected in the current WebUI runtime
 
 ## Purpose
 
