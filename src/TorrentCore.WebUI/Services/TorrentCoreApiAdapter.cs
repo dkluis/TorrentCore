@@ -17,8 +17,21 @@ public sealed class TorrentCoreApiAdapter(TorrentCoreClient client) : ITorrentCo
     public Task<ServiceCallResult<RuntimeSettingsDto?>> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(() => client.GetRuntimeSettingsAsync(cancellationToken));
 
+    public Task<ServiceCallResult<RuntimeSettingsDto>> UpdateRuntimeSettingsAsync(
+        UpdateRuntimeSettingsRequest request,
+        CancellationToken cancellationToken = default
+    )
+        => ExecuteAsync(() => client.UpdateRuntimeSettingsAsync(request, cancellationToken));
+
     public Task<ServiceCallResult<IReadOnlyList<TorrentCategoryDto>>> GetCategoriesAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(() => client.GetCategoriesAsync(cancellationToken));
+
+    public Task<ServiceCallResult<TorrentCategoryDto>> UpdateCategoryAsync(
+        string key,
+        UpdateTorrentCategoryRequest request,
+        CancellationToken cancellationToken = default
+    )
+        => ExecuteAsync(() => client.UpdateCategoryAsync(key, request, cancellationToken));
 
     public Task<ServiceCallResult<IReadOnlyList<TorrentSummaryDto>>> GetTorrentsAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(() => client.GetTorrentsAsync(cancellationToken));

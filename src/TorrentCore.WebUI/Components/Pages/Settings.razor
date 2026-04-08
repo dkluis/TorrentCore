@@ -1,18 +1,22 @@
 @page "/settings"
+@using TorrentCore.Contracts.Categories
+@using TorrentCore.Contracts.Host
 @inject ITorrentCoreApiAdapter Api
 @inject IOperatorFeedbackService Feedback
+@inject IDialogService DialogService
 
 <PageTitle>Settings</PageTitle>
 
 <OperatorPage Kicker="Administration"
               Title="Settings"
-              Summary="Runtime settings snapshot using shared API and state feedback wrappers."
-              StatusLine="Update flows will be added in the settings feature slice.">
+              Summary="Compact grouped editor for runtime policy, engine limits, callback handling, and category routing."
+              Class="settings-page"
+              StatusLine="@BuildStatusLine()">
     <HeaderActions>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    Size="Size.Small"
-                   Disabled="_isRefreshing"
+                   Disabled="@(_isRefreshing || _savingGroupKey is not null)"
                    OnClick="RefreshAsync">
             Refresh
         </MudButton>
@@ -20,58 +24,606 @@
 
     <ChildContent>
         <StateView Mode="@_mode"
-                   Title="Runtime settings unavailable"
+                   Title="Settings unavailable"
                    Message="@_errorMessage"
                    ActionText="Retry"
                    OnAction="RefreshAsync">
-            @if (_runtime is not null)
+            @if (_runtimeSnapshot is not null)
             {
-                <OperatorCardGrid>
-                    <OperatorCard>
-                        <p class="section-card-eyebrow">Engine Limits</p>
-                        <h2>@_runtime.EngineRuntime</h2>
-                        <p>Max metadata sessions: @_runtime.MaxActiveMetadataResolutions</p>
-                        <p>Max downloads: @_runtime.MaxActiveDownloads</p>
+                <div class="settings-page-layout">
+                    <OperatorCard Class="settings-summary-card">
+                        <div class="settings-summary-line">
+                            <div class="settings-summary-chip">
+                                <span class="settings-summary-label">Runtime</span>
+                                <strong>@_runtimeSnapshot.EngineRuntime</strong>
+                                <span class="settings-summary-meta">@(_runtimeSnapshot.PartialFilesEnabled ? $"Partial On ({_runtimeSnapshot.PartialFileSuffix})" : "Partial Off")</span>
+                            </div>
+
+                            <div class="settings-summary-chip">
+                                <span class="settings-summary-label">Apply State</span>
+                                <strong>@(_runtimeSnapshot.EngineSettingsRequireRestart ? "Restart Required" : "Applied")</strong>
+                                <span class="settings-summary-meta">Overrides: @(_runtimeSnapshot.UsesPersistedOverrides ? "Yes" : "No")</span>
+                            </div>
+
+                            <div class="settings-summary-chip">
+                                <span class="settings-summary-label">Applied Throttles</span>
+                                <strong>@_runtimeSnapshot.AppliedEngineMaximumConnections conn / @_runtimeSnapshot.AppliedEngineMaximumHalfOpenConnections half-open</strong>
+                                <span class="settings-summary-meta">Down @FormatRate(_runtimeSnapshot.AppliedEngineMaximumDownloadRateBytesPerSecond) | Up @FormatRate(_runtimeSnapshot.AppliedEngineMaximumUploadRateBytesPerSecond)</span>
+                            </div>
+
+                            <div class="settings-summary-chip">
+                                <span class="settings-summary-label">Routing</span>
+                                <strong>@_categories.Count categories</strong>
+                                <span class="settings-summary-meta">Callback @(_callback.CompletionCallbackEnabled ? "On" : "Off") | Completed logs @(_lifecycle.DeleteLogsForCompletedTorrents ? "On" : "Off")</span>
+                            </div>
+                        </div>
                     </OperatorCard>
 
-                    <OperatorCard>
-                        <p class="section-card-eyebrow">Bandwidth</p>
-                        <h2>@FormatRate(_runtime.EngineMaximumDownloadRateBytesPerSecond)</h2>
-                        <p>Upload cap: @FormatRate(_runtime.EngineMaximumUploadRateBytesPerSecond)</p>
-                        <p>Connections: @_runtime.EngineMaximumConnections</p>
-                    </OperatorCard>
+                    <div class="settings-editor-grid">
+                        <OperatorCard Class="settings-group-card">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Lifecycle))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Lifecycle)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
 
-                    <OperatorCard>
-                        <p class="section-card-eyebrow">Completion Callback</p>
-                        <h2>@(_runtime.CompletionCallbackEnabled ? "Enabled" : "Disabled")</h2>
-                        <p>Timeout: @_runtime.CompletionCallbackTimeoutSeconds sec</p>
-                        <p>Finalize timeout: @_runtime.CompletionCallbackFinalizationTimeoutSeconds sec</p>
-                    </OperatorCard>
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Lifecycle &amp; Cleanup</h2>
+                                        <p class="dashboard-panel-copy">Live seeding policy and completed-torrent cleanup behavior.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.Lifecycle)">@GetGroupStateText(SettingsGroupKey.Lifecycle)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Lifecycle) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.Lifecycle)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Lifecycle) || IsBusy)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.Lifecycle)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
 
-                    <OperatorCard>
-                        <p class="section-card-eyebrow">Cleanup</p>
-                        <h2>@_runtime.CompletedTorrentCleanupMode</h2>
-                        <p>Completion age: @_runtime.CompletedTorrentCleanupMinutes min</p>
-                        <p>Delete completed logs: @(_runtime.DeleteLogsForCompletedTorrents ? "On" : "Off")</p>
-                    </OperatorCard>
+                                <div class="settings-field-grid">
+                                    <MudSelect T="string"
+                                               Label="Seeding Stop Mode"
+                                               Value="_lifecycle.SeedingStopMode"
+                                               ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopMode = next)"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Dense="true">
+                                        @foreach (var seedingMode in SeedingModes)
+                                        {
+                                            <MudSelectItem T="string" Value="@seedingMode">@seedingMode</MudSelectItem>
+                                        }
+                                    </MudSelect>
 
-                    <OperatorCard>
-                        <p class="section-card-eyebrow">Engine Apply State</p>
-                        <h2>@(_runtime.EngineSettingsRequireRestart ? "Restart Required" : "Applied")</h2>
-                        <p>Persisted overrides: @(_runtime.UsesPersistedOverrides ? "Yes" : "No")</p>
-                        <p>Retrieved: @_runtime.RetrievedAtUtc.LocalDateTime.ToString("g")</p>
-                    </OperatorCard>
-                </OperatorCardGrid>
+                                    <MudNumericField T="double"
+                                                     Label="Seeding Stop Ratio"
+                                                     Value="_lifecycle.SeedingStopRatio"
+                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopRatio = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="0.01"
+                                                     Step="0.01"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Seeding Stop Minutes"
+                                                     Value="_lifecycle.SeedingStopMinutes"
+                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.SeedingStopMinutes = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudSelect T="string"
+                                               Label="Completed Torrent Cleanup Mode"
+                                               Value="_lifecycle.CompletedTorrentCleanupMode"
+                                               ValueChanged="value => UpdateLifecycle(value, (group, next) => group.CompletedTorrentCleanupMode = next)"
+                                               Variant="Variant.Outlined"
+                                               Margin="Margin.Dense"
+                                               Dense="true">
+                                        @foreach (var cleanupMode in CleanupModes)
+                                        {
+                                            <MudSelectItem T="string" Value="@cleanupMode">@cleanupMode</MudSelectItem>
+                                        }
+                                    </MudSelect>
+
+                                    <MudNumericField T="int"
+                                                     Label="Completed Torrent Cleanup Minutes"
+                                                     Value="_lifecycle.CompletedTorrentCleanupMinutes"
+                                                     ValueChanged="value => UpdateLifecycle(value, (group, next) => group.CompletedTorrentCleanupMinutes = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="0"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudCheckBox T="bool"
+                                                 Value="_lifecycle.DeleteLogsForCompletedTorrents"
+                                                 ValueChanged="value => UpdateLifecycle(value, (group, next) => group.DeleteLogsForCompletedTorrents = next)"
+                                                 Label="Delete Log Entries For Completed Torrents"
+                                                 Dense="true"
+                                                 Color="Color.Primary" />
+                                </div>
+
+                                <p class="dashboard-panel-copy">
+                                    Completed-log deletion uses the same completion-age window and only applies after a successful completion. Automatic cleanup never deletes downloaded data.
+                                </p>
+                            </div>
+                        </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Queue))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Queue)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Queue &amp; Recovery</h2>
+                                        <p class="dashboard-panel-copy">Live queue limits, stale metadata recovery, and connection-failure log throttling.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.Queue)">@GetGroupStateText(SettingsGroupKey.Queue)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Queue) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.Queue)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Queue) || IsBusy)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.Queue)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
+
+                                <div class="settings-field-grid">
+                                    <MudNumericField T="int"
+                                                     Label="Max Active Metadata Resolutions"
+                                                     Value="_queue.MaxActiveMetadataResolutions"
+                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MaxActiveMetadataResolutions = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Max Active Downloads"
+                                                     Value="_queue.MaxActiveDownloads"
+                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MaxActiveDownloads = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Refresh After Seconds"
+                                                     Value="_queue.MetadataRefreshStaleSeconds"
+                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataRefreshStaleSeconds = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Restart Delay Seconds"
+                                                     Value="_queue.MetadataRefreshRestartDelaySeconds"
+                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataRefreshRestartDelaySeconds = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Connection Failure Burst Limit"
+                                                     Value="_queue.EngineConnectionFailureLogBurstLimit"
+                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.EngineConnectionFailureLogBurstLimit = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Connection Failure Window Seconds"
+                                                     Value="_queue.EngineConnectionFailureLogWindowSeconds"
+                                                     ValueChanged="value => UpdateQueue(value, (group, next) => group.EngineConnectionFailureLogWindowSeconds = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+                                </div>
+
+                                <p class="dashboard-panel-copy">
+                                    New magnets are accepted immediately; queue limits only control execution. Recovery first refreshes discovery, then escalates if the torrent stays cold.
+                                </p>
+                            </div>
+                        </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Engine))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Engine)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Engine Throttles</h2>
+                                        <p class="dashboard-panel-copy">Saved engine host limits. These values apply after TorrentCore.Service restarts.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.Engine)">@GetGroupStateText(SettingsGroupKey.Engine)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Engine) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.Engine)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Engine) || IsBusy)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.Engine)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
+
+                                <div class="settings-readonly-grid">
+                                    <div class="settings-readonly-item">
+                                        <span class="settings-readonly-label">Applied max connections</span>
+                                        <strong>@_runtimeSnapshot.AppliedEngineMaximumConnections</strong>
+                                    </div>
+                                    <div class="settings-readonly-item">
+                                        <span class="settings-readonly-label">Applied half-open</span>
+                                        <strong>@_runtimeSnapshot.AppliedEngineMaximumHalfOpenConnections</strong>
+                                    </div>
+                                    <div class="settings-readonly-item">
+                                        <span class="settings-readonly-label">Applied max download</span>
+                                        <strong>@FormatRate(_runtimeSnapshot.AppliedEngineMaximumDownloadRateBytesPerSecond)</strong>
+                                    </div>
+                                    <div class="settings-readonly-item">
+                                        <span class="settings-readonly-label">Applied max upload</span>
+                                        <strong>@FormatRate(_runtimeSnapshot.AppliedEngineMaximumUploadRateBytesPerSecond)</strong>
+                                    </div>
+                                </div>
+
+                                <div class="settings-field-grid">
+                                    <MudNumericField T="int"
+                                                     Label="Saved Max Connections"
+                                                     Value="_engine.EngineMaximumConnections"
+                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumConnections = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Saved Max Half-Open Connections"
+                                                     Value="_engine.EngineMaximumHalfOpenConnections"
+                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumHalfOpenConnections = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="1"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Saved Max Download Rate"
+                                                     Value="_engine.EngineMaximumDownloadRateBytesPerSecond"
+                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumDownloadRateBytesPerSecond = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="0"
+                                                     Step="1"
+                                                     Immediate="true" />
+
+                                    <MudNumericField T="int"
+                                                     Label="Saved Max Upload Rate"
+                                                     Value="_engine.EngineMaximumUploadRateBytesPerSecond"
+                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineMaximumUploadRateBytesPerSecond = next)"
+                                                     Variant="Variant.Outlined"
+                                                     Margin="Margin.Dense"
+                                                     Min="0"
+                                                     Step="1"
+                                                     Immediate="true" />
+                                </div>
+
+                                <p class="dashboard-panel-copy">
+                                    Use <strong>0</strong> for unlimited download or upload rate. Restart-required values are shown separately from the engine's currently applied limits.
+                                </p>
+                            </div>
+                        </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Callback))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Callback)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Completion Callback</h2>
+                                        <p class="dashboard-panel-copy">Shared TVMaze callback launcher, process timeouts, and optional override values.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.Callback)">@GetGroupStateText(SettingsGroupKey.Callback)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Callback) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.Callback)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Callback) || IsBusy)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.Callback)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
+
+                                <MudCheckBox T="bool"
+                                             Value="_callback.CompletionCallbackEnabled"
+                                             ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackEnabled = next)"
+                                             Label="Enable completion callback invocation"
+                                             Dense="true"
+                                             Color="Color.Primary" />
+
+                                <div class="settings-field-stack">
+                                    <MudTextField T="string"
+                                                  Label="Command Path"
+                                                  Value="_callback.CompletionCallbackCommandPath"
+                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackCommandPath = next)"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Immediate="true" />
+
+                                    <div class="settings-field-grid settings-field-grid--pair">
+                                        <MudNumericField T="int"
+                                                         Label="Process Timeout Seconds"
+                                                         Value="_callback.CompletionCallbackTimeoutSeconds"
+                                                         ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackTimeoutSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+
+                                        <MudNumericField T="int"
+                                                         Label="Finalization Wait Seconds"
+                                                         Value="_callback.CompletionCallbackFinalizationTimeoutSeconds"
+                                                         ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackFinalizationTimeoutSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <MudTextField T="string"
+                                                  Label="Arguments"
+                                                  Value="_callback.CompletionCallbackArguments"
+                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackArguments = next)"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Immediate="true" />
+
+                                    <MudTextField T="string"
+                                                  Label="Working Directory"
+                                                  Value="_callback.CompletionCallbackWorkingDirectory"
+                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackWorkingDirectory = next)"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Immediate="true" />
+
+                                    <MudTextField T="string"
+                                                  Label="API Base URL Override"
+                                                  Value="_callback.CompletionCallbackApiBaseUrlOverride"
+                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackApiBaseUrlOverride = next)"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Immediate="true" />
+
+                                    <MudTextField T="string"
+                                                  Label="API Key Override"
+                                                  Value="_callback.CompletionCallbackApiKeyOverride"
+                                                  ValueChanged="value => UpdateCallback(value, (group, next) => group.CompletionCallbackApiKeyOverride = next)"
+                                                  Variant="Variant.Outlined"
+                                                  Margin="Margin.Dense"
+                                                  Immediate="true" />
+                                </div>
+
+                                <p class="dashboard-panel-copy">
+                                    Leave the override fields blank for the normal shared TVMaze callback setup. TorrentCore waits for the final visible payload before treating callback finalization as timed out.
+                                </p>
+                            </div>
+                        </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card settings-group-card--wide">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Categories))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Categories)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Categories</h2>
+                                        <p class="dashboard-panel-copy">These definitions route future adds. Editing a category does not move existing torrents.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.Categories)">@GetGroupStateText(SettingsGroupKey.Categories)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Categories) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.Categories)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Categories) || IsBusy)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.Categories)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
+
+                                <div class="settings-category-grid">
+                                    @foreach (var category in _categories)
+                                    {
+                                        <div class="settings-category-card" @key="category.Key">
+                                            <div class="settings-category-header">
+                                                <div>
+                                                    <h3>@category.Key</h3>
+                                                    <p class="dashboard-panel-copy">Display: @category.DisplayName</p>
+                                                </div>
+                                                <div class="settings-category-toggles">
+                                                    <MudCheckBox T="bool"
+                                                                 Value="category.Enabled"
+                                                                 ValueChanged="value => UpdateCategory(value, category, (item, next) => item.Enabled = next)"
+                                                                 Label="Enabled"
+                                                                 Dense="true"
+                                                                 Color="Color.Primary" />
+                                                    <MudCheckBox T="bool"
+                                                                 Value="category.InvokeCompletionCallback"
+                                                                 ValueChanged="value => UpdateCategory(value, category, (item, next) => item.InvokeCompletionCallback = next)"
+                                                                 Label="Invoke Callback"
+                                                                 Dense="true"
+                                                                 Color="Color.Primary" />
+                                                </div>
+                                            </div>
+
+                                            <div class="settings-category-fields">
+                                                <MudTextField T="string"
+                                                              Label="Display Name"
+                                                              Value="category.DisplayName"
+                                                              ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DisplayName = next)"
+                                                              Variant="Variant.Outlined"
+                                                              Margin="Margin.Dense"
+                                                              Immediate="true" />
+
+                                                <MudTextField T="string"
+                                                              Label="Callback Label"
+                                                              Value="category.CallbackLabel"
+                                                              ValueChanged="value => UpdateCategory(value, category, (item, next) => item.CallbackLabel = next)"
+                                                              Variant="Variant.Outlined"
+                                                              Margin="Margin.Dense"
+                                                              Immediate="true" />
+
+                                                <MudTextField T="string"
+                                                              Label="Download Root"
+                                                              Value="category.DownloadRootPath"
+                                                              ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DownloadRootPath = next)"
+                                                              Variant="Variant.Outlined"
+                                                              Margin="Margin.Dense"
+                                                              Immediate="true" />
+
+                                                <MudNumericField T="int"
+                                                                 Label="Sort Order"
+                                                                 Value="category.SortOrder"
+                                                                 ValueChanged="value => UpdateCategory(value, category, (item, next) => item.SortOrder = next)"
+                                                                 Variant="Variant.Outlined"
+                                                                 Margin="Margin.Dense"
+                                                                 Min="0"
+                                                                 Step="1"
+                                                                 Immediate="true" />
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </OperatorCard>
+                    </div>
+                </div>
             }
         </StateView>
     </ChildContent>
 </OperatorPage>
 
 @code {
+    private readonly LifecycleSettingsGroup _lifecycle = new();
+    private readonly QueueSettingsGroup _queue = new();
+    private readonly EngineThrottleSettingsGroup _engine = new();
+    private readonly CallbackSettingsGroup _callback = new();
+    private readonly List<EditableCategoryModel> _categories = [];
+
+    private static readonly IReadOnlyList<string> SeedingModes =
+    [
+        "Unlimited", "StopImmediately", "StopAfterRatio", "StopAfterTime", "StopAfterRatioOrTime",
+    ];
+
+    private static readonly IReadOnlyList<string> CleanupModes = ["Never", "AfterCompletedMinutes"];
+
     private StateViewMode _mode = StateViewMode.Loading;
     private bool _isRefreshing;
+    private bool _isResolvingPendingGroup;
     private string? _errorMessage;
-    private RuntimeSettingsDto? _runtime;
+    private RuntimeSettingsDto? _runtimeSnapshot;
+    private List<TorrentCategoryDto> _categorySnapshots = [];
+    private SettingsGroupKey? _dirtyGroupKey;
+    private SettingsGroupKey? _savingGroupKey;
+
+    private bool IsBusy => _isRefreshing || _isResolvingPendingGroup || _savingGroupKey is not null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,7 +632,7 @@
 
     private async Task RefreshAsync()
     {
-        await LoadAsync(showSuccessToast: true);
+        await ExecuteWithPendingGroupGuardAsync(async () => await LoadAsync(showSuccessToast: true));
     }
 
     private async Task LoadAsync(bool showSuccessToast)
@@ -89,8 +641,14 @@
         _mode = StateViewMode.Loading;
         _errorMessage = null;
 
-        var runtimeResult = await Api.GetRuntimeSettingsAsync();
-        if (!runtimeResult.IsSuccess)
+        var runtimeTask = Api.GetRuntimeSettingsAsync();
+        var categoriesTask = Api.GetCategoriesAsync();
+        await Task.WhenAll(runtimeTask, categoriesTask);
+
+        var runtimeResult = await runtimeTask;
+        var categoriesResult = await categoriesTask;
+
+        if (!runtimeResult.IsSuccess || runtimeResult.Value is null)
         {
             _errorMessage = runtimeResult.ErrorMessage ?? "Runtime settings request failed.";
             _mode = StateViewMode.Error;
@@ -98,18 +656,575 @@
             return;
         }
 
-        _runtime = runtimeResult.Value;
-        _mode = _runtime is null ? StateViewMode.Empty : StateViewMode.Ready;
+        if (!categoriesResult.IsSuccess || categoriesResult.Value is null)
+        {
+            _errorMessage = categoriesResult.ErrorMessage ?? "Category settings request failed.";
+            _mode = StateViewMode.Error;
+            _isRefreshing = false;
+            return;
+        }
+
+        ApplyRuntimeSettings(runtimeResult.Value);
+        ApplyCategories(categoriesResult.Value);
+        _dirtyGroupKey = null;
+        _mode = StateViewMode.Ready;
         _isRefreshing = false;
 
         if (showSuccessToast)
         {
-            Feedback.Success("Runtime settings refreshed.");
+            Feedback.Success("Settings refreshed.");
         }
+    }
+
+    private async Task SaveGroupAsync(SettingsGroupKey key)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        _savingGroupKey = key;
+
+        try
+        {
+            switch (key)
+            {
+                case SettingsGroupKey.Categories:
+                    await SaveCategoriesAsync();
+                    break;
+                default:
+                    await SaveRuntimeGroupAsync(key);
+                    break;
+            }
+        }
+        finally
+        {
+            _savingGroupKey = null;
+        }
+    }
+
+    private async Task SaveRuntimeGroupAsync(SettingsGroupKey key)
+    {
+        var result = await Api.UpdateRuntimeSettingsAsync(BuildRuntimeSettingsRequest());
+        if (!result.IsSuccess || result.Value is null)
+        {
+            Feedback.Error(result.ErrorMessage ?? $"Unable to save {GetGroupTitle(key)}.");
+            return;
+        }
+
+        ApplyRuntimeSettings(result.Value);
+        _dirtyGroupKey = null;
+
+        Feedback.Success(
+            key == SettingsGroupKey.Engine && result.Value.EngineSettingsRequireRestart ?
+                "Engine throttles saved. Restart TorrentCore.Service to apply them." :
+                $"{GetGroupTitle(key)} saved."
+        );
+    }
+
+    private async Task SaveCategoriesAsync()
+    {
+        var updatedCategories = new List<TorrentCategoryDto>(_categories.Count);
+
+        foreach (var category in _categories.OrderBy(item => item.SortOrder)
+                                            .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var result = await Api.UpdateCategoryAsync(
+                category.Key,
+                new UpdateTorrentCategoryRequest
+                {
+                    DisplayName = category.DisplayName,
+                    CallbackLabel = category.CallbackLabel,
+                    DownloadRootPath = category.DownloadRootPath,
+                    Enabled = category.Enabled,
+                    InvokeCompletionCallback = category.InvokeCompletionCallback,
+                    SortOrder = category.SortOrder,
+                }
+            );
+
+            if (!result.IsSuccess || result.Value is null)
+            {
+                Feedback.Error(result.ErrorMessage ?? "Unable to save categories.");
+                return;
+            }
+
+            updatedCategories.Add(result.Value);
+        }
+
+        ApplyCategories(updatedCategories);
+        _dirtyGroupKey = null;
+        Feedback.Success("Categories saved.");
+    }
+
+    private Task DiscardGroupAsync(SettingsGroupKey key)
+    {
+        switch (key)
+        {
+            case SettingsGroupKey.Lifecycle:
+                ApplyLifecycleFromSnapshot();
+                break;
+            case SettingsGroupKey.Queue:
+                ApplyQueueFromSnapshot();
+                break;
+            case SettingsGroupKey.Engine:
+                ApplyEngineFromSnapshot();
+                break;
+            case SettingsGroupKey.Callback:
+                ApplyCallbackFromSnapshot();
+                break;
+            case SettingsGroupKey.Categories:
+                ApplyCategories(_categorySnapshots);
+                break;
+        }
+
+        if (_dirtyGroupKey == key)
+        {
+            _dirtyGroupKey = null;
+        }
+
+        Feedback.Info($"{GetGroupTitle(key)} changes discarded.");
+        return Task.CompletedTask;
+    }
+
+    private async Task OnBlockedGroupClickedAsync(SettingsGroupKey targetGroupKey)
+    {
+        if (!IsGroupBlocked(targetGroupKey))
+        {
+            return;
+        }
+
+        await ResolvePendingGroupAsync();
+    }
+
+    private async Task ExecuteWithPendingGroupGuardAsync(Func<Task> action)
+    {
+        if (!await ResolvePendingGroupAsync())
+        {
+            return;
+        }
+
+        await action();
+    }
+
+    private async Task<bool> ResolvePendingGroupAsync()
+    {
+        if (_dirtyGroupKey is null || _isResolvingPendingGroup)
+        {
+            return _dirtyGroupKey is null;
+        }
+
+        _isResolvingPendingGroup = true;
+
+        try
+        {
+            var dirtyGroup = _dirtyGroupKey.Value;
+            var dialog = await DialogService.ShowAsync<PendingSettingsGroupDialog>(
+                "Unsaved Changes",
+                new DialogParameters
+                {
+                    [nameof(PendingSettingsGroupDialog.GroupName)] = GetGroupTitle(dirtyGroup),
+                },
+                new DialogOptions
+                {
+                    CloseButton = true,
+                    CloseOnEscapeKey = true,
+                    BackdropClick = false,
+                    FullWidth = true,
+                    MaxWidth = MaxWidth.Small,
+                }
+            );
+
+            var result = await dialog.Result;
+            if (result is null || result.Canceled)
+            {
+                return false;
+            }
+
+            var action = result.Data?.ToString();
+            if (string.Equals(action, "save", StringComparison.OrdinalIgnoreCase))
+            {
+                await SaveGroupAsync(dirtyGroup);
+                return _dirtyGroupKey is null;
+            }
+
+            if (string.Equals(action, "discard", StringComparison.OrdinalIgnoreCase))
+            {
+                await DiscardGroupAsync(dirtyGroup);
+                return true;
+            }
+
+            return false;
+        }
+        finally
+        {
+            _isResolvingPendingGroup = false;
+        }
+    }
+
+    private void ApplyRuntimeSettings(RuntimeSettingsDto settings)
+    {
+        _runtimeSnapshot = settings;
+        ApplyLifecycleFromSnapshot();
+        ApplyQueueFromSnapshot();
+        ApplyEngineFromSnapshot();
+        ApplyCallbackFromSnapshot();
+    }
+
+    private void ApplyCategories(IReadOnlyList<TorrentCategoryDto> categories)
+    {
+        _categorySnapshots = categories
+            .OrderBy(item => item.SortOrder)
+            .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        _categories.Clear();
+        _categories.AddRange(
+            _categorySnapshots.Select(
+                category => new EditableCategoryModel
+                {
+                    Key = category.Key,
+                    DisplayName = category.DisplayName,
+                    CallbackLabel = category.CallbackLabel,
+                    DownloadRootPath = category.DownloadRootPath,
+                    Enabled = category.Enabled,
+                    InvokeCompletionCallback = category.InvokeCompletionCallback,
+                    SortOrder = category.SortOrder,
+                }
+            )
+        );
+    }
+
+    private void ApplyLifecycleFromSnapshot()
+    {
+        if (_runtimeSnapshot is null)
+        {
+            return;
+        }
+
+        _lifecycle.SeedingStopMode = _runtimeSnapshot.SeedingStopMode;
+        _lifecycle.SeedingStopRatio = _runtimeSnapshot.SeedingStopRatio;
+        _lifecycle.SeedingStopMinutes = _runtimeSnapshot.SeedingStopMinutes;
+        _lifecycle.CompletedTorrentCleanupMode = _runtimeSnapshot.CompletedTorrentCleanupMode;
+        _lifecycle.CompletedTorrentCleanupMinutes = _runtimeSnapshot.CompletedTorrentCleanupMinutes;
+        _lifecycle.DeleteLogsForCompletedTorrents = _runtimeSnapshot.DeleteLogsForCompletedTorrents;
+    }
+
+    private void ApplyQueueFromSnapshot()
+    {
+        if (_runtimeSnapshot is null)
+        {
+            return;
+        }
+
+        _queue.MaxActiveMetadataResolutions = _runtimeSnapshot.MaxActiveMetadataResolutions;
+        _queue.MaxActiveDownloads = _runtimeSnapshot.MaxActiveDownloads;
+        _queue.MetadataRefreshStaleSeconds = _runtimeSnapshot.MetadataRefreshStaleSeconds;
+        _queue.MetadataRefreshRestartDelaySeconds = _runtimeSnapshot.MetadataRefreshRestartDelaySeconds;
+        _queue.EngineConnectionFailureLogBurstLimit = _runtimeSnapshot.EngineConnectionFailureLogBurstLimit;
+        _queue.EngineConnectionFailureLogWindowSeconds = _runtimeSnapshot.EngineConnectionFailureLogWindowSeconds;
+    }
+
+    private void ApplyEngineFromSnapshot()
+    {
+        if (_runtimeSnapshot is null)
+        {
+            return;
+        }
+
+        _engine.EngineMaximumConnections = _runtimeSnapshot.EngineMaximumConnections;
+        _engine.EngineMaximumHalfOpenConnections = _runtimeSnapshot.EngineMaximumHalfOpenConnections;
+        _engine.EngineMaximumDownloadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond;
+        _engine.EngineMaximumUploadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond;
+    }
+
+    private void ApplyCallbackFromSnapshot()
+    {
+        if (_runtimeSnapshot is null)
+        {
+            return;
+        }
+
+        _callback.CompletionCallbackEnabled = _runtimeSnapshot.CompletionCallbackEnabled;
+        _callback.CompletionCallbackCommandPath = _runtimeSnapshot.CompletionCallbackCommandPath ?? string.Empty;
+        _callback.CompletionCallbackArguments = _runtimeSnapshot.CompletionCallbackArguments ?? string.Empty;
+        _callback.CompletionCallbackWorkingDirectory = _runtimeSnapshot.CompletionCallbackWorkingDirectory ?? string.Empty;
+        _callback.CompletionCallbackTimeoutSeconds = _runtimeSnapshot.CompletionCallbackTimeoutSeconds;
+        _callback.CompletionCallbackFinalizationTimeoutSeconds = _runtimeSnapshot.CompletionCallbackFinalizationTimeoutSeconds;
+        _callback.CompletionCallbackApiBaseUrlOverride = _runtimeSnapshot.CompletionCallbackApiBaseUrlOverride ?? string.Empty;
+        _callback.CompletionCallbackApiKeyOverride = _runtimeSnapshot.CompletionCallbackApiKeyOverride ?? string.Empty;
+    }
+
+    private UpdateRuntimeSettingsRequest BuildRuntimeSettingsRequest()
+    {
+        return new UpdateRuntimeSettingsRequest
+        {
+            SeedingStopMode = _lifecycle.SeedingStopMode,
+            SeedingStopRatio = _lifecycle.SeedingStopRatio,
+            SeedingStopMinutes = _lifecycle.SeedingStopMinutes,
+            CompletedTorrentCleanupMode = _lifecycle.CompletedTorrentCleanupMode,
+            CompletedTorrentCleanupMinutes = _lifecycle.CompletedTorrentCleanupMinutes,
+            DeleteLogsForCompletedTorrents = _lifecycle.DeleteLogsForCompletedTorrents,
+            EngineConnectionFailureLogBurstLimit = _queue.EngineConnectionFailureLogBurstLimit,
+            EngineConnectionFailureLogWindowSeconds = _queue.EngineConnectionFailureLogWindowSeconds,
+            EngineMaximumConnections = _engine.EngineMaximumConnections,
+            EngineMaximumHalfOpenConnections = _engine.EngineMaximumHalfOpenConnections,
+            EngineMaximumDownloadRateBytesPerSecond = _engine.EngineMaximumDownloadRateBytesPerSecond,
+            EngineMaximumUploadRateBytesPerSecond = _engine.EngineMaximumUploadRateBytesPerSecond,
+            MaxActiveMetadataResolutions = _queue.MaxActiveMetadataResolutions,
+            MaxActiveDownloads = _queue.MaxActiveDownloads,
+            MetadataRefreshStaleSeconds = _queue.MetadataRefreshStaleSeconds,
+            MetadataRefreshRestartDelaySeconds = _queue.MetadataRefreshRestartDelaySeconds,
+            CompletionCallbackEnabled = _callback.CompletionCallbackEnabled,
+            CompletionCallbackCommandPath = _callback.CompletionCallbackCommandPath,
+            CompletionCallbackArguments = _callback.CompletionCallbackArguments,
+            CompletionCallbackWorkingDirectory = _callback.CompletionCallbackWorkingDirectory,
+            CompletionCallbackTimeoutSeconds = _callback.CompletionCallbackTimeoutSeconds,
+            CompletionCallbackFinalizationTimeoutSeconds = _callback.CompletionCallbackFinalizationTimeoutSeconds,
+            CompletionCallbackApiBaseUrlOverride = _callback.CompletionCallbackApiBaseUrlOverride,
+            CompletionCallbackApiKeyOverride = _callback.CompletionCallbackApiKeyOverride,
+        };
+    }
+
+    private Task UpdateLifecycle<T>(T value, Action<LifecycleSettingsGroup, T> assign)
+    {
+        assign(_lifecycle, value);
+        UpdateDirtyGroup(SettingsGroupKey.Lifecycle);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateQueue<T>(T value, Action<QueueSettingsGroup, T> assign)
+    {
+        assign(_queue, value);
+        UpdateDirtyGroup(SettingsGroupKey.Queue);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateEngine<T>(T value, Action<EngineThrottleSettingsGroup, T> assign)
+    {
+        assign(_engine, value);
+        UpdateDirtyGroup(SettingsGroupKey.Engine);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateCallback<T>(T value, Action<CallbackSettingsGroup, T> assign)
+    {
+        assign(_callback, value);
+        UpdateDirtyGroup(SettingsGroupKey.Callback);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateCategory<T>(T value, EditableCategoryModel category, Action<EditableCategoryModel, T> assign)
+    {
+        assign(category, value);
+        UpdateDirtyGroup(SettingsGroupKey.Categories);
+        return Task.CompletedTask;
+    }
+
+    private void UpdateDirtyGroup(SettingsGroupKey key)
+    {
+        if (IsGroupDirty(key))
+        {
+            _dirtyGroupKey = key;
+            return;
+        }
+
+        if (_dirtyGroupKey == key)
+        {
+            _dirtyGroupKey = null;
+        }
+    }
+
+    private bool IsGroupDirty(SettingsGroupKey key)
+    {
+        return key switch
+        {
+            SettingsGroupKey.Lifecycle => IsLifecycleDirty(),
+            SettingsGroupKey.Queue => IsQueueDirty(),
+            SettingsGroupKey.Engine => IsEngineDirty(),
+            SettingsGroupKey.Callback => IsCallbackDirty(),
+            SettingsGroupKey.Categories => IsCategoriesDirty(),
+            _ => false,
+        };
+    }
+
+    private bool IsGroupBlocked(SettingsGroupKey key)
+    {
+        return _dirtyGroupKey is not null && _dirtyGroupKey != key;
+    }
+
+    private bool IsLifecycleDirty()
+    {
+        return _runtimeSnapshot is not null &&
+               (_lifecycle.SeedingStopMode != _runtimeSnapshot.SeedingStopMode ||
+                _lifecycle.SeedingStopRatio != _runtimeSnapshot.SeedingStopRatio ||
+                _lifecycle.SeedingStopMinutes != _runtimeSnapshot.SeedingStopMinutes ||
+                _lifecycle.CompletedTorrentCleanupMode != _runtimeSnapshot.CompletedTorrentCleanupMode ||
+                _lifecycle.CompletedTorrentCleanupMinutes != _runtimeSnapshot.CompletedTorrentCleanupMinutes ||
+                _lifecycle.DeleteLogsForCompletedTorrents != _runtimeSnapshot.DeleteLogsForCompletedTorrents);
+    }
+
+    private bool IsQueueDirty()
+    {
+        return _runtimeSnapshot is not null &&
+               (_queue.MaxActiveMetadataResolutions != _runtimeSnapshot.MaxActiveMetadataResolutions ||
+                _queue.MaxActiveDownloads != _runtimeSnapshot.MaxActiveDownloads ||
+                _queue.MetadataRefreshStaleSeconds != _runtimeSnapshot.MetadataRefreshStaleSeconds ||
+                _queue.MetadataRefreshRestartDelaySeconds != _runtimeSnapshot.MetadataRefreshRestartDelaySeconds ||
+                _queue.EngineConnectionFailureLogBurstLimit != _runtimeSnapshot.EngineConnectionFailureLogBurstLimit ||
+                _queue.EngineConnectionFailureLogWindowSeconds != _runtimeSnapshot.EngineConnectionFailureLogWindowSeconds);
+    }
+
+    private bool IsEngineDirty()
+    {
+        return _runtimeSnapshot is not null &&
+               (_engine.EngineMaximumConnections != _runtimeSnapshot.EngineMaximumConnections ||
+                _engine.EngineMaximumHalfOpenConnections != _runtimeSnapshot.EngineMaximumHalfOpenConnections ||
+                _engine.EngineMaximumDownloadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond ||
+                _engine.EngineMaximumUploadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond);
+    }
+
+    private bool IsCallbackDirty()
+    {
+        return _runtimeSnapshot is not null &&
+               (_callback.CompletionCallbackEnabled != _runtimeSnapshot.CompletionCallbackEnabled ||
+                _callback.CompletionCallbackCommandPath != (_runtimeSnapshot.CompletionCallbackCommandPath ?? string.Empty) ||
+                _callback.CompletionCallbackArguments != (_runtimeSnapshot.CompletionCallbackArguments ?? string.Empty) ||
+                _callback.CompletionCallbackWorkingDirectory != (_runtimeSnapshot.CompletionCallbackWorkingDirectory ?? string.Empty) ||
+                _callback.CompletionCallbackTimeoutSeconds != _runtimeSnapshot.CompletionCallbackTimeoutSeconds ||
+                _callback.CompletionCallbackFinalizationTimeoutSeconds != _runtimeSnapshot.CompletionCallbackFinalizationTimeoutSeconds ||
+                _callback.CompletionCallbackApiBaseUrlOverride != (_runtimeSnapshot.CompletionCallbackApiBaseUrlOverride ?? string.Empty) ||
+                _callback.CompletionCallbackApiKeyOverride != (_runtimeSnapshot.CompletionCallbackApiKeyOverride ?? string.Empty));
+    }
+
+    private bool IsCategoriesDirty()
+    {
+        if (_categories.Count != _categorySnapshots.Count)
+        {
+            return true;
+        }
+
+        var snapshotLookup = _categorySnapshots.ToDictionary(item => item.Key, StringComparer.OrdinalIgnoreCase);
+        foreach (var category in _categories)
+        {
+            if (!snapshotLookup.TryGetValue(category.Key, out var snapshot))
+            {
+                return true;
+            }
+
+            if (category.DisplayName != snapshot.DisplayName ||
+                category.CallbackLabel != snapshot.CallbackLabel ||
+                category.DownloadRootPath != snapshot.DownloadRootPath ||
+                category.Enabled != snapshot.Enabled ||
+                category.InvokeCompletionCallback != snapshot.InvokeCompletionCallback ||
+                category.SortOrder != snapshot.SortOrder)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private string BuildStatusLine()
+    {
+        if (_dirtyGroupKey is null)
+        {
+            return "Each group saves independently. Once you start editing a group, save or discard it before moving to another section.";
+        }
+
+        return $"{GetGroupTitle(_dirtyGroupKey.Value)} has unsaved changes. Save or discard before editing another section.";
+    }
+
+    private string GetGroupStateText(SettingsGroupKey key)
+    {
+        if (_savingGroupKey == key)
+        {
+            return "Saving";
+        }
+
+        return IsGroupDirty(key) ? "Edited" : "Saved";
+    }
+
+    private string GetGroupStateClass(SettingsGroupKey key)
+    {
+        return IsGroupDirty(key) ? "settings-group-state settings-group-state--dirty" : "settings-group-state";
+    }
+
+    private static string GetGroupTitle(SettingsGroupKey key)
+    {
+        return key switch
+        {
+            SettingsGroupKey.Lifecycle => "Lifecycle & Cleanup",
+            SettingsGroupKey.Queue => "Queue & Recovery",
+            SettingsGroupKey.Engine => "Engine Throttles",
+            SettingsGroupKey.Callback => "Completion Callback",
+            SettingsGroupKey.Categories => "Categories",
+            _ => "Settings",
+        };
     }
 
     private static string FormatRate(int bytesPerSecond)
     {
-        return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+        return bytesPerSecond <= 0 ? "Unlimited" : $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    }
+
+    private enum SettingsGroupKey
+    {
+        Lifecycle,
+        Queue,
+        Engine,
+        Callback,
+        Categories,
+    }
+
+    private sealed class LifecycleSettingsGroup
+    {
+        public string SeedingStopMode { get; set; } = "Unlimited";
+        public double SeedingStopRatio { get; set; } = 1.0;
+        public int SeedingStopMinutes { get; set; } = 60;
+        public string CompletedTorrentCleanupMode { get; set; } = "Never";
+        public int CompletedTorrentCleanupMinutes { get; set; } = 60;
+        public bool DeleteLogsForCompletedTorrents { get; set; }
+    }
+
+    private sealed class QueueSettingsGroup
+    {
+        public int MaxActiveMetadataResolutions { get; set; } = 4;
+        public int MaxActiveDownloads { get; set; } = 4;
+        public int MetadataRefreshStaleSeconds { get; set; } = 90;
+        public int MetadataRefreshRestartDelaySeconds { get; set; } = 30;
+        public int EngineConnectionFailureLogBurstLimit { get; set; } = 5;
+        public int EngineConnectionFailureLogWindowSeconds { get; set; } = 60;
+    }
+
+    private sealed class EngineThrottleSettingsGroup
+    {
+        public int EngineMaximumConnections { get; set; } = 150;
+        public int EngineMaximumHalfOpenConnections { get; set; } = 8;
+        public int EngineMaximumDownloadRateBytesPerSecond { get; set; }
+        public int EngineMaximumUploadRateBytesPerSecond { get; set; }
+    }
+
+    private sealed class CallbackSettingsGroup
+    {
+        public bool CompletionCallbackEnabled { get; set; }
+        public string CompletionCallbackCommandPath { get; set; } = string.Empty;
+        public string CompletionCallbackArguments { get; set; } = string.Empty;
+        public string CompletionCallbackWorkingDirectory { get; set; } = string.Empty;
+        public int CompletionCallbackTimeoutSeconds { get; set; } = 30;
+        public int CompletionCallbackFinalizationTimeoutSeconds { get; set; } = 120;
+        public string CompletionCallbackApiBaseUrlOverride { get; set; } = string.Empty;
+        public string CompletionCallbackApiKeyOverride { get; set; } = string.Empty;
+    }
+
+    private sealed class EditableCategoryModel
+    {
+        public required string Key { get; init; }
+        public string DisplayName { get; set; } = string.Empty;
+        public string CallbackLabel { get; set; } = string.Empty;
+        public string DownloadRootPath { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+        public bool InvokeCompletionCallback { get; set; }
+        public int SortOrder { get; set; }
     }
 }

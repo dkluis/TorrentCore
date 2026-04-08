@@ -1,0 +1,53 @@
+<MudDialog>
+    <DialogContent>
+        <div class="pending-group-dialog">
+            <p class="dashboard-callout-title">Unsaved changes</p>
+            <p class="dashboard-callout-copy">
+                <strong>@GroupName</strong> has unsaved changes. Save them, discard them, or cancel and stay in this section.
+            </p>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   Size="Size.Small"
+                   OnClick="Cancel">
+            Cancel
+        </MudButton>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Warning"
+                   Size="Size.Small"
+                   OnClick="Discard">
+            Discard
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   OnClick="Save">
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string GroupName { get; set; } = "This section";
+
+    private void Cancel()
+    {
+        MudDialog.Cancel();
+    }
+
+    private void Discard()
+    {
+        MudDialog.Close(DialogResult.Ok("discard"));
+    }
+
+    private void Save()
+    {
+        MudDialog.Close(DialogResult.Ok("save"));
+    }
+}

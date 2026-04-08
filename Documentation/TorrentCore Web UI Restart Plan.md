@@ -4,9 +4,9 @@
 
 Active planning document.
 
-Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phase 3 Pending`
+Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phases 3-6 Complete`, `Phase 7 In Progress`
 
-Last updated: `2026-04-07`
+Last updated: `2026-04-08`
 
 Current checkpoint:
 
@@ -33,6 +33,9 @@ Current checkpoint:
 - peer diagnostics use a compact paged grid with live auto-refresh while the dialog is open
 - tracker diagnostics use a paged read-only grid with manual refresh and no tracker-URL column in the operator view
 - the peer/tracker dialog slice has now been operator-tested and is behaving as expected in the current WebUI runtime
+- the settings page now uses compact grouped edit cards with per-group save/discard actions for lifecycle, queue/recovery, engine throttles, callback settings, and categories
+- the settings page now blocks cross-section editing when one group is dirty; clicking another section opens a `Save / Discard / Cancel` decision dialog for the dirty group
+- runtime settings updates now flow through the shared WebUI API adapter, and successful group saves surface toast feedback instead of inline page-only messages
 
 ## Purpose
 
@@ -192,6 +195,25 @@ These rules are now explicit for selected-torrent diagnostics in `TorrentCore.We
   - default 25 rows per page
   - pager always visible inside the table shell
   - no browser-window scrolling required for normal use
+
+## Settings Editing Rules (2026-04-08)
+
+These rules are now explicit for `TorrentCore.WebUI` settings behavior:
+
+- The settings page is no longer a read-only status snapshot; it is a grouped editor over the existing runtime-settings and category APIs.
+- Related settings must be organized into compact operator sections:
+  - `Lifecycle & Cleanup`
+  - `Queue & Recovery`
+  - `Engine Throttles`
+  - `Completion Callback`
+  - `Categories`
+- Each group owns its own `Save` and `Discard` actions. The page must not rely on a single all-settings save button.
+- Only one settings group may remain dirty at a time in the WebUI flow.
+- When a group is dirty, other groups are intentionally blocked. Clicking a blocked group opens a `Save / Discard / Cancel` dialog for the dirty group before the operator continues.
+- Successful save and discard actions must use toast/snackbar feedback, matching the shared operator feedback pattern already used on other pages.
+- Engine throttle saves remain restart-required service settings even though the save interaction is now group-scoped.
+- Top-of-page runtime/apply informational content should stay compact. Prefer one summary strip or chips row instead of large overview cards when the data is not directly edited in that area.
+- The settings page must have its own internal content scroll path so lower groups remain reachable even though the shell/browser window itself does not scroll.
 
 ## TVMaze Baseline Conventions (Captured)
 
@@ -464,7 +486,7 @@ Verify:
 
 Status:
 
-`Pending`
+`In Progress`
 
 ### Phase 8 - Hardening And Cutover
 

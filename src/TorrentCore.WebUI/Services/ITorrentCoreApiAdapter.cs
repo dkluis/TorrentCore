@@ -10,7 +10,16 @@ public interface ITorrentCoreApiAdapter
     Task<ServiceCallResult<ServiceHealthDto?>> GetHealthAsync(CancellationToken cancellationToken = default);
     Task<ServiceCallResult<EngineHostStatusDto?>> GetHostStatusAsync(CancellationToken cancellationToken = default);
     Task<ServiceCallResult<RuntimeSettingsDto?>> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<RuntimeSettingsDto>> UpdateRuntimeSettingsAsync(
+        UpdateRuntimeSettingsRequest request,
+        CancellationToken cancellationToken = default
+    );
     Task<ServiceCallResult<IReadOnlyList<TorrentCategoryDto>>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<TorrentCategoryDto>> UpdateCategoryAsync(
+        string key,
+        UpdateTorrentCategoryRequest request,
+        CancellationToken cancellationToken = default
+    );
     Task<ServiceCallResult<IReadOnlyList<TorrentSummaryDto>>> GetTorrentsAsync(CancellationToken cancellationToken = default);
     Task<ServiceCallResult<IReadOnlyList<ActivityLogEntryDto>>> GetRecentLogsAsync(
         int take = 100,

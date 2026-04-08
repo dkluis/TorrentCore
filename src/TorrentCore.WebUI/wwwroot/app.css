@@ -536,6 +536,226 @@ h1:focus {
     align-items: flex-start;
 }
 
+.settings-page-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    padding-right: 0.1rem;
+}
+
+.settings-page {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.settings-summary-card {
+    padding-block: 0.6rem;
+}
+
+.settings-summary-line {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.settings-summary-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--tvz-border);
+    border-radius: 0.75rem;
+    background: rgba(247, 240, 228, 0.72);
+    min-width: 0;
+}
+
+.settings-summary-label {
+    color: var(--tvz-brand);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.settings-summary-chip strong {
+    font-size: 0.84rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.settings-summary-meta {
+    color: var(--tvz-muted);
+    font-size: 0.76rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.settings-editor-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+    min-width: 0;
+}
+
+.settings-group-card {
+    min-height: 0;
+}
+
+.settings-group-card--wide {
+    grid-column: 1 / -1;
+}
+
+.settings-group-shell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.settings-group-actions {
+    align-items: center;
+}
+
+.settings-group-state {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(21, 37, 47, 0.08);
+    color: var(--tvz-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.settings-group-state--dirty {
+    background: rgba(168, 77, 32, 0.14);
+    color: var(--tvz-brand);
+}
+
+.settings-field-grid {
+    display: grid;
+    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    min-width: 0;
+}
+
+.settings-field-grid--pair {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.settings-field-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.settings-readonly-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+}
+
+.settings-readonly-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--tvz-border);
+    border-radius: 0.75rem;
+    background: rgba(247, 240, 228, 0.72);
+}
+
+.settings-readonly-label {
+    color: var(--tvz-muted);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.settings-category-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.settings-category-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--tvz-border);
+    border-radius: 0.85rem;
+    background: rgba(247, 240, 228, 0.66);
+}
+
+.settings-category-header {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.settings-category-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.settings-category-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    justify-content: flex-end;
+}
+
+.settings-category-fields {
+    display: grid;
+    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+
+.settings-group-blocker {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    border: 0;
+    border-radius: 0.9rem;
+    background: rgba(255, 250, 242, 0.88);
+    color: var(--tvz-ink);
+    cursor: pointer;
+    text-align: center;
+}
+
+.settings-group-blocker-copy {
+    max-width: 20rem;
+    padding: 0.6rem 0.8rem;
+    border: 1px solid rgba(168, 77, 32, 0.22);
+    border-radius: 0.85rem;
+    background: rgba(247, 240, 228, 0.96);
+    box-shadow: var(--tvz-shadow);
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+.pending-group-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
 .dashboard-torrent-submit-grid {
     display: grid;
     gap: 0.5rem;
