@@ -160,6 +160,7 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
             SeedingStopMinutes = 60,
             CompletedTorrentCleanupMode = CompletedTorrentCleanupMode.Never,
             CompletedTorrentCleanupMinutes = 60,
+            DeleteLogsForCompletedTorrents = false,
             EngineConnectionFailureLogBurstLimit = 10,
             EngineConnectionFailureLogWindowSeconds = 60,
             EngineMaximumConnections = 200,

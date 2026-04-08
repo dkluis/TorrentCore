@@ -152,6 +152,7 @@ Current service configuration section:
 - `Delete Data` now explicitly removes torrent payload files/directories before pruning empty parent folders, so operator data deletion matches the UI action label instead of only removing TorrentCore tracking state
 - the operator settings reference now includes a short troubleshooting guide for magnets stuck in `ResolvingMetadata`, covering the automatic recovery sequence, when to use `refresh_metadata`, and which engine events to inspect
 - the operator settings reference now also documents the automatic zero-peer download recovery path and calls out that IPv6 route failures can be incidental when the active VPN path only carries IPv4
+- completed-torrent policy now includes an optional `DeleteLogsForCompletedTorrents` runtime toggle; when enabled, TorrentCore prunes torrent-scoped activity logs for successfully completed torrents after the normal completion-age window, and the same toggle also clears those torrent-scoped logs when automatic completed-torrent removal runs
 
 Note:
 - one `MSB3026` copy warning occurred when build and test were run in parallel against the same output directories

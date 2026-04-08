@@ -18,6 +18,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
         : BackgroundService
 {
     private readonly SemaphoreSlim             _gate           = new(1, 1);
+    private readonly HashSet<Guid>             _prunedTorrentLogIds = [];
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -49,7 +50,8 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
     private async Task ProcessTickAsync(CancellationToken cancellationToken)
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
-        if (runtimeSettings.CompletedTorrentCleanupMode != CompletedTorrentCleanupMode.AfterCompletedMinutes)
+        if (runtimeSettings.CompletedTorrentCleanupMode != CompletedTorrentCleanupMode.AfterCompletedMinutes &&
+            !runtimeSettings.DeleteLogsForCompletedTorrents)
         {
             return;
         }
@@ -60,19 +62,34 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
         {
             var now      = DateTimeOffset.UtcNow;
             var torrents = await torrentStateStore.ListAsync(cancellationToken);
-            var candidates = torrents
-                            .Where(torrent
-                                     => torrent.State == TorrentState.Completed && torrent.CompletedAtUtc is not null
-                             )
-                            .Where(torrent
-                                     => (now - torrent.CompletedAtUtc!.Value).TotalMinutes >=
-                                     runtimeSettings.CompletedTorrentCleanupMinutes
-                             )
-                            .OrderBy(torrent => torrent.CompletedAtUtc)
-                            .ThenBy(torrent => torrent.TorrentId)
-                            .ToList();
+            var completedCandidates = torrents
+                                     .Where(IsSuccessfulCompletedTorrent)
+                                     .Where(torrent
+                                              => (now - torrent.CompletedAtUtc!.Value).TotalMinutes >=
+                                              runtimeSettings.CompletedTorrentCleanupMinutes
+                                      )
+                                     .OrderBy(torrent => torrent.CompletedAtUtc)
+                                     .ThenBy(torrent => torrent.TorrentId)
+                                     .ToList();
 
-            foreach (var torrent in candidates)
+            _prunedTorrentLogIds.IntersectWith(completedCandidates.Select(torrent => torrent.TorrentId));
+
+            var autoRemoveCandidateIds = runtimeSettings.CompletedTorrentCleanupMode ==
+                    CompletedTorrentCleanupMode.AfterCompletedMinutes
+                    ? completedCandidates.Select(torrent => torrent.TorrentId).ToHashSet()
+                    : [];
+
+            if (runtimeSettings.DeleteLogsForCompletedTorrents)
+            {
+                foreach (var torrent in completedCandidates.Where(torrent =>
+                             !autoRemoveCandidateIds.Contains(torrent.TorrentId) &&
+                             !_prunedTorrentLogIds.Contains(torrent.TorrentId)))
+                {
+                    await TryDeleteCompletedTorrentLogsAsync(torrent, cancellationToken);
+                }
+            }
+
+            foreach (var torrent in completedCandidates.Where(torrent => autoRemoveCandidateIds.Contains(torrent.TorrentId)))
             {
                 try
                 {
@@ -104,6 +121,11 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                             ),
                         }, cancellationToken
                     );
+
+                    if (runtimeSettings.DeleteLogsForCompletedTorrents)
+                    {
+                        await TryDeleteCompletedTorrentLogsAsync(torrent, cancellationToken);
+                    }
                 }
                 catch (Application.ServiceOperationException exception) when (exception.Code == "torrent_not_found")
                 {
@@ -150,5 +172,43 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
     {
         _gate.Dispose();
         base.Dispose();
+    }
+
+    private async Task TryDeleteCompletedTorrentLogsAsync(TorrentSnapshot torrent, CancellationToken cancellationToken)
+    {
+        var deletedCount = await activityLogService.DeleteByTorrentIdAsync(torrent.TorrentId, cancellationToken);
+        _prunedTorrentLogIds.Add(torrent.TorrentId);
+
+        if (deletedCount <= 0)
+        {
+            return;
+        }
+
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level             = ActivityLogLevel.Information,
+                Category          = "torrent",
+                EventType         = "torrent.logs.auto_deleted",
+                Message           = $"Automatically deleted completed torrent log history for '{torrent.Name}'.",
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        torrent.TorrentId,
+                        torrent.Name,
+                        torrent.CompletedAtUtc,
+                        DeletedCount = deletedCount,
+                    }
+                ),
+            }, cancellationToken
+        );
+    }
+
+    private static bool IsSuccessfulCompletedTorrent(TorrentSnapshot torrent)
+    {
+        return torrent.State == TorrentState.Completed &&
+               torrent.CompletedAtUtc is not null &&
+               torrent.CompletionCallbackState is null or TorrentCompletionCallbackState.Invoked;
     }
 }

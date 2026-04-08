@@ -328,9 +328,24 @@ Applies:
 
 Meaning:
 - The delay before automatic completed-torrent cleanup runs when a time-based cleanup mode is active.
+- TorrentCore also uses this same completion-age window for optional completed-log pruning when `Delete Log Entries For Completed Torrents` is enabled.
 
 Unit:
 - Minutes.
+
+Applies:
+- Live.
+
+### Delete Log Entries For Completed Torrents
+
+Meaning:
+- Controls whether TorrentCore automatically deletes torrent-scoped activity logs after a torrent has completed successfully and aged past the current completed-cleanup minute window.
+
+Important rules:
+- This deletes only activity-log rows whose `torrent_id` matches that completed torrent.
+- It does not delete downloaded data.
+- It does not run while a completion callback is still pending, failed, or timed out.
+- If automatic completed-torrent removal is also enabled, TorrentCore removes the torrent from tracking first and then clears that torrent's log history as part of the same cleanup pass.
 
 Applies:
 - Live.

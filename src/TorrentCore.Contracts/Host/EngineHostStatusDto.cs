@@ -38,6 +38,7 @@ public sealed class EngineHostStatusDto
     public required int              SeedingStopMinutes                      { get; init; }
     public required string           CompletedTorrentCleanupMode             { get; init; }
     public required int              CompletedTorrentCleanupMinutes          { get; init; }
+    public required bool             DeleteLogsForCompletedTorrents         { get; init; }
     public required EngineHostStatus Status                                  { get; init; }
     public required string           EnvironmentName                         { get; init; }
     public required string           DownloadRootPath                        { get; init; }

@@ -49,6 +49,13 @@
                     </OperatorCard>
 
                     <OperatorCard>
+                        <p class="section-card-eyebrow">Cleanup</p>
+                        <h2>@_runtime.CompletedTorrentCleanupMode</h2>
+                        <p>Completion age: @_runtime.CompletedTorrentCleanupMinutes min</p>
+                        <p>Delete completed logs: @(_runtime.DeleteLogsForCompletedTorrents ? "On" : "Off")</p>
+                    </OperatorCard>
+
+                    <OperatorCard>
                         <p class="section-card-eyebrow">Engine Apply State</p>
                         <h2>@(_runtime.EngineSettingsRequireRestart ? "Restart Required" : "Applied")</h2>
                         <p>Persisted overrides: @(_runtime.UsesPersistedOverrides ? "Yes" : "No")</p>

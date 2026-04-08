@@ -26,6 +26,8 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
     [ObservableProperty]
     private string _completedTorrentCleanupMode = "Never";
     [ObservableProperty]
+    private bool _deleteLogsForCompletedTorrents;
+    [ObservableProperty]
     private string _completionCallbackApiBaseUrlOverride = string.Empty;
     [ObservableProperty]
     private string _completionCallbackApiKeyOverride = string.Empty;
@@ -128,6 +130,7 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
                     SeedingStopMinutes                           = SeedingStopMinutes,
                     CompletedTorrentCleanupMode                  = CompletedTorrentCleanupMode,
                     CompletedTorrentCleanupMinutes               = CompletedTorrentCleanupMinutes,
+                    DeleteLogsForCompletedTorrents              = DeleteLogsForCompletedTorrents,
                     EngineConnectionFailureLogBurstLimit         = EngineConnectionFailureLogBurstLimit,
                     EngineConnectionFailureLogWindowSeconds      = EngineConnectionFailureLogWindowSeconds,
                     EngineMaximumConnections                     = EngineMaximumConnections,
@@ -235,6 +238,7 @@ public partial class SettingsViewModel(TorrentCoreClient client) : ViewModelBase
         SeedingStopMinutes = settings.SeedingStopMinutes;
         CompletedTorrentCleanupMode = settings.CompletedTorrentCleanupMode;
         CompletedTorrentCleanupMinutes = settings.CompletedTorrentCleanupMinutes;
+        DeleteLogsForCompletedTorrents = settings.DeleteLogsForCompletedTorrents;
         EngineConnectionFailureLogBurstLimit = settings.EngineConnectionFailureLogBurstLimit;
         EngineConnectionFailureLogWindowSeconds = settings.EngineConnectionFailureLogWindowSeconds;
         EngineMaximumConnections = settings.EngineMaximumConnections;

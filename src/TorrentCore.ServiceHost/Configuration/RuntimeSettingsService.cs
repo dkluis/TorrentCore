@@ -212,6 +212,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 [RuntimeSettingsKeys.CompletedTorrentCleanupMode] = completedTorrentCleanupMode.ToString(),
                 [RuntimeSettingsKeys.CompletedTorrentCleanupMinutes] =
                         request.CompletedTorrentCleanupMinutes.ToString(CultureInfo.InvariantCulture),
+                [RuntimeSettingsKeys.DeleteLogsForCompletedTorrents] =
+                        request.DeleteLogsForCompletedTorrents.ToString(),
                 [RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit] =
                         request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
                 [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] =
@@ -264,6 +266,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                         request.SeedingStopMinutes,
                         completedTorrentCleanupMode,
                         request.CompletedTorrentCleanupMinutes,
+                        request.DeleteLogsForCompletedTorrents,
                         request.EngineConnectionFailureLogBurstLimit,
                         request.EngineConnectionFailureLogWindowSeconds,
                         request.EngineMaximumConnections,
@@ -336,6 +339,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             ) && parsedCompletedTorrentCleanupMinutes >= 0)
         {
             completedTorrentCleanupMinutes = parsedCompletedTorrentCleanupMinutes;
+        }
+
+        var deleteLogsForCompletedTorrents = baseOptions.DeleteLogsForCompletedTorrents;
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.DeleteLogsForCompletedTorrents, out var deleteLogsForCompletedTorrentsValue
+            ) && bool.TryParse(deleteLogsForCompletedTorrentsValue, out var parsedDeleteLogsForCompletedTorrents))
+        {
+            deleteLogsForCompletedTorrents = parsedDeleteLogsForCompletedTorrents;
         }
 
         var burstLimit = baseOptions.EngineConnectionFailureLogBurstLimit;
@@ -503,6 +514,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             SeedingStopMinutes                           = seedingStopMinutes,
             CompletedTorrentCleanupMode                  = completedTorrentCleanupMode,
             CompletedTorrentCleanupMinutes               = completedTorrentCleanupMinutes,
+            DeleteLogsForCompletedTorrents              = deleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit         = burstLimit,
             EngineConnectionFailureLogWindowSeconds      = windowSeconds,
             EngineMaximumConnections                     = engineMaximumConnections,
@@ -546,6 +558,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             SeedingStopMinutes                           = settings.SeedingStopMinutes,
             CompletedTorrentCleanupMode                  = settings.CompletedTorrentCleanupMode.ToString(),
             CompletedTorrentCleanupMinutes               = settings.CompletedTorrentCleanupMinutes,
+            DeleteLogsForCompletedTorrents              = settings.DeleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit         = settings.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds      = settings.EngineConnectionFailureLogWindowSeconds,
             EngineMaximumConnections                     = settings.EngineMaximumConnections,

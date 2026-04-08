@@ -56,6 +56,7 @@ public sealed class AvaloniaDashboardViewModelTests
             SeedingStopMinutes = 120,
             CompletedTorrentCleanupMode = "Age",
             CompletedTorrentCleanupMinutes = 60,
+            DeleteLogsForCompletedTorrents = false,
             SupportsPersistentStorage = true,
             SupportsMultiHost = false,
             SupportsMagnetAdds = true,

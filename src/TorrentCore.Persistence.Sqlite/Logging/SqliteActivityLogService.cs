@@ -212,6 +212,23 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
         return results;
     }
 
+    public async Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              DELETE FROM activity_logs
+                              WHERE torrent_id = $torrent_id;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private async Task EnforceRetentionAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var boundedMaxEntryCount = Math.Max(100, maxEntryCount);

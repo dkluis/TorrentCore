@@ -47,6 +47,7 @@ public sealed class AvaloniaSettingsViewModelTests
         Assert.Equal(150, viewModel.CompletionCallbackFinalizationTimeoutSeconds);
         Assert.Equal("http://tvmaze:5078/", viewModel.CompletionCallbackApiBaseUrlOverride);
         Assert.Equal("secret", viewModel.CompletionCallbackApiKeyOverride);
+        Assert.False(viewModel.DeleteLogsForCompletedTorrents);
         Assert.Equal(90, viewModel.MetadataRefreshStaleSeconds);
         Assert.Equal(30, viewModel.MetadataRefreshRestartDelaySeconds);
         Assert.True(viewModel.HasCategories);
@@ -127,6 +128,7 @@ public sealed class AvaloniaSettingsViewModelTests
         viewModel.CompletionCallbackFinalizationTimeoutSeconds = 180;
         viewModel.CompletionCallbackApiBaseUrlOverride = "http://tvmaze:5078/";
         viewModel.CompletionCallbackApiKeyOverride = "secret";
+        viewModel.DeleteLogsForCompletedTorrents = true;
         viewModel.MetadataRefreshStaleSeconds = 120;
         viewModel.MetadataRefreshRestartDelaySeconds = 45;
 
@@ -157,6 +159,7 @@ public sealed class AvaloniaSettingsViewModelTests
         Assert.Equal(180, runtimeJson.RootElement.GetProperty("completionCallbackFinalizationTimeoutSeconds").GetInt32());
         Assert.Equal("http://tvmaze:5078/", runtimeJson.RootElement.GetProperty("completionCallbackApiBaseUrlOverride").GetString());
         Assert.Equal("secret", runtimeJson.RootElement.GetProperty("completionCallbackApiKeyOverride").GetString());
+        Assert.True(runtimeJson.RootElement.GetProperty("deleteLogsForCompletedTorrents").GetBoolean());
         Assert.Equal(120, runtimeJson.RootElement.GetProperty("metadataRefreshStaleSeconds").GetInt32());
         Assert.Equal(45, runtimeJson.RootElement.GetProperty("metadataRefreshRestartDelaySeconds").GetInt32());
 
@@ -193,6 +196,7 @@ public sealed class AvaloniaSettingsViewModelTests
             SeedingStopMinutes = 90,
             CompletedTorrentCleanupMode = "Never",
             CompletedTorrentCleanupMinutes = 120,
+            DeleteLogsForCompletedTorrents = false,
             EngineConnectionFailureLogBurstLimit = 5,
             EngineConnectionFailureLogWindowSeconds = 60,
             EngineMaximumConnections = 150,

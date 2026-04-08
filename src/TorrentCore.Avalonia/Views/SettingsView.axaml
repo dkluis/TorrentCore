@@ -100,6 +100,13 @@
                                            Foreground="{DynamicResource TextMutedBrush}" />
                                 <TextBox Text="{Binding CompletedTorrentCleanupMinutes}" />
                             </StackPanel>
+                            <CheckBox Content="Delete Log Entries For Completed Torrents"
+                                      IsChecked="{Binding DeleteLogsForCompletedTorrents}" />
+                            <TextBlock
+                                Text="Completed-log deletion uses the same completion-age window. It only deletes torrent-scoped activity logs for successfully completed torrents."
+                                Classes="text-body-small"
+                                TextWrapping="Wrap"
+                                Foreground="{DynamicResource TextSecondaryBrush}" />
                             <TextBlock
                                 Text="Automatic cleanup removes TorrentCore tracking only. It never deletes downloaded data."
                                 Classes="text-body-small"

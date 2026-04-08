@@ -20,6 +20,7 @@ public sealed class TorrentCoreServiceOptions
     public int SeedingStopMinutes { get; init; } = 60;
     public CompletedTorrentCleanupMode CompletedTorrentCleanupMode { get; init; } = CompletedTorrentCleanupMode.Never;
     public int CompletedTorrentCleanupMinutes { get; init; } = 60;
+    public bool DeleteLogsForCompletedTorrents { get; init; }
     public string DownloadRootPath { get; init; } = TorrentCoreDefaultPaths.GetDefaultDownloadRootPath();
     public string StorageRootPath { get; init; } = TorrentCoreDefaultPaths.GetDefaultStorageRootPath();
     public int MaxActivityLogEntries { get; init; } = 20_000;

@@ -7,6 +7,7 @@ public sealed class UpdateRuntimeSettingsRequest
     public required int     SeedingStopMinutes                           { get; init; }
     public required string  CompletedTorrentCleanupMode                  { get; init; }
     public required int     CompletedTorrentCleanupMinutes               { get; init; }
+    public required bool    DeleteLogsForCompletedTorrents               { get; init; }
     public required int     EngineConnectionFailureLogBurstLimit         { get; init; }
     public required int     EngineConnectionFailureLogWindowSeconds      { get; init; }
     public required int     EngineMaximumConnections                     { get; init; }
