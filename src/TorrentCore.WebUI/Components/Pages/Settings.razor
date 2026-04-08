@@ -608,7 +608,7 @@
                                             </div>
 
                                             <div class="settings-category-fields">
-                                                <div class="settings-field-block">
+                                                <div class="settings-field-block settings-category-field settings-category-field--short">
                                                     <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryDisplayName" />
                                                     <MudTextField T="string"
                                                                   Value="category.DisplayName"
@@ -618,7 +618,7 @@
                                                                   Immediate="true" />
                                                 </div>
 
-                                                <div class="settings-field-block">
+                                                <div class="settings-field-block settings-category-field settings-category-field--short">
                                                     <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryCallbackLabel" />
                                                     <MudTextField T="string"
                                                                   Value="category.CallbackLabel"
@@ -628,17 +628,7 @@
                                                                   Immediate="true" />
                                                 </div>
 
-                                                <div class="settings-field-block">
-                                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryDownloadRootPath" />
-                                                    <MudTextField T="string"
-                                                                  Value="category.DownloadRootPath"
-                                                                  ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DownloadRootPath = next)"
-                                                                  Variant="Variant.Outlined"
-                                                                  Margin="Margin.Dense"
-                                                                  Immediate="true" />
-                                                </div>
-
-                                                <div class="settings-field-block">
+                                                <div class="settings-field-block settings-category-field settings-category-field--sort">
                                                     <SettingHelpTrigger Content="@SettingsHelpCatalog.CategorySortOrder" />
                                                     <MudNumericField T="int"
                                                                      Value="category.SortOrder"
@@ -648,6 +638,16 @@
                                                                      Min="0"
                                                                      Step="1"
                                                                      Immediate="true" />
+                                                </div>
+
+                                                <div class="settings-field-block settings-category-field settings-category-field--path">
+                                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.CategoryDownloadRootPath" />
+                                                    <MudTextField T="string"
+                                                                  Value="category.DownloadRootPath"
+                                                                  ValueChanged="value => UpdateCategory(value, category, (item, next) => item.DownloadRootPath = next)"
+                                                                  Variant="Variant.Outlined"
+                                                                  Margin="Margin.Dense"
+                                                                  Immediate="true" />
                                                 </div>
                                             </div>
                                         </div>
