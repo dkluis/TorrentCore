@@ -30,6 +30,26 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
         return Ok(torrent);
     }
 
+    [HttpGet("{torrentId:guid}/peers")]
+    [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(IReadOnlyList<TorrentPeerDto>))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    public async Task<ActionResult<IReadOnlyList<TorrentPeerDto>>> GetPeers(Guid torrentId,
+        CancellationToken                                                      cancellationToken)
+    {
+        var peers = await torrentApplicationService.GetTorrentPeersAsync(torrentId, cancellationToken);
+        return Ok(peers);
+    }
+
+    [HttpGet("{torrentId:guid}/trackers")]
+    [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(IReadOnlyList<TorrentTrackerDto>))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    public async Task<ActionResult<IReadOnlyList<TorrentTrackerDto>>> GetTrackers(Guid torrentId,
+        CancellationToken                                                         cancellationToken)
+    {
+        var trackers = await torrentApplicationService.GetTorrentTrackersAsync(torrentId, cancellationToken);
+        return Ok(trackers);
+    }
+
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created,    Type = typeof(TorrentDetailDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]

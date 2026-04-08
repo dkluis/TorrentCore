@@ -1,0 +1,216 @@
+@using TorrentCore.Contracts.Torrents
+@inject ITorrentCoreApiAdapter Api
+
+<MudDialog>
+    <DialogContent>
+        <div class="diagnostic-dialog-shell">
+            <div class="dashboard-panel-header">
+                <div>
+                    <h2>Trackers</h2>
+                    <p class="dashboard-panel-copy">@BuildSummary()</p>
+                </div>
+                <div class="dashboard-inline-actions dashboard-inline-actions--compact">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Disabled="_isRefreshing"
+                               OnClick="RefreshAsync">
+                        Refresh
+                    </MudButton>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <p class="dashboard-panel-copy">@_statusMessage</p>
+            }
+
+            <div class="operations-table-frame diagnostic-dialog-frame">
+                <MudTable T="TorrentTrackerDto"
+                          Items="_trackers"
+                          Dense="true"
+                          Hover="true"
+                          Bordered="true"
+                          Striped="true"
+                          FixedHeader="true"
+                          Loading="_isRefreshing"
+                          Breakpoint="Breakpoint.None"
+                          Height="100%"
+                          RowsPerPage="@_rowsPerPage"
+                          RowsPerPageChanged="OnRowsPerPageChanged"
+                          Class="operations-table diagnostic-dialog-table"
+                          Elevation="0">
+                    <HeaderContent>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.TierNumber)">Tier</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.TrackerNumber)">Tracker</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.IsActive)">Active</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.Status)">Status</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.CanAnnounce ?? false)">Announce</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.CanScrape)">Scrape</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.TimeSinceLastAnnounceSeconds ?? long.MaxValue)">Since Ann.</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.LastAnnounceSucceeded ?? false)">Ann. OK</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.TimeSinceLastScrapeSeconds ?? long.MaxValue)">Since Scrape</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentTrackerDto" SortBy="@(tracker => tracker.LastScrapeSucceeded ?? false)">Scrape OK</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>Failure</MudTh>
+                        <MudTh>Warning</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Tier">@context.TierNumber</MudTd>
+                        <MudTd DataLabel="Tracker">@($"{context.TierNumber}.{context.TrackerNumber}")</MudTd>
+                        <MudTd DataLabel="Active">@FormatNullableBoolean(context.IsActive)</MudTd>
+                        <MudTd DataLabel="Status">@context.Status</MudTd>
+                        <MudTd DataLabel="Announce">@FormatNullableBoolean(context.CanAnnounce)</MudTd>
+                        <MudTd DataLabel="Scrape">@FormatNullableBoolean(context.CanScrape)</MudTd>
+                        <MudTd DataLabel="Since Ann.">@FormatDuration(context.TimeSinceLastAnnounceSeconds)</MudTd>
+                        <MudTd DataLabel="Ann. OK">@FormatNullableBoolean(context.LastAnnounceSucceeded)</MudTd>
+                        <MudTd DataLabel="Since Scrape">@FormatDuration(context.TimeSinceLastScrapeSeconds)</MudTd>
+                        <MudTd DataLabel="Scrape OK">@FormatNullableBoolean(context.LastScrapeSucceeded)</MudTd>
+                        <MudTd DataLabel="Failure" Class="operations-table-wrap">@FormatText(context.FailureMessage)</MudTd>
+                        <MudTd DataLabel="Warning" Class="operations-table-wrap">@FormatText(context.WarningMessage)</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2">No trackers are currently known for this torrent.</MudText>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new[] { 10, 25, 50, 100 }"
+                                       RowsPerPageString="Rows" />
+                    </PagerContent>
+                </MudTable>
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   Size="Size.Small"
+                   OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public Guid TorrentId { get; set; }
+
+    [Parameter]
+    public string TorrentName { get; set; } = string.Empty;
+
+    private IReadOnlyList<TorrentTrackerDto> _trackers = Array.Empty<TorrentTrackerDto>();
+    private bool _isRefreshing;
+    private int _rowsPerPage = 25;
+    private string? _errorMessage;
+    private string? _statusMessage;
+    private DateTimeOffset? _lastLoadedAtUtc;
+
+    protected override Task OnInitializedAsync()
+    {
+        return LoadAsync();
+    }
+
+    private Task RefreshAsync()
+    {
+        return LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_isRefreshing)
+        {
+            return;
+        }
+
+        _isRefreshing = true;
+        _errorMessage = null;
+
+        var result = await Api.GetTorrentTrackersAsync(TorrentId);
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.ErrorMessage ?? "Tracker diagnostics are unavailable.";
+            _statusMessage = _errorMessage;
+            _isRefreshing = false;
+            return;
+        }
+
+        _trackers = result.Value ?? Array.Empty<TorrentTrackerDto>();
+        _lastLoadedAtUtc = DateTimeOffset.UtcNow;
+        _statusMessage = $"Loaded {_trackers.Count} tracker row(s).";
+        _isRefreshing = false;
+    }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+
+    private Task OnRowsPerPageChanged(int value)
+    {
+        _rowsPerPage = value;
+        return Task.CompletedTask;
+    }
+
+    private string BuildSummary()
+    {
+        var name = string.IsNullOrWhiteSpace(TorrentName) ? TorrentId.ToString("D") : TorrentName;
+        var loadedAt = _lastLoadedAtUtc is null ? "Loading..." : $"Last updated {FormatTimestamp(_lastLoadedAtUtc.Value)}";
+        return $"{name} | {loadedAt}";
+    }
+
+    private static string FormatNullableBoolean(bool? value)
+    {
+        return value switch
+        {
+            true => "Yes",
+            false => "No",
+            null => "N/A",
+        };
+    }
+
+    private static string FormatDuration(long? seconds)
+    {
+        if (seconds is null)
+        {
+            return "N/A";
+        }
+
+        return TimeSpan.FromSeconds(seconds.Value).ToString(@"d\.hh\:mm\:ss");
+    }
+
+    private static string FormatText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "N/A" : value;
+    }
+
+    private static string FormatTimestamp(DateTimeOffset timestamp)
+    {
+        return timestamp.LocalDateTime.ToString("g");
+    }
+}

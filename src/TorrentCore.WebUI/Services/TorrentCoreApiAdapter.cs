@@ -56,6 +56,18 @@ public sealed class TorrentCoreApiAdapter(TorrentCoreClient client) : ITorrentCo
     )
         => ExecuteAsync(() => client.GetTorrentAsync(torrentId, cancellationToken));
 
+    public Task<ServiceCallResult<IReadOnlyList<TorrentPeerDto>>> GetTorrentPeersAsync(
+        Guid torrentId,
+        CancellationToken cancellationToken = default
+    )
+        => ExecuteAsync(() => client.GetTorrentPeersAsync(torrentId, cancellationToken));
+
+    public Task<ServiceCallResult<IReadOnlyList<TorrentTrackerDto>>> GetTorrentTrackersAsync(
+        Guid torrentId,
+        CancellationToken cancellationToken = default
+    )
+        => ExecuteAsync(() => client.GetTorrentTrackersAsync(torrentId, cancellationToken));
+
     public Task<ServiceCallResult<TorrentDetailDto>> AddMagnetAsync(
         AddMagnetRequest request,
         CancellationToken cancellationToken = default

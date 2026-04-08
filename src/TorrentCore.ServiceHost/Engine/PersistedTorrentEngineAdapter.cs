@@ -109,6 +109,20 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
                 );
     }
 
+    public async Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId,
+        CancellationToken                                                      cancellationToken)
+    {
+        _ = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
+        return Array.Empty<TorrentPeerDto>();
+    }
+
+    public async Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId,
+        CancellationToken                                                         cancellationToken)
+    {
+        _ = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
+        return Array.Empty<TorrentTrackerDto>();
+    }
+
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request,
         ResolvedTorrentCategorySelection categorySelection, CancellationToken cancellationToken)
     {

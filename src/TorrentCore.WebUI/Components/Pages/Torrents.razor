@@ -4,6 +4,7 @@
 @inject IOperatorFeedbackService Feedback
 @inject IPageStateStore PageStateStore
 @inject NavigationManager NavigationManager
+@inject IDialogService DialogService
 
 <PageTitle>Torrents</PageTitle>
 
@@ -240,6 +241,20 @@
                                                Disabled="@DisableSelectedActions"
                                                OnClick="OpenSelectedLogDetails">
                                         Log Details
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               Disabled="@DisableSelectedActions"
+                                               OnClick="OpenSelectedPeersAsync">
+                                        Peers
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               Disabled="@DisableSelectedActions"
+                                               OnClick="OpenSelectedTrackersAsync">
+                                        Trackers
                                     </MudButton>
                                     @if (_selectedTorrentDetail.CanRemove)
                                     {
@@ -684,6 +699,56 @@
 
         NavigationManager.NavigateTo($"/logs?torrentId={_selectedTorrentId.Value:D}");
         return Task.CompletedTask;
+    }
+
+    private async Task OpenSelectedPeersAsync()
+    {
+        if (_selectedTorrentDetail is null)
+        {
+            return;
+        }
+
+        await DialogService.ShowAsync<TorrentPeersDialog>(
+            "Peers",
+            new DialogParameters
+            {
+                [nameof(TorrentPeersDialog.TorrentId)] = _selectedTorrentDetail.TorrentId,
+                [nameof(TorrentPeersDialog.TorrentName)] = _selectedTorrentDetail.Name,
+            },
+            new DialogOptions
+            {
+                CloseButton = true,
+                CloseOnEscapeKey = true,
+                BackdropClick = true,
+                FullWidth = true,
+                MaxWidth = MaxWidth.ExtraLarge,
+            }
+        );
+    }
+
+    private async Task OpenSelectedTrackersAsync()
+    {
+        if (_selectedTorrentDetail is null)
+        {
+            return;
+        }
+
+        await DialogService.ShowAsync<TorrentTrackersDialog>(
+            "Trackers",
+            new DialogParameters
+            {
+                [nameof(TorrentTrackersDialog.TorrentId)] = _selectedTorrentDetail.TorrentId,
+                [nameof(TorrentTrackersDialog.TorrentName)] = _selectedTorrentDetail.Name,
+            },
+            new DialogOptions
+            {
+                CloseButton = true,
+                CloseOnEscapeKey = true,
+                BackdropClick = true,
+                FullWidth = true,
+                MaxWidth = MaxWidth.ExtraLarge,
+            }
+        );
     }
 
     private async Task RemoveSelectedAsync()

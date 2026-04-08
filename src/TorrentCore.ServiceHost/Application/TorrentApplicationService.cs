@@ -139,6 +139,34 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         }
     }
 
+    public async Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId,
+        CancellationToken                                                      cancellationToken)
+    {
+        try
+        {
+            return await torrentEngineAdapter.GetTorrentPeersAsync(torrentId, cancellationToken);
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.peers.lookup.failed", exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId,
+        CancellationToken                                                         cancellationToken)
+    {
+        try
+        {
+            return await torrentEngineAdapter.GetTorrentTrackersAsync(torrentId, cancellationToken);
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.trackers.lookup.failed", exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken)
     {
         try

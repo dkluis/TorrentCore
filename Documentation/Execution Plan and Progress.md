@@ -92,6 +92,7 @@ Current service configuration section:
 - host status now exposes available metadata/download slots plus aggregated current peer count and transfer rates so queue pressure and engine saturation are easier to understand
 - the web UI is now split so the Dashboard is host-status focused while magnet submission and torrent lifecycle management live on a dedicated Torrents page
 - the web UI now includes a dedicated torrent detail page with deeper runtime diagnostics, local-time timestamps, action controls, and recent per-torrent log history
+- the WebUI selected-torrent panel now exposes dedicated `Peers` and `Trackers` dialogs backed by new torrent diagnostics endpoints, keeping the main detail card compact while still surfacing live peer and tracker state when needed
 - pausing a MonoTorrent torrent during metadata resolution now explicitly stops the manager so later sync passes do not project it back to `ResolvingMetadata`, and regression coverage now verifies paused state is preserved in both detail and list views
 - the Torrents page now supports multi-select bulk actions for pause and remove using the existing torrent lifecycle API calls
 - the earlier host-wide `Pause All` and `Resume All` controls were intentionally backed back out of the Torrents page after operator testing showed inconsistent behavior and poor responsiveness under real MonoTorrent load; row-level and selected-row lifecycle actions remain in place

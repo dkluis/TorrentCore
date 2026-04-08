@@ -219,6 +219,26 @@ h1:focus {
     min-width: 0;
 }
 
+.diagnostic-dialog-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: min(92vw, 92rem);
+    min-height: min(72dvh, 72vh);
+}
+
+.diagnostic-dialog-frame {
+    min-height: 0;
+}
+
+.diagnostic-dialog-table .mud-table-cell {
+    white-space: nowrap;
+}
+
+.diagnostic-dialog-table .operations-table-wrap {
+    white-space: normal;
+}
+
 .section-page {
     display: flex;
     flex-direction: column;

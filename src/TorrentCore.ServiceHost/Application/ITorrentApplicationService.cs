@@ -23,6 +23,8 @@ public interface ITorrentApplicationService
 
     Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken);
     Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken);

@@ -1,0 +1,263 @@
+@using TorrentCore.Contracts.Torrents
+@implements IAsyncDisposable
+@inject ITorrentCoreApiAdapter Api
+
+<MudDialog>
+    <DialogContent>
+        <div class="diagnostic-dialog-shell">
+            <div class="dashboard-panel-header">
+                <div>
+                    <h2>Peers</h2>
+                    <p class="dashboard-panel-copy">@BuildSummary()</p>
+                </div>
+                <div class="dashboard-inline-actions dashboard-inline-actions--compact">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               Disabled="_isRefreshing"
+                               OnClick="RefreshAsync">
+                        Refresh
+                    </MudButton>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Dense="true">@_errorMessage</MudAlert>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <p class="dashboard-panel-copy">@_statusMessage</p>
+            }
+
+            <div class="operations-table-frame diagnostic-dialog-frame">
+                <MudTable T="TorrentPeerDto"
+                          Items="_peers"
+                          Dense="true"
+                          Hover="true"
+                          Bordered="true"
+                          Striped="true"
+                          FixedHeader="true"
+                          Loading="_isRefreshing"
+                          Breakpoint="Breakpoint.None"
+                          Height="100%"
+                          RowsPerPage="@_rowsPerPage"
+                          RowsPerPageChanged="OnRowsPerPageChanged"
+                          Class="operations-table diagnostic-dialog-table"
+                          Elevation="0">
+                    <HeaderContent>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.Endpoint)">Endpoint</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.Client)">Client</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.Direction)">Direction</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.IsConnected)">Connected</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.IsSeeder)">Seeder</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.DownloadRateBytesPerSecond)">Down</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.UploadRateBytesPerSecond)">Up</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.DownloadedBytes)">Downloaded</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.UploadedBytes)">Uploaded</MudTableSortLabel>
+                        </MudTh>
+                        <MudTh>
+                            <MudTableSortLabel T="TorrentPeerDto" SortBy="@(peer => peer.Encryption)">Encryption</MudTableSortLabel>
+                        </MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Endpoint" Class="operations-table-wrap">@context.Endpoint</MudTd>
+                        <MudTd DataLabel="Client" Class="operations-table-wrap">@context.Client</MudTd>
+                        <MudTd DataLabel="Direction">@context.Direction</MudTd>
+                        <MudTd DataLabel="Connected">@FormatBoolean(context.IsConnected)</MudTd>
+                        <MudTd DataLabel="Seeder">@FormatBoolean(context.IsSeeder)</MudTd>
+                        <MudTd DataLabel="Down">@FormatRate(context.DownloadRateBytesPerSecond)</MudTd>
+                        <MudTd DataLabel="Up">@FormatRate(context.UploadRateBytesPerSecond)</MudTd>
+                        <MudTd DataLabel="Downloaded">@FormatSize(context.DownloadedBytes)</MudTd>
+                        <MudTd DataLabel="Uploaded">@FormatSize(context.UploadedBytes)</MudTd>
+                        <MudTd DataLabel="Encryption">@context.Encryption</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2">No peers are currently known for this torrent.</MudText>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager PageSizeOptions="new[] { 10, 25, 50, 100 }"
+                                       RowsPerPageString="Rows" />
+                    </PagerContent>
+                </MudTable>
+            </div>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Secondary"
+                   Size="Size.Small"
+                   OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const int AutoRefreshSeconds = 5;
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public Guid TorrentId { get; set; }
+
+    [Parameter]
+    public string TorrentName { get; set; } = string.Empty;
+
+    private IReadOnlyList<TorrentPeerDto> _peers = Array.Empty<TorrentPeerDto>();
+    private CancellationTokenSource? _refreshLoopCts;
+    private Task? _refreshLoopTask;
+    private bool _disposed;
+    private bool _isRefreshing;
+    private int _rowsPerPage = 25;
+    private string? _errorMessage;
+    private string? _statusMessage;
+    private DateTimeOffset? _lastLoadedAtUtc;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync(fromAutoRefresh: false);
+        _refreshLoopCts = new CancellationTokenSource();
+        _refreshLoopTask = RunRefreshLoopAsync(_refreshLoopCts.Token);
+    }
+
+    private Task RefreshAsync()
+    {
+        return LoadAsync(fromAutoRefresh: false);
+    }
+
+    private async Task LoadAsync(bool fromAutoRefresh)
+    {
+        if (_disposed || _isRefreshing)
+        {
+            return;
+        }
+
+        _isRefreshing = true;
+        _errorMessage = null;
+
+        var result = await Api.GetTorrentPeersAsync(TorrentId);
+        if (!result.IsSuccess)
+        {
+            _errorMessage = result.ErrorMessage ?? "Peer diagnostics are unavailable.";
+            _isRefreshing = false;
+
+            if (!fromAutoRefresh)
+            {
+                _statusMessage = _errorMessage;
+            }
+
+            return;
+        }
+
+        _peers = result.Value ?? Array.Empty<TorrentPeerDto>();
+        _lastLoadedAtUtc = DateTimeOffset.UtcNow;
+        _statusMessage = $"Loaded {_peers.Count} peer(s). Auto refresh runs every {AutoRefreshSeconds} seconds.";
+        _isRefreshing = false;
+    }
+
+    private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(AutoRefreshSeconds));
+
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            if (_disposed || _isRefreshing)
+            {
+                continue;
+            }
+
+            await InvokeAsync(
+                async () =>
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    await LoadAsync(fromAutoRefresh: true);
+                    StateHasChanged();
+                }
+            );
+        }
+    }
+
+    private void Close()
+    {
+        MudDialog.Close();
+    }
+
+    private Task OnRowsPerPageChanged(int value)
+    {
+        _rowsPerPage = value;
+        return Task.CompletedTask;
+    }
+
+    private string BuildSummary()
+    {
+        var name = string.IsNullOrWhiteSpace(TorrentName) ? TorrentId.ToString("D") : TorrentName;
+        var loadedAt = _lastLoadedAtUtc is null ? "Loading..." : $"Last updated {FormatTimestamp(_lastLoadedAtUtc.Value)}";
+        return $"{name} | {loadedAt}";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+
+        if (_refreshLoopCts is not null)
+        {
+            await _refreshLoopCts.CancelAsync();
+            _refreshLoopCts.Dispose();
+        }
+
+        if (_refreshLoopTask is not null)
+        {
+            try
+            {
+                await _refreshLoopTask;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    private static string FormatBoolean(bool value)
+    {
+        return value ? "Yes" : "No";
+    }
+
+    private static string FormatRate(long bytesPerSecond)
+    {
+        return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
+    }
+
+    private static string FormatSize(long bytes)
+    {
+        return $"{bytes / 1_000_000.0:0.00} MB";
+    }
+
+    private static string FormatTimestamp(DateTimeOffset timestamp)
+    {
+        return timestamp.LocalDateTime.ToString("g");
+    }
+}

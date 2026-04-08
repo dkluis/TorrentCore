@@ -270,6 +270,81 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 );
     }
 
+    public async Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId,
+        CancellationToken                                                      cancellationToken)
+    {
+        var (_, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+        var peers = await manager.GetPeersAsync();
+
+        return peers
+              .Select(
+                   peer => new TorrentPeerDto
+                   {
+                       Endpoint = peer.Uri.ToString(),
+                       Client = peer.ClientApp.ToString(),
+                       Direction = peer.ConnectionDirection.ToString(),
+                       IsConnected = peer.IsConnected,
+                       IsSeeder = peer.IsSeeder,
+                       DownloadRateBytesPerSecond = peer.Monitor.DownloadRate,
+                       UploadRateBytesPerSecond = peer.Monitor.UploadRate,
+                       DownloadedBytes = peer.Monitor.DataBytesReceived,
+                       UploadedBytes = peer.Monitor.DataBytesSent,
+                       Encryption = peer.EncryptionType.ToString(),
+                   }
+               )
+              .OrderByDescending(peer => peer.DownloadRateBytesPerSecond)
+              .ThenByDescending(peer => peer.UploadRateBytesPerSecond)
+              .ThenBy(peer => peer.Endpoint, StringComparer.OrdinalIgnoreCase)
+              .ToArray();
+    }
+
+    public async Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId,
+        CancellationToken                                                         cancellationToken)
+    {
+        var (_, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+        var tiers = manager.TrackerManager?.Tiers;
+        if (tiers is null || tiers.Count == 0)
+        {
+            return Array.Empty<TorrentTrackerDto>();
+        }
+
+        var trackers = new List<TorrentTrackerDto>();
+
+        for (var tierIndex = 0; tierIndex < tiers.Count; tierIndex++)
+        {
+            var tier = tiers[tierIndex];
+
+            for (var trackerIndex = 0; trackerIndex < tier.Trackers.Count; trackerIndex++)
+            {
+                var tracker = tier.Trackers[trackerIndex];
+                var concreteTracker = tracker as MonoTorrent.Trackers.Tracker;
+
+                trackers.Add(
+                    new TorrentTrackerDto
+                    {
+                        TierNumber = tierIndex + 1,
+                        TrackerNumber = trackerIndex + 1,
+                        IsActive = ReferenceEquals(tier.ActiveTracker, tracker),
+                        Status = tracker.Status.ToString(),
+                        CanAnnounce = concreteTracker?.CanAnnounce,
+                        CanScrape = tracker.CanScrape,
+                        TimeSinceLastAnnounceSeconds = (long) Math.Max(0, tier.TimeSinceLastAnnounce.TotalSeconds),
+                        LastAnnounceSucceeded = tier.LastAnnounceSucceeded,
+                        TimeSinceLastScrapeSeconds = (long) Math.Max(0, tier.TimeSinceLastScrape.TotalSeconds),
+                        LastScrapeSucceeded = tier.LastScrapeSucceeded,
+                        FailureMessage = string.IsNullOrWhiteSpace(tracker.FailureMessage) ? null : tracker.FailureMessage,
+                        WarningMessage = string.IsNullOrWhiteSpace(tracker.WarningMessage) ? null : tracker.WarningMessage,
+                    }
+                );
+            }
+        }
+
+        return trackers
+              .OrderBy(row => row.TierNumber)
+              .ThenBy(row => row.TrackerNumber)
+              .ToArray();
+    }
+
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request,
         ResolvedTorrentCategorySelection categorySelection, CancellationToken cancellationToken)
     {

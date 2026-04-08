@@ -24,6 +24,8 @@ public interface ITorrentCoreApiAdapter
         CancellationToken cancellationToken = default
     );
     Task<ServiceCallResult<TorrentDetailDto?>> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<IReadOnlyList<TorrentPeerDto>>> GetTorrentPeersAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<IReadOnlyList<TorrentTrackerDto>>> GetTorrentTrackersAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentDetailDto>> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> PauseAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> ResumeAsync(Guid torrentId, CancellationToken cancellationToken = default);

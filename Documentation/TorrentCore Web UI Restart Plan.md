@@ -6,7 +6,7 @@ Active planning document.
 
 Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phase 3 Pending`
 
-Last updated: `2026-04-04`
+Last updated: `2026-04-07`
 
 Current checkpoint:
 
@@ -29,6 +29,9 @@ Current checkpoint:
 - torrents page now follows the locked “single grid + selected detail panel” pattern with 5-second auto-refresh and row-level action execution from the detail panel
 - torrents and logs tables now use MudBlazor header-based sorting (`MudTableSortLabel`) instead of separate sort selectors
 - shell app bar `Add Magnet` now opens a global add dialog and submits directly through shared API adapter/service feedback patterns
+- selected torrent actions now include `Peers` and `Trackers` dialogs backed by dedicated service endpoints instead of overloading the main details panel
+- peer diagnostics use a compact paged grid with live auto-refresh while the dialog is open
+- tracker diagnostics use a paged read-only grid with manual refresh and no tracker-URL column in the operator view
 
 ## Purpose
 
@@ -163,6 +166,31 @@ These rules are now explicit for `TorrentCore.WebUI` logs behavior:
 - `From` and `To` date fields apply only when they contain parseable date/time values.
 - `Refresh` applies the currently entered filter values.
 - `Clear` resets all filter inputs and query-string filter context.
+
+## Torrent Diagnostics Dialog Rules (2026-04-07)
+
+These rules are now explicit for selected-torrent diagnostics in `TorrentCore.WebUI`:
+
+- The `Selected Torrent` action area owns deeper peer/tracker inspection through `MudDialog` popups, not through more rows in the detail card.
+- `Peers` opens a compact paged grid with these default columns:
+  - endpoint
+  - client
+  - direction
+  - connected
+  - seeder
+  - down rate
+  - up rate
+  - downloaded bytes
+  - uploaded bytes
+  - encryption
+- The peers dialog auto-refreshes while open so live swarm changes can be inspected without leaving the selected torrent context.
+- `Trackers` opens a paged read-only grid with tier/tracker position plus active/status/announce/scrape diagnostics.
+- Tracker URL is intentionally not shown in the first WebUI diagnostics slice; operator view stays focused on state/health rather than raw announce strings.
+- Dialog grids still follow the same table rules as full pages:
+  - header-based sorting
+  - default 25 rows per page
+  - pager always visible inside the table shell
+  - no browser-window scrolling required for normal use
 
 ## TVMaze Baseline Conventions (Captured)
 

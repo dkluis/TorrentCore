@@ -124,6 +124,26 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
         return await ReadResponseAsync<TorrentDetailDto>(response, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId,
+        CancellationToken                                                     cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            BuildRequestUri($"api/torrents/{torrentId}/peers"), cancellationToken
+        );
+        return await ReadResponseAsync<IReadOnlyList<TorrentPeerDto>>(response, cancellationToken) ??
+                Array.Empty<TorrentPeerDto>();
+    }
+
+    public async Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId,
+        CancellationToken                                                        cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            BuildRequestUri($"api/torrents/{torrentId}/trackers"), cancellationToken
+        );
+        return await ReadResponseAsync<IReadOnlyList<TorrentTrackerDto>>(response, cancellationToken) ??
+                Array.Empty<TorrentTrackerDto>();
+    }
+
     public async Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request,
         CancellationToken                                               cancellationToken = default)
     {
