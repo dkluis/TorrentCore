@@ -2,6 +2,9 @@
 
 ## Status
 
+`TorrentCore.WebUI` is the supported operator client for this slice.
+`TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
+
 Phases 1 through 3 are implemented.
 
 Implemented in this slice:
@@ -27,7 +30,7 @@ Implemented in this slice:
 
 Not implemented yet:
 
-- Avalonia category/callback management
+- no additional supported UI work remains in this slice beyond normal `TorrentCore.WebUI` refinement
 
 ## Goal
 
@@ -213,7 +216,7 @@ Required Web UI capability:
 - select category during Add Magnet
 - show category in torrent list, detail, and filters
 
-Avalonia can follow after the Web UI slice is stable.
+No Avalonia follow-up is planned for this slice; `TorrentCore.WebUI` is the maintained operator surface.
 
 ## API Surface
 

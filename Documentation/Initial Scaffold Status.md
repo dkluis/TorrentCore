@@ -1,5 +1,13 @@
 # Initial Scaffold Status
 
+## Status
+
+This is a historical scaffold snapshot from the first repo-construction chat.
+
+- The supported operator client is now `TorrentCore.WebUI`.
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
+- Treat the project list and decisions below as the initial baseline, not the current delivery target.
+
 ## Created In This Chat
 
 - new git repo: `TorrentCore`
@@ -19,14 +27,14 @@
 - minimal health contract in `TorrentCore.Contracts`
 - minimal HTTP client in `TorrentCore.Client`
 - minimal health controller in `TorrentCore.Service`
-- minimal Blazor admin shell in `TorrentCore.Web`
+- the maintained Blazor operator shell is now `TorrentCore.WebUI`
 - project references wired through the solution
 
 ## Intentional Decisions
 
 - separate repo from TVMaze
-- Web is the first rich management UI
-- Avalonia is deferred, not rejected
+- `TorrentCore.WebUI` is the supported rich management UI
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are not active delivery targets
 - TVMaze remains a lightweight integration client only
 
 ## What Has Not Been Built Yet

@@ -1,3 +1,10 @@
+## Status
+
+Historical document only.
+
+`TorrentCore.Avalonia` is no longer a supported operator client and is not receiving further feature work or support updates.
+`TorrentCore.WebUI` has replaced it as the maintained operator surface.
+
 ## Goal
 
 Bring `TorrentCore.Avalonia` up to date with the current operator capabilities in the Web UI while preserving the existing desktop design language:

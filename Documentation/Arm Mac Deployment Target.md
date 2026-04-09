@@ -9,6 +9,10 @@ The target is:
 - .NET 10 already installed on that host
 - service and web started through the same `zsh` runtime scripts used by the Intel deployment
 
+Current support note:
+- the supported deployment pair is `TorrentCore.Service` plus `TorrentCore.WebUI`
+- Avalonia deployment details below are retained only as historical/reference information and are no longer part of the supported operator path
+
 ## Deployment Layout
 
 Default target base path on the Arm Mac host:

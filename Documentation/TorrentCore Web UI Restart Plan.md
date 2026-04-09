@@ -2,7 +2,7 @@
 
 ## Status
 
-Active planning document.
+Active planning document for the supported operator UI.
 
 Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phases 3-6 Complete`, `Phase 7 In Progress`
 
@@ -10,13 +10,12 @@ Last updated: `2026-04-08`
 
 Current checkpoint:
 
-- ground rules are agreed for a full web UI restart
-- target direction is a new parallel TorrentCore web UI project with TVMazeWeb-aligned design language and MudBlazor usage
-- current `TorrentCore.Web` remains available as a reference implementation during restart delivery
+- ground rules are agreed for the supported `TorrentCore.WebUI` operator surface
+- `TorrentCore.WebUI` has replaced the earlier Web and Avalonia operator clients for ongoing work
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are now legacy/reference-only and are no longer receiving feature updates or support maintenance
 - TVMazeWeb baseline conventions have been captured from live source files to guide Phase 1 implementation
 - project naming direction is now `TorrentCore.WebUI`
 - visual baseline should stay as close as practical to TVMazeWeb, with TorrentCore-specific favicon/brand assets
-- side-by-side runtime hosting is not required because Avalonia remains available during web restart delivery
 - `src/TorrentCore.WebUI` has been created and added to `TorrentCore.sln`
 - `TorrentCore.WebUI` now has MudBlazor, TVMaze-aligned shell/theme baseline, client-boundary DI wiring, and initial route placeholders
 - Phase 2 shared infrastructure is now in place:
@@ -82,12 +81,13 @@ The following are fixed decisions:
 7. Build responsive behavior from the first slices, not as later polish.
 8. Use shared interaction patterns for loading, errors, confirmations, and action feedback.
 9. Add web-specific tests for client boundary and component behavior.
-10. Cut over only when acceptance criteria pass; old web runtime can be disabled during restart while Avalonia remains fallback.
+10. `TorrentCore.WebUI` is the supported operator client after cutover; legacy Web and Avalonia runtimes remain historical/reference-only.
 
 ## Working Assumptions
 
 - Working project name is `TorrentCore.WebUI`.
-- Existing `TorrentCore.Web` remains reference/maintenance-only during restart implementation.
+- Existing `TorrentCore.Web` is legacy/reference-only and no longer receives updates.
+- Existing `TorrentCore.Avalonia` is legacy/reference-only and no longer receives updates.
 - Existing `TorrentCore.Client` and `TorrentCore.Contracts` remain the primary service boundary for web UI calls.
 - If a needed workflow is not available through current contracts, extend service/contracts instead of leaking logic into
   the UI.
@@ -298,7 +298,7 @@ Recommended route strategy during migration:
 
 - keep current UI routes stable
 - side-by-side runtime hosting is optional, not required
-- if the current web UI is shut down during restart, Avalonia remains the operator fallback
+- the legacy Web and Avalonia clients are no longer part of the supported operator path
 - final cutover still requires the full acceptance checklist
 
 ## Proposed Delivery Order

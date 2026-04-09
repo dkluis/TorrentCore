@@ -55,25 +55,28 @@ Important context carried forward:
 
 Primary components:
 - `TorrentCore.Service`
-- `TorrentCore.Web`
+- `TorrentCore.WebUI`
 - `TorrentCore.Contracts`
 - `TorrentCore.Client`
 - `TorrentCore.Core`
 - `TorrentCore.Persistence.Sqlite`
 
-Planned later if needed:
+Legacy components retained in-repo for historical/reference purposes only:
+- `TorrentCore.Web`
 - `TorrentCore.Avalonia`
 
 ## First UI Decision
 
-The first rich management UI is `TorrentCore.Web`.
+The supported rich management UI is `TorrentCore.WebUI`.
 
 Reasoning:
 - better fit for remote multi-host administration
 - lower friction for initial admin tooling
-- avoids building two full management clients at once
+- it has now replaced the earlier Web and Avalonia operator surfaces for ongoing product work
 
-Avalonia remains a valid later addition if a native desktop operator app is still desired.
+Current support status:
+- `TorrentCore.WebUI` is the maintained operator client
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer receiving feature work or support updates
 
 ## Reuse From TVMaze
 
@@ -123,7 +126,7 @@ TVMaze may do only lightweight interaction:
 
 Keep v1 narrow:
 - one service host
-- one web admin UI
+- one supported web admin UI (`TorrentCore.WebUI`)
 - add magnet
 - resolve metadata
 - list torrents
@@ -141,7 +144,7 @@ Keep v1 narrow:
 
 ## Non-Goals For v1
 
-- building both rich Web and Avalonia admin apps immediately
+- building multiple supported rich admin clients in parallel
 - TVMaze-specific workflows embedded in the engine
 - direct MonoTorrent types crossing the API boundary
 - premature plugin/config abstraction

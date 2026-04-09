@@ -6,11 +6,13 @@ This document defines the current TorrentCore network-access model for a trusted
 
 The implemented model is:
 - `TorrentCore.Service` is the API host that must be reachable on the LAN
-- `TorrentCore.Web` is a Blazor Server UI that can also be exposed on the LAN
-- `TorrentCore.Avalonia` is a desktop client that calls the service over HTTP
-- Web stores one global service endpoint for that Web host
-- Avalonia stores one saved service endpoint per desktop app install/user profile
-- both UIs test `/api/health` before saving a new endpoint
+- `TorrentCore.WebUI` is the supported Blazor Server UI that can also be exposed on the LAN
+- WebUI stores one global service endpoint for that WebUI host
+- the supported UI tests `/api/health` before saving a new endpoint
+
+Legacy note:
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer supported operator clients
+- references to them in older docs are historical only
 
 This slice is intentionally HTTP-only. HTTPS, certificates, and internet-facing hardening are out of scope here.
 
@@ -31,7 +33,7 @@ Default HTTP ports:
 | Component | Default HTTP Port |
 |-----------|-------------------|
 | `TorrentCore.Service` | `5078` |
-| `TorrentCore.Web` | `5131` |
+| `TorrentCore.WebUI` | `5131` |
 
 Repo defaults stay on `localhost` for normal development. Network-accessible binding is a deploy/run concern, not a source default.
 
@@ -64,25 +66,25 @@ dotnet TorrentCore.Service.dll
 
 ```bash
 export ASPNETCORE_URLS="http://0.0.0.0:5131"
-dotnet TorrentCore.Web.dll
+dotnet TorrentCore.WebUI.dll
 ```
 
 The host firewall must allow inbound TCP traffic on the chosen service and Web ports.
 
 ## Runtime Endpoint Bootstrap
 
-The two UIs no longer require a permanently correct service URL baked into source config.
+The supported UI no longer requires a permanently correct service URL baked into source config.
 
 Instead:
-- both UIs start with a fallback `TorrentCoreService:BaseUrl`
-- both UIs detect whether the configured service endpoint is reachable
+- WebUI starts with a fallback `TorrentCoreService:BaseUrl`
+- WebUI detects whether the configured service endpoint is reachable
 - if the service is unreachable, the UI shows connection setup instead of assuming the backend is healthy
 - the UI tests `/api/health` before saving a new endpoint
 - once a tested endpoint is saved, it is reused on the next startup
 
 ## Web UI Behavior
 
-`TorrentCore.Web` is a server app, so its service connection is host-global.
+`TorrentCore.WebUI` is a server app, so its service connection is host-global.
 
 Behavior:
 - the Web host uses `TorrentCoreService:BaseUrl` from appsettings as a fallback
@@ -91,41 +93,22 @@ Behavior:
 - saving a new endpoint updates the Web host immediately after the health check passes
 
 Persistence:
-- saved file: `src/TorrentCore.Web/Config/service-connection.json` in repo/dev scenarios
+- saved file: `src/TorrentCore.WebUI/Config/service-connection.json` in repo/dev scenarios
 - published host: the same relative `Config/service-connection.json` under the app content root
 
 Operational meaning:
 - every browser session that talks to that Web host shares the same backend service endpoint
 - this is the correct model for the Web UI; it is not per browser or per session
 
-## Avalonia Behavior
-
-`TorrentCore.Avalonia` is a true client, so its service connection is local to that desktop app instance.
-
-Behavior:
-- Avalonia uses `Config/appsettings.json` as a fallback default
-- if a saved override exists, that override wins
-- if the current endpoint is unreachable at startup, Avalonia opens its connection setup view
-- saving a new endpoint updates the client immediately after the health check passes
-
-Persistence:
-- saved file is written under the current user's local application-data area in a `TorrentCore.Avalonia` folder
-
-Operational meaning:
-- different desktop machines can point to different TorrentCore service hosts
-- testing a local dev Avalonia build against a deployed LAN service is supported without changing committed defaults
-
 ## Development Against a Deployed Service
 
 This model supports local development against a deployed service on the LAN.
 
 Examples:
-- local dev `TorrentCore.Web` -> remote deployed `TorrentCore.Service`
-- local dev `TorrentCore.Avalonia` -> remote deployed `TorrentCore.Service`
+- local dev `TorrentCore.WebUI` -> remote deployed `TorrentCore.Service`
 
 Why it works:
-- Web is Blazor Server, so the browser only talks to the Web host; the Web host makes the service API calls
-- Avalonia is a direct HTTP client to the service
+- WebUI is Blazor Server, so the browser only talks to the WebUI host; the WebUI host makes the service API calls
 - service endpoint changes are runtime-configurable and persisted outside source-controlled defaults
 
 Recommended approach:
@@ -141,13 +124,10 @@ One machine hosts both server processes:
 ```text
 Machine: 192.168.68.80
 ├── TorrentCore.Service  -> http://0.0.0.0:5078
-└── TorrentCore.Web      -> http://0.0.0.0:5131
+└── TorrentCore.WebUI    -> http://0.0.0.0:5131
 
 Remote browser:
 └── http://192.168.68.80:5131
-
-Remote Avalonia:
-└── http://192.168.68.80:5078
 ```
 
 Normal Web service target in this case:
@@ -162,13 +142,10 @@ Service host: 192.168.68.80
 └── TorrentCore.Service  -> http://0.0.0.0:5078
 
 Web host: 192.168.68.81
-└── TorrentCore.Web      -> http://0.0.0.0:5131
+└── TorrentCore.WebUI    -> http://0.0.0.0:5131
 
 Remote browser:
 └── http://192.168.68.81:5131
-
-Remote Avalonia:
-└── http://192.168.68.80:5078
 ```
 
 Normal Web service target in this case:

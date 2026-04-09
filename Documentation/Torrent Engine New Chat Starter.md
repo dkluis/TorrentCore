@@ -1,5 +1,16 @@
 # Torrent Engine New Chat Starter
 
+## Status
+
+This is a historical starter for the original repo/solution-boundary discussion.
+
+- The supported operator client is now `TorrentCore.WebUI`.
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
+- For current TorrentCore implementation work, prefer:
+  - [Project Brief.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Project%20Brief.md)
+  - [Execution Plan and Progress.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Execution%20Plan%20and%20Progress.md)
+  - [TorrentCore Web UI Restart Plan.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/TorrentCore%20Web%20UI%20Restart%20Plan.md)
+
 ## Purpose
 Use this as the starting context for a new chat about the torrent engine project boundary, repo structure, and solution structure.
 
@@ -53,7 +64,7 @@ Primary input document:
 ## Helpful Extra Context
 Include these only if they are known:
 - expected clients of the torrent engine
-- whether Avalonia UI will call it directly
+- whether `TorrentCore.WebUI` is the only supported operator client for the scope being discussed
 - whether the engine owns its own DB schema
 - whether it should expose a public/internal API
 - whether it will be run locally only or across multiple systems

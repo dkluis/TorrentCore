@@ -12,6 +12,10 @@ The target is:
 
 This is now a tracked product/deployment requirement, not an informal note.
 
+Current support note:
+- the supported deployment pair is `TorrentCore.Service` plus `TorrentCore.WebUI`
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving updates or support
+
 ## Deployment Layout
 
 Target base path on the Intel Mac host:
@@ -104,7 +108,7 @@ Should:
 ### Web UI Start Script
 
 Should:
-- start the published `TorrentCore.Web` app from `~/TorrentCore/WebUI`
+- start the published `TorrentCore.WebUI` app from `~/TorrentCore/WebUI`
 - run under `zsh`
 - write stdout/stderr to a predictable log file
 - record a PID file so stop/restart can target the right process
@@ -125,7 +129,7 @@ Should:
 ### Deploy Scripts
 
 Should:
-- publish `TorrentCore.ServiceHost` and `TorrentCore.Web` for `osx-x64`
+- publish `TorrentCore.ServiceHost` and `TorrentCore.WebUI` for `osx-x64`
 - copy only the published runtime output to the target host share
 - copy only the shared runtime-control subset of `Scripts` into the target `Scripts` directory
 - create target directories if they do not already exist
@@ -212,7 +216,7 @@ Use this tighter baseline when:
 - the Web UI should be reachable from other machines
 - the service itself does not need to be called directly from other machines
 
-If remote Avalonia or direct remote API access is required on that host, change:
+If direct remote API access is required on that host, change:
 - `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
 
 Remote access note:
@@ -220,7 +224,7 @@ Remote access note:
 - deployed hosts should not rely on those defaults
 - the target host should always create `torrentcore.env` explicitly
 - to open the Web UI from another machine on the LAN, set `TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053`
-- if remote Swagger/API access or remote Avalonia access is also desired, set `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
+- if remote Swagger/API access is also desired, set `TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033`
 - the web UI can still keep `TORRENTCORE_WEBUI_SERVICE_BASE_URL=http://127.0.0.1:7033/` because the service is local to that host
 
 ## Deploy Behavior
