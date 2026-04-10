@@ -1975,6 +1975,44 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task DeleteOrphanedTorrentLogs_RemovesLogsForRemovedTorrents_Only()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(httpClient, "D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0D0", "Orphan Cleanup Torrent");
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        Assert.NotNull(addedTorrent);
+
+        var logsBeforeRemoval = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+            $"api/logs?take=100&torrentId={addedTorrent.TorrentId}"
+        );
+
+        Assert.NotNull(logsBeforeRemoval);
+        Assert.NotEmpty(logsBeforeRemoval);
+
+        var removeResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent.TorrentId}/remove", content: null);
+        removeResponse.EnsureSuccessStatusCode();
+
+        var cleanupResponse = await httpClient.PostAsync("api/logs/delete-orphaned-torrent-logs", content: null);
+        cleanupResponse.EnsureSuccessStatusCode();
+
+        var cleanupResult = await cleanupResponse.Content.ReadFromJsonAsync<DeleteOrphanedTorrentLogsResultDto>();
+        var logsAfterCleanup = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+            $"api/logs?take=100&torrentId={addedTorrent.TorrentId}"
+        );
+        var allLogs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=100");
+
+        Assert.NotNull(cleanupResult);
+        Assert.True(cleanupResult.DeletedLogEntryCount > 0);
+        Assert.NotNull(logsAfterCleanup);
+        Assert.Empty(logsAfterCleanup);
+        Assert.NotNull(allLogs);
+        Assert.Contains(allLogs, log => log.EventType == "torrent.logs.orphaned_deleted" && log.TorrentId is null);
+    }
+
+    [Fact]
     public async Task FakeRuntime_UsesSingleActiveDownloadQueue_ByDefault()
     {
         await using var factory = CreateFactory(

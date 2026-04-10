@@ -16,7 +16,7 @@
                    OnAction="LoadAsync">
             <OperatorCardGrid>
                 <OperatorCard>
-                    <div class="service-connection-section-header">
+                    <div class="operator-section-header">
                         <p class="section-card-eyebrow">Current Endpoint</p>
                         <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.CurrentEndpoint" IconOnly="true" />
                     </div>
@@ -35,7 +35,7 @@
                 </OperatorCard>
 
                 <OperatorCard>
-                    <div class="service-connection-section-header">
+                    <div class="operator-section-header">
                         <p class="section-card-eyebrow">Update Endpoint</p>
                     </div>
                     <div class="settings-field-block">
@@ -55,8 +55,8 @@
                     </div>
                     <p class="dashboard-panel-copy">Use the host/IP for the machine running `TorrentCore.Service`.</p>
 
-                    <div class="dashboard-inline-actions dashboard-inline-actions--compact service-connection-action-strip">
-                        <div class="service-connection-action">
+                    <div class="dashboard-inline-actions dashboard-inline-actions--compact operator-action-help-strip">
+                        <div class="operator-action-with-help">
                             <MudButton Variant="Variant.Outlined"
                                        Color="Color.Primary"
                                        Size="Size.Small"
@@ -67,7 +67,7 @@
                             <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.Test" IconOnly="true" />
                         </div>
 
-                        <div class="service-connection-action">
+                        <div class="operator-action-with-help">
                             <MudButton Variant="Variant.Filled"
                                        Color="Color.Primary"
                                        Size="Size.Small"
@@ -78,7 +78,7 @@
                             <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.Save" IconOnly="true" />
                         </div>
 
-                        <div class="service-connection-action">
+                        <div class="operator-action-with-help">
                             <MudButton Variant="Variant.Outlined"
                                        Color="Color.Secondary"
                                        Size="Size.Small"

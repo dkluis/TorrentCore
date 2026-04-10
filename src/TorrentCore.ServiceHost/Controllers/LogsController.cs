@@ -1,8 +1,10 @@
 #region
 
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Core.Diagnostics;
+using TorrentCore.Service.Configuration;
 
 #endregion
 
@@ -11,7 +13,8 @@ namespace TorrentCore.Service.Controllers;
 [ApiController]
 [Route("api/logs")]
 [Produces("application/json")]
-public sealed class LogsController(IActivityLogService activityLogService) : ControllerBase
+public sealed class LogsController(IActivityLogService activityLogService, ServiceInstanceContext serviceInstanceContext)
+    : ControllerBase
 {
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IReadOnlyList<ActivityLogEntryDto>))]
@@ -51,6 +54,40 @@ public sealed class LogsController(IActivityLogService activityLogService) : Con
                          }
                  )
                 .ToArray()
+        );
+    }
+
+    [HttpPost("delete-orphaned-torrent-logs")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeleteOrphanedTorrentLogsResultDto))]
+    public async Task<ActionResult<DeleteOrphanedTorrentLogsResultDto>> DeleteOrphanedTorrentLogs(
+        CancellationToken cancellationToken = default)
+    {
+        var deletedCount = await activityLogService.DeleteOrphanedTorrentLogsAsync(cancellationToken);
+
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Information,
+                Category = "torrent",
+                EventType = "torrent.logs.orphaned_deleted",
+                Message = deletedCount == 0
+                    ? "No orphaned torrent log rows required deletion."
+                    : $"Deleted {deletedCount} orphaned torrent log row(s).",
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        DeletedLogEntryCount = deletedCount,
+                    }
+                ),
+            }, cancellationToken
+        );
+
+        return Ok(
+            new DeleteOrphanedTorrentLogsResultDto
+            {
+                DeletedLogEntryCount = deletedCount,
+            }
         );
     }
 }

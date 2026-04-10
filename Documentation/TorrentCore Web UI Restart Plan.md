@@ -172,6 +172,14 @@ These rules are now explicit for `TorrentCore.WebUI` logs behavior:
 - `From` and `To` date fields apply only when they contain parseable date/time values.
 - `Refresh` applies the currently entered filter values.
 - `Clear` resets all filter inputs and query-string filter context.
+- The logs page now also uses the shared help affordance pattern for its filter fields, filter actions, result-table section, and selected-log section:
+  - short hover/focus summary via `MudTooltip`
+  - fuller click/tap help via dialog
+  - help text reflects the explicit local-filtering and reload behavior above
+- The logs page now includes an explicit orphan-log cleanup action:
+  - `Delete Orphan Logs` calls the service to remove log rows whose `torrent_id` no longer exists in the current torrent list
+  - this is intended for torrents removed outside the normal completed-torrent cleanup path
+  - service-level logs and logs for still-tracked torrents must remain intact
 
 ## Torrent Diagnostics Dialog Rules (2026-04-07)
 

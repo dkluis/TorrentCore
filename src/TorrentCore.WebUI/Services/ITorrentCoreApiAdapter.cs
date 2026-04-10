@@ -32,6 +32,9 @@ public interface ITorrentCoreApiAdapter
         DateTimeOffset? toUtc = null,
         CancellationToken cancellationToken = default
     );
+    Task<ServiceCallResult<DeleteOrphanedTorrentLogsResultDto>> DeleteOrphanedTorrentLogsAsync(
+        CancellationToken cancellationToken = default
+    );
     Task<ServiceCallResult<TorrentDetailDto?>> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<IReadOnlyList<TorrentPeerDto>>> GetTorrentPeersAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<IReadOnlyList<TorrentTrackerDto>>> GetTorrentTrackersAsync(Guid torrentId, CancellationToken cancellationToken = default);

@@ -63,6 +63,11 @@ public sealed class TorrentCoreApiAdapter(TorrentCoreClient client) : ITorrentCo
         );
     }
 
+    public Task<ServiceCallResult<DeleteOrphanedTorrentLogsResultDto>> DeleteOrphanedTorrentLogsAsync(
+        CancellationToken cancellationToken = default
+    )
+        => ExecuteAsync(() => client.DeleteOrphanedTorrentLogsAsync(cancellationToken));
+
     public Task<ServiceCallResult<TorrentDetailDto?>> GetTorrentAsync(
         Guid torrentId,
         CancellationToken cancellationToken = default

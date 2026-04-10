@@ -128,6 +128,8 @@ Current service configuration section:
 - the restarted WebUI `Settings` page now also exposes per-setting operator guidance through shared help icons: hover/focus shows a short summary and click/tap opens a fuller paragraph, with text aligned to the operator settings reference
 - the WebUI settings-help icon pattern has now been operator-reviewed and accepted as the default guidance model for future admin-style pages
 - the WebUI `Service Connection` page now uses that same shared help model for current endpoint status, the service base URL entry field, and the `Test` / `Save` / `Recheck` actions
+- the WebUI `Logs` page now uses the same shared help model for its filter fields, `Refresh` / `Clear` filter actions, results table, and selected-log details section
+- the WebUI `Logs` page now also supports manual orphaned-torrent log cleanup through a `Delete Orphan Logs` action, backed by a new service endpoint that deletes rows for torrent ids no longer present in the current torrent list
 - resolved callback routing data is now persisted per torrent at add time, so later category edits affect future torrents without silently changing callback labels or invoke behavior for existing torrents
 - completed torrents now invoke the shared TVMaze callback entrypoint once using Transmission-compatible environment variables, and callback diagnostics are written to the activity log
 - service-level regression coverage now verifies the callback environment contract and that restart/recovery does not re-fire the completion callback for an already-completed torrent

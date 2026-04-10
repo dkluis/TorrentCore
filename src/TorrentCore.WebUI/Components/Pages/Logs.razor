@@ -15,7 +15,7 @@
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    Size="Size.Small"
-                   Disabled="_isRefreshing"
+                   Disabled="@(_isRefreshing || _isDeletingOrphanedLogs)"
                    OnClick="RefreshAsync">
             Refresh
         </MudButton>
@@ -32,83 +32,114 @@
                 <OperatorCard Class="section-card logs-panel logs-panel--filters">
                     <div class="dashboard-panel-header">
                         <div>
-                            <h2>Filters</h2>
+                            <div class="operator-section-header">
+                                <h2>Filters</h2>
+                                <SettingHelpTrigger Content="@LogsHelpCatalog.Filters" IconOnly="true" />
+                            </div>
                             <p class="dashboard-panel-copy">Refresh applies current filters. Clear resets inputs and reloads unfiltered logs.</p>
                         </div>
-                        <div class="dashboard-inline-actions dashboard-inline-actions--compact">
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Primary"
-                                       Size="Size.Small"
-                                       Disabled="_isRefreshing"
-                                       OnClick="RefreshAsync">
-                                Refresh
-                            </MudButton>
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Secondary"
-                                       Size="Size.Small"
-                                       Disabled="_isRefreshing"
-                                       OnClick="ClearFiltersAsync">
-                                Clear
-                            </MudButton>
+                        <div class="dashboard-inline-actions dashboard-inline-actions--compact operator-action-help-strip">
+                            <div class="operator-action-with-help">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Primary"
+                                           Size="Size.Small"
+                                           Disabled="@(_isRefreshing || _isDeletingOrphanedLogs)"
+                                           OnClick="RefreshAsync">
+                                    Refresh
+                                </MudButton>
+                                <SettingHelpTrigger Content="@LogsHelpCatalog.Refresh" IconOnly="true" />
+                            </div>
+                            <div class="operator-action-with-help">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Secondary"
+                                           Size="Size.Small"
+                                           Disabled="@(_isRefreshing || _isDeletingOrphanedLogs)"
+                                           OnClick="ClearFiltersAsync">
+                                    Clear
+                                </MudButton>
+                                <SettingHelpTrigger Content="@LogsHelpCatalog.Clear" IconOnly="true" />
+                            </div>
+                            <div class="operator-action-with-help">
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Secondary"
+                                           Size="Size.Small"
+                                           Disabled="@(_isRefreshing || _isDeletingOrphanedLogs)"
+                                           OnClick="DeleteOrphanedTorrentLogsAsync">
+                                    @(_isDeletingOrphanedLogs ? "Deleting..." : "Delete Orphan Logs")
+                                </MudButton>
+                                <SettingHelpTrigger Content="@LogsHelpCatalog.DeleteOrphanedTorrentLogs" IconOnly="true" />
+                            </div>
                         </div>
                     </div>
 
                     <div class="operations-filters">
-                        <MudTextField T="string"
-                                      Label="Search Message"
-                                      Value="_state.SearchText"
-                                      ValueChanged="OnSearchChanged"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Immediate="true" />
+                        <div class="settings-field-block">
+                            <SettingHelpTrigger Content="@LogsHelpCatalog.SearchMessage" />
+                            <MudTextField T="string"
+                                          Value="_state.SearchText"
+                                          ValueChanged="OnSearchChanged"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true" />
+                        </div>
 
-                        <MudSelect T="string"
-                                   Label="Level"
-                                   Value="_state.PrimaryFilter"
-                                   ValueChanged="OnLevelChanged"
-                                   Variant="Variant.Outlined"
-                                   Margin="Margin.Dense"
-                                   Dense="true">
-                            <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Trace")">Trace</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Debug")">Debug</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Information")">Information</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Warning")">Warning</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Error")">Error</MudSelectItem>
-                            <MudSelectItem T="string" Value="@("Critical")">Critical</MudSelectItem>
-                        </MudSelect>
+                        <div class="settings-field-block">
+                            <SettingHelpTrigger Content="@LogsHelpCatalog.Level" />
+                            <MudSelect T="string"
+                                       Value="_state.PrimaryFilter"
+                                       ValueChanged="OnLevelChanged"
+                                       Variant="Variant.Outlined"
+                                       Margin="Margin.Dense"
+                                       Dense="true">
+                                <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Trace")">Trace</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Debug")">Debug</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Information")">Information</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Warning")">Warning</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Error")">Error</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Critical")">Critical</MudSelectItem>
+                            </MudSelect>
+                        </div>
 
-                        <MudTextField T="string"
-                                      Label="Category"
-                                      Value="_state.SecondaryFilter"
-                                      ValueChanged="OnCategoryChanged"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Immediate="true" />
+                        <div class="settings-field-block">
+                            <SettingHelpTrigger Content="@LogsHelpCatalog.Category" />
+                            <MudTextField T="string"
+                                          Value="_state.SecondaryFilter"
+                                          ValueChanged="OnCategoryChanged"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true" />
+                        </div>
 
-                        <MudTextField T="string"
-                                      Label="Torrent Id"
-                                      Value="_torrentIdFilter"
-                                      ValueChanged="OnTorrentIdChanged"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Immediate="true" />
+                        <div class="settings-field-block">
+                            <SettingHelpTrigger Content="@LogsHelpCatalog.TorrentId" />
+                            <MudTextField T="string"
+                                          Value="_torrentIdFilter"
+                                          ValueChanged="OnTorrentIdChanged"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true" />
+                        </div>
 
-                        <MudTextField T="string"
-                                      Label="From (Local Date/Time)"
-                                      Value="_fromLocalFilter"
-                                      ValueChanged="OnFromLocalChanged"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Immediate="true" />
+                        <div class="settings-field-block">
+                            <SettingHelpTrigger Content="@LogsHelpCatalog.FromLocalDateTime" />
+                            <MudTextField T="string"
+                                          Value="_fromLocalFilter"
+                                          ValueChanged="OnFromLocalChanged"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true" />
+                        </div>
 
-                        <MudTextField T="string"
-                                      Label="To (Local Date/Time)"
-                                      Value="_toLocalFilter"
-                                      ValueChanged="OnToLocalChanged"
-                                      Variant="Variant.Outlined"
-                                      Margin="Margin.Dense"
-                                      Immediate="true" />
+                        <div class="settings-field-block">
+                            <SettingHelpTrigger Content="@LogsHelpCatalog.ToLocalDateTime" />
+                            <MudTextField T="string"
+                                          Value="_toLocalFilter"
+                                          ValueChanged="OnToLocalChanged"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Immediate="true" />
+                        </div>
                     </div>
 
                     @if (!string.IsNullOrWhiteSpace(_filterValidationMessage))
@@ -120,8 +151,11 @@
                 <OperatorCard Class="section-card logs-panel logs-panel--table">
                     <div class="dashboard-panel-header">
                         <div>
-                            <h2>Recent Activity</h2>
-                            <p class="dashboard-panel-copy">@FilteredLogs.Count result(s) of @_allLogs.Count loaded</p>
+                            <div class="operator-section-header">
+                                <h2>Recent Activity</h2>
+                                <SettingHelpTrigger Content="@LogsHelpCatalog.RecentActivity" IconOnly="true" />
+                            </div>
+                            <p class="dashboard-panel-copy">@BuildRecentActivitySummary()</p>
                         </div>
                     </div>
 
@@ -185,7 +219,10 @@
                 <OperatorCard Class="section-card logs-panel logs-panel--detail">
                     <div class="dashboard-panel-header">
                         <div>
-                            <h2>Selected Log Entry</h2>
+                            <div class="operator-section-header">
+                                <h2>Selected Log Entry</h2>
+                                <SettingHelpTrigger Content="@LogsHelpCatalog.SelectedLogEntry" IconOnly="true" />
+                            </div>
                             <p class="dashboard-panel-copy">@BuildSelectionSummary()</p>
                         </div>
                     </div>
@@ -267,6 +304,7 @@
     };
     private StateViewMode _mode = StateViewMode.Loading;
     private bool _isRefreshing;
+    private bool _isDeletingOrphanedLogs;
     private string? _errorMessage;
     private string? _actionMessage;
     private bool _actionIsError;
@@ -454,6 +492,49 @@
         _actionIsError = false;
     }
 
+    private async Task DeleteOrphanedTorrentLogsAsync()
+    {
+        _isDeletingOrphanedLogs = true;
+        _actionMessage = "Deleting orphaned torrent log rows...";
+        _actionIsError = false;
+
+        try
+        {
+            var result = await Api.DeleteOrphanedTorrentLogsAsync();
+            if (!result.IsSuccess || result.Value is null)
+            {
+                var errorMessage = result.ErrorMessage ?? "Unable to delete orphaned torrent log rows.";
+                _actionMessage = errorMessage;
+                _actionIsError = true;
+                Feedback.Error(errorMessage);
+                return;
+            }
+
+            await LoadAsync(showSuccessToast: false, showLoadingState: false);
+
+            var deletedCount = result.Value.DeletedLogEntryCount;
+            var summary = deletedCount == 0
+                ? "No orphaned torrent log rows found."
+                : $"Deleted {deletedCount:n0} orphaned torrent log row(s).";
+
+            _actionMessage = $"{summary} Last refresh: {DateTimeOffset.Now.LocalDateTime:g} | Loaded {_allLogs.Count:n0} row(s).";
+            _actionIsError = false;
+
+            if (deletedCount == 0)
+            {
+                Feedback.Info(summary);
+            }
+            else
+            {
+                Feedback.Success(summary);
+            }
+        }
+        finally
+        {
+            _isDeletingOrphanedLogs = false;
+        }
+    }
+
     private void PersistState()
     {
         PageStateStore.Save(StateKey, _state);
@@ -586,6 +667,11 @@
         }
 
         return $"{SelectedLog.Level} | {SelectedLog.Category} | {SelectedLog.EventType}";
+    }
+
+    private string BuildRecentActivitySummary()
+    {
+        return $"{FilteredLogs.Count:n0} result(s) of {_allLogs.Count:n0} loaded. Click a column header to sort.";
     }
 
     private static string ValueOrNotAvailable(string? value)

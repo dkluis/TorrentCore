@@ -118,6 +118,16 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
                 Array.Empty<ActivityLogEntryDto>();
     }
 
+    public async Task<DeleteOrphanedTorrentLogsResultDto> DeleteOrphanedTorrentLogsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsync(
+            BuildRequestUri("api/logs/delete-orphaned-torrent-logs"), null, cancellationToken
+        );
+        return await ReadResponseAsync<DeleteOrphanedTorrentLogsResultDto>(response, cancellationToken) ??
+                throw new InvalidOperationException("TorrentCore service returned no log cleanup payload.");
+    }
+
     public async Task<TorrentDetailDto?> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync(BuildRequestUri($"api/torrents/{torrentId}"), cancellationToken);

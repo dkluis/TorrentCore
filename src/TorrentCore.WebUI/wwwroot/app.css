@@ -840,7 +840,7 @@ h1:focus {
     line-height: 1.45;
 }
 
-.service-connection-section-header {
+.operator-section-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -848,11 +848,11 @@ h1:focus {
     min-width: 0;
 }
 
-.service-connection-action-strip {
+.operator-action-help-strip {
     row-gap: 0.35rem;
 }
 
-.service-connection-action {
+.operator-action-with-help {
     display: inline-flex;
     align-items: center;
     gap: 0.12rem;
