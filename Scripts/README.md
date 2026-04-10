@@ -164,6 +164,7 @@ The callback script receives the following environment variables:
 | `TR_TORRENT_NAME` | Torrent name | `Show.S01E01.1080p` |
 | `TR_TORRENT_DIR` | Download root path | `/downloads/tv` |
 | `TR_TORRENT_LABELS` | Category callback label | `TV` |
+| `TORRENTCORE_FINAL_PAYLOAD_PATH` | Exact validated final payload path | `/downloads/tv/Show.S01E01.1080p.mkv` |
 | `TVMAZE_API_COMPLETE_URL` | Optional API override | `https://api.example.com` |
 | `TVMAZE_API_COMPLETE_API_KEY` | Optional API key override | `secret123` |
 

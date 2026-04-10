@@ -17,14 +17,18 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
 {
     private const string TvmazeApiCompleteApiKeyEnvironmentVariable      = "TVMAZE_API_COMPLETE_API_KEY";
     private const string TvmazeApiCompleteUrlEnvironmentVariable         = "TVMAZE_API_COMPLETE_URL";
+    private const string TorrentCoreFinalPayloadPathEnvironmentVariable  = "TORRENTCORE_FINAL_PAYLOAD_PATH";
     private const string TransmissionTorrentDirectoryEnvironmentVariable = "TR_TORRENT_DIR";
     private const string TransmissionTorrentHashEnvironmentVariable      = "TR_TORRENT_HASH";
     private const string TransmissionTorrentIdEnvironmentVariable        = "TR_TORRENT_ID";
     private const string TransmissionTorrentLabelsEnvironmentVariable    = "TR_TORRENT_LABELS";
     private const string TransmissionTorrentNameEnvironmentVariable      = "TR_TORRENT_NAME";
 
-    public async Task<TorrentCompletionCallbackInvocationResult> InvokeAsync(TorrentSnapshot currentSnapshot,
-        CancellationToken                                                                    cancellationToken)
+    public async Task<TorrentCompletionCallbackInvocationResult> InvokeAsync(
+        TorrentSnapshot currentSnapshot,
+        string? finalPayloadPath,
+        CancellationToken cancellationToken
+    )
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         if (!runtimeSettings.CompletionCallbackEnabled ||
@@ -40,7 +44,9 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
         var workingDirectory = ResolveWorkingDirectory(runtimeSettings, commandPath);
         using var process = new Process
         {
-            StartInfo = BuildProcessStartInfo(runtimeSettings, currentSnapshot, commandPath, workingDirectory),
+            StartInfo = BuildProcessStartInfo(
+                runtimeSettings, currentSnapshot, finalPayloadPath, commandPath, workingDirectory
+            ),
         };
 
         int processId;
@@ -61,7 +67,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
             await WriteCallbackLogAsync(
                 ActivityLogLevel.Warning, "torrent.callback.failed",
                 $"Completion callback launch failed for torrent '{currentSnapshot.Name}'.", currentSnapshot,
-                runtimeSettings, null, null, workingDirectory, exception.Message,
+                runtimeSettings, finalPayloadPath, null, null, workingDirectory, exception.Message,
                 cancellationToken
             );
             return new TorrentCompletionCallbackInvocationResult
@@ -104,7 +110,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
             await WriteCallbackLogAsync(
                 ActivityLogLevel.Warning, "torrent.callback.timed_out",
                 $"Completion callback timed out for torrent '{currentSnapshot.Name}'.", currentSnapshot,
-                runtimeSettings, processId, null, workingDirectory,
+                runtimeSettings, finalPayloadPath, processId, null, workingDirectory,
                 $"The callback exceeded the {runtimeSettings.CompletionCallbackTimeoutSeconds}-second timeout.",
                 cancellationToken
             );
@@ -125,7 +131,8 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
             await WriteCallbackLogAsync(
                 ActivityLogLevel.Warning, "torrent.callback.failed",
                 $"Completion callback failed for torrent '{currentSnapshot.Name}'.", currentSnapshot, runtimeSettings,
-                processId, process.ExitCode, workingDirectory, $"The callback exited with code {process.ExitCode}.",
+                finalPayloadPath, processId, process.ExitCode, workingDirectory,
+                $"The callback exited with code {process.ExitCode}.",
                 cancellationToken
             );
             return new TorrentCompletionCallbackInvocationResult
@@ -138,7 +145,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
         await WriteCallbackLogAsync(
             ActivityLogLevel.Information, "torrent.callback.invoked",
             $"Invoked completion callback for torrent '{currentSnapshot.Name}'.", currentSnapshot, runtimeSettings,
-            processId, process.ExitCode, workingDirectory, null, cancellationToken
+            finalPayloadPath, processId, process.ExitCode, workingDirectory, null, cancellationToken
         );
 
         return new TorrentCompletionCallbackInvocationResult
@@ -148,7 +155,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
     }
 
     private ProcessStartInfo BuildProcessStartInfo(RuntimeSettingsSnapshot runtimeSettings, TorrentSnapshot snapshot,
-        string                                                             commandPath,     string workingDirectory)
+        string? finalPayloadPath, string commandPath, string workingDirectory)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -165,6 +172,11 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
                 snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
         startInfo.Environment[TransmissionTorrentLabelsEnvironmentVariable] =
                 snapshot.CompletionCallbackLabel ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(finalPayloadPath))
+        {
+            startInfo.Environment[TorrentCoreFinalPayloadPathEnvironmentVariable] = finalPayloadPath;
+        }
 
         if (!string.IsNullOrWhiteSpace(runtimeSettings.CompletionCallbackApiBaseUrlOverride))
         {
@@ -193,7 +205,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
     }
 
     private async Task WriteCallbackLogAsync(ActivityLogLevel level, string eventType, string message,
-        TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings, int? processId, int? exitCode,
+        TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings, string? finalPayloadPath, int? processId, int? exitCode,
         string workingDirectory, string? error, CancellationToken cancellationToken)
     {
         await activityLogService.WriteAsync(
@@ -213,6 +225,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
                         snapshot.InfoHash,
                         snapshot.DownloadRootPath,
                         snapshot.CompletionCallbackLabel,
+                        FinalPayloadPath = finalPayloadPath,
                         CommandPath = runtimeSettings.CompletionCallbackCommandPath,
                         runtimeSettings.CompletionCallbackArguments,
                         WorkingDirectory = workingDirectory,

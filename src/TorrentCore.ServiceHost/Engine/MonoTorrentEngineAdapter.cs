@@ -2251,8 +2251,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         );
         string? callbackPendingReason = null;
         if (runtimeSettings is not null &&
-            snapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
-                    TorrentCompletionCallbackState.TimedOut)
+            TorrentCompletionCallbackDiagnostics.ShouldSurfaceFinalizationStatus(
+                snapshot.CompletionCallbackState,
+                snapshot.CompletionCallbackLastError
+            ))
         {
             var finalizationResult = CreateFinalizationCheckResult(snapshot, runtimeSettings, manager);
             callbackFinalPayloadPath = finalizationResult.FinalPayloadPath;
@@ -2401,9 +2403,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return snapshot.CompletionCallbackState == TorrentCompletionCallbackState.TimedOut &&
                snapshot.CompletionCallbackInvokedAtUtc is null &&
                !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLastError) &&
-               snapshot.CompletionCallbackLastError.StartsWith(
-                   "Timed out waiting for final payload visibility at '", StringComparison.Ordinal
-               ) &&
+               TorrentCompletionCallbackDiagnostics.IsFinalizationVisibilityTimeout(snapshot.CompletionCallbackLastError) &&
                finalizationResult.IsReady;
     }
 

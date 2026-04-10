@@ -72,7 +72,11 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             return true;
         }
 
-        var invocationResult = await completionCallbackInvoker.InvokeAsync(snapshot, cancellationToken);
+        var invocationResult = await completionCallbackInvoker.InvokeAsync(
+            snapshot,
+            resolvedFinalizationResult.FinalPayloadPath,
+            cancellationToken
+        );
         switch (invocationResult.Status)
         {
             case TorrentCompletionCallbackInvocationStatus.Skipped:
@@ -84,15 +88,33 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
                 return true;
             case TorrentCompletionCallbackInvocationStatus.Failed:
                 snapshot.CompletionCallbackState     = TorrentCompletionCallbackState.Failed;
-                snapshot.CompletionCallbackLastError = invocationResult.Error;
+                snapshot.CompletionCallbackLastError = BuildPostAttemptError(
+                    invocationResult.Error,
+                    resolvedFinalizationResult.FinalPayloadPath
+                );
                 return true;
             case TorrentCompletionCallbackInvocationStatus.TimedOut:
                 snapshot.CompletionCallbackState     = TorrentCompletionCallbackState.TimedOut;
-                snapshot.CompletionCallbackLastError = invocationResult.Error;
+                snapshot.CompletionCallbackLastError = BuildPostAttemptError(
+                    invocationResult.Error,
+                    resolvedFinalizationResult.FinalPayloadPath
+                );
                 return true;
             default:
                 return changed;
         }
+    }
+
+    private static string? BuildPostAttemptError(string? error, string finalPayloadPath)
+    {
+        if (string.IsNullOrWhiteSpace(finalPayloadPath) ||
+            File.Exists(finalPayloadPath) ||
+            Directory.Exists(finalPayloadPath))
+        {
+            return error;
+        }
+
+        return TorrentCompletionCallbackDiagnostics.AppendMissingAfterAttemptHint(error, finalPayloadPath);
     }
 
     private async Task WriteFinalizationTimeoutLogAsync(TorrentSnapshot snapshot,

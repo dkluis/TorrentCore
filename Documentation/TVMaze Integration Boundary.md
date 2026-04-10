@@ -88,6 +88,7 @@ Important timing rule:
 - do not fire the shared callback on the engine's first internal completed edge alone
 - fire it only after the downstream-visible final path at `Path.Combine(TR_TORRENT_DIR, TR_TORRENT_NAME)` exists as a file or directory
 - if incomplete-file mode is enabled, the callback must wait until the incomplete-suffix variant is no longer the only visible payload
+- TorrentCore may also provide the exact validated final payload path through `TORRENTCORE_FINAL_PAYLOAD_PATH` so the shared callback can avoid reconstructing a single-file source path from name/root alone
 
 Finalization check guidance:
 
@@ -96,6 +97,7 @@ Finalization check guidance:
 - when MonoTorrent exposes exact per-file complete/incomplete paths for the active torrent, TorrentCore should prefer those engine-reported paths over a reconstructed `TR_TORRENT_NAME` guess when deciding whether a single-file payload is really finalized
 - when MonoTorrent also reports that the file's current active path is already the complete path, a leftover `.!mt` sibling should be treated as stale cleanup residue rather than proof that the payload is still incomplete
 - TorrentCore should persist a generic callback lifecycle state such as `PendingFinalization`, `Invoked`, `Failed`, or `TimedOut` so restart recovery does not confuse transfer state with callback state
+- if the callback process itself fails or times out after starting, TorrentCore should not present that as another finalization-visibility timeout; if the source path disappears during the callback attempt, diagnostics should say that the callback may already have moved the payload
 - TorrentCore should not persist TVMaze-specific outcome states; TVMaze ownership remains outside the TorrentCore boundary
 
 TVMaze validates source existence immediately when it receives the callback. If TorrentCore invokes the callback too

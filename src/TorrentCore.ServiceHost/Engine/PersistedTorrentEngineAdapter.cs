@@ -462,8 +462,10 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         );
         string? callbackPendingReason = null;
         if (runtimeSettings is not null &&
-            snapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
-                    TorrentCompletionCallbackState.TimedOut)
+            TorrentCompletionCallbackDiagnostics.ShouldSurfaceFinalizationStatus(
+                snapshot.CompletionCallbackState,
+                snapshot.CompletionCallbackLastError
+            ))
         {
             var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
             callbackFinalPayloadPath = finalizationResult.FinalPayloadPath;

@@ -155,6 +155,7 @@ Primary environment variables:
 - `TR_TORRENT_NAME`
 - `TR_TORRENT_DIR`
 - `TR_TORRENT_LABELS`
+- `TORRENTCORE_FINAL_PAYLOAD_PATH`
 
 Recommended TorrentCore mapping:
 
@@ -168,6 +169,8 @@ Recommended TorrentCore mapping:
   - resolved category download root
 - `TR_TORRENT_LABELS`
   - category `CallbackLabel`
+- `TORRENTCORE_FINAL_PAYLOAD_PATH`
+  - exact validated final payload path used by TorrentCore when the callback is launched
 
 Optional override environment variables should also be supported when configured:
 

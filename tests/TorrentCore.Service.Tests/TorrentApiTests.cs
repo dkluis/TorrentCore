@@ -1320,6 +1320,7 @@ public sealed class TorrentApiTests
         Assert.Equal("Callback Movie", callbackInvocation["TR_TORRENT_NAME"]);
         Assert.Equal(Path.Combine(downloadPath, "Movie"), callbackInvocation["TR_TORRENT_DIR"]);
         Assert.Equal("Movie", callbackInvocation["TR_TORRENT_LABELS"]);
+        Assert.Equal(Path.Combine(downloadPath, "Movie", "Callback Movie"), callbackInvocation["TORRENTCORE_FINAL_PAYLOAD_PATH"]);
         Assert.Equal("http://127.0.0.1:5501/api/transmission/completions", callbackInvocation["TVMAZE_API_COMPLETE_URL"]);
         Assert.Equal("callback-test-key", callbackInvocation["TVMAZE_API_COMPLETE_API_KEY"]);
 
@@ -1672,6 +1673,75 @@ public sealed class TorrentApiTests
         Assert.Equal(rootPath, failedDetails.GetProperty("WorkingDirectory").GetString());
         Assert.Equal(1, failedDetails.GetProperty("ExitCode").GetInt32());
         Assert.True(failedDetails.GetProperty("ProcessId").GetInt32() > 0);
+    }
+
+    [Fact]
+    public async Task FakeRuntime_CompletionCallback_ProcessTimeout_AfterMovingPayload_ReportsCallbackFailureInsteadOfFinalizationWait()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-timeout-moved");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var movedPayloadPath = Path.Combine(rootPath, "moved-payload", "Timed Out Movie");
+        Directory.CreateDirectory(Path.GetDirectoryName(movedPayloadPath)!);
+
+        var callbackScriptPath = Path.Combine(rootPath, "move-and-timeout-callback.sh");
+        File.WriteAllText(
+            callbackScriptPath,
+            $$"""
+            #!/bin/sh
+            mv "${TORRENTCORE_FINAL_PAYLOAD_PATH}" "{{movedPayloadPath}}"
+            sleep 2
+            exit 0
+            """
+        );
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(
+            httpClient,
+            "/bin/sh",
+            callbackScriptPath,
+            rootPath,
+            callbackTimeoutSeconds: 1);
+
+        var response = await AddMagnetAsync(httpClient, "7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A7A", "Timed Out Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var finalPayloadPath = Path.Combine(downloadPath, "Movie", "Timed Out Movie");
+        CreateSingleFilePayload(finalPayloadPath);
+
+        await WaitForAsync(
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId),
+            state => state.State == TorrentCompletionCallbackState.TimedOut.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        var timedOutState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
+        Assert.NotNull(timedOutState.LastError);
+        Assert.Contains("The callback exceeded the 1-second timeout.", timedOutState.LastError, StringComparison.Ordinal);
+        Assert.Contains("The final payload is no longer visible", timedOutState.LastError, StringComparison.Ordinal);
+
+        var torrentDetail = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+        Assert.NotNull(torrentDetail);
+        Assert.Equal(TorrentCompletionCallbackState.TimedOut.ToString(), torrentDetail.CompletionCallbackState);
+        Assert.True(torrentDetail.CanRetryCompletionCallback);
+        Assert.Equal(finalPayloadPath, torrentDetail.CompletionCallbackFinalPayloadPath);
+        Assert.Null(torrentDetail.CompletionCallbackPendingReason);
+        Assert.Contains("The callback exceeded the 1-second timeout.", torrentDetail.CompletionCallbackLastError ?? string.Empty, StringComparison.Ordinal);
+        Assert.Contains("The final payload is no longer visible", torrentDetail.CompletionCallbackLastError ?? string.Empty, StringComparison.Ordinal);
+
+        Assert.False(File.Exists(finalPayloadPath));
+        Assert.True(File.Exists(movedPayloadPath));
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
+        Assert.NotNull(logs);
+        var timedOutLog = Assert.Single(logs, log => log.EventType == "torrent.callback.timed_out");
+        var timedOutDetails = ParseLogDetails(timedOutLog);
+        Assert.Equal(finalPayloadPath, timedOutDetails.GetProperty("FinalPayloadPath").GetString());
     }
 
     [Fact]
@@ -2598,7 +2668,8 @@ public sealed class TorrentApiTests
         string? workingDirectory,
         string? apiBaseUrlOverride = null,
         string? apiKeyOverride = null,
-        int? finalizationTimeoutSeconds = null)
+        int? finalizationTimeoutSeconds = null,
+        int? callbackTimeoutSeconds = null)
     {
         var response = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
         {
@@ -2622,7 +2693,7 @@ public sealed class TorrentApiTests
             CompletionCallbackCommandPath = commandPath,
             CompletionCallbackArguments = arguments,
             CompletionCallbackWorkingDirectory = workingDirectory,
-            CompletionCallbackTimeoutSeconds = 30,
+            CompletionCallbackTimeoutSeconds = callbackTimeoutSeconds ?? 30,
             CompletionCallbackFinalizationTimeoutSeconds = finalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride = apiBaseUrlOverride,
             CompletionCallbackApiKeyOverride = apiKeyOverride,
@@ -2677,6 +2748,7 @@ public sealed class TorrentApiTests
               printf 'TR_TORRENT_NAME=%s\n' "${TR_TORRENT_NAME}"
               printf 'TR_TORRENT_DIR=%s\n' "${TR_TORRENT_DIR}"
               printf 'TR_TORRENT_LABELS=%s\n' "${TR_TORRENT_LABELS}"
+              printf 'TORRENTCORE_FINAL_PAYLOAD_PATH=%s\n' "${TORRENTCORE_FINAL_PAYLOAD_PATH}"
               printf 'TVMAZE_API_COMPLETE_URL=%s\n' "${TVMAZE_API_COMPLETE_URL}"
               printf 'TVMAZE_API_COMPLETE_API_KEY=%s\n' "${TVMAZE_API_COMPLETE_API_KEY}"
               printf -- '---\n'
