@@ -206,6 +206,26 @@ These rules are now explicit for selected-torrent diagnostics in `TorrentCore.We
   - pager always visible inside the table shell
   - no browser-window scrolling required for normal use
 
+## Torrents Page Help Rules (2026-04-10)
+
+These rules are now explicit for `TorrentCore.WebUI` torrents behavior:
+
+- The `Torrents` page now uses the shared help affordance pattern for:
+  - filter section
+  - filter fields
+  - filter actions
+  - results-grid section
+  - selected-torrent section
+  - selected-torrent action buttons
+- The `State` filter help must explicitly explain every `TorrentState` option shown in the selector instead of assuming the operator already knows the lifecycle names.
+- The `Current Torrents` section should explicitly remind operators that grid sorting is done from the column headers.
+- The shared help text for selected-torrent actions should explain the operational difference between:
+  - `Refresh Metadata`
+  - `Reset Metadata`
+  - `Retry Callback`
+  - `Remove`
+  - `Delete Data`
+
 ## Settings Editing Rules (2026-04-08)
 
 These rules are now explicit for `TorrentCore.WebUI` settings behavior:
@@ -401,22 +421,117 @@ Status:
 
 Goal:
 
-- deliver host visibility baseline in new design language
+- turn the dashboard into a service-lifecycle and active-work control center
 
 Tasks:
 
-- implement dashboard cards/panels for host/runtime/queue/callback visibility
-- implement periodic refresh behavior with explicit operator refresh control
+- reshape the page around lifecycle, current pipeline pressure, active work, and attention-required views
+- keep the dashboard host-focused rather than reintroducing full torrent management into the landing page
+- use manual refresh plus periodic refresh, but make the dashboard resilient when any one panel source fails
 - implement mobile/tablet/desktop responsive behavior
 
 Verify:
 
-- functional parity with current dashboard
+- operators can understand what has happened since the current service instance started
+- operators can see which work is active right now without leaving the dashboard
 - responsive review passed at phone/tablet/desktop widths
 
 Status:
 
-`Pending`
+`Planned`
+
+Implementation plan:
+
+1. Dashboard layout rewrite using existing data
+   - replace the current simple four-card summary with a structured work area:
+     - `Service Lifecycle`
+     - `Current Pipeline`
+     - `Active Metadata`
+     - `Active Downloads`
+     - `Callback Watchlist`
+     - `Attention Required`
+   - keep the top summary strip compact:
+     - service name/version
+     - current service instance id
+     - environment/runtime
+     - last refresh time
+   - keep the page chart-free for now; prefer counters, status pills, compact tables, and event lists
+
+2. First implementation pass from existing APIs only
+   - data sources:
+     - `GetHealthAsync`
+     - `GetHostStatusAsync`
+     - `GetTorrentsAsync`
+   - derive dashboard panels in WebUI from current contracts:
+     - `Service Lifecycle`
+       - startup recovery completed
+       - startup recovery completed at
+       - startup recovered torrent count
+       - startup normalized torrent count
+     - `Current Pipeline`
+       - resolving metadata
+       - queued for metadata
+       - downloading
+       - queued for download
+       - seeding
+       - paused
+       - completed
+       - error
+       - available metadata slots
+       - available download slots
+     - `Active Metadata`
+       - torrents in `ResolvingMetadata`
+       - optionally include items waiting on metadata slot/dispatch
+     - `Active Downloads`
+       - torrents in `Downloading`
+     - `Callback Watchlist`
+       - torrents with callback states such as `PendingFinalization`, `Failed`, or `TimedOut`
+     - `Attention Required`
+       - torrents in `Error`
+       - torrents with `BlockedByError`
+       - stale zero-peer downloads / long metadata waits using UI heuristics over `LastActivityAtUtc`
+
+3. Add explicit "since last restart" lifecycle summary backend
+   - do not make the dashboard reconstruct lifecycle history by downloading and aggregating the full log table in the browser every refresh
+   - add a dedicated dashboard lifecycle endpoint backed by activity logs filtered to the current `ServiceInstanceId`
+   - recommended contract shape:
+     - `DashboardLifecycleSummaryDto`
+     - `DashboardLifecycleEventDto`
+   - recommended lifecycle counters:
+     - torrents added
+     - metadata resolved
+     - metadata refreshes requested
+     - metadata resets requested
+     - completions reached
+     - callback invoked
+     - callback failed
+     - callback timed out
+     - auto-removed completed torrents
+     - orphaned torrent logs deleted
+   - recommended recent event list:
+     - last 10-20 high-value lifecycle events for the current service instance only
+
+4. Integrate lifecycle summary into dashboard
+   - show a `Since Restart` panel using the new lifecycle summary endpoint
+   - show the most recent lifecycle events as a compact event list, not the full logs table
+   - use the current `ServiceInstanceId` as the authoritative boundary for "since restart"
+
+5. Optional backend refinement for active tasks
+   - if the first-pass UI heuristics over `GetTorrentsAsync` become noisy or duplicated, add a dedicated dashboard-tasks endpoint
+   - that endpoint should pre-group:
+     - active metadata tasks
+     - active downloads
+     - pending callback/finalization items
+     - attention-required items
+   - defer this until after the first dashboard rewrite proves what the operators actually need
+
+6. Operator validation pass
+   - validate that the dashboard answers these questions quickly:
+     - what has happened since the last restart?
+     - what is active right now?
+     - what is stuck or needs attention?
+     - how much queue pressure exists right now?
+   - only after that should help icons/tooltips be added for dashboard sections
 
 ### Phase 4 - Torrents List Slice
 

@@ -130,6 +130,8 @@ Current service configuration section:
 - the WebUI `Service Connection` page now uses that same shared help model for current endpoint status, the service base URL entry field, and the `Test` / `Save` / `Recheck` actions
 - the WebUI `Logs` page now uses the same shared help model for its filter fields, `Refresh` / `Clear` filter actions, results table, and selected-log details section
 - the WebUI `Logs` page now also supports manual orphaned-torrent log cleanup through a `Delete Orphan Logs` action, backed by a new service endpoint that deletes rows for torrent ids no longer present in the current torrent list
+- the WebUI `Torrents` page now uses the same shared help model for filters, results, selected-torrent actions, and especially the `State` filter, whose help text explicitly explains every TorrentCore lifecycle state shown in the selector
+- the next planned dashboard slice is now defined as a lifecycle-and-active-work rewrite: first pass from existing health/host/torrents APIs, then a dedicated `since restart` lifecycle summary endpoint keyed to the current `ServiceInstanceId`, with help affordances intentionally deferred until the dashboard layout is accepted
 - resolved callback routing data is now persisted per torrent at add time, so later category edits affect future torrents without silently changing callback labels or invoke behavior for existing torrents
 - completed torrents now invoke the shared TVMaze callback entrypoint once using Transmission-compatible environment variables, and callback diagnostics are written to the activity log
 - service-level regression coverage now verifies the callback environment contract and that restart/recovery does not re-fire the completion callback for an already-completed torrent

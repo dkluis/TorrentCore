@@ -34,79 +34,99 @@
                     <OperatorCard Class="section-card torrents-panel torrents-panel--filters">
                         <div class="dashboard-panel-header">
                             <div>
-                                <h2>Filters</h2>
+                                <div class="operator-section-header">
+                                    <h2>Filters</h2>
+                                    <SettingHelpTrigger Content="@TorrentsHelpCatalog.Filters" IconOnly="true" />
+                                </div>
                                 <p class="dashboard-panel-copy">Filtering and sort are local. Select a row to open details and actions below.</p>
                             </div>
-                            <div class="dashboard-inline-actions dashboard-inline-actions--compact">
-                                <MudButton Variant="Variant.Outlined"
-                                           Color="Color.Primary"
-                                           Size="Size.Small"
-                                           Disabled="_isRefreshing || _isActingOnSelected"
-                                           OnClick="RefreshAsync">
-                                    Refresh
-                                </MudButton>
-                                <MudButton Variant="Variant.Outlined"
-                                           Color="Color.Secondary"
-                                           Size="Size.Small"
-                                           Disabled="_isRefreshing || _isActingOnSelected"
-                                           OnClick="ClearFiltersAsync">
-                                    Clear
-                                </MudButton>
+                            <div class="dashboard-inline-actions dashboard-inline-actions--compact operator-action-help-strip">
+                                <div class="operator-action-with-help">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               Disabled="_isRefreshing || _isActingOnSelected"
+                                               OnClick="RefreshAsync">
+                                        Refresh
+                                    </MudButton>
+                                    <SettingHelpTrigger Content="@TorrentsHelpCatalog.Refresh" IconOnly="true" />
+                                </div>
+                                <div class="operator-action-with-help">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               Disabled="_isRefreshing || _isActingOnSelected"
+                                               OnClick="ClearFiltersAsync">
+                                        Clear
+                                    </MudButton>
+                                    <SettingHelpTrigger Content="@TorrentsHelpCatalog.Clear" IconOnly="true" />
+                                </div>
                             </div>
                         </div>
 
                         <div class="operations-filters">
-                            <MudTextField T="string"
-                                          Label="Name"
-                                          Value="_state.SearchText"
-                                          ValueChanged="OnSearchChanged"
-                                          Variant="Variant.Outlined"
-                                          Margin="Margin.Dense"
-                                          Immediate="true" />
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.Name" />
+                                <MudTextField T="string"
+                                              Value="_state.SearchText"
+                                              ValueChanged="OnSearchChanged"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Immediate="true" />
+                            </div>
 
-                            <MudSelect T="string"
-                                       Label="State"
-                                       Value="_state.PrimaryFilter"
-                                       ValueChanged="OnStateFilterChanged"
-                                       Variant="Variant.Outlined"
-                                       Margin="Margin.Dense"
-                                       Dense="true">
-                                <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
-                                @foreach (var torrentState in Enum.GetValues<TorrentState>())
-                                {
-                                    <MudSelectItem T="string" Value="@torrentState.ToString()">@torrentState</MudSelectItem>
-                                }
-                            </MudSelect>
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.State" />
+                                <MudSelect T="string"
+                                           Value="_state.PrimaryFilter"
+                                           ValueChanged="OnStateFilterChanged"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Dense="true">
+                                    <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+                                    @foreach (var torrentState in Enum.GetValues<TorrentState>())
+                                    {
+                                        <MudSelectItem T="string" Value="@torrentState.ToString()">@torrentState</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
 
-                            <MudSelect T="string"
-                                       Label="Category"
-                                       Value="_state.SecondaryFilter"
-                                       ValueChanged="OnCategoryFilterChanged"
-                                       Variant="Variant.Outlined"
-                                       Margin="Margin.Dense"
-                                       Dense="true">
-                                <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
-                                <MudSelectItem T="string" Value="@UncategorizedFilterValue">Uncategorized</MudSelectItem>
-                                @foreach (var category in CategoryFilterOptions)
-                                {
-                                    <MudSelectItem T="string" Value="@category">@category</MudSelectItem>
-                                }
-                            </MudSelect>
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.Category" />
+                                <MudSelect T="string"
+                                           Value="_state.SecondaryFilter"
+                                           ValueChanged="OnCategoryFilterChanged"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Dense="true">
+                                    <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@UncategorizedFilterValue">Uncategorized</MudSelectItem>
+                                    @foreach (var category in CategoryFilterOptions)
+                                    {
+                                        <MudSelectItem T="string" Value="@category">@category</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
 
-                            <MudCheckBox T="bool"
-                                         Dense="true"
-                                         Color="Color.Primary"
-                                         Label="Auto Refresh (5s)"
-                                         Value="_autoRefreshEnabled"
-                                         ValueChanged="OnAutoRefreshChanged" />
+                            <div class="settings-field-block settings-field-block--toggle">
+                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.AutoRefresh" />
+                                <MudCheckBox T="bool"
+                                             Dense="true"
+                                             Color="Color.Primary"
+                                             Value="_autoRefreshEnabled"
+                                             ValueChanged="OnAutoRefreshChanged" />
+                            </div>
                         </div>
                     </OperatorCard>
 
                     <OperatorCard Class="section-card torrents-panel torrents-panel--table">
                         <div class="dashboard-panel-header">
                             <div>
-                                <h2>Current Torrents</h2>
-                                <p class="dashboard-panel-copy">@FilteredTorrents.Count result(s)</p>
+                                <div class="operator-section-header">
+                                    <h2>Current Torrents</h2>
+                                    <SettingHelpTrigger Content="@TorrentsHelpCatalog.CurrentTorrents" IconOnly="true" />
+                                </div>
+                                <p class="dashboard-panel-copy">@BuildCurrentTorrentsSummary()</p>
                             </div>
                         </div>
 
@@ -182,7 +202,10 @@
                     <OperatorCard Class="section-card torrents-panel torrents-panel--detail">
                         <div class="dashboard-panel-header">
                             <div>
-                                <h2>Selected Torrent</h2>
+                                <div class="operator-section-header">
+                                    <h2>Selected Torrent</h2>
+                                    <SettingHelpTrigger Content="@TorrentsHelpCatalog.SelectedTorrent" IconOnly="true" />
+                                </div>
                                 <p class="dashboard-panel-copy">@BuildSelectionSummary()</p>
                             </div>
                             @if (CanShowSelectedActions)
@@ -190,90 +213,120 @@
                                 <div class="torrents-actions">
                                     @if (_selectedTorrentDetail!.CanPause)
                                     {
-                                        <MudButton Variant="Variant.Outlined"
-                                                   Color="Color.Primary"
-                                                   Size="Size.Small"
-                                                   Disabled="@DisableSelectedActions"
-                                                   OnClick="PauseSelectedAsync">
-                                            Pause
-                                        </MudButton>
+                                        <div class="operator-action-with-help">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Disabled="@DisableSelectedActions"
+                                                       OnClick="PauseSelectedAsync">
+                                                Pause
+                                            </MudButton>
+                                            <SettingHelpTrigger Content="@TorrentsHelpCatalog.Pause" IconOnly="true" />
+                                        </div>
                                     }
                                     @if (_selectedTorrentDetail.CanResume)
                                     {
-                                        <MudButton Variant="Variant.Outlined"
-                                                   Color="Color.Primary"
-                                                   Size="Size.Small"
-                                                   Disabled="@DisableSelectedActions"
-                                                   OnClick="ResumeSelectedAsync">
-                                            Resume
-                                        </MudButton>
+                                        <div class="operator-action-with-help">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Disabled="@DisableSelectedActions"
+                                                       OnClick="ResumeSelectedAsync">
+                                                Resume
+                                            </MudButton>
+                                            <SettingHelpTrigger Content="@TorrentsHelpCatalog.Resume" IconOnly="true" />
+                                        </div>
                                     }
                                     @if (_selectedTorrentDetail.CanRefreshMetadata)
                                     {
-                                        <MudButton Variant="Variant.Outlined"
-                                                   Color="Color.Primary"
-                                                   Size="Size.Small"
-                                                   Disabled="@DisableSelectedActions"
-                                                   OnClick="RefreshMetadataSelectedAsync">
-                                            Refresh Metadata
-                                        </MudButton>
-                                        <MudButton Variant="Variant.Outlined"
-                                                   Color="Color.Primary"
-                                                   Size="Size.Small"
-                                                   Disabled="@DisableSelectedActions"
-                                                   OnClick="ResetMetadataSelectedAsync">
-                                            Reset Metadata
-                                        </MudButton>
+                                        <div class="operator-action-with-help">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Disabled="@DisableSelectedActions"
+                                                       OnClick="RefreshMetadataSelectedAsync">
+                                                Refresh Metadata
+                                            </MudButton>
+                                            <SettingHelpTrigger Content="@TorrentsHelpCatalog.RefreshMetadata" IconOnly="true" />
+                                        </div>
+                                        <div class="operator-action-with-help">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Disabled="@DisableSelectedActions"
+                                                       OnClick="ResetMetadataSelectedAsync">
+                                                Reset Metadata
+                                            </MudButton>
+                                            <SettingHelpTrigger Content="@TorrentsHelpCatalog.ResetMetadata" IconOnly="true" />
+                                        </div>
                                     }
                                     @if (_selectedTorrentDetail.CanRetryCompletionCallback)
                                     {
+                                        <div class="operator-action-with-help">
+                                            <MudButton Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small"
+                                                       Disabled="@DisableSelectedActions"
+                                                       OnClick="RetryCallbackSelectedAsync">
+                                                Retry Callback
+                                            </MudButton>
+                                            <SettingHelpTrigger Content="@TorrentsHelpCatalog.RetryCallback" IconOnly="true" />
+                                        </div>
+                                    }
+                                    <div class="operator-action-with-help">
                                         <MudButton Variant="Variant.Outlined"
-                                                   Color="Color.Primary"
+                                                   Color="Color.Secondary"
                                                    Size="Size.Small"
                                                    Disabled="@DisableSelectedActions"
-                                                   OnClick="RetryCallbackSelectedAsync">
-                                            Retry Callback
+                                                   OnClick="OpenSelectedLogDetails">
+                                            Log Details
                                         </MudButton>
-                                    }
-                                    <MudButton Variant="Variant.Outlined"
-                                               Color="Color.Secondary"
-                                               Size="Size.Small"
-                                               Disabled="@DisableSelectedActions"
-                                               OnClick="OpenSelectedLogDetails">
-                                        Log Details
-                                    </MudButton>
-                                    <MudButton Variant="Variant.Outlined"
-                                               Color="Color.Secondary"
-                                               Size="Size.Small"
-                                               Disabled="@DisableSelectedActions"
-                                               OnClick="OpenSelectedPeersAsync">
-                                        Peers
-                                    </MudButton>
-                                    <MudButton Variant="Variant.Outlined"
-                                               Color="Color.Secondary"
-                                               Size="Size.Small"
-                                               Disabled="@DisableSelectedActions"
-                                               OnClick="OpenSelectedTrackersAsync">
-                                        Trackers
-                                    </MudButton>
+                                        <SettingHelpTrigger Content="@TorrentsHelpCatalog.LogDetails" IconOnly="true" />
+                                    </div>
+                                    <div class="operator-action-with-help">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions"
+                                                   OnClick="OpenSelectedPeersAsync">
+                                            Peers
+                                        </MudButton>
+                                        <SettingHelpTrigger Content="@TorrentsHelpCatalog.Peers" IconOnly="true" />
+                                    </div>
+                                    <div class="operator-action-with-help">
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions"
+                                                   OnClick="OpenSelectedTrackersAsync">
+                                            Trackers
+                                        </MudButton>
+                                        <SettingHelpTrigger Content="@TorrentsHelpCatalog.Trackers" IconOnly="true" />
+                                    </div>
                                     @if (_selectedTorrentDetail.CanRemove)
                                     {
-                                        <MudButton Variant="Variant.Filled"
-                                                   Color="Color.Error"
-                                                   Size="Size.Small"
-                                                   Disabled="@DisableSelectedActions"
-                                                   OnClick="RemoveSelectedAsync">
-                                            Remove
-                                        </MudButton>
-                                        @if (CanDeleteData(_selectedTorrentDetail))
-                                        {
+                                        <div class="operator-action-with-help">
                                             <MudButton Variant="Variant.Filled"
                                                        Color="Color.Error"
                                                        Size="Size.Small"
                                                        Disabled="@DisableSelectedActions"
-                                                       OnClick="DeleteSelectedDataAsync">
-                                                Delete Data
+                                                       OnClick="RemoveSelectedAsync">
+                                                Remove
                                             </MudButton>
+                                            <SettingHelpTrigger Content="@TorrentsHelpCatalog.Remove" IconOnly="true" />
+                                        </div>
+                                        @if (CanDeleteData(_selectedTorrentDetail))
+                                        {
+                                            <div class="operator-action-with-help">
+                                                <MudButton Variant="Variant.Filled"
+                                                           Color="Color.Error"
+                                                           Size="Size.Small"
+                                                           Disabled="@DisableSelectedActions"
+                                                           OnClick="DeleteSelectedDataAsync">
+                                                    Delete Data
+                                                </MudButton>
+                                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.DeleteData" IconOnly="true" />
+                                            </div>
                                         }
                                     }
                                 </div>
@@ -900,6 +953,11 @@
         }
 
         return $"{_selectedTorrentDetail.Name} | {_selectedTorrentDetail.State} | {_selectedTorrentDetail.ProgressPercent:0.0}%";
+    }
+
+    private string BuildCurrentTorrentsSummary()
+    {
+        return $"{FilteredTorrents.Count:n0} result(s). Click a column header to sort.";
     }
 
     private string GetActionMessageClass()

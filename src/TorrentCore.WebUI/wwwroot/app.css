@@ -838,6 +838,7 @@ h1:focus {
     color: var(--tvz-ink);
     font-size: 0.9rem;
     line-height: 1.45;
+    white-space: pre-line;
 }
 
 .operator-section-header {
