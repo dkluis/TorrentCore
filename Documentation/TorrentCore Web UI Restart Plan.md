@@ -34,7 +34,7 @@ Current checkpoint:
 - the peer/tracker dialog slice has now been operator-tested and is behaving as expected in the current WebUI runtime
 - the dashboard is now rewritten as a lifecycle-and-active-work control center instead of the earlier generic four-card summary
 - the dashboard now combines current host status with a dedicated `since restart` lifecycle summary endpoint keyed to the current `ServiceInstanceId`
-- the dashboard now surfaces current metadata/download work, callback watchlist items, attention-required items, and recent lifecycle events without turning the landing page back into a second Torrents screen
+- the dashboard now surfaces lifecycle, pipeline, callback watchlist, attention-required items, and recent lifecycle events without turning the landing page back into a second Torrents screen
 - dashboard help affordances are intentionally deferred until the new layout is operator-reviewed
 - the settings page now uses compact grouped edit cards with per-group save/discard actions for lifecycle, queue/recovery, engine throttles, callback settings, and categories
 - the settings page now blocks cross-section editing when one group is dirty; clicking another section opens a `Save / Discard / Cancel` decision dialog for the dirty group
@@ -543,12 +543,10 @@ Current implementation notes:
   - `Service Lifecycle`
   - `Since Restart`
   - `Current Pipeline`
-  - `Metadata Work`
-  - `Download Work`
   - `Callback Watchlist`
   - `Attention Required`
   - `Recent Lifecycle Events`
-- active-work panels are currently derived in the WebUI from `GetTorrentsAsync`
+- active metadata/download work is intentionally kept on the `Torrents` page instead of duplicating that operational view on the dashboard
 - the `Since Restart` panel and recent lifecycle event list are backed by `api/host/dashboard-lifecycle`
 - the lifecycle endpoint reads retained activity-log rows for the current `ServiceInstanceId`, not browser-side aggregated logs
 - dashboard refresh is manual in the first pass; periodic refresh remains optional future refinement if operators ask for it

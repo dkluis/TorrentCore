@@ -7,7 +7,7 @@
 
 <OperatorPage Kicker="Operator"
               Title="Dashboard"
-              Summary="Lifecycle since restart, current pipeline pressure, and active work watchlists."
+              Summary="Lifecycle since restart, current pipeline pressure, and operator watchlists."
               Class="dashboard-page dashboard-operations-page"
               StatusLine="@BuildStatusLine()">
     <HeaderActions>
@@ -244,108 +244,6 @@
                         <OperatorCard Class="dashboard-panel">
                             <div class="dashboard-panel-header">
                                 <div>
-                                    <h2>Metadata Work</h2>
-                                    <p class="dashboard-panel-copy">@BuildMetadataWorkSummary()</p>
-                                </div>
-                            </div>
-
-                            @if (!string.IsNullOrWhiteSpace(_torrentsErrorMessage))
-                            {
-                                <div class="dashboard-callout">
-                                    <p class="dashboard-callout-title">Torrent work unavailable</p>
-                                    <p class="dashboard-callout-copy">@_torrentsErrorMessage</p>
-                                </div>
-                            }
-                            else if (VisibleMetadataWorkItems.Count == 0)
-                            {
-                                <div class="dashboard-callout">
-                                    <p class="dashboard-callout-title">No metadata work</p>
-                                    <p class="dashboard-callout-copy">No torrents are actively resolving metadata or waiting on metadata queue pressure.</p>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="dashboard-work-table-frame">
-                                    <table class="dashboard-work-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Status</th>
-                                                <th>Peers</th>
-                                                <th>Last Activity</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var torrent in VisibleMetadataWorkItems)
-                                            {
-                                                <tr>
-                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@torrent.Name</td>
-                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildTaskStatus(torrent)</td>
-                                                    <td class="dashboard-work-cell">@torrent.ConnectedPeerCount</td>
-                                                    <td class="dashboard-work-cell">@FormatTimestamp(torrent.LastActivityAtUtc)</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-                        </OperatorCard>
-
-                        <OperatorCard Class="dashboard-panel">
-                            <div class="dashboard-panel-header">
-                                <div>
-                                    <h2>Download Work</h2>
-                                    <p class="dashboard-panel-copy">@BuildDownloadWorkSummary()</p>
-                                </div>
-                            </div>
-
-                            @if (!string.IsNullOrWhiteSpace(_torrentsErrorMessage))
-                            {
-                                <div class="dashboard-callout">
-                                    <p class="dashboard-callout-title">Torrent work unavailable</p>
-                                    <p class="dashboard-callout-copy">@_torrentsErrorMessage</p>
-                                </div>
-                            }
-                            else if (VisibleDownloadWorkItems.Count == 0)
-                            {
-                                <div class="dashboard-callout">
-                                    <p class="dashboard-callout-title">No download work</p>
-                                    <p class="dashboard-callout-copy">No torrents are actively downloading or waiting on download queue pressure.</p>
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="dashboard-work-table-frame">
-                                    <table class="dashboard-work-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Name</th>
-                                                <th>Status</th>
-                                                <th>Progress</th>
-                                                <th>Transfer</th>
-                                                <th>Last Activity</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var torrent in VisibleDownloadWorkItems)
-                                            {
-                                                <tr>
-                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@torrent.Name</td>
-                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildTaskStatus(torrent)</td>
-                                                    <td class="dashboard-work-cell">@torrent.ProgressPercent.ToString("0.0")%</td>
-                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildTransferSummary(torrent)</td>
-                                                    <td class="dashboard-work-cell">@FormatTimestamp(torrent.LastActivityAtUtc)</td>
-                                                </tr>
-                                            }
-                                        </tbody>
-                                    </table>
-                                </div>
-                            }
-                        </OperatorCard>
-
-                        <OperatorCard Class="dashboard-panel">
-                            <div class="dashboard-panel-header">
-                                <div>
                                     <h2>Callback Watchlist</h2>
                                     <p class="dashboard-panel-copy">@BuildCallbackWatchlistSummary()</p>
                                 </div>
@@ -575,22 +473,6 @@
         }
     }
 
-    private IReadOnlyList<TorrentSummaryDto> VisibleMetadataWorkItems =>
-        _allTorrents
-            .Where(IsMetadataWorkItem)
-            .OrderByDescending(GetTaskTimestamp)
-            .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(8)
-            .ToArray();
-
-    private IReadOnlyList<TorrentSummaryDto> VisibleDownloadWorkItems =>
-        _allTorrents
-            .Where(IsDownloadWorkItem)
-            .OrderByDescending(GetTaskTimestamp)
-            .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
-            .Take(8)
-            .ToArray();
-
     private IReadOnlyList<TorrentSummaryDto> VisibleCallbackWatchItems =>
         _allTorrents
             .Where(IsCallbackWatchItem)
@@ -622,16 +504,6 @@
         return startedAt is null ? "Current instance" : $"Up {FormatAge(DateTimeOffset.UtcNow - startedAt.Value)}";
     }
 
-    private string BuildMetadataWorkSummary()
-    {
-        return $"{VisibleMetadataWorkItems.Count:n0} of {_allTorrents.Count(IsMetadataWorkItem):n0} shown. Resolving metadata and waiting-for-metadata items.";
-    }
-
-    private string BuildDownloadWorkSummary()
-    {
-        return $"{VisibleDownloadWorkItems.Count:n0} of {_allTorrents.Count(IsDownloadWorkItem):n0} shown. Active downloads and waiting-for-download items.";
-    }
-
     private string BuildCallbackWatchlistSummary()
     {
         return $"{VisibleCallbackWatchItems.Count:n0} of {_allTorrents.Count(IsCallbackWatchItem):n0} shown. Pending finalization plus retryable callback states.";
@@ -647,18 +519,6 @@
         return _lifecycleSummary?.StartupReadyAtUtc ?? _lifecycleSummary?.FirstEventAtUtc;
     }
 
-    private static bool IsMetadataWorkItem(TorrentSummaryDto torrent)
-    {
-        return torrent.State == TorrentState.ResolvingMetadata ||
-               torrent.WaitReason is TorrentWaitReason.PendingMetadataDispatch or TorrentWaitReason.WaitingForMetadataSlot;
-    }
-
-    private static bool IsDownloadWorkItem(TorrentSummaryDto torrent)
-    {
-        return torrent.State == TorrentState.Downloading ||
-               torrent.WaitReason is TorrentWaitReason.PendingDownloadDispatch or TorrentWaitReason.WaitingForDownloadSlot;
-    }
-
     private static bool IsCallbackWatchItem(TorrentSummaryDto torrent)
     {
         return HasCallbackState(torrent, "PendingFinalization") ||
@@ -669,11 +529,6 @@
     private static bool HasCallbackState(TorrentSummaryDto torrent, string state)
     {
         return string.Equals(torrent.CompletionCallbackState, state, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static DateTimeOffset GetTaskTimestamp(TorrentSummaryDto torrent)
-    {
-        return torrent.LastActivityAtUtc ?? torrent.AddedAtUtc;
     }
 
     private static DateTimeOffset GetCallbackTimestamp(TorrentSummaryDto torrent)
@@ -728,31 +583,6 @@
         }
 
         return null;
-    }
-
-    private static string BuildTaskStatus(TorrentSummaryDto torrent)
-    {
-        if (torrent.WaitReason is not null)
-        {
-            return FormatWaitReason(torrent.WaitReason, torrent.QueuePosition);
-        }
-
-        return torrent.State switch
-        {
-            TorrentState.ResolvingMetadata => "Resolving metadata",
-            TorrentState.Downloading => "Downloading",
-            TorrentState.Seeding => "Seeding",
-            TorrentState.Paused => "Paused",
-            TorrentState.Completed => "Completed",
-            TorrentState.Error => "Error",
-            TorrentState.Removed => "Removed",
-            _ => torrent.State.ToString(),
-        };
-    }
-
-    private static string BuildTransferSummary(TorrentSummaryDto torrent)
-    {
-        return $"Down {FormatRate(torrent.DownloadRateBytesPerSecond)} | Up {FormatRate(torrent.UploadRateBytesPerSecond)} | Peers {torrent.ConnectedPeerCount}";
     }
 
     private static string BuildCallbackDetail(TorrentSummaryDto torrent)

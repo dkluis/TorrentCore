@@ -131,9 +131,9 @@ Current service configuration section:
 - the WebUI `Logs` page now uses the same shared help model for its filter fields, `Refresh` / `Clear` filter actions, results table, and selected-log details section
 - the WebUI `Logs` page now also supports manual orphaned-torrent log cleanup through a `Delete Orphan Logs` action, backed by a new service endpoint that deletes rows for torrent ids no longer present in the current torrent list
 - the WebUI `Torrents` page now uses the same shared help model for filters, results, selected-torrent actions, and especially the `State` filter, whose help text explicitly explains every TorrentCore lifecycle state shown in the selector
-- the WebUI `Dashboard` is now rewritten as a lifecycle-and-active-work control center: `Service Lifecycle`, `Since Restart`, `Current Pipeline`, `Metadata Work`, `Download Work`, `Callback Watchlist`, `Attention Required`, and `Recent Lifecycle Events`
+- the WebUI `Dashboard` is now rewritten as a lifecycle-and-watchlist control center: `Service Lifecycle`, `Since Restart`, `Current Pipeline`, `Callback Watchlist`, `Attention Required`, and `Recent Lifecycle Events`
 - the dashboard's `since restart` view is now backed by a dedicated `api/host/dashboard-lifecycle` endpoint keyed to the current `ServiceInstanceId`, so the browser does not reconstruct restart history by downloading and aggregating the full logs table
-- dashboard active-work panels are currently derived from `GetTorrentsAsync`, and dashboard help affordances remain intentionally deferred until the new operator layout is reviewed
+- active metadata/download work remains on the `Torrents` page, and dashboard help affordances remain intentionally deferred until the new operator layout is reviewed
 - resolved callback routing data is now persisted per torrent at add time, so later category edits affect future torrents without silently changing callback labels or invoke behavior for existing torrents
 - completed torrents now invoke the shared TVMaze callback entrypoint once using Transmission-compatible environment variables, and callback diagnostics are written to the activity log
 - service-level regression coverage now verifies the callback environment contract and that restart/recovery does not re-fire the completion callback for an already-completed torrent
