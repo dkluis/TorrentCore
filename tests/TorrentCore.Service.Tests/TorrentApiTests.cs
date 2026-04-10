@@ -97,6 +97,36 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task GetDashboardLifecycle_ReturnsCurrentInstanceLifecycleSummary()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        await AddMagnetAsync(httpClient, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "Dashboard Lifecycle");
+
+        var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+        var summary = await httpClient.GetFromJsonAsync<DashboardLifecycleSummaryDto>("api/host/dashboard-lifecycle");
+
+        Assert.NotNull(hostStatus);
+        Assert.NotNull(summary);
+        Assert.Equal(hostStatus.ServiceInstanceId, summary.ServiceInstanceId);
+        Assert.NotNull(summary.StartupReadyAtUtc);
+        Assert.NotNull(summary.RecoveryCompletedAtUtc);
+        Assert.NotNull(summary.FirstEventAtUtc);
+        Assert.NotNull(summary.LastEventAtUtc);
+        Assert.Equal(0, summary.StartupRecoveredTorrentCount);
+        Assert.Equal(0, summary.StartupNormalizedTorrentCount);
+        Assert.Equal(1, summary.TorrentsAddedCount);
+        Assert.Equal(0, summary.TorrentsRemovedCount);
+        Assert.Equal(0, summary.MetadataRefreshRequestedCount);
+        Assert.Equal(0, summary.MetadataResetRequestedCount);
+        Assert.Equal(0, summary.MetadataRestartRequestedCount);
+        Assert.NotEmpty(summary.RecentEvents);
+        Assert.Contains(summary.RecentEvents, entry => entry.EventType == "service.startup.ready");
+        Assert.Contains(summary.RecentEvents, entry => entry.EventType == "torrent.added");
+    }
+
+    [Fact]
     public async Task GetRuntimeSettings_ReturnsEffectiveDefaults()
     {
         await using var factory = CreateFactory();

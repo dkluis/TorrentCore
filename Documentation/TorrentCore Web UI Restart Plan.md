@@ -6,7 +6,7 @@ Active planning document for the supported operator UI.
 
 Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phases 3-6 Complete`, `Phase 7 In Progress`
 
-Last updated: `2026-04-08`
+Last updated: `2026-04-10`
 
 Current checkpoint:
 
@@ -32,6 +32,10 @@ Current checkpoint:
 - peer diagnostics use a compact paged grid with live auto-refresh while the dialog is open
 - tracker diagnostics use a paged read-only grid with manual refresh and no tracker-URL column in the operator view
 - the peer/tracker dialog slice has now been operator-tested and is behaving as expected in the current WebUI runtime
+- the dashboard is now rewritten as a lifecycle-and-active-work control center instead of the earlier generic four-card summary
+- the dashboard now combines current host status with a dedicated `since restart` lifecycle summary endpoint keyed to the current `ServiceInstanceId`
+- the dashboard now surfaces current metadata/download work, callback watchlist items, attention-required items, and recent lifecycle events without turning the landing page back into a second Torrents screen
+- dashboard help affordances are intentionally deferred until the new layout is operator-reviewed
 - the settings page now uses compact grouped edit cards with per-group save/discard actions for lifecycle, queue/recovery, engine throttles, callback settings, and categories
 - the settings page now blocks cross-section editing when one group is dirty; clicking another section opens a `Save / Discard / Cancel` decision dialog for the dirty group
 - runtime settings updates now flow through the shared WebUI API adapter, and successful group saves surface toast feedback instead of inline page-only messages
@@ -438,7 +442,7 @@ Verify:
 
 Status:
 
-`Planned`
+`Implemented`
 
 Implementation plan:
 
@@ -532,6 +536,22 @@ Implementation plan:
      - what is stuck or needs attention?
      - how much queue pressure exists right now?
    - only after that should help icons/tooltips be added for dashboard sections
+
+Current implementation notes:
+
+- the first pass is now in place with a compact summary strip plus:
+  - `Service Lifecycle`
+  - `Since Restart`
+  - `Current Pipeline`
+  - `Metadata Work`
+  - `Download Work`
+  - `Callback Watchlist`
+  - `Attention Required`
+  - `Recent Lifecycle Events`
+- active-work panels are currently derived in the WebUI from `GetTorrentsAsync`
+- the `Since Restart` panel and recent lifecycle event list are backed by `api/host/dashboard-lifecycle`
+- the lifecycle endpoint reads retained activity-log rows for the current `ServiceInstanceId`, not browser-side aggregated logs
+- dashboard refresh is manual in the first pass; periodic refresh remains optional future refinement if operators ask for it
 
 ### Phase 4 - Torrents List Slice
 

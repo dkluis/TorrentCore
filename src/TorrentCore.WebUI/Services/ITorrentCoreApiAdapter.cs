@@ -9,6 +9,9 @@ public interface ITorrentCoreApiAdapter
 {
     Task<ServiceCallResult<ServiceHealthDto?>> GetHealthAsync(CancellationToken cancellationToken = default);
     Task<ServiceCallResult<EngineHostStatusDto?>> GetHostStatusAsync(CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<DashboardLifecycleSummaryDto?>> GetDashboardLifecycleAsync(
+        CancellationToken cancellationToken = default
+    );
     Task<ServiceCallResult<RuntimeSettingsDto?>> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default);
     Task<ServiceCallResult<RuntimeSettingsDto>> UpdateRuntimeSettingsAsync(
         UpdateRuntimeSettingsRequest request,

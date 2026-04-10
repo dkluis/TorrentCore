@@ -438,6 +438,64 @@ h1:focus {
     --dashboard-torrent-work-area-offset: 23rem;
 }
 
+.dashboard-operations-page {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+}
+
+.dashboard-operations-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+    padding-bottom: 0.35rem;
+}
+
+.dashboard-summary-card {
+    padding-block: 0.6rem;
+}
+
+.dashboard-summary-line {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.dashboard-summary-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding: 0.35rem 0.45rem;
+    border: 1px solid var(--tvz-border);
+    border-radius: 0.75rem;
+    background: rgba(247, 240, 228, 0.72);
+    min-width: 0;
+}
+
+.dashboard-summary-label {
+    color: var(--tvz-brand);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+.dashboard-summary-chip strong {
+    font-size: 0.84rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.dashboard-summary-meta {
+    color: var(--tvz-muted);
+    font-size: 0.76rem;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 .dashboard-torrents-layout {
     display: grid;
     gap: 0.75rem;
@@ -495,6 +553,10 @@ h1:focus {
     min-width: 0;
 }
 
+.dashboard-panel--wide {
+    grid-column: 1 / -1;
+}
+
 .dashboard-panel--client-grid {
     min-height: 0;
     overflow: hidden;
@@ -534,6 +596,101 @@ h1:focus {
 
 .dashboard-inline-actions--compact {
     align-items: flex-start;
+}
+
+.dashboard-operations-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    min-width: 0;
+}
+
+.dashboard-work-table-frame {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.dashboard-work-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+
+.dashboard-work-table th,
+.dashboard-work-table td {
+    padding: 0.38rem 0.2rem;
+    border-bottom: 1px solid rgba(21, 37, 47, 0.08);
+    vertical-align: top;
+}
+
+.dashboard-work-table th {
+    color: var(--tvz-brand);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.dashboard-work-cell {
+    white-space: nowrap;
+}
+
+.dashboard-work-cell--wrap {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.dashboard-event-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.dashboard-event-item {
+    padding: 0.65rem 0.75rem;
+    border: 1px solid rgba(21, 37, 47, 0.08);
+    border-radius: 0.75rem;
+    background: rgba(255, 250, 242, 0.76);
+}
+
+.dashboard-event-topline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.dashboard-event-title {
+    color: var(--tvz-ink);
+    font-size: 0.84rem;
+    font-weight: 700;
+}
+
+.dashboard-event-time {
+    color: var(--tvz-muted);
+    font-size: 0.76rem;
+}
+
+.dashboard-event-message {
+    margin: 0.35rem 0 0 0;
+    color: var(--tvz-ink);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.dashboard-event-meta {
+    margin: 0.3rem 0 0 0;
+    color: var(--tvz-muted);
+    font-size: 0.74rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .settings-page-layout {
@@ -2345,6 +2502,11 @@ h1:focus {
         align-items: flex-start;
     }
 
+    .dashboard-event-topline {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
     .dashboard-inline-actions {
         width: 100%;
         justify-content: flex-start;
@@ -2550,6 +2712,14 @@ h1:focus {
         align-items: start;
     }
 
+    .dashboard-summary-line {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-overview-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .dashboard-detail-grid {
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -2579,6 +2749,18 @@ h1:focus {
 
     .dashboard-metrics {
         grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .dashboard-summary-line {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .dashboard-overview-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .dashboard-operations-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .dashboard-detail-grid {

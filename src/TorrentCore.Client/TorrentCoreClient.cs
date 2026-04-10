@@ -29,6 +29,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
         return await ReadResponseAsync<EngineHostStatusDto>(response, cancellationToken);
     }
 
+    public async Task<DashboardLifecycleSummaryDto?> GetDashboardLifecycleAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/host/dashboard-lifecycle"), cancellationToken);
+        return await ReadResponseAsync<DashboardLifecycleSummaryDto>(response, cancellationToken);
+    }
+
     public async Task<RuntimeSettingsDto?> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync(BuildRequestUri("api/host/runtime-settings"), cancellationToken);

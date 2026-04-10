@@ -11,6 +11,7 @@ namespace TorrentCore.Service.Application;
 public interface ITorrentApplicationService
 {
     Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken      cancellationToken);
+    Task<DashboardLifecycleSummaryDto> GetDashboardLifecycleAsync(CancellationToken cancellationToken);
     Task<RuntimeSettingsDto>  GetRuntimeSettingsAsync(CancellationToken cancellationToken);
 
     Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request,

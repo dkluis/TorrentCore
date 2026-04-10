@@ -21,6 +21,14 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
         return Ok(status);
     }
 
+    [HttpGet("dashboard-lifecycle")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DashboardLifecycleSummaryDto))]
+    public async Task<ActionResult<DashboardLifecycleSummaryDto>> GetDashboardLifecycle(CancellationToken cancellationToken)
+    {
+        var summary = await torrentApplicationService.GetDashboardLifecycleAsync(cancellationToken);
+        return Ok(summary);
+    }
+
     [HttpGet("runtime-settings")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RuntimeSettingsDto))]
     public async Task<ActionResult<RuntimeSettingsDto>> GetRuntimeSettings(CancellationToken cancellationToken)

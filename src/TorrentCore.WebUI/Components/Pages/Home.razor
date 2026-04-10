@@ -7,8 +7,9 @@
 
 <OperatorPage Kicker="Operator"
               Title="Dashboard"
-              Summary="Host visibility baseline using shared state, request, and feedback primitives."
-              StatusLine="Phase 2 shared infrastructure is active.">
+              Summary="Lifecycle since restart, current pipeline pressure, and active work watchlists."
+              Class="dashboard-page dashboard-operations-page"
+              StatusLine="@BuildStatusLine()">
     <HeaderActions>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -25,35 +26,461 @@
                    Message="@_errorMessage"
                    ActionText="Retry"
                    OnAction="RefreshAsync">
-            <OperatorCardGrid>
-                <OperatorCard>
-                    <p class="section-card-eyebrow">Service</p>
-                    <h2>@(_health?.ServiceName ?? "TorrentCore Service")</h2>
-                    <p>Status: @(_health?.Status ?? "Unknown")</p>
-                    <p>Environment: @(_health?.EnvironmentName ?? "Unknown")</p>
-                </OperatorCard>
+            @if (_hostStatus is not null)
+            {
+                <div class="dashboard-operations-layout">
+                    <OperatorCard Class="dashboard-summary-card">
+                        <div class="dashboard-summary-line">
+                            <div class="dashboard-summary-chip">
+                                <span class="dashboard-summary-label">Service</span>
+                                <strong>@(_health?.Status ?? _hostStatus.Status.ToString())</strong>
+                                <span class="dashboard-summary-meta">@(_health?.EnvironmentName ?? _hostStatus.EnvironmentName) | @(_health?.ServiceName ?? _hostStatus.ServiceName) v@_hostStatus.ServiceVersion</span>
+                            </div>
 
-                <OperatorCard>
-                    <p class="section-card-eyebrow">Host Runtime</p>
-                    <h2>@(_hostStatus?.EngineRuntime ?? "Unavailable")</h2>
-                    <p>Torrents: @(_hostStatus?.TorrentCount ?? 0)</p>
-                    <p>Instance: @(_hostStatus?.ServiceInstanceId.ToString("D") ?? "Unknown")</p>
-                </OperatorCard>
+                            <div class="dashboard-summary-chip">
+                                <span class="dashboard-summary-label">Instance</span>
+                                <strong>@_hostStatus.ServiceInstanceId.ToString("D")</strong>
+                                <span class="dashboard-summary-meta">Runtime @_hostStatus.EngineRuntime | Checked @FormatTimestamp(_hostStatus.CheckedAtUtc)</span>
+                            </div>
 
-                <OperatorCard>
-                    <p class="section-card-eyebrow">Queue</p>
-                    <h2>@(_hostStatus?.ResolvingMetadataCount ?? 0) Metadata</h2>
-                    <p>Queued metadata: @(_hostStatus?.MetadataQueueCount ?? 0)</p>
-                    <p>Queued downloads: @(_hostStatus?.DownloadQueueCount ?? 0)</p>
-                </OperatorCard>
+                            <div class="dashboard-summary-chip">
+                                <span class="dashboard-summary-label">Since Restart</span>
+                                <strong>@BuildRestartWindowText()</strong>
+                                <span class="dashboard-summary-meta">Started @FormatTimestamp(GetServiceStartedAtUtc()) | Last event @FormatTimestamp(_lifecycleSummary?.LastEventAtUtc)</span>
+                            </div>
 
-                <OperatorCard>
-                    <p class="section-card-eyebrow">Transfer</p>
-                    <h2>@FormatRate(_hostStatus?.CurrentDownloadRateBytesPerSecond ?? 0)</h2>
-                    <p>Upload: @FormatRate(_hostStatus?.CurrentUploadRateBytesPerSecond ?? 0)</p>
-                    <p>Peers: @(_hostStatus?.CurrentConnectedPeerCount ?? 0)</p>
-                </OperatorCard>
-            </OperatorCardGrid>
+                            <div class="dashboard-summary-chip">
+                                <span class="dashboard-summary-label">Transfer</span>
+                                <strong>@FormatRate(_hostStatus.CurrentDownloadRateBytesPerSecond)</strong>
+                                <span class="dashboard-summary-meta">Up @FormatRate(_hostStatus.CurrentUploadRateBytesPerSecond) | Peers @_hostStatus.CurrentConnectedPeerCount</span>
+                            </div>
+
+                            <div class="dashboard-summary-chip">
+                                <span class="dashboard-summary-label">Queue</span>
+                                <strong>@_hostStatus.TorrentCount torrents</strong>
+                                <span class="dashboard-summary-meta">Metadata slots @_hostStatus.AvailableMetadataResolutionSlots open | Download slots @_hostStatus.AvailableDownloadSlots open</span>
+                            </div>
+                        </div>
+                    </OperatorCard>
+
+                    <div class="dashboard-overview-grid">
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Service Lifecycle</h2>
+                                    <p class="dashboard-panel-copy">Current service-instance boundary and startup recovery details.</p>
+                                </div>
+                            </div>
+
+                            <table class="dashboard-simple-table">
+                                <tbody>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Service</td>
+                                        <td class="dashboard-simple-table-value">@(_health?.ServiceName ?? _hostStatus.ServiceName)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Status</td>
+                                        <td class="dashboard-simple-table-value">@(_health?.Status ?? _hostStatus.Status.ToString())</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Service Instance</td>
+                                        <td class="dashboard-simple-table-detail dashboard-table-wrap">@_hostStatus.ServiceInstanceId.ToString("D")</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Startup Ready</td>
+                                        <td class="dashboard-simple-table-value">@FormatTimestamp(_lifecycleSummary?.StartupReadyAtUtc)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Recovery Completed</td>
+                                        <td class="dashboard-simple-table-value">@FormatTimestamp(_lifecycleSummary?.RecoveryCompletedAtUtc ?? _hostStatus.StartupRecoveryCompletedAtUtc)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Recovered At Startup</td>
+                                        <td class="dashboard-simple-table-value">@_hostStatus.StartupRecoveredTorrentCount</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Normalized At Startup</td>
+                                        <td class="dashboard-simple-table-value">@_hostStatus.StartupNormalizedTorrentCount</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">First Lifecycle Event</td>
+                                        <td class="dashboard-simple-table-value">@FormatTimestamp(_lifecycleSummary?.FirstEventAtUtc)</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dashboard-simple-table-label">Latest Lifecycle Event</td>
+                                        <td class="dashboard-simple-table-value">@FormatTimestamp(_lifecycleSummary?.LastEventAtUtc)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </OperatorCard>
+
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Since Restart</h2>
+                                    <p class="dashboard-panel-copy">Lifecycle counters for the current service instance only.</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_lifecycleErrorMessage))
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Lifecycle summary unavailable</p>
+                                    <p class="dashboard-callout-copy">@_lifecycleErrorMessage</p>
+                                </div>
+                            }
+                            else if (_lifecycleSummary is null)
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Lifecycle summary unavailable</p>
+                                    <p class="dashboard-callout-copy">No lifecycle data was returned for the current service instance.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dashboard-metrics">
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Added</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.TorrentsAddedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Removed</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.TorrentsRemovedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Resolved</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.MetadataResolvedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Refresh Requested</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.MetadataRefreshRequestedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Reset Requested</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.MetadataResetRequestedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Restart Requested</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.MetadataRestartRequestedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Callback Invoked</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.CallbackInvokedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Callback Failed</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.CallbackFailedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Callback Timed Out</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.CallbackTimedOutCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Auto Removed</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.CompletedAutoRemovedCount</p>
+                                    </div>
+                                    <div class="dashboard-metric">
+                                        <p class="dashboard-metric-label">Orphan Logs Deleted</p>
+                                        <p class="dashboard-metric-value">@_lifecycleSummary.OrphanedTorrentLogsDeletedCount</p>
+                                    </div>
+                                </div>
+                            }
+                        </OperatorCard>
+
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Current Pipeline</h2>
+                                    <p class="dashboard-panel-copy">Current state counts and queue-slot pressure.</p>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-metrics">
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Resolving Metadata</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.ResolvingMetadataCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Queued Metadata</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.MetadataQueueCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Downloading</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.DownloadingCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Queued Download</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.DownloadQueueCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Seeding</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.SeedingCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Paused</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.PausedCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Completed</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.CompletedCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Error</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.ErrorCount</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Open Metadata Slots</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.AvailableMetadataResolutionSlots</p>
+                                </div>
+                                <div class="dashboard-metric">
+                                    <p class="dashboard-metric-label">Open Download Slots</p>
+                                    <p class="dashboard-metric-value">@_hostStatus.AvailableDownloadSlots</p>
+                                </div>
+                            </div>
+                        </OperatorCard>
+                    </div>
+
+                    <div class="dashboard-operations-grid">
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Metadata Work</h2>
+                                    <p class="dashboard-panel-copy">@BuildMetadataWorkSummary()</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_torrentsErrorMessage))
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Torrent work unavailable</p>
+                                    <p class="dashboard-callout-copy">@_torrentsErrorMessage</p>
+                                </div>
+                            }
+                            else if (VisibleMetadataWorkItems.Count == 0)
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">No metadata work</p>
+                                    <p class="dashboard-callout-copy">No torrents are actively resolving metadata or waiting on metadata queue pressure.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dashboard-work-table-frame">
+                                    <table class="dashboard-work-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Status</th>
+                                                <th>Peers</th>
+                                                <th>Last Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var torrent in VisibleMetadataWorkItems)
+                                            {
+                                                <tr>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@torrent.Name</td>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildTaskStatus(torrent)</td>
+                                                    <td class="dashboard-work-cell">@torrent.ConnectedPeerCount</td>
+                                                    <td class="dashboard-work-cell">@FormatTimestamp(torrent.LastActivityAtUtc)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </OperatorCard>
+
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Download Work</h2>
+                                    <p class="dashboard-panel-copy">@BuildDownloadWorkSummary()</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_torrentsErrorMessage))
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Torrent work unavailable</p>
+                                    <p class="dashboard-callout-copy">@_torrentsErrorMessage</p>
+                                </div>
+                            }
+                            else if (VisibleDownloadWorkItems.Count == 0)
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">No download work</p>
+                                    <p class="dashboard-callout-copy">No torrents are actively downloading or waiting on download queue pressure.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dashboard-work-table-frame">
+                                    <table class="dashboard-work-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Status</th>
+                                                <th>Progress</th>
+                                                <th>Transfer</th>
+                                                <th>Last Activity</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var torrent in VisibleDownloadWorkItems)
+                                            {
+                                                <tr>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@torrent.Name</td>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildTaskStatus(torrent)</td>
+                                                    <td class="dashboard-work-cell">@torrent.ProgressPercent.ToString("0.0")%</td>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildTransferSummary(torrent)</td>
+                                                    <td class="dashboard-work-cell">@FormatTimestamp(torrent.LastActivityAtUtc)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </OperatorCard>
+
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Callback Watchlist</h2>
+                                    <p class="dashboard-panel-copy">@BuildCallbackWatchlistSummary()</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_torrentsErrorMessage))
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Callback watchlist unavailable</p>
+                                    <p class="dashboard-callout-copy">@_torrentsErrorMessage</p>
+                                </div>
+                            }
+                            else if (VisibleCallbackWatchItems.Count == 0)
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">No callback watch items</p>
+                                    <p class="dashboard-callout-copy">No torrents currently need callback finalization visibility, retry, or timeout review.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dashboard-work-table-frame">
+                                    <table class="dashboard-work-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Callback State</th>
+                                                <th>Detail</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var torrent in VisibleCallbackWatchItems)
+                                            {
+                                                <tr>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@torrent.Name</td>
+                                                    <td class="dashboard-work-cell">@ValueOrNotAvailable(torrent.CompletionCallbackState)</td>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildCallbackDetail(torrent)</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </OperatorCard>
+
+                        <OperatorCard Class="dashboard-panel">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Attention Required</h2>
+                                    <p class="dashboard-panel-copy">@BuildAttentionSummary()</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_torrentsErrorMessage))
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Attention list unavailable</p>
+                                    <p class="dashboard-callout-copy">@_torrentsErrorMessage</p>
+                                </div>
+                            }
+                            else if (VisibleAttentionItems.Count == 0)
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">No urgent items</p>
+                                    <p class="dashboard-callout-copy">No torrent errors or retryable callback problems are currently visible.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dashboard-work-table-frame">
+                                    <table class="dashboard-work-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Status</th>
+                                                <th>Detail</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var item in VisibleAttentionItems)
+                                            {
+                                                <tr>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@item.Name</td>
+                                                    <td class="dashboard-work-cell">@item.Status</td>
+                                                    <td class="dashboard-work-cell dashboard-work-cell--wrap">@item.Detail</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </OperatorCard>
+
+                        <OperatorCard Class="dashboard-panel dashboard-panel--wide">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>Recent Lifecycle Events</h2>
+                                    <p class="dashboard-panel-copy">Most recent high-value lifecycle events for the current service instance.</p>
+                                </div>
+                            </div>
+
+                            @if (!string.IsNullOrWhiteSpace(_lifecycleErrorMessage))
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">Lifecycle events unavailable</p>
+                                    <p class="dashboard-callout-copy">@_lifecycleErrorMessage</p>
+                                </div>
+                            }
+                            else if (_lifecycleSummary is null || _lifecycleSummary.RecentEvents.Count == 0)
+                            {
+                                <div class="dashboard-callout">
+                                    <p class="dashboard-callout-title">No lifecycle events</p>
+                                    <p class="dashboard-callout-copy">No recent lifecycle events are available for the current service instance.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="dashboard-event-list">
+                                    @foreach (var entry in _lifecycleSummary.RecentEvents)
+                                    {
+                                        <div class="dashboard-event-item">
+                                            <div class="dashboard-event-topline">
+                                                <span class="dashboard-event-title">@FormatLifecycleEventType(entry.EventType)</span>
+                                                <span class="dashboard-event-time">@FormatTimestamp(entry.OccurredAtUtc)</span>
+                                            </div>
+                                            <p class="dashboard-event-message">@entry.Message</p>
+                                            <p class="dashboard-event-meta">@entry.Category | @entry.Level@if (entry.TorrentId is not null){<text> | Torrent @entry.TorrentId.Value.ToString("D")</text>}</p>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </OperatorCard>
+                    </div>
+                </div>
+            }
         </StateView>
     </ChildContent>
 </OperatorPage>
@@ -64,6 +491,11 @@
     private string? _errorMessage;
     private ServiceHealthDto? _health;
     private EngineHostStatusDto? _hostStatus;
+    private DashboardLifecycleSummaryDto? _lifecycleSummary;
+    private readonly List<TorrentSummaryDto> _allTorrents = [];
+    private string? _lifecycleErrorMessage;
+    private string? _torrentsErrorMessage;
+    private DateTimeOffset? _lastRefreshedAtLocal;
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,35 +512,347 @@
         _isRefreshing = true;
         _mode = StateViewMode.Loading;
         _errorMessage = null;
+        _lifecycleErrorMessage = null;
+        _torrentsErrorMessage = null;
 
         var healthTask = Api.GetHealthAsync();
         var hostTask = Api.GetHostStatusAsync();
-        await Task.WhenAll(healthTask, hostTask);
+        var lifecycleTask = Api.GetDashboardLifecycleAsync();
+        var torrentsTask = Api.GetTorrentsAsync();
+        await Task.WhenAll(healthTask, hostTask, lifecycleTask, torrentsTask);
 
         var healthResult = healthTask.Result;
         var hostResult = hostTask.Result;
+        var lifecycleResult = lifecycleTask.Result;
+        var torrentsResult = torrentsTask.Result;
 
-        if (!healthResult.IsSuccess || !hostResult.IsSuccess)
+        if (!hostResult.IsSuccess)
         {
-            _errorMessage = healthResult.ErrorMessage ?? hostResult.ErrorMessage ?? "Dashboard data could not be loaded.";
+            _errorMessage = hostResult.ErrorMessage ?? healthResult.ErrorMessage ?? "Dashboard data could not be loaded.";
             _mode = StateViewMode.Error;
             _isRefreshing = false;
             return;
         }
 
-        _health = healthResult.Value;
+        _health = healthResult.IsSuccess ? healthResult.Value : null;
         _hostStatus = hostResult.Value;
-        _mode = _health is null && _hostStatus is null ? StateViewMode.Empty : StateViewMode.Ready;
+
+        if (lifecycleResult.IsSuccess)
+        {
+            _lifecycleSummary = lifecycleResult.Value;
+        }
+        else
+        {
+            _lifecycleSummary = null;
+            _lifecycleErrorMessage = lifecycleResult.ErrorMessage ?? "Lifecycle summary could not be loaded.";
+        }
+
+        _allTorrents.Clear();
+        if (torrentsResult.IsSuccess && torrentsResult.Value is not null)
+        {
+            _allTorrents.AddRange(torrentsResult.Value);
+        }
+        else if (!torrentsResult.IsSuccess)
+        {
+            _torrentsErrorMessage = torrentsResult.ErrorMessage ?? "Current torrent work items could not be loaded.";
+        }
+
+        _lastRefreshedAtLocal = DateTimeOffset.Now;
+        _mode = _hostStatus is null ? StateViewMode.Empty : StateViewMode.Ready;
         _isRefreshing = false;
 
         if (showSuccessToast)
         {
-            Feedback.Success("Dashboard refreshed.");
+            if (!string.IsNullOrWhiteSpace(_lifecycleErrorMessage) || !string.IsNullOrWhiteSpace(_torrentsErrorMessage) ||
+                !healthResult.IsSuccess)
+            {
+                Feedback.Warning("Dashboard refreshed with partial data.");
+            }
+            else
+            {
+                Feedback.Success("Dashboard refreshed.");
+            }
         }
+    }
+
+    private IReadOnlyList<TorrentSummaryDto> VisibleMetadataWorkItems =>
+        _allTorrents
+            .Where(IsMetadataWorkItem)
+            .OrderByDescending(GetTaskTimestamp)
+            .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
+
+    private IReadOnlyList<TorrentSummaryDto> VisibleDownloadWorkItems =>
+        _allTorrents
+            .Where(IsDownloadWorkItem)
+            .OrderByDescending(GetTaskTimestamp)
+            .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
+
+    private IReadOnlyList<TorrentSummaryDto> VisibleCallbackWatchItems =>
+        _allTorrents
+            .Where(IsCallbackWatchItem)
+            .OrderByDescending(GetCallbackTimestamp)
+            .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
+
+    private IReadOnlyList<DashboardAttentionItem> VisibleAttentionItems =>
+        _allTorrents
+            .Select(BuildAttentionItem)
+            .Where(static item => item is not null)
+            .Cast<DashboardAttentionItem>()
+            .OrderByDescending(item => item.TimestampUtc ?? DateTimeOffset.MinValue)
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .Take(8)
+            .ToArray();
+
+    private string BuildStatusLine()
+    {
+        return _lastRefreshedAtLocal is null
+            ? "Since-restart lifecycle uses the current service instance boundary."
+            : $"Last refreshed {_lastRefreshedAtLocal.Value.LocalDateTime:g}. Since-restart lifecycle uses the current service instance boundary.";
+    }
+
+    private string BuildRestartWindowText()
+    {
+        var startedAt = GetServiceStartedAtUtc();
+        return startedAt is null ? "Current instance" : $"Up {FormatAge(DateTimeOffset.UtcNow - startedAt.Value)}";
+    }
+
+    private string BuildMetadataWorkSummary()
+    {
+        return $"{VisibleMetadataWorkItems.Count:n0} of {_allTorrents.Count(IsMetadataWorkItem):n0} shown. Resolving metadata and waiting-for-metadata items.";
+    }
+
+    private string BuildDownloadWorkSummary()
+    {
+        return $"{VisibleDownloadWorkItems.Count:n0} of {_allTorrents.Count(IsDownloadWorkItem):n0} shown. Active downloads and waiting-for-download items.";
+    }
+
+    private string BuildCallbackWatchlistSummary()
+    {
+        return $"{VisibleCallbackWatchItems.Count:n0} of {_allTorrents.Count(IsCallbackWatchItem):n0} shown. Pending finalization plus retryable callback states.";
+    }
+
+    private string BuildAttentionSummary()
+    {
+        return $"{VisibleAttentionItems.Count:n0} of {_allTorrents.Count(torrent => BuildAttentionItem(torrent) is not null):n0} shown. Errors, blocked items, and retryable callback problems.";
+    }
+
+    private DateTimeOffset? GetServiceStartedAtUtc()
+    {
+        return _lifecycleSummary?.StartupReadyAtUtc ?? _lifecycleSummary?.FirstEventAtUtc;
+    }
+
+    private static bool IsMetadataWorkItem(TorrentSummaryDto torrent)
+    {
+        return torrent.State == TorrentState.ResolvingMetadata ||
+               torrent.WaitReason is TorrentWaitReason.PendingMetadataDispatch or TorrentWaitReason.WaitingForMetadataSlot;
+    }
+
+    private static bool IsDownloadWorkItem(TorrentSummaryDto torrent)
+    {
+        return torrent.State == TorrentState.Downloading ||
+               torrent.WaitReason is TorrentWaitReason.PendingDownloadDispatch or TorrentWaitReason.WaitingForDownloadSlot;
+    }
+
+    private static bool IsCallbackWatchItem(TorrentSummaryDto torrent)
+    {
+        return HasCallbackState(torrent, "PendingFinalization") ||
+               HasCallbackState(torrent, "Failed") ||
+               HasCallbackState(torrent, "TimedOut");
+    }
+
+    private static bool HasCallbackState(TorrentSummaryDto torrent, string state)
+    {
+        return string.Equals(torrent.CompletionCallbackState, state, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static DateTimeOffset GetTaskTimestamp(TorrentSummaryDto torrent)
+    {
+        return torrent.LastActivityAtUtc ?? torrent.AddedAtUtc;
+    }
+
+    private static DateTimeOffset GetCallbackTimestamp(TorrentSummaryDto torrent)
+    {
+        return torrent.CompletionCallbackPendingSinceUtc ?? torrent.CompletionCallbackInvokedAtUtc ?? torrent.LastActivityAtUtc ?? torrent.AddedAtUtc;
+    }
+
+    private static DashboardAttentionItem? BuildAttentionItem(TorrentSummaryDto torrent)
+    {
+        if (torrent.State == TorrentState.Error)
+        {
+            return new DashboardAttentionItem(
+                torrent.TorrentId,
+                torrent.Name,
+                "Torrent Error",
+                string.IsNullOrWhiteSpace(torrent.ErrorMessage) ? "TorrentCore marked this torrent as error." : torrent.ErrorMessage,
+                torrent.LastActivityAtUtc ?? torrent.AddedAtUtc
+            );
+        }
+
+        if (torrent.WaitReason == TorrentWaitReason.BlockedByError)
+        {
+            return new DashboardAttentionItem(
+                torrent.TorrentId,
+                torrent.Name,
+                "Blocked By Error",
+                FormatWaitReason(torrent.WaitReason, torrent.QueuePosition),
+                torrent.LastActivityAtUtc ?? torrent.AddedAtUtc
+            );
+        }
+
+        if (HasCallbackState(torrent, "Failed"))
+        {
+            return new DashboardAttentionItem(
+                torrent.TorrentId,
+                torrent.Name,
+                "Callback Failed",
+                string.IsNullOrWhiteSpace(torrent.CompletionCallbackLastError) ? "Retry may be required." : torrent.CompletionCallbackLastError,
+                torrent.LastActivityAtUtc ?? torrent.AddedAtUtc
+            );
+        }
+
+        if (HasCallbackState(torrent, "TimedOut"))
+        {
+            return new DashboardAttentionItem(
+                torrent.TorrentId,
+                torrent.Name,
+                "Callback Timed Out",
+                string.IsNullOrWhiteSpace(torrent.CompletionCallbackLastError) ? "Retry may be required." : torrent.CompletionCallbackLastError,
+                torrent.LastActivityAtUtc ?? torrent.AddedAtUtc
+            );
+        }
+
+        return null;
+    }
+
+    private static string BuildTaskStatus(TorrentSummaryDto torrent)
+    {
+        if (torrent.WaitReason is not null)
+        {
+            return FormatWaitReason(torrent.WaitReason, torrent.QueuePosition);
+        }
+
+        return torrent.State switch
+        {
+            TorrentState.ResolvingMetadata => "Resolving metadata",
+            TorrentState.Downloading => "Downloading",
+            TorrentState.Seeding => "Seeding",
+            TorrentState.Paused => "Paused",
+            TorrentState.Completed => "Completed",
+            TorrentState.Error => "Error",
+            TorrentState.Removed => "Removed",
+            _ => torrent.State.ToString(),
+        };
+    }
+
+    private static string BuildTransferSummary(TorrentSummaryDto torrent)
+    {
+        return $"Down {FormatRate(torrent.DownloadRateBytesPerSecond)} | Up {FormatRate(torrent.UploadRateBytesPerSecond)} | Peers {torrent.ConnectedPeerCount}";
+    }
+
+    private static string BuildCallbackDetail(TorrentSummaryDto torrent)
+    {
+        if (HasCallbackState(torrent, "PendingFinalization"))
+        {
+            return torrent.CompletionCallbackPendingSinceUtc is null
+                ? "Waiting for final payload visibility."
+                : $"Pending since {FormatTimestamp(torrent.CompletionCallbackPendingSinceUtc)}";
+        }
+
+        return string.IsNullOrWhiteSpace(torrent.CompletionCallbackLastError)
+            ? "Review torrent detail or logs for more callback context."
+            : torrent.CompletionCallbackLastError;
+    }
+
+    private static string FormatLifecycleEventType(string eventType)
+    {
+        return eventType switch
+        {
+            "service.recovery.completed" => "Recovery Completed",
+            "service.startup.ready" => "Service Ready",
+            "torrent.added" => "Torrent Added",
+            "torrent.removed" => "Torrent Removed",
+            "torrent.metadata.resolved" => "Metadata Resolved",
+            "torrent.metadata.refresh_requested" => "Metadata Refresh Requested",
+            "torrent.metadata.reset_requested" => "Metadata Reset Requested",
+            "torrent.metadata.restart_requested" => "Metadata Restart Requested",
+            "torrent.callback.pending_finalization" => "Callback Pending Finalization",
+            "torrent.callback.retry_requested" => "Callback Retry Requested",
+            "torrent.callback.invoked" => "Callback Invoked",
+            "torrent.callback.failed" => "Callback Failed",
+            "torrent.callback.finalization_timed_out" => "Callback Timed Out",
+            "torrent.cleanup.auto_removed" => "Completed Torrent Auto Removed",
+            "torrent.logs.orphaned_deleted" => "Orphan Logs Deleted",
+            _ => eventType,
+        };
     }
 
     private static string FormatRate(long bytesPerSecond)
     {
         return $"{bytesPerSecond / 1_000_000.0:0.00} MB/s";
     }
+
+    private static string FormatTimestamp(DateTimeOffset? timestamp)
+    {
+        return timestamp is null ? "N/A" : timestamp.Value.LocalDateTime.ToString("g");
+    }
+
+    private static string FormatWaitReason(TorrentWaitReason? waitReason, int? queuePosition)
+    {
+        var waitReasonText = waitReason switch
+        {
+            TorrentWaitReason.PendingMetadataDispatch => "Pending metadata dispatch",
+            TorrentWaitReason.WaitingForMetadataSlot => "Waiting for metadata slot",
+            TorrentWaitReason.PendingDownloadDispatch => "Pending download dispatch",
+            TorrentWaitReason.WaitingForDownloadSlot => "Waiting for download slot",
+            TorrentWaitReason.PausedByOperator => "Paused by operator",
+            TorrentWaitReason.BlockedByError => "Blocked by error",
+            _ => string.Empty,
+        };
+
+        if (string.IsNullOrWhiteSpace(waitReasonText))
+        {
+            return "Not waiting";
+        }
+
+        return queuePosition is null ? waitReasonText : $"{waitReasonText} (#{queuePosition.Value})";
+    }
+
+    private static string ValueOrNotAvailable(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "N/A" : value;
+    }
+
+    private static string FormatAge(TimeSpan duration)
+    {
+        if (duration.TotalMinutes < 1)
+        {
+            return $"{Math.Max(0, (int)duration.TotalSeconds)}s";
+        }
+
+        if (duration.TotalHours < 1)
+        {
+            return $"{(int)duration.TotalMinutes}m";
+        }
+
+        if (duration.TotalDays < 1)
+        {
+            return $"{(int)duration.TotalHours}h {(int)duration.Minutes}m";
+        }
+
+        return $"{(int)duration.TotalDays}d {duration.Hours}h";
+    }
+
+    private sealed record DashboardAttentionItem(
+        Guid TorrentId,
+        string Name,
+        string Status,
+        string Detail,
+        DateTimeOffset? TimestampUtc
+    );
 }

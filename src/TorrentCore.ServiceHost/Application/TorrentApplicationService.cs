@@ -21,6 +21,25 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
     StartupRecoveryState startupRecoveryState, ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
 {
+    private static readonly HashSet<string> DashboardLifecycleRecentEventTypes = new(StringComparer.Ordinal)
+    {
+        "service.recovery.completed",
+        "service.startup.ready",
+        "torrent.added",
+        "torrent.removed",
+        "torrent.metadata.resolved",
+        "torrent.metadata.refresh_requested",
+        "torrent.metadata.reset_requested",
+        "torrent.metadata.restart_requested",
+        "torrent.callback.pending_finalization",
+        "torrent.callback.retry_requested",
+        "torrent.callback.invoked",
+        "torrent.callback.failed",
+        "torrent.callback.finalization_timed_out",
+        "torrent.cleanup.auto_removed",
+        "torrent.logs.orphaned_deleted",
+    };
+
     public async Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken cancellationToken)
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
@@ -97,6 +116,60 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             StartupNormalizedTorrentCount = startupRecoveryState.NormalizedTorrentCount,
             StartupRecoveryCompletedAtUtc = startupRecoveryState.CompletedAtUtc,
             CheckedAtUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
+    public async Task<DashboardLifecycleSummaryDto> GetDashboardLifecycleAsync(CancellationToken cancellationToken)
+    {
+        var logs = await activityLogService.GetRecentAsync(
+            new ActivityLogQuery
+            {
+                Take = int.MaxValue,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            },
+            cancellationToken
+        );
+
+        DateTimeOffset? firstEventAtUtc = logs.Count > 0 ? logs[^1].OccurredAtUtc : null;
+        DateTimeOffset? lastEventAtUtc = logs.Count > 0 ? logs[0].OccurredAtUtc : null;
+        var startupReadyAtUtc = logs.FirstOrDefault(log => log.EventType == "service.startup.ready")?.OccurredAtUtc;
+        var recoveryCompletedAtUtc = logs.FirstOrDefault(log => log.EventType == "service.recovery.completed")?.OccurredAtUtc;
+
+        return new DashboardLifecycleSummaryDto
+        {
+            ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            FirstEventAtUtc = firstEventAtUtc,
+            LastEventAtUtc = lastEventAtUtc,
+            StartupReadyAtUtc = startupReadyAtUtc,
+            RecoveryCompletedAtUtc = recoveryCompletedAtUtc,
+            StartupRecoveredTorrentCount = startupRecoveryState.RecoveredTorrentCount,
+            StartupNormalizedTorrentCount = startupRecoveryState.NormalizedTorrentCount,
+            TorrentsAddedCount = logs.Count(log => log.EventType == "torrent.added"),
+            TorrentsRemovedCount = logs.Count(log => log.EventType == "torrent.removed"),
+            MetadataResolvedCount = logs.Count(log => log.EventType == "torrent.metadata.resolved"),
+            MetadataRefreshRequestedCount = logs.Count(log => log.EventType == "torrent.metadata.refresh_requested"),
+            MetadataResetRequestedCount = logs.Count(log => log.EventType == "torrent.metadata.reset_requested"),
+            MetadataRestartRequestedCount = logs.Count(log => log.EventType == "torrent.metadata.restart_requested"),
+            CallbackInvokedCount = logs.Count(log => log.EventType == "torrent.callback.invoked"),
+            CallbackFailedCount = logs.Count(log => log.EventType == "torrent.callback.failed"),
+            CallbackTimedOutCount = logs.Count(log => log.EventType == "torrent.callback.finalization_timed_out"),
+            CompletedAutoRemovedCount = logs.Count(log => log.EventType == "torrent.cleanup.auto_removed"),
+            OrphanedTorrentLogsDeletedCount = logs.Count(log => log.EventType == "torrent.logs.orphaned_deleted"),
+            RecentEvents = logs
+                .Where(log => DashboardLifecycleRecentEventTypes.Contains(log.EventType))
+                .Take(12)
+                .Select(
+                    log => new DashboardLifecycleEventDto
+                    {
+                        OccurredAtUtc = log.OccurredAtUtc,
+                        Level = log.Level.ToString(),
+                        Category = log.Category,
+                        EventType = log.EventType,
+                        Message = log.Message,
+                        TorrentId = log.TorrentId,
+                    }
+                )
+                .ToArray(),
         };
     }
 
