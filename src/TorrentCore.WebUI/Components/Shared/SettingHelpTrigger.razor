@@ -40,7 +40,7 @@ else
     private async Task OpenDialogAsync()
     {
         await DialogService.ShowAsync<SettingHelpDialog>(
-            "Setting Help",
+            "Help",
             new DialogParameters
             {
                 [nameof(SettingHelpDialog.Title)] = Content.Label,

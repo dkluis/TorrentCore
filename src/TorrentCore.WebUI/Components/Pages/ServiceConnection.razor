@@ -16,7 +16,10 @@
                    OnAction="LoadAsync">
             <OperatorCardGrid>
                 <OperatorCard>
-                    <p class="section-card-eyebrow">Current Endpoint</p>
+                    <div class="service-connection-section-header">
+                        <p class="section-card-eyebrow">Current Endpoint</p>
+                        <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.CurrentEndpoint" IconOnly="true" />
+                    </div>
                     <h2 class="tc-break">@(_status?.BaseUrl ?? "Not configured")</h2>
                     <p>
                         Reachability:
@@ -32,39 +35,59 @@
                 </OperatorCard>
 
                 <OperatorCard>
-                    <p class="section-card-eyebrow">Update Endpoint</p>
+                    <div class="service-connection-section-header">
+                        <p class="section-card-eyebrow">Update Endpoint</p>
+                    </div>
+                    <div class="settings-field-block">
+                        <div class="settings-field-labelrow">
+                            <label class="settings-field-label" for="@ServiceBaseUrlInputId">Service Base URL</label>
+                            <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.ServiceBaseUrl" IconOnly="true" />
+                        </div>
+
                     <MudTextField T="string"
-                                  Label="Service Base URL"
+                                  InputId="@ServiceBaseUrlInputId"
                                   Value="_baseUrl"
                                   ValueChanged="OnBaseUrlChanged"
                                   Variant="Variant.Outlined"
                                   Margin="Margin.Dense"
                                   Immediate="true"
                                   Placeholder="http://torrentcore-service.local:5050/" />
+                    </div>
                     <p class="dashboard-panel-copy">Use the host/IP for the machine running `TorrentCore.Service`.</p>
 
-                    <div class="dashboard-inline-actions dashboard-inline-actions--compact">
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   Disabled="@(_isTesting || _isSaving)"
-                                   OnClick="TestAsync">
-                            @(_isTesting ? "Testing..." : "Test")
-                        </MudButton>
-                        <MudButton Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   Size="Size.Small"
-                                   Disabled="@(_isTesting || _isSaving)"
-                                   OnClick="SaveAsync">
-                            @(_isSaving ? "Saving..." : "Save")
-                        </MudButton>
-                        <MudButton Variant="Variant.Outlined"
-                                   Color="Color.Secondary"
-                                   Size="Size.Small"
-                                   Disabled="@(_isTesting || _isSaving)"
-                                   OnClick="RefreshStatusAsync">
-                            Recheck
-                        </MudButton>
+                    <div class="dashboard-inline-actions dashboard-inline-actions--compact service-connection-action-strip">
+                        <div class="service-connection-action">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Disabled="@(_isTesting || _isSaving)"
+                                       OnClick="TestAsync">
+                                @(_isTesting ? "Testing..." : "Test")
+                            </MudButton>
+                            <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.Test" IconOnly="true" />
+                        </div>
+
+                        <div class="service-connection-action">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Small"
+                                       Disabled="@(_isTesting || _isSaving)"
+                                       OnClick="SaveAsync">
+                                @(_isSaving ? "Saving..." : "Save")
+                            </MudButton>
+                            <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.Save" IconOnly="true" />
+                        </div>
+
+                        <div class="service-connection-action">
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Secondary"
+                                       Size="Size.Small"
+                                       Disabled="@(_isTesting || _isSaving)"
+                                       OnClick="RefreshStatusAsync">
+                                Recheck
+                            </MudButton>
+                            <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.Recheck" IconOnly="true" />
+                        </div>
                     </div>
 
                     @if (!string.IsNullOrWhiteSpace(_actionMessage))
@@ -80,6 +103,7 @@
 @code {
     private bool _isTesting;
     private bool _isSaving;
+    private const string ServiceBaseUrlInputId = "service-base-url";
     private string _baseUrl = string.Empty;
     private string? _errorMessage;
     private string? _actionMessage;

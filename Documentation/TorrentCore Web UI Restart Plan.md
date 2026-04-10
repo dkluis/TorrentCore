@@ -36,6 +36,7 @@ Current checkpoint:
 - the settings page now blocks cross-section editing when one group is dirty; clicking another section opens a `Save / Discard / Cancel` decision dialog for the dirty group
 - runtime settings updates now flow through the shared WebUI API adapter, and successful group saves surface toast feedback instead of inline page-only messages
 - the per-setting help icon pattern on the settings page has now been operator-reviewed and is considered part of the current WebUI baseline
+- the `Service Connection` page now also uses the shared help affordance for current endpoint status, the service base URL field, and the `Test` / `Save` / `Recheck` actions
 
 ## Purpose
 
@@ -219,6 +220,7 @@ These rules are now explicit for `TorrentCore.WebUI` settings behavior:
   - short hover/focus summary via `MudTooltip`
   - fuller paragraph via click/tap dialog or popover
   - help text should be sourced from operator documentation language, not invented ad hoc per field
+- This shared help pattern now extends beyond `Settings`; the `Service Connection` page should use the same tooltip-plus-dialog model for its operator-critical controls instead of a separate inline-help approach.
 
 ## TVMaze Baseline Conventions (Captured)
 

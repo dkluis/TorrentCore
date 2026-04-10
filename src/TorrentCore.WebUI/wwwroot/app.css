@@ -840,6 +840,24 @@ h1:focus {
     line-height: 1.45;
 }
 
+.service-connection-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.service-connection-action-strip {
+    row-gap: 0.35rem;
+}
+
+.service-connection-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.12rem;
+}
+
 .dashboard-torrent-submit-grid {
     display: grid;
     gap: 0.5rem;
