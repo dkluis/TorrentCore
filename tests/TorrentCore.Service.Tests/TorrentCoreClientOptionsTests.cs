@@ -5,13 +5,13 @@ namespace TorrentCore.Service.Tests;
 public sealed class TorrentCoreClientOptionsTests
 {
     [Fact]
-    public void ToUri_ReturnsUri_ForValidHttpsBaseUrl()
+    public void ToUri_ReturnsUri_ForValidHttpBaseUrl()
     {
-        var options = new TorrentCoreClientOptions {BaseUrl = "https://localhost:7033/"};
+        var options = new TorrentCoreClientOptions {BaseUrl = "http://localhost:7033/"};
 
         var result = options.ToUri();
 
-        Assert.Equal("https://localhost:7033/", result.ToString());
+        Assert.Equal("http://localhost:7033/", result.ToString());
     }
 
     [Fact]
