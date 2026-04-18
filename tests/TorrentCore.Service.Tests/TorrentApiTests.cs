@@ -732,6 +732,68 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_StartupRecovery_DoesNotRequeuePersistedFinishedTorrent_WhenCacheIsMissing()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-finished-recovery");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var cachePath = Path.Combine(storagePath, "monotorrent-cache");
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+            var addResponse = await AddMagnetAsync(httpClient, "7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B", "MonoTorrent Finished Recovery");
+            var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            torrentId = addedTorrent!.TorrentId;
+        }
+
+        var completedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5);
+        await ForcePersistedFinishedTorrentSnapshotAsync(
+            storagePath,
+            torrentId,
+            TorrentState.Seeding,
+            TorrentDesiredState.Runnable,
+            completedAtUtc);
+
+        if (Directory.Exists(cachePath))
+        {
+            Directory.Delete(cachePath, recursive: true);
+        }
+
+        await using (var factory = CreateFactory(
+                         engineMode: TorrentEngineMode.MonoTorrent,
+                         downloadPath: downloadPath,
+                         storagePath: storagePath))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var recoveredTorrent = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                torrent => torrent is not null && torrent.State == TorrentState.Completed,
+                timeout: TimeSpan.FromSeconds(5));
+
+            await Task.Delay(500);
+            var stableTorrent = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}");
+            var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={torrentId}");
+
+            Assert.NotNull(recoveredTorrent);
+            Assert.Equal(100, recoveredTorrent.ProgressPercent);
+            Assert.Equal(1_048_576, recoveredTorrent.DownloadedBytes);
+            Assert.NotNull(recoveredTorrent.CompletedAtUtc);
+            Assert.Equal(TorrentState.Completed, stableTorrent!.State);
+            Assert.Null(stableTorrent.WaitReason);
+            Assert.Equal(0, stableTorrent.DownloadRateBytesPerSecond);
+
+            Assert.NotNull(logs);
+            Assert.Contains(logs, log => log.EventType == "torrent.recovery.normalized" && log.TorrentId == torrentId);
+        }
+    }
+
+    [Fact]
     public async Task MonoTorrentEngine_ResumePausedQueuedTorrent_WaitsForMetadataSlot_WhenCapacityIsFull()
     {
         await using var factory = CreateFactory(
@@ -934,7 +996,7 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
-    public async Task MonoTorrentEngine_PendingFinalization_OnRecovery_WaitsForVisibilityThenInvokesCallback()
+    public async Task MonoTorrentEngine_PendingFinalization_OnRecovery_WaitsForVisibilityThenInvokesCallback_AndRemovesTorrentTracking()
     {
         var rootPath = CreateTempRootPath("torrentcore-monotorrent-callback-pending");
         var downloadPath = Path.Combine(rootPath, "downloads");
@@ -999,14 +1061,18 @@ public sealed class TorrentApiTests
                 invocations => invocations.Count == 1,
                 timeout: TimeSpan.FromSeconds(5));
 
-            var invokedTorrent = await WaitForAsync(
-                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
-                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+            var missingStatusCode = await WaitForAsync(
+                async () => await GetTorrentStatusCodeAsync(httpClient, torrentId),
+                statusCode => statusCode == HttpStatusCode.NotFound,
                 timeout: TimeSpan.FromSeconds(5));
 
-            Assert.NotNull(invokedTorrent);
-            Assert.False(invokedTorrent.CanRetryCompletionCallback);
-            Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+            var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+            Assert.Equal(HttpStatusCode.NotFound, missingStatusCode);
+            Assert.NotNull(torrents);
+            Assert.DoesNotContain(torrents, torrent => torrent.TorrentId == torrentId);
+            Assert.True(File.Exists(finalPayloadPath));
+            Assert.False(await ReadPersistedTorrentExistsAsync(storagePath, torrentId));
 
             var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={torrentId}");
             Assert.NotNull(logs);
@@ -1015,7 +1081,7 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
-    public async Task MonoTorrentEngine_RetryCompletionCallback_RequeuesTimedOutState_AndInvokesWhenPayloadAppears()
+    public async Task MonoTorrentEngine_RetryCompletionCallback_RequeuesTimedOutState_AndInvokesWhenPayloadAppears_AndRemovesTorrentTracking()
     {
         var rootPath = CreateTempRootPath("torrentcore-monotorrent-callback-retry");
         var downloadPath = Path.Combine(rootPath, "downloads");
@@ -1090,13 +1156,18 @@ public sealed class TorrentApiTests
                 invocations => invocations.Count == 1,
                 timeout: TimeSpan.FromSeconds(5));
 
-            var invokedTorrent = await WaitForAsync(
-                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
-                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+            var missingStatusCode = await WaitForAsync(
+                async () => await GetTorrentStatusCodeAsync(httpClient, torrentId),
+                statusCode => statusCode == HttpStatusCode.NotFound,
                 timeout: TimeSpan.FromSeconds(5));
 
-            Assert.NotNull(invokedTorrent);
-            Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+            var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+            Assert.Equal(HttpStatusCode.NotFound, missingStatusCode);
+            Assert.NotNull(torrents);
+            Assert.DoesNotContain(torrents, torrent => torrent.TorrentId == torrentId);
+            Assert.True(File.Exists(finalPayloadPath));
+            Assert.False(await ReadPersistedTorrentExistsAsync(storagePath, torrentId));
 
             var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={torrentId}");
             Assert.NotNull(logs);
@@ -2582,6 +2653,12 @@ public sealed class TorrentApiTests
         });
     }
 
+    private static async Task<HttpStatusCode> GetTorrentStatusCodeAsync(HttpClient httpClient, Guid torrentId)
+    {
+        using var response = await httpClient.GetAsync($"api/torrents/{torrentId}");
+        return response.StatusCode;
+    }
+
     private static async Task ForcePersistedTorrentSnapshotAsync(
         string storagePath,
         Guid torrentId,
@@ -2612,6 +2689,46 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue("$state", state.ToString());
         command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
         command.Parameters.AddWithValue("$error_message", (object?)errorMessage ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ForcePersistedFinishedTorrentSnapshotAsync(
+        string storagePath,
+        Guid torrentId,
+        TorrentState state,
+        TorrentDesiredState desiredState,
+        DateTimeOffset completedAtUtc)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE torrents
+            SET
+                state = $state,
+                desired_state = $desired_state,
+                progress_percent = 100,
+                downloaded_bytes = 1048576,
+                total_bytes = 1048576,
+                download_rate_bytes_per_second = 0,
+                upload_rate_bytes_per_second = 0,
+                connected_peer_count = 0,
+                error_message = NULL,
+                completed_at_utc = $completed_at_utc,
+                seeding_started_at_utc = $completed_at_utc,
+                completion_callback_state = NULL,
+                completion_callback_pending_since_utc = NULL,
+                completion_callback_invoked_at_utc = NULL,
+                completion_callback_last_error = NULL
+            WHERE torrent_id = $torrent_id;
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$state", state.ToString());
+        command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
+        command.Parameters.AddWithValue("$completed_at_utc", completedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         await command.ExecuteNonQueryAsync();
     }
 
@@ -2796,6 +2913,27 @@ public sealed class TorrentApiTests
             reader.IsDBNull(1) ? null : DateTimeOffset.Parse(reader.GetString(1), System.Globalization.CultureInfo.InvariantCulture),
             reader.IsDBNull(2) ? null : DateTimeOffset.Parse(reader.GetString(2), System.Globalization.CultureInfo.InvariantCulture),
             reader.IsDBNull(3) ? null : reader.GetString(3));
+    }
+
+    private static async Task<bool> ReadPersistedTorrentExistsAsync(string storagePath, Guid torrentId)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT EXISTS(
+                SELECT 1
+                FROM torrents
+                WHERE torrent_id = $torrent_id
+            );
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+
+        var result = await command.ExecuteScalarAsync();
+        return result is not null && Convert.ToInt32(result, System.Globalization.CultureInfo.InvariantCulture) == 1;
     }
 
     private static IReadOnlyList<IReadOnlyDictionary<string, string>> ReadCallbackInvocations(string outputPath)
