@@ -749,39 +749,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         paths.Add(Path.GetFullPath(path));
     }
 
-    private async Task RemoveCallbackInvokedTorrentAsync(TorrentSnapshot snapshot, TorrentManager manager,
-        CancellationToken                                             cancellationToken)
-    {
-        await RemoveManagedTorrentAsync(snapshot.TorrentId, manager, deleteData: false, cancellationToken);
-        await torrentStateStore.DeleteAsync(snapshot.TorrentId, cancellationToken);
-
-        await activityLogService.WriteAsync(
-            new ActivityLogWriteRequest
-            {
-                Level     = ActivityLogLevel.Information,
-                Category  = "torrent",
-                EventType = "torrent.callback.auto_removed",
-                Message =
-                        $"Removed torrent '{snapshot.Name}' from TorrentCore tracking after completion callback.",
-                TorrentId         = snapshot.TorrentId,
-                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                DetailsJson = JsonSerializer.Serialize(
-                    new
-                    {
-                        snapshot.Name,
-                        snapshot.CategoryKey,
-                        snapshot.InfoHash,
-                        snapshot.DownloadRootPath,
-                        snapshot.SavePath,
-                        snapshot.CompletedAtUtc,
-                        snapshot.CompletionCallbackInvokedAtUtc,
-                        DeleteData = false,
-                    }
-                ),
-            }, cancellationToken
-        );
-    }
-
     private async Task RemoveManagedTorrentAsync(Guid torrentId, TorrentManager manager, bool deleteData,
         CancellationToken                              cancellationToken)
     {
@@ -1096,12 +1063,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             await torrentStateStore.UpdateAsync(callbackSnapshot, cancellationToken);
-
-            if (callbackSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.Invoked &&
-                manager is not null)
-            {
-                await RemoveCallbackInvokedTorrentAsync(callbackSnapshot, manager, cancellationToken);
-            }
         }
     }
 
