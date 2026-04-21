@@ -82,6 +82,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 return;
             }
 
+            await FlushManagedSnapshotsForShutdownAsync(cancellationToken);
+
             foreach (var manager in _managers.Values)
             {
                 try
@@ -936,6 +938,45 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await ReconcileDownloadQueueAsync(managedTorrents, runtimeSettings.MaxActiveDownloads, now, cancellationToken);
     }
 
+    private async Task FlushManagedSnapshotsForShutdownAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        foreach (var (torrentId, manager) in _managers)
+        {
+            try
+            {
+                var snapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+                if (snapshot is null)
+                {
+                    continue;
+                }
+
+                var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
+                if (ShouldPreservePersistedCompletion(snapshot, manager))
+                {
+                    updatedSnapshot = CreateRecoveredCompletedSnapshot(snapshot, updatedSnapshot, now);
+                }
+
+                if (manager.Complete && updatedSnapshot.ProgressPercent >= 100d &&
+                    updatedSnapshot.State == ContractTorrentState.Queued)
+                {
+                    updatedSnapshot = CreateRecoveredCompletedSnapshot(updatedSnapshot, updatedSnapshot, now);
+                }
+
+                await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "Failed flushing MonoTorrent manager {TorrentId} before shutdown", torrentId);
+            }
+        }
+    }
+
     private async Task<List<(TorrentSnapshot Snapshot, TorrentManager Manager)>> GetManagedTorrentsAsync(
         CancellationToken cancellationToken)
     {
@@ -1020,7 +1061,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
             var previousCompletedAtUtc = snapshot.CompletedAtUtc;
             var observedFiles = GetObservedFilePaths(entry.Value);
-            await TryDeleteStalePartialFilesAsync(updatedSnapshot, observedFiles, cancellationToken);
             var finalizationResult = CreateFinalizationCheckResult(updatedSnapshot, runtimeSettings, observedFiles);
             await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
                 previousCompletedAtUtc, updatedSnapshot, runtimeSettings, now, cancellationToken, finalizationResult
@@ -1053,7 +1093,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             var manager = managers.FirstOrDefault(entry => entry.Key == callbackSnapshot.TorrentId).Value;
             var observedFiles = GetObservedFilePaths(manager);
-            await TryDeleteStalePartialFilesAsync(callbackSnapshot, observedFiles, cancellationToken);
             if (!await completionCallbackProcessor.ProcessPendingAsync(
                         callbackSnapshot, runtimeSettings, now, cancellationToken,
                         CreateFinalizationCheckResult(callbackSnapshot, runtimeSettings, observedFiles)
@@ -2395,63 +2434,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return observedFiles;
     }
 
-    private async Task TryDeleteStalePartialFilesAsync(TorrentSnapshot snapshot,
-        IReadOnlyList<TorrentCompletionObservedFilePaths>? observedFiles, CancellationToken cancellationToken)
-    {
-        if (!snapshot.InvokeCompletionCallback || observedFiles is not { Count: > 0 })
-        {
-            return;
-        }
-
-        foreach (var observedFile in observedFiles)
-        {
-            if (string.IsNullOrWhiteSpace(observedFile.IncompletePath) ||
-                PathsEqual(observedFile.CompletePath, observedFile.IncompletePath) ||
-                !PathsEqual(observedFile.ActivePath, observedFile.CompletePath) ||
-                !File.Exists(observedFile.CompletePath) ||
-                !File.Exists(observedFile.IncompletePath))
-            {
-                continue;
-            }
-
-            try
-            {
-                File.Delete(observedFile.IncompletePath);
-
-                await activityLogService.WriteAsync(
-                    new ActivityLogWriteRequest
-                    {
-                        Level             = ActivityLogLevel.Information,
-                        Category          = "torrent",
-                        EventType         = "torrent.callback.stale_partial_deleted",
-                        Message           = $"Deleted stale partial file after MonoTorrent promoted the final payload for torrent '{snapshot.Name}'.",
-                        TorrentId         = snapshot.TorrentId,
-                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                        DetailsJson = JsonSerializer.Serialize(
-                            new
-                            {
-                                snapshot.Name,
-                                observedFile.ActivePath,
-                                observedFile.CompletePath,
-                                observedFile.IncompletePath,
-                            }
-                        ),
-                    }, cancellationToken
-                );
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                logger.LogWarning(
-                    exception,
-                    "Failed deleting stale partial file for torrent {TorrentId} ({TorrentName}) at {PartialPath}",
-                    snapshot.TorrentId,
-                    snapshot.Name,
-                    observedFile.IncompletePath
-                );
-            }
-        }
-    }
-
     private static bool ShouldAutoRequeueFinalizationTimeout(TorrentSnapshot snapshot,
         TorrentCompletionFinalizationCheckResult finalizationResult)
     {
@@ -2460,20 +2442,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLastError) &&
                TorrentCompletionCallbackDiagnostics.IsFinalizationVisibilityTimeout(snapshot.CompletionCallbackLastError) &&
                finalizationResult.IsReady;
-    }
-
-    private static bool PathsEqual(string? left, string? right)
-    {
-        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
-        {
-            return false;
-        }
-
-        var comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal;
-
-        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), comparison);
     }
 
     private async Task<TorrentManager?> TryGetManagerAsync(Guid torrentId, CancellationToken cancellationToken)
