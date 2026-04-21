@@ -534,6 +534,8 @@ Applies:
 TorrentCore currently uses MonoTorrent partial-file behavior:
 - incomplete files use `.!mt`
 - completed files lose the `.!mt` suffix
+- TorrentCore observes these paths to decide when a callback can safely run, but it does not delete partial files or final media files during callback finalization.
+- Cleanup of leftover non-media files or directories should be handled by the configured callback app or by an explicit operator cleanup policy, not by the finalization wait loop.
 
 ## Restart Semantics
 

@@ -96,6 +96,7 @@ Finalization check guidance:
 - if it resolves to a directory, TorrentCore should recursively scan that subtree and wait until no partial-suffix files remain
 - when MonoTorrent exposes exact per-file complete/incomplete paths for the active torrent, TorrentCore should prefer those engine-reported paths over a reconstructed `TR_TORRENT_NAME` guess when deciding whether a single-file payload is really finalized
 - when MonoTorrent also reports that the file's current active path is already the complete path, a leftover `.!mt` sibling should be treated as stale cleanup residue rather than proof that the payload is still incomplete
+- TorrentCore must not delete partial files, final media files, or other payload-side artifacts as part of callback finalization; cleanup of non-media residue belongs to the shared callback app or a separate explicit cleanup policy
 - TorrentCore should persist a generic callback lifecycle state such as `PendingFinalization`, `Invoked`, `Failed`, or `TimedOut` so restart recovery does not confuse transfer state with callback state
 - if the callback process itself fails or times out after starting, TorrentCore should not present that as another finalization-visibility timeout; if the source path disappears during the callback attempt, diagnostics should say that the callback may already have moved the payload
 - TorrentCore should not persist TVMaze-specific outcome states; TVMaze ownership remains outside the TorrentCore boundary
