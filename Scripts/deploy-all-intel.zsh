@@ -29,16 +29,6 @@ SERVICE_PUBLISH_DIR="${PUBLISH_ROOT}/service"
 WEBUI_PUBLISH_DIR="${PUBLISH_ROOT}/webui"
 TARGET_SCRIPT_DIR="${TORRENTCORE_DEPLOY_BASE}/Scripts"
 
-if [[ "${RESTART_AFTER_DEPLOY}" == true ]]; then
-  if [[ -x "${TARGET_SCRIPT_DIR}/stop-webui.zsh" ]]; then
-    "${TARGET_SCRIPT_DIR}/stop-webui.zsh"
-  fi
-
-  if [[ -x "${TARGET_SCRIPT_DIR}/stop-service.zsh" ]]; then
-    "${TARGET_SCRIPT_DIR}/stop-service.zsh"
-  fi
-fi
-
 tc_log_info "Publishing TorrentCore.Service for ${TORRENTCORE_PUBLISH_RUNTIME}."
 tc_publish_project "src/TorrentCore.ServiceHost/TorrentCore.Service.csproj" "${SERVICE_PUBLISH_DIR}"
 
@@ -55,8 +45,8 @@ tc_log_info "Syncing scripts."
 tc_sync_scripts_to_target
 
 if [[ "${RESTART_AFTER_DEPLOY}" == true ]]; then
-  "${TARGET_SCRIPT_DIR}/start-service.zsh"
-  "${TARGET_SCRIPT_DIR}/start-webui.zsh"
+  "${TARGET_SCRIPT_DIR}/install-launch-agents.zsh" all
+  "${TARGET_SCRIPT_DIR}/ManageTorrentCoreLaunchAgents.zsh" restart all
 fi
 
 tc_log_info "Combined Intel deployment complete."

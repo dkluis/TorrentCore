@@ -1,7 +1,7 @@
 # TorrentCore Scripts
 
 This folder contains:
-- runtime control scripts intended to live on the deployed host under `~/TorrentCore/Scripts`
+- runtime launch-agent scripts intended to live on the deployed host under `~/TorrentCore/Scripts`
 - deploy scripts intended to run from the repo on the development machine and sync to either the Intel or Arm deployment target
 - one ARM desktop deploy script for the Avalonia app that publishes and bundles a macOS `.app`
 
@@ -9,16 +9,16 @@ This folder contains:
 
 These scripts have two roles:
 - `deploy-*.zsh` scripts are publish-and-copy scripts
-- `start/stop/restart-*.zsh` scripts are host-local runtime control scripts
+- `ManageTorrentCoreLaunchAgents.zsh`, `install-launch-agents.zsh`, and `agentstatus.zsh` are host-local runtime control scripts
 
 Important rule:
 - deploy scripts can be run from any machine that has the repo, `dotnet`, `rsync`, and write access to the target path
-- runtime start/stop/restart scripts should be run on the machine that is actually running TorrentCore
+- runtime launch-agent scripts should be run on the machine that is actually running TorrentCore
 - deploy scripts are intentionally not copied into the target host `~/TorrentCore/Scripts` directory
 
 Current limitation:
 - if you run a deploy script from one machine against another machine's mounted share, the `--restart` flag is not a true remote restart
-- in that case the deploy should be run without `--restart`, and the target host should run its own local restart scripts afterward
+- in that case the deploy should be run without `--restart`, and the target host should run its own local launch-agent install or restart command afterward
 
 ## Runtime Script Layout
 
@@ -30,12 +30,11 @@ Expected sibling layout on the target host:
 The runtime scripts infer those sibling paths automatically from their own location.
 
 What is copied to the target host `Scripts` directory:
-- `start-service.zsh`
-- `stop-service.zsh`
-- `restart-service.zsh`
-- `start-webui.zsh`
-- `stop-webui.zsh`
-- `restart-webui.zsh`
+- `ManageTorrentCoreLaunchAgents.zsh`
+- `install-launch-agents.zsh`
+- `agentstatus.zsh`
+- `com.torrentcore.service.plist`
+- `com.torrentcore.webui.plist`
 - `lib/torrentcore-common.zsh`
 - `torrentcore.env.example`
 - `README.md`
@@ -44,29 +43,45 @@ What is not copied to the target host:
 - `deploy-*.zsh`
 
 Desktop app note:
-- `TorrentCore.Avalonia` is not managed through the start/stop/restart runtime scripts
+- `TorrentCore.Avalonia` is not managed through the launch-agent scripts
 - its deploy script builds a macOS `.app` bundle for ARM Macs instead
 
 ## Runtime Files
 
-The scripts create:
-- `Scripts/run/service.pid`
-- `Scripts/run/webui.pid`
-- `Scripts/logs/service.log`
-- `Scripts/logs/webui.log`
+The launch-agent installer creates:
+- `~/Library/LaunchAgents/com.torrentcore.service.plist`
+- `~/Library/LaunchAgents/com.torrentcore.webui.plist`
+- `~/TorrentCore/Logs/TorrentCore.Service.launchd.out.log`
+- `~/TorrentCore/Logs/TorrentCore.Service.launchd.err.log`
+- `~/TorrentCore/Logs/TorrentCore.WebUI.launchd.out.log`
+- `~/TorrentCore/Logs/TorrentCore.WebUI.launchd.err.log`
+- `~/TorrentCore/Logs/LaunchAgents.console.log`
+- `~/TorrentCore/Logs/LaunchAgents.errors.log`
+
+The launch agents run the published executables directly:
+- `~/TorrentCore/Service/TorrentCore.Service`
+- `~/TorrentCore/WebUI/TorrentCore.WebUI`
 
 ## Runtime Commands
 
 From `~/TorrentCore/Scripts` on the target host:
 
 ```bash
-./start-service.zsh
-./stop-service.zsh
-./restart-service.zsh
+./install-launch-agents.zsh all
+./ManageTorrentCoreLaunchAgents.zsh start all
+./ManageTorrentCoreLaunchAgents.zsh stop all
+./ManageTorrentCoreLaunchAgents.zsh restart all
+./agentstatus.zsh
+```
 
-./start-webui.zsh
-./stop-webui.zsh
-./restart-webui.zsh
+Service-specific and WebUI-specific control:
+
+```bash
+./install-launch-agents.zsh service
+./install-launch-agents.zsh webui
+
+./ManageTorrentCoreLaunchAgents.zsh restart service
+./ManageTorrentCoreLaunchAgents.zsh restart webui
 ```
 
 ## Deploy Commands
@@ -91,6 +106,7 @@ Optional restart during deploy:
 ```
 
 Use `--restart` only when the deploy script is being run on the same host that will run TorrentCore.
+When `--restart` is used, the deploy now reinstalls the affected launch agents and restarts them through `launchctl`.
 
 Desktop app deploy:
 
@@ -109,24 +125,24 @@ That script:
 For cross-machine deploy over a mounted share:
 1. run the deploy script without `--restart`
 2. log onto the target host
-3. run the target host's local restart scripts
+3. run the target host's local launch-agent install or restart command
 
 Example on the target host:
 
 ```bash
 cd ~/TorrentCore/Scripts
-./restart-service.zsh
-./restart-webui.zsh
+./install-launch-agents.zsh all
+./ManageTorrentCoreLaunchAgents.zsh restart all
 ```
 
 ## Environment Overrides
 
-Copy [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example) to `Scripts/torrentcore.env` and edit the values you need.
+Copy [torrentcore.env.example](/Volumes/HD-Desktop-Dev-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example) to `Scripts/torrentcore.env` and edit the values you need.
 
 First-start rule:
 - every deployed host should create its own `~/TorrentCore/Scripts/torrentcore.env`
 - do not rely on the script built-in defaults for a real deployed host
-- if `torrentcore.env` is missing, the start scripts now log a warning and fall back to the built-in loopback defaults
+- if `torrentcore.env` is missing, the launch-agent installer logs a warning and falls back to the built-in loopback defaults
 
 Recommended host profile for a LAN-accessible Web UI with a local-only service:
 
@@ -142,58 +158,6 @@ If you also want remote API access or remote Avalonia clients to hit that host's
 TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033
 ```
 
-# Completion Callback Contract
-
-## Purpose
-TorrentCore invokes an external callback script when a torrent completes downloading.
-This allows integration with downstream systems (e.g., TVMaze) without coupling TorrentCore to their internals.
-
-## Invocation Trigger
-The callback is invoked **once** when a torrent transitions to completed state:
-- `CompletedAtUtc` changes from null to a value
-- `State` is `Completed` or `Seeding`
-- `InvokeCompletionCallback` is true
-- `CompletionCallbackLabel` is non-empty
-
-## Environment Variables
-The callback script receives the following environment variables:
-
-| Variable | Source | Example |
-|----------|--------|---------|
-| `TR_TORRENT_HASH` | InfoHash | `abc123...` |
-| `TR_TORRENT_NAME` | Torrent name | `Show.S01E01.1080p` |
-| `TR_TORRENT_DIR` | Download root path | `/downloads/tv` |
-| `TR_TORRENT_LABELS` | Category callback label | `TV` |
-| `TORRENTCORE_FINAL_PAYLOAD_PATH` | Exact validated final payload path | `/downloads/tv/Show.S01E01.1080p.mkv` |
-| `TVMAZE_API_COMPLETE_URL` | Optional API override | `https://api.example.com` |
-| `TVMAZE_API_COMPLETE_API_KEY` | Optional API key override | `secret123` |
-
-Note: `TR_TORRENT_ID` is always `"0"` (reserved for future use).
-
-## Exit Code Contract
-- **0**: Success - callback processed the completion
-- **Non-zero**: Failure - callback encountered an error
-
-Failed callbacks are logged but **not retried automatically**.
-
-## Timeout
-Callbacks must complete within `CompletionCallbackTimeoutSeconds` (configurable, default TBD).
-Timed-out processes are killed and logged as warnings.
-
-## Failure Handling
-- Launch failures, timeouts, and non-zero exits are logged to the activity log
-- No automatic retries
-- Operators can manually re-invoke via [TBD: API endpoint or UI action]
-
-## Category Mapping
-Each category defines its own `CallbackLabel`:
-- `TV` → `"TV"`
-- `Movie` → `"Movie"`
-- `Audiobook` → `"Audiobook"`
-- `Music` → `"Music"`
-
-The label is passed to the callback script via `TR_TORRENT_LABELS` for routing logic.
-
 Useful overrides:
 - `TORRENTCORE_DEPLOY_BASE`
 - `TORRENTCORE_DEPLOY_BASE_INTEL`
@@ -202,6 +166,10 @@ Useful overrides:
 - `TORRENTCORE_SERVICE_URLS`
 - `TORRENTCORE_WEBUI_URLS`
 - `TORRENTCORE_WEBUI_SERVICE_BASE_URL`
+- `TORRENTCORE_LAUNCH_AGENT_TARGET_DIR`
+- `TORRENTCORE_LAUNCH_AGENT_LOG_DIR`
+- `TORRENTCORE_SERVICE_LAUNCH_LABEL`
+- `TORRENTCORE_WEBUI_LAUNCH_LABEL`
 - `TORRENTCORE_PUBLISH_CONFIGURATION`
 - `TORRENTCORE_PUBLISH_RUNTIME`
 - `TORRENTCORE_PUBLISH_RUNTIME_INTEL`
@@ -214,10 +182,10 @@ Useful overrides:
 
 ## Remote Web Access
 
-The built-in script defaults are loopback-only:
+The built-in script defaults are loopback-only for the service and loopback-only unless overridden for the Web UI:
 - service: `http://127.0.0.1:7033`
 - web UI: `http://127.0.0.1:7053`
 
 Those defaults are only a fallback. Real deployed hosts should use `torrentcore.env`.
 
-After changing network bindings in `torrentcore.env`, restart the affected process.
+After changing network bindings in `torrentcore.env`, rerun `./install-launch-agents.zsh all` so the regenerated plists carry the updated environment.

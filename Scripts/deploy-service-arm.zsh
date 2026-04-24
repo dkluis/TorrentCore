@@ -28,10 +28,6 @@ PUBLISH_DIR="${REPO_ROOT}/artifacts/publish/${TORRENTCORE_ARTIFACT_SEGMENT}/serv
 TARGET_SERVICE_DIR="${TORRENTCORE_DEPLOY_BASE}/Service"
 TARGET_SCRIPT_DIR="${TORRENTCORE_DEPLOY_BASE}/Scripts"
 
-if [[ "${RESTART_AFTER_DEPLOY}" == true && -x "${TARGET_SCRIPT_DIR}/stop-service.zsh" ]]; then
-  "${TARGET_SCRIPT_DIR}/stop-service.zsh"
-fi
-
 tc_log_info "Publishing TorrentCore.Service for ${TORRENTCORE_PUBLISH_RUNTIME}."
 tc_publish_project "src/TorrentCore.ServiceHost/TorrentCore.Service.csproj" "${PUBLISH_DIR}"
 
@@ -42,7 +38,8 @@ tc_log_info "Syncing scripts to ${TARGET_SCRIPT_DIR}."
 tc_sync_scripts_to_target
 
 if [[ "${RESTART_AFTER_DEPLOY}" == true ]]; then
-  "${TARGET_SCRIPT_DIR}/start-service.zsh"
+  "${TARGET_SCRIPT_DIR}/install-launch-agents.zsh" service
+  "${TARGET_SCRIPT_DIR}/ManageTorrentCoreLaunchAgents.zsh" restart service
 fi
 
 tc_log_info "Arm service deployment complete."

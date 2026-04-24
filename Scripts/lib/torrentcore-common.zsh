@@ -34,6 +34,10 @@ fi
 : "${TORRENTCORE_AVALONIA_ICON_PATH:=}"
 : "${TORRENTCORE_AVALONIA_ICON_NAME:=TorrentCore.icns}"
 : "${TORRENTCORE_ARTIFACT_SEGMENT:=intel}"
+: "${TORRENTCORE_LAUNCH_AGENT_TARGET_DIR:=${HOME}/Library/LaunchAgents}"
+: "${TORRENTCORE_LAUNCH_AGENT_LOG_DIR:=${HOME}/TorrentCore/Logs}"
+: "${TORRENTCORE_SERVICE_LAUNCH_LABEL:=com.torrentcore.service}"
+: "${TORRENTCORE_WEBUI_LAUNCH_LABEL:=com.torrentcore.webui}"
 
 tc_timestamp() {
   date '+%Y-%m-%d %H:%M:%S'
@@ -112,6 +116,18 @@ tc_log_webui_runtime_configuration() {
     tc_log_warn "TorrentCore.WebUI is bound to loopback only. Other machines will not be able to open the Web UI."
     tc_log_warn "For LAN browser access, set TORRENTCORE_WEBUI_URLS=http://0.0.0.0:7053 in torrentcore.env and restart the Web UI."
   fi
+}
+
+tc_launchd_domain() {
+  print -- "gui/$(id -u)"
+}
+
+tc_service_program_path() {
+  print -- "${TORRENTCORE_DEPLOY_BASE}/Service/TorrentCore.Service"
+}
+
+tc_webui_program_path() {
+  print -- "${TORRENTCORE_DEPLOY_BASE}/WebUI/TorrentCore.WebUI"
 }
 
 tc_warn_if_target_env_file_missing() {
