@@ -91,6 +91,7 @@ Behavior:
 - if a saved override exists, that override wins
 - if the current endpoint is unreachable, normal app pages are gated and the operator is sent to `Service Connection`
 - saving a new endpoint updates the Web host immediately after the health check passes
+- the `Service Connection` page can also request a service restart through the service API when the backend is currently reachable
 
 Persistence:
 - saved file: `src/TorrentCore.WebUI/Config/service-connection.json` in repo/dev scenarios
@@ -156,4 +157,6 @@ Normal Web service target in this case:
 - Prefer stable hostnames over raw IP addresses when the LAN supports it.
 - If the service moves to a new machine or port, use the UI connection flow rather than changing source-controlled defaults.
 - Restart is not required for the current runtime endpoint change flow; the updated endpoint is applied immediately after a successful health check.
+- The `Restart Service` action on the `Service Connection` page is intended for process recycling, not endpoint changes.
+- After a restart request, the WebUI may reconnect automatically after a short outage window, but a manual browser refresh can still be necessary in some cases.
 - Changing listen bindings such as `ASPNETCORE_URLS` is still a host-process configuration change and therefore still requires restarting that server process.

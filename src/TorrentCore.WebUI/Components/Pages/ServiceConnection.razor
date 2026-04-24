@@ -87,6 +87,7 @@
                                        OnClick="RestartServiceAsync">
                                 @(_isRestarting ? "Restarting..." : "Restart Service")
                             </MudButton>
+                            <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.RestartService" IconOnly="true" />
                         </div>
 
                         <div class="operator-action-with-help">
@@ -105,6 +106,11 @@
                     {
                         <p class="@GetActionMessageClass()">@_actionMessage</p>
                     }
+
+                    <div class="service-connection-restart-help">
+                        <span class="dashboard-panel-copy">Need to recycle the backend process?</span>
+                        <SettingHelpTrigger Content="@ServiceConnectionHelpCatalog.RestartService" IconOnly="true" />
+                    </div>
                 </OperatorCard>
             </OperatorCardGrid>
         </StateView>

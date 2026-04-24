@@ -26,6 +26,12 @@ public static class ServiceConnectionHelpCatalog
         "Save writes the endpoint to `Config/service-connection.json` for this TorrentCore.WebUI host. If the saved endpoint is reachable, the WebUI immediately starts using it for later API calls. If the endpoint cannot be reached, TorrentCore.WebUI reports the failure instead of silently switching to a broken target."
     );
 
+    public static readonly SettingHelpContent RestartService = new(
+        "Restart Service",
+        "Requests a launchctl restart of TorrentCore.Service through the service API.",
+        "Use Restart Service when the service process needs to be recycled without logging onto the host and running the launch-agent scripts manually. The WebUI asks for confirmation first, then the current service instance schedules its own launchctl restart and returns before the process is recycled. The API may be unavailable briefly during the restart window. TorrentCore.WebUI attempts to detect recovery automatically, but a manual browser refresh may still be needed if reconnect does not recover cleanly."
+    );
+
     public static readonly SettingHelpContent Recheck = new(
         "Recheck",
         "Retests the currently saved endpoint without changing the stored value.",

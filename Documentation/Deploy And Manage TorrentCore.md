@@ -8,6 +8,7 @@ It covers:
 - publishing and deploying the Service and WebUI
 - installing the `launchd` agents
 - start, stop, restart, and status commands
+- the WebUI service restart action
 - the expected file layout and runtime logs
 
 ## Runtime Model
@@ -34,6 +35,7 @@ Important behavior:
 - `install-launch-agents.zsh` installs the plists and starts the agents automatically
 - you do not need to run a separate `start` command after a normal install
 - `ManageTorrentCoreLaunchAgents.zsh` exists for explicit operator control after install
+- the WebUI `Service Connection` page can request a service restart through the service API
 
 ## Expected Target Layout
 
@@ -219,6 +221,22 @@ Behavior note:
 - if you stop an agent before reboot, it should stay stopped after reboot/login
 - if an agent is installed and enabled and you do not stop it first, it should start again at next user login
 
+## WebUI Restart Service Button
+
+`TorrentCore.WebUI` now exposes a `Restart Service` button on the `Service Connection` page.
+
+The button behavior is:
+- asks for operator confirmation first
+- calls the TorrentCore service API rather than running `launchctl` from the browser host
+- the current service instance schedules its own `launchctl kickstart -k` restart asynchronously
+- the UI expects a brief outage window while the service process recycles
+- the UI polls for recovery for a short period
+- if reconnect does not settle cleanly, the operator may still need to refresh the browser manually
+
+Operational intent:
+- use the WebUI button for normal remote operator restart requests
+- use `ManageTorrentCoreLaunchAgents.zsh` when you are already on the runtime host or need explicit low-level control
+
 ## Status Commands
 
 Show current launch-agent status:
@@ -274,6 +292,12 @@ cd ~/TorrentCore/Scripts
 ./ManageTorrentCoreLaunchAgents.zsh restart service
 ./ManageTorrentCoreLaunchAgents.zsh restart webui
 ```
+
+Typical remote operator action from the browser:
+- open `Service Connection`
+- confirm `Restart Service`
+- wait briefly for reconnect
+- refresh the browser manually if the reconnect banner or page state does not settle on its own
 
 Typical full refresh after code changes:
 

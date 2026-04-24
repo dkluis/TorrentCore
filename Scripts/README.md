@@ -11,6 +11,10 @@ These scripts have two roles:
 - `deploy-*.zsh` scripts are publish-and-copy scripts
 - `ManageTorrentCoreLaunchAgents.zsh`, `install-launch-agents.zsh`, and `agentstatus.zsh` are host-local runtime control scripts
 
+Operator note:
+- the WebUI `Service Connection` page can request a service restart through the TorrentCore service API
+- use the local runtime scripts when you need direct host-side control or when the WebUI is unavailable
+
 Important rule:
 - deploy scripts can be run from any machine that has the repo, `dotnet`, `rsync`, and write access to the target path
 - runtime launch-agent scripts should be run on the machine that is actually running TorrentCore
@@ -83,6 +87,10 @@ Service-specific and WebUI-specific control:
 ./ManageTorrentCoreLaunchAgents.zsh restart service
 ./ManageTorrentCoreLaunchAgents.zsh restart webui
 ```
+
+WebUI note:
+- `install-launch-agents.zsh` already bootstraps and starts the selected agents
+- the WebUI `Restart Service` button is a separate operator convenience for restarting the backend from the browser when the service is currently reachable
 
 ## Deploy Commands
 

@@ -1016,6 +1016,13 @@ h1:focus {
     gap: 0.12rem;
 }
 
+.service-connection-restart-help {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    margin-top: 0.15rem;
+}
+
 .dashboard-torrent-submit-grid {
     display: grid;
     gap: 0.5rem;
