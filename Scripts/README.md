@@ -59,7 +59,7 @@ The launch-agent installer creates:
 - `~/TorrentCore/Logs/LaunchAgents.errors.log`
 
 The launch agents run the published executables directly:
-- `~/TorrentCore/Service/TorrentCore.Service`
+- `~/TorrentCore/Service/TorrentCoreService`
 - `~/TorrentCore/WebUI/TorrentCore.WebUI`
 
 ## Runtime Commands
@@ -159,7 +159,6 @@ TORRENTCORE_SERVICE_URLS=http://0.0.0.0:7033
 ```
 
 Useful overrides:
-- `TORRENTCORE_DEPLOY_BASE`
 - `TORRENTCORE_DEPLOY_BASE_INTEL`
 - `TORRENTCORE_DEPLOY_BASE_ARM`
 - `TORRENTCORE_ASPNETCORE_ENVIRONMENT`
@@ -189,3 +188,8 @@ The built-in script defaults are loopback-only for the service and loopback-only
 Those defaults are only a fallback. Real deployed hosts should use `torrentcore.env`.
 
 After changing network bindings in `torrentcore.env`, rerun `./install-launch-agents.zsh all` so the regenerated plists carry the updated environment.
+
+Deploy target rule:
+- configure `TORRENTCORE_DEPLOY_BASE_INTEL` and `TORRENTCORE_DEPLOY_BASE_ARM`
+- do not set a shared `TORRENTCORE_DEPLOY_BASE` in `torrentcore.env`
+- the deploy scripts derive `TORRENTCORE_DEPLOY_BASE` from the selected target internally

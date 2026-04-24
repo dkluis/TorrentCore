@@ -10,9 +10,9 @@ fi
 : "${TORRENTCORE_BASE_DIR:=$(cd "${TORRENTCORE_SCRIPT_DIR}/.." && pwd)}"
 : "${TORRENTCORE_RUN_DIR:=${TORRENTCORE_SCRIPT_DIR}/run}"
 : "${TORRENTCORE_LOG_DIR:=${TORRENTCORE_SCRIPT_DIR}/logs}"
-: "${TORRENTCORE_DEPLOY_BASE:=/Volumes/HD-Boot-CA-Server/Users/dick/TorrentCore}"
 : "${TORRENTCORE_DEPLOY_BASE_INTEL:=/Volumes/HD-Boot-CA-Server/Users/dick/TorrentCore}"
 : "${TORRENTCORE_DEPLOY_BASE_ARM:=${HOME}/TorrentCore}"
+: "${TORRENTCORE_DEPLOY_BASE:=${TORRENTCORE_DEPLOY_BASE_ARM}}"
 : "${TORRENTCORE_PUBLISH_CONFIGURATION:=Release}"
 : "${TORRENTCORE_PUBLISH_RUNTIME:=osx-x64}"
 : "${TORRENTCORE_PUBLISH_RUNTIME_INTEL:=osx-x64}"
@@ -35,7 +35,7 @@ fi
 : "${TORRENTCORE_AVALONIA_ICON_NAME:=TorrentCore.icns}"
 : "${TORRENTCORE_ARTIFACT_SEGMENT:=intel}"
 : "${TORRENTCORE_LAUNCH_AGENT_TARGET_DIR:=${HOME}/Library/LaunchAgents}"
-: "${TORRENTCORE_LAUNCH_AGENT_LOG_DIR:=${HOME}/TorrentCore/Logs}"
+: "${TORRENTCORE_LAUNCH_AGENT_LOG_DIR:=${TORRENTCORE_BASE_DIR}/Logs}"
 : "${TORRENTCORE_SERVICE_LAUNCH_LABEL:=com.torrentcore.service}"
 : "${TORRENTCORE_WEBUI_LAUNCH_LABEL:=com.torrentcore.webui}"
 
@@ -123,11 +123,11 @@ tc_launchd_domain() {
 }
 
 tc_service_program_path() {
-  print -- "${TORRENTCORE_DEPLOY_BASE}/Service/TorrentCore.Service"
+  print -- "${TORRENTCORE_BASE_DIR}/Service/TorrentCoreService"
 }
 
 tc_webui_program_path() {
-  print -- "${TORRENTCORE_DEPLOY_BASE}/WebUI/TorrentCore.WebUI"
+  print -- "${TORRENTCORE_BASE_DIR}/WebUI/TorrentCore.WebUI"
 }
 
 tc_warn_if_target_env_file_missing() {
