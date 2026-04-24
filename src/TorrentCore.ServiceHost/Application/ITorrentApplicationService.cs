@@ -13,6 +13,7 @@ public interface ITorrentApplicationService
     Task<EngineHostStatusDto> GetHostStatusAsync(CancellationToken      cancellationToken);
     Task<DashboardLifecycleSummaryDto> GetDashboardLifecycleAsync(CancellationToken cancellationToken);
     Task<RuntimeSettingsDto>  GetRuntimeSettingsAsync(CancellationToken cancellationToken);
+    Task<ServiceRestartRequestResultDto> RequestServiceRestartAsync(CancellationToken cancellationToken);
 
     Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request,
         CancellationToken                                                            cancellationToken);

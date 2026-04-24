@@ -113,6 +113,7 @@ builder.Services.AddHostedService<CompletedTorrentCleanupService>();
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>());
 builder.Services.AddHostedService<TorrentEngineSynchronizationService>();
 builder.Services.AddSingleton<ITorrentApplicationService, TorrentApplicationService>();
+builder.Services.AddSingleton<ILaunchAgentServiceRestartScheduler, LaunchAgentServiceRestartScheduler>();
 
 var app = builder.Build();
 

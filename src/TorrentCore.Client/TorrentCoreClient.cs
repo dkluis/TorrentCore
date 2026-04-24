@@ -52,6 +52,15 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
                 throw new InvalidOperationException("TorrentCore service returned no runtime settings payload.");
     }
 
+    public async Task<ServiceRestartRequestResultDto> RequestServiceRestartAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsync(
+            BuildRequestUri("api/host/restart-service"), null, cancellationToken
+        );
+        return await ReadResponseAsync<ServiceRestartRequestResultDto>(response, cancellationToken) ??
+               throw new InvalidOperationException("TorrentCore service returned no restart payload.");
+    }
+
     public async Task<IReadOnlyList<TorrentCategoryDto>> GetCategoriesAsync(
         CancellationToken cancellationToken = default)
     {

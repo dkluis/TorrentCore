@@ -18,6 +18,11 @@ public sealed class TorrentCoreApiAdapter(TorrentCoreClient client) : ITorrentCo
         CancellationToken cancellationToken = default)
         => ExecuteAsync(() => client.GetDashboardLifecycleAsync(cancellationToken));
 
+    public Task<ServiceCallResult<ServiceRestartRequestResultDto>> RequestServiceRestartAsync(
+        CancellationToken cancellationToken = default
+    )
+        => ExecuteAsync(() => client.RequestServiceRestartAsync(cancellationToken));
+
     public Task<ServiceCallResult<RuntimeSettingsDto?>> GetRuntimeSettingsAsync(CancellationToken cancellationToken = default)
         => ExecuteAsync(() => client.GetRuntimeSettingsAsync(cancellationToken));
 

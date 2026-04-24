@@ -1,6 +1,7 @@
 @page "/service-connection"
 @inject WebServiceConnectionManager ConnectionManager
 @inject IOperatorFeedbackService Feedback
+@inject ITorrentCoreApiAdapter Api
 
 <PageTitle>Service Connection</PageTitle>
 
@@ -80,6 +81,16 @@
 
                         <div class="operator-action-with-help">
                             <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Warning"
+                                       Size="Size.Small"
+                                       Disabled="@(_isTesting || _isSaving || _isRestarting || _status?.IsReachable != true)"
+                                       OnClick="RestartServiceAsync">
+                                @(_isRestarting ? "Restarting..." : "Restart Service")
+                            </MudButton>
+                        </div>
+
+                        <div class="operator-action-with-help">
+                            <MudButton Variant="Variant.Outlined"
                                        Color="Color.Secondary"
                                        Size="Size.Small"
                                        Disabled="@(_isTesting || _isSaving)"
@@ -103,6 +114,7 @@
 @code {
     private bool _isTesting;
     private bool _isSaving;
+    private bool _isRestarting;
     private const string ServiceBaseUrlInputId = "service-base-url";
     private string _baseUrl = string.Empty;
     private string? _errorMessage;
@@ -233,6 +245,82 @@
         {
             _isSaving = false;
         }
+    }
+
+    private async Task RestartServiceAsync()
+    {
+        var confirmed = await Feedback.ConfirmAsync(
+            "Restart TorrentCore.Service",
+            "Restart the service now? The API may be unavailable briefly. The page may need a browser refresh if reconnect does not recover automatically.",
+            confirmText: "Restart",
+            cancelText: "Cancel"
+        );
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _isRestarting = true;
+        _actionIsError = false;
+        _actionMessage = "Requesting service restart...";
+
+        try
+        {
+            var result = await Api.RequestServiceRestartAsync();
+            if (!result.IsSuccess)
+            {
+                _actionIsError = true;
+                _actionMessage = result.ErrorMessage ?? "Unable to request service restart.";
+                Feedback.Error(_actionMessage);
+                return;
+            }
+
+            _actionMessage =
+                "Restart requested. The service may be unavailable briefly. This page may need a manual refresh if reconnect does not recover automatically.";
+            Feedback.Warning("Service restart requested.");
+
+            await WaitForServiceRecoveryAsync();
+        }
+        finally
+        {
+            _isRestarting = false;
+        }
+    }
+
+    private async Task WaitForServiceRecoveryAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        const int maxAttempts = 15;
+
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            try
+            {
+                var status = await ConnectionManager.RefreshAsync();
+                _status = status;
+
+                if (status.IsReachable)
+                {
+                    _actionIsError = false;
+                    _actionMessage = "Service restarted and is reachable again.";
+                    Feedback.Success("Service restarted.");
+                    return;
+                }
+            }
+            catch
+            {
+                // The service is expected to be unavailable while it restarts.
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        }
+
+        _actionIsError = true;
+        _actionMessage =
+            "Restart was requested, but the service did not become reachable again within the expected window. Refresh the browser and recheck the endpoint after a short delay.";
+        Feedback.Warning("Service restart requested. Manual refresh may still be needed.");
     }
 
     private Task OnBaseUrlChanged(string value)

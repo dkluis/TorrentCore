@@ -45,4 +45,12 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
         var settings = await torrentApplicationService.UpdateRuntimeSettingsAsync(request, cancellationToken);
         return Ok(settings);
     }
+
+    [HttpPost("restart-service")]
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ServiceRestartRequestResultDto))]
+    public async Task<ActionResult<ServiceRestartRequestResultDto>> RestartService(CancellationToken cancellationToken)
+    {
+        var result = await torrentApplicationService.RequestServiceRestartAsync(cancellationToken);
+        return Accepted(result);
+    }
 }

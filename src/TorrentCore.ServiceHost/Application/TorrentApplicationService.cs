@@ -9,6 +9,7 @@ using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
+using TorrentCore.Service.Infrastructure;
 
 #endregion
 
@@ -19,7 +20,8 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     IActivityLogService activityLogService, IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService, ITorrentCategoryService torrentCategoryService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
-    StartupRecoveryState startupRecoveryState, ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
+    StartupRecoveryState startupRecoveryState, ILaunchAgentServiceRestartScheduler restartScheduler,
+    ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
 {
     private static readonly HashSet<string> DashboardLifecycleRecentEventTypes = new(StringComparer.Ordinal)
     {
@@ -176,6 +178,38 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     public Task<RuntimeSettingsDto> GetRuntimeSettingsAsync(CancellationToken cancellationToken)
     {
         return runtimeSettingsService.GetRuntimeSettingsDtoAsync(cancellationToken);
+    }
+
+    public async Task<ServiceRestartRequestResultDto> RequestServiceRestartAsync(CancellationToken cancellationToken)
+    {
+        var result = await restartScheduler.ScheduleRestartAsync(cancellationToken);
+
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Warning,
+                Category = "service",
+                EventType = "service.restart.requested",
+                Message = result.Message,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        result.ServiceLabel,
+                    }
+                ),
+            },
+            cancellationToken
+        );
+
+        logger.LogWarning("TorrentCore service restart requested for {ServiceLabel}.", result.ServiceLabel);
+
+        return new ServiceRestartRequestResultDto
+        {
+            RequestedAtUtc = DateTimeOffset.UtcNow,
+            ServiceLabel = result.ServiceLabel,
+            Message = result.Message,
+        };
     }
 
     public Task<RuntimeSettingsDto> UpdateRuntimeSettingsAsync(UpdateRuntimeSettingsRequest request,
