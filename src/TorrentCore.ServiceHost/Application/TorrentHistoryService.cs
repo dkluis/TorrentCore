@@ -156,10 +156,36 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         updated.InvokeCompletionCallback = snapshot.InvokeCompletionCallback;
         updated.CompletionCallbackLabel = snapshot.CompletionCallbackLabel;
         updated.LatestCallbackStatus = snapshot.CompletionCallbackState?.ToString();
-        updated.CallbackStartedAtUtc = snapshot.CompletionCallbackPendingSinceUtc;
-        updated.CallbackCompletedAtUtc = snapshot.CompletionCallbackInvokedAtUtc;
-        updated.CallbackLastError = snapshot.CompletionCallbackLastError;
         updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
+
+        var snapshotPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc;
+        var snapshotInvokedAtUtc = snapshot.CompletionCallbackInvokedAtUtc;
+        var snapshotCallbackStatus = snapshot.CompletionCallbackState;
+
+        if (IsRetryTransition(existing, snapshot))
+        {
+            updated.CallbackStartedAtUtc = snapshotPendingSinceUtc;
+            updated.CallbackCompletedAtUtc = null;
+            updated.CallbackLastError = snapshot.CompletionCallbackLastError;
+        }
+        else
+        {
+            updated.CallbackStartedAtUtc ??= snapshotPendingSinceUtc;
+            if (updated.CallbackStartedAtUtc is null &&
+                snapshotCallbackStatus == TorrentCompletionCallbackState.PendingFinalization)
+            {
+                updated.CallbackStartedAtUtc = snapshot.LastActivityAtUtc ?? now;
+            }
+
+            updated.CallbackCompletedAtUtc ??= snapshotInvokedAtUtc;
+            if (updated.CallbackCompletedAtUtc is null &&
+                IsTerminalCallbackStatus(snapshotCallbackStatus))
+            {
+                updated.CallbackCompletedAtUtc = snapshot.LastActivityAtUtc ?? now;
+            }
+
+            updated.CallbackLastError = snapshot.CompletionCallbackLastError;
+        }
 
         if (updated.MetadataResolvedAtUtc is null && ShouldStampMetadataResolved(existing, snapshot))
         {
@@ -225,6 +251,17 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             existing.CallbackCompletedAtUtc != updated.CallbackCompletedAtUtc ||
             existing.CallbackLastError != updated.CallbackLastError ||
             existing.ServiceInstanceIdLastSeen != updated.ServiceInstanceIdLastSeen;
+    }
+
+    private static bool IsRetryTransition(TorrentHistoryRecord existing, TorrentSnapshot snapshot)
+    {
+        return snapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization &&
+               existing.LatestCallbackStatus is nameof(TorrentCompletionCallbackState.Failed) or nameof(TorrentCompletionCallbackState.TimedOut);
+    }
+
+    private static bool IsTerminalCallbackStatus(TorrentCompletionCallbackState? status)
+    {
+        return status is TorrentCompletionCallbackState.Invoked or TorrentCompletionCallbackState.Failed or TorrentCompletionCallbackState.TimedOut;
     }
 
     private static TorrentHistoryRecord Clone(TorrentHistoryRecord source)

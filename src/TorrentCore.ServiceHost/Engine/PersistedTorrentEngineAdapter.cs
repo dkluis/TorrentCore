@@ -14,6 +14,7 @@ namespace TorrentCore.Service.Engine;
 
 public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStateStore,
     IRuntimeSettingsService runtimeSettingsService, ITorrentCompletionFinalizationChecker finalizationChecker,
+    ITorrentHistoryService torrentHistoryService,
     ResolvedTorrentCoreServicePaths servicePaths) : ITorrentEngineAdapter
 {
     public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken)
@@ -308,6 +309,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         torrent.LastActivityAtUtc                 = now;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
 
         return new TorrentActionResultDto
         {

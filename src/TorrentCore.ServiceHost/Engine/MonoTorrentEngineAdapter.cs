@@ -651,6 +651,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             updatedSnapshot.CompletionCallbackInvokedAtUtc    = null;
             updatedSnapshot.CompletionCallbackLastError       = null;
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
 
             await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 

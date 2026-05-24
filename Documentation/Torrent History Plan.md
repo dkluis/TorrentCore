@@ -12,7 +12,8 @@ Current execution status:
 - Phase 1 complete
 - Phase 2 complete
 - Phase 3 complete
-- Phases 4-7 pending
+- Phase 4 complete
+- Phases 5-7 pending
 
 Last updated: `2026-05-24`
 
@@ -517,7 +518,17 @@ Estimated time:
 
 Status:
 
-- `Pending`
+- `Complete`
+
+Delivered:
+
+- history now mirrors the existing callback lifecycle state directly
+- `callback_started_at_utc` is stamped when callback lifecycle enters `PendingFinalization`
+- `callback_completed_at_utc` is stamped when callback reaches a terminal visible state
+- `latest_callback_status` is latest-write-wins
+- `callback_last_error` is latest-write-wins
+- callback retry resets the active attempt timestamps and error state for the new attempt
+- retry paths now update history immediately instead of waiting only for a later sync
 
 ### Phase 5 - Removal And Cleanup Retention
 
