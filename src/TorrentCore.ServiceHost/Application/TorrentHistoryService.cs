@@ -1,5 +1,8 @@
 #region
 
+using Microsoft.AspNetCore.Http;
+using TorrentCore.Contracts.History;
+using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Core.History;
 using TorrentCore.Service.Configuration;
@@ -11,6 +14,8 @@ namespace TorrentCore.Service.Application;
 public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistoryStore,
     ServiceInstanceContext serviceInstanceContext) : ITorrentHistoryService
 {
+    private static readonly TimeZoneInfo LocalTimeZone = TimeZoneInfo.Local;
+
     public Task CreateOnAddAsync(TorrentCore.Contracts.Torrents.TorrentDetailDto torrent,
         ResolvedTorrentCategorySelection categorySelection, CancellationToken cancellationToken)
     {
@@ -57,6 +62,36 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
                 ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId,
             },
             cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
+        CancellationToken cancellationToken)
+    {
+        var records = await torrentHistoryStore.ListAsync(cancellationToken);
+        var filtered = ApplyFilters(records, request);
+        var take = request.Take is > 0 ? request.Take.Value : int.MaxValue;
+
+        return filtered
+            .OrderByDescending(record => record.SubmittedAtUtc)
+            .ThenByDescending(record => record.TorrentId)
+            .Take(take)
+            .Select(MapSummary)
+            .ToArray();
+    }
+
+    public async Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
+    {
+        var record = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);
+        if (record is null)
+        {
+            throw new ServiceOperationException(
+                "torrent_history_not_found",
+                $"Torrent history for '{torrentId}' was not found.",
+                StatusCodes.Status404NotFound,
+                nameof(torrentId));
+        }
+
+        return MapDetail(record);
     }
 
     public async Task ObserveSnapshotAsync(TorrentSnapshot snapshot, CancellationToken cancellationToken)
@@ -287,6 +322,141 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
     private static bool IsTerminalCallbackStatus(TorrentCompletionCallbackState? status)
     {
         return status is TorrentCompletionCallbackState.Invoked or TorrentCompletionCallbackState.Failed or TorrentCompletionCallbackState.TimedOut;
+    }
+
+    private static IEnumerable<TorrentHistoryRecord> ApplyFilters(IEnumerable<TorrentHistoryRecord> records,
+        TorrentHistoryQueryRequest request)
+    {
+        var query = records;
+
+        if (!string.IsNullOrWhiteSpace(request.TorrentName))
+        {
+            query = query.Where(record => record.Name.Contains(request.TorrentName.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CategoryKey))
+        {
+            query = query.Where(record => (record.CategoryKey ?? string.Empty).Contains(
+                request.CategoryKey.Trim(),
+                StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.State))
+        {
+            query = query.Where(record => record.LatestTorrentState.Contains(
+                request.State.Trim(),
+                StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (request.Removed is not null)
+        {
+            query = query.Where(record => request.Removed.Value ? record.RemovedAtUtc is not null : record.RemovedAtUtc is null);
+        }
+
+        if (request.FromDate is not null)
+        {
+            query = query.Where(record => ToLocalDate(record.SubmittedAtUtc) >= request.FromDate.Value);
+        }
+
+        if (request.ToDate is not null)
+        {
+            query = query.Where(record => ToLocalDate(record.SubmittedAtUtc) <= request.ToDate.Value);
+        }
+
+        return query;
+    }
+
+    private static TorrentHistorySummaryDto MapSummary(TorrentHistoryRecord record)
+    {
+        return new TorrentHistorySummaryDto
+        {
+            TorrentId = record.TorrentId,
+            Name = record.Name,
+            InfoHash = record.InfoHash,
+            CategoryKey = record.CategoryKey,
+            DownloadRootPath = record.DownloadRootPath,
+            LatestTorrentState = record.LatestTorrentState,
+            LatestWaitReason = record.LatestWaitReason,
+            LatestErrorMessage = record.LatestErrorMessage,
+            LatestProgressPercent = record.LatestProgressPercent,
+            LatestDownloadedBytes = record.LatestDownloadedBytes,
+            LatestUploadedBytes = record.LatestUploadedBytes,
+            LatestTotalBytes = record.LatestTotalBytes,
+            LatestDownloadRateBytesPerSecond = record.LatestDownloadRateBytesPerSecond,
+            LatestUploadRateBytesPerSecond = record.LatestUploadRateBytesPerSecond,
+            LatestTrackerCount = record.LatestTrackerCount,
+            LatestConnectedPeerCount = record.LatestConnectedPeerCount,
+            SubmittedAt = ToLocalTime(record.SubmittedAtUtc),
+            MetadataResolvedAt = ToLocalTime(record.MetadataResolvedAtUtc),
+            DownloadStartedAt = ToLocalTime(record.DownloadStartedAtUtc),
+            DownloadCompletedAt = ToLocalTime(record.DownloadCompletedAtUtc),
+            SeedingStartedAt = ToLocalTime(record.SeedingStartedAtUtc),
+            LastActivityAt = ToLocalTime(record.LastActivityAtUtc),
+            LastUpdatedAt = ToLocalTime(record.LastUpdatedAtUtc),
+            RemovedAt = ToLocalTime(record.RemovedAtUtc),
+            LatestCallbackStatus = record.LatestCallbackStatus,
+            DataDeleted = record.DataDeleted,
+            RemovalReason = record.RemovalReason,
+            RemovedByCleanupPolicy = record.RemovedByCleanupPolicy,
+        };
+    }
+
+    private static TorrentHistoryDetailDto MapDetail(TorrentHistoryRecord record)
+    {
+        return new TorrentHistoryDetailDto
+        {
+            TorrentId = record.TorrentId,
+            Name = record.Name,
+            MagnetUri = record.MagnetUri,
+            InfoHash = record.InfoHash,
+            CategoryKey = record.CategoryKey,
+            DownloadRootPath = record.DownloadRootPath,
+            LatestTorrentState = record.LatestTorrentState,
+            LatestWaitReason = record.LatestWaitReason,
+            LatestErrorMessage = record.LatestErrorMessage,
+            LatestProgressPercent = record.LatestProgressPercent,
+            LatestDownloadedBytes = record.LatestDownloadedBytes,
+            LatestUploadedBytes = record.LatestUploadedBytes,
+            LatestTotalBytes = record.LatestTotalBytes,
+            LatestDownloadRateBytesPerSecond = record.LatestDownloadRateBytesPerSecond,
+            LatestUploadRateBytesPerSecond = record.LatestUploadRateBytesPerSecond,
+            LatestTrackerCount = record.LatestTrackerCount,
+            LatestConnectedPeerCount = record.LatestConnectedPeerCount,
+            SubmittedAt = ToLocalTime(record.SubmittedAtUtc),
+            MetadataResolvedAt = ToLocalTime(record.MetadataResolvedAtUtc),
+            DownloadStartedAt = ToLocalTime(record.DownloadStartedAtUtc),
+            DownloadCompletedAt = ToLocalTime(record.DownloadCompletedAtUtc),
+            SeedingStartedAt = ToLocalTime(record.SeedingStartedAtUtc),
+            LastActivityAt = ToLocalTime(record.LastActivityAtUtc),
+            LastUpdatedAt = ToLocalTime(record.LastUpdatedAtUtc),
+            RemovedAt = ToLocalTime(record.RemovedAtUtc),
+            InvokeCompletionCallback = record.InvokeCompletionCallback,
+            CompletionCallbackLabel = record.CompletionCallbackLabel,
+            LatestCallbackStatus = record.LatestCallbackStatus,
+            CallbackStartedAt = ToLocalTime(record.CallbackStartedAtUtc),
+            CallbackCompletedAt = ToLocalTime(record.CallbackCompletedAtUtc),
+            CallbackLastError = record.CallbackLastError,
+            DataDeleted = record.DataDeleted,
+            RemovalReason = record.RemovalReason,
+            RemovedByCleanupPolicy = record.RemovedByCleanupPolicy,
+            FinalPayloadPath = record.FinalPayloadPath,
+            ServiceInstanceIdLastSeen = record.ServiceInstanceIdLastSeen,
+        };
+    }
+
+    private static DateOnly ToLocalDate(DateTimeOffset value)
+    {
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(value, LocalTimeZone).DateTime);
+    }
+
+    private static DateTimeOffset ToLocalTime(DateTimeOffset value)
+    {
+        return TimeZoneInfo.ConvertTime(value, LocalTimeZone);
+    }
+
+    private static DateTimeOffset? ToLocalTime(DateTimeOffset? value)
+    {
+        return value is null ? null : ToLocalTime(value.Value);
     }
 
     private static TorrentHistoryRecord Clone(TorrentHistoryRecord source)

@@ -18,6 +18,17 @@ This document follows:
 - [TVMaze Integration Boundary.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/TVMaze%20Integration%20Boundary.md)
 - [Initial Scaffold Status.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Initial%20Scaffold%20Status.md)
 - [Torrent Category Routing And Callback Plan.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Torrent%20Category%20Routing%20And%20Callback%20Plan.md)
+- [Torrent History Plan.md](/Volumes/CA-Desktop-HD-2/Development/Source/C#/TorrentCore/Documentation/Torrent%20History%20Plan.md)
+
+## Current Active Step
+
+- history work is currently at `Slice D / Phase 7`
+- Phase 6 is complete:
+  - history read API is implemented
+  - local-time history responses are implemented
+  - explicit local-date filters are implemented
+  - string filters use case-insensitive contains matching
+- the next engineering task is the Phase 7 hardening and lifecycle-gap review pass
 
 ## Current Baseline
 

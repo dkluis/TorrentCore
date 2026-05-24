@@ -1,6 +1,7 @@
 #region
 
 using TorrentCore.Contracts.Categories;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 
@@ -24,7 +25,10 @@ public interface ITorrentApplicationService
         CancellationToken                               cancellationToken);
 
     Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
+        CancellationToken cancellationToken);
     Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken);

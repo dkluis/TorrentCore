@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Torrents;
@@ -359,6 +360,118 @@ public sealed class TorrentApiTests
         Assert.False(historyRow.DataDeleted);
         Assert.Equal("automatic_cleanup", historyRow.RemovalReason);
         Assert.True(historyRow.RemovedByCleanupPolicy);
+    }
+
+    [Fact]
+    public async Task GetHistory_ReturnsNewestFirst_AndSupportsExplicitFilters()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-api-list");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var firstResponse = await AddMagnetAsync(httpClient, "3131313131313131313131313131313131313131", "Alpha First", "TV");
+        var secondResponse = await AddMagnetAsync(httpClient, "3232323232323232323232323232323232323232", "Bravo Second", "Movie");
+        var thirdResponse = await AddMagnetAsync(httpClient, "3333333333333333333333333333333333333333", "Alpha Removed", "TV");
+
+        var firstTorrent = await firstResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var secondTorrent = await secondResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var thirdTorrent = await thirdResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        Assert.NotNull(firstTorrent);
+        Assert.NotNull(secondTorrent);
+        Assert.NotNull(thirdTorrent);
+
+        var may20 = new DateTimeOffset(2026, 5, 20, 9, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 20, 9, 0, 0)));
+        var may21 = new DateTimeOffset(2026, 5, 21, 10, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 21, 10, 0, 0)));
+        var may22 = new DateTimeOffset(2026, 5, 22, 11, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 22, 11, 0, 0)));
+
+        await UpdateHistoryRowAsync(databaseFilePath, firstTorrent.TorrentId, may20, "Completed", removedAtUtc: null);
+        await UpdateHistoryRowAsync(databaseFilePath, secondTorrent.TorrentId, may21, "Seeding", removedAtUtc: null);
+        await UpdateHistoryRowAsync(databaseFilePath, thirdTorrent.TorrentId, may22, "Completed", removedAtUtc: may22.AddHours(1), removalReason: "manual_remove");
+
+        var allHistory = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history");
+
+        Assert.NotNull(allHistory);
+        Assert.Equal([thirdTorrent.TorrentId, secondTorrent.TorrentId, firstTorrent.TorrentId], allHistory.Select(item => item.TorrentId).ToArray());
+
+        var byName = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?torrentName=alpha");
+        Assert.NotNull(byName);
+        Assert.Equal(2, byName.Count);
+        Assert.All(byName, item => Assert.Contains("Alpha", item.Name, StringComparison.OrdinalIgnoreCase));
+
+        var byCategory = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?categoryKey=ovi");
+        Assert.NotNull(byCategory);
+        Assert.Single(byCategory);
+        Assert.Equal(secondTorrent.TorrentId, byCategory[0].TorrentId);
+
+        var byState = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?state=eed");
+        Assert.NotNull(byState);
+        Assert.Single(byState);
+        Assert.Equal(secondTorrent.TorrentId, byState[0].TorrentId);
+
+        var removed = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?removed=true");
+        Assert.NotNull(removed);
+        Assert.Single(removed);
+        Assert.Equal(thirdTorrent.TorrentId, removed[0].TorrentId);
+
+        var active = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?removed=false");
+        Assert.NotNull(active);
+        Assert.Equal(2, active.Count);
+        Assert.DoesNotContain(active, item => item.TorrentId == thirdTorrent.TorrentId);
+
+        var byDate = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?fromDate=2026-05-21&toDate=2026-05-22");
+        Assert.NotNull(byDate);
+        Assert.Equal([thirdTorrent.TorrentId, secondTorrent.TorrentId], byDate.Select(item => item.TorrentId).ToArray());
+
+        var limited = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?take=1");
+        Assert.NotNull(limited);
+        Assert.Single(limited);
+        Assert.Equal(thirdTorrent.TorrentId, limited[0].TorrentId);
+    }
+
+    [Fact]
+    public async Task GetHistoryByTorrentId_ReturnsHistoryDetail()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-api-detail");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(httpClient, "3434343434343434343434343434343434343434", "History Detail Torrent", "Movie");
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        Assert.NotNull(torrent);
+
+        var localSubmittedAt = new DateTimeOffset(2026, 5, 23, 14, 30, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 23, 14, 30, 0)));
+        await UpdateHistoryRowAsync(databaseFilePath, torrent.TorrentId, localSubmittedAt, "Paused", removedAtUtc: null);
+
+        var detail = await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{torrent.TorrentId}");
+
+        Assert.NotNull(detail);
+        Assert.Equal(torrent.TorrentId, detail.TorrentId);
+        Assert.Equal("History Detail Torrent", detail.Name);
+        Assert.Equal("Movie", detail.CategoryKey);
+        Assert.Equal("Paused", detail.LatestTorrentState);
+        Assert.Equal(localSubmittedAt.Date, detail.SubmittedAt.Date);
+        Assert.Equal(Path.Combine(downloadPath, "Movie"), detail.DownloadRootPath);
+    }
+
+    [Fact]
+    public async Task GetHistoryByTorrentId_ReturnsNotFound_WhenMissing()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.GetAsync($"api/history/by-torrent/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -3034,6 +3147,40 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue("$state", state.ToString());
         command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
         command.Parameters.AddWithValue("$error_message", (object?)errorMessage ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task UpdateHistoryRowAsync(
+        string databaseFilePath,
+        Guid torrentId,
+        DateTimeOffset submittedAtUtc,
+        string latestTorrentState,
+        DateTimeOffset? removedAtUtc,
+        string? removalReason = null)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE torrent_history
+            SET
+                submitted_at_utc = $submitted_at_utc,
+                last_updated_at_utc = $last_updated_at_utc,
+                latest_torrent_state = $latest_torrent_state,
+                removed_at_utc = $removed_at_utc,
+                removal_reason = $removal_reason,
+                removed_by_cleanup_policy = $removed_by_cleanup_policy
+            WHERE torrent_id = $torrent_id;
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$submitted_at_utc", submittedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$last_updated_at_utc", submittedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("$latest_torrent_state", latestTorrentState);
+        command.Parameters.AddWithValue("$removed_at_utc", removedAtUtc?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$removal_reason", (object?)removalReason ?? DBNull.Value);
+        command.Parameters.AddWithValue("$removed_by_cleanup_policy", 0);
         await command.ExecuteNonQueryAsync();
     }
 

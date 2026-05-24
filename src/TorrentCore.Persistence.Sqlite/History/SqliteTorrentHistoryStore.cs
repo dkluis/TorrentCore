@@ -10,6 +10,46 @@ namespace TorrentCore.Persistence.Sqlite.History;
 
 public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorrentHistoryStore
 {
+    private const string SelectColumns = """
+                                         SELECT
+                                             torrent_id,
+                                             name,
+                                             magnet_uri,
+                                             info_hash,
+                                             category_key,
+                                             download_root_path,
+                                             latest_torrent_state,
+                                             latest_wait_reason,
+                                             latest_error_message,
+                                             latest_progress_percent,
+                                             latest_downloaded_bytes,
+                                             latest_uploaded_bytes,
+                                             latest_total_bytes,
+                                             latest_download_rate_bytes_per_second,
+                                             latest_upload_rate_bytes_per_second,
+                                             latest_tracker_count,
+                                             latest_connected_peer_count,
+                                             submitted_at_utc,
+                                             metadata_resolved_at_utc,
+                                             download_started_at_utc,
+                                             download_completed_at_utc,
+                                             seeding_started_at_utc,
+                                             last_activity_at_utc,
+                                             last_updated_at_utc,
+                                             removed_at_utc,
+                                             invoke_completion_callback,
+                                             completion_callback_label,
+                                             latest_callback_status,
+                                             callback_started_at_utc,
+                                             callback_completed_at_utc,
+                                             callback_last_error,
+                                             data_deleted,
+                                             removal_reason,
+                                             removed_by_cleanup_policy,
+                                             final_payload_path,
+                                             service_instance_id_last_seen
+                                         FROM torrent_history
+                                         """;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
     private volatile bool          _isInitialized;
 
@@ -53,51 +93,30 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         await connection.OpenAsync(cancellationToken);
 
         var command = connection.CreateCommand();
-        command.CommandText = """
-                              SELECT
-                                  torrent_id,
-                                  name,
-                                  magnet_uri,
-                                  info_hash,
-                                  category_key,
-                                  download_root_path,
-                                  latest_torrent_state,
-                                  latest_wait_reason,
-                                  latest_error_message,
-                                  latest_progress_percent,
-                                  latest_downloaded_bytes,
-                                  latest_uploaded_bytes,
-                                  latest_total_bytes,
-                                  latest_download_rate_bytes_per_second,
-                                  latest_upload_rate_bytes_per_second,
-                                  latest_tracker_count,
-                                  latest_connected_peer_count,
-                                  submitted_at_utc,
-                                  metadata_resolved_at_utc,
-                                  download_started_at_utc,
-                                  download_completed_at_utc,
-                                  seeding_started_at_utc,
-                                  last_activity_at_utc,
-                                  last_updated_at_utc,
-                                  removed_at_utc,
-                                  invoke_completion_callback,
-                                  completion_callback_label,
-                                  latest_callback_status,
-                                  callback_started_at_utc,
-                                  callback_completed_at_utc,
-                                  callback_last_error,
-                                  data_deleted,
-                                  removal_reason,
-                                  removed_by_cleanup_policy,
-                                  final_payload_path,
-                                  service_instance_id_last_seen
-                              FROM torrent_history
-                              WHERE torrent_id = $torrent_id
-                              LIMIT 1;
-                              """;
+        command.CommandText = $"{SelectColumns}\nWHERE torrent_id = $torrent_id\nLIMIT 1;";
         command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
 
         return await ReadSingleAsync(command, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TorrentHistoryRecord>> ListAsync(CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = $"{SelectColumns}\nORDER BY submitted_at_utc DESC, torrent_id DESC;";
+
+        var results = new List<TorrentHistoryRecord>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(ReadRecord(reader));
+        }
+
+        return results;
     }
 
     public async Task InsertAsync(TorrentHistoryRecord record, CancellationToken cancellationToken)
@@ -253,6 +272,11 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
             return null;
         }
 
+        return ReadRecord(reader);
+    }
+
+    private static TorrentHistoryRecord ReadRecord(SqliteDataReader reader)
+    {
         return new TorrentHistoryRecord
         {
             TorrentId = Guid.Parse(reader.GetString(0)),

@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Categories;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
@@ -235,6 +236,12 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         return torrentEngineAdapter.GetTorrentsAsync(cancellationToken);
     }
 
+    public Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
+        CancellationToken cancellationToken)
+    {
+        return torrentHistoryService.GetHistoryAsync(request, cancellationToken);
+    }
+
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         try
@@ -272,6 +279,20 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         catch (ServiceOperationException exception)
         {
             await LogFailureAsync("torrent", "torrent.trackers.lookup.failed", exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await torrentHistoryService.GetHistoryByTorrentIdAsync(torrentId, cancellationToken);
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.history.lookup.failed", exception.Message, torrentId, cancellationToken);
             throw;
         }
     }

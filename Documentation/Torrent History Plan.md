@@ -9,12 +9,14 @@ This document captures the agreed design for adding a durable torrent history ta
 Current execution status:
 
 - Slices A-C complete
+- Slice D in progress
+- Phase 6 complete
 - Phase 1 complete
 - Phase 2 complete
 - Phase 3 complete
 - Phase 4 complete
 - Phase 5 complete
-- Phases 6-7 pending
+- Phase 7 pending
 
 Last updated: `2026-05-24`
 
@@ -594,7 +596,27 @@ Estimated time:
 
 Status:
 
-- `Pending`
+- `Complete`
+
+Delivered:
+
+- `GET /api/history` now returns history rows with explicit UI-oriented filters:
+  - `torrentName`
+  - `categoryKey`
+  - `state`
+  - `removed`
+  - `fromDate`
+  - `toDate`
+  - `take`
+- `GET /api/history/by-torrent/{torrentId}` now returns a single history detail row
+- API default ordering is `submitted_at desc`
+- browser-side sorting remains the intended interaction model for later UI work
+- `fromDate` and `toDate` are local-date filters, not UTC filters
+- API responses map timestamps to local time for user-facing history reads
+- string filters now use case-insensitive contains matching by default:
+  - `torrentName`
+  - `categoryKey`
+  - `state`
 
 ### Phase 7 - Hardening And Gaps
 
@@ -622,6 +644,11 @@ Estimated time:
 Status:
 
 - `Pending`
+
+Next start point:
+
+- resume at `Slice D / Phase 7`
+- first task is a lifecycle hardening pass over history update call sites and restart/recovery behavior
 
 ## Delivery Slices
 
@@ -686,6 +713,10 @@ Estimated time:
 
 - about half a day to one day
 
+Status:
+
+- `In Progress`
+
 ## Recommended Review Cadence
 
 Stop for explicit review after:
@@ -722,9 +753,32 @@ First slice should include read APIs for history.
 Recommended surface:
 
 - history list endpoint
-- history detail endpoint by `history_id` or `torrent_id`
+- history detail endpoint by `torrent_id`
 
-The exact route shape can be decided during implementation, but the first slice should expose the data through the service boundary instead of requiring direct database inspection.
+Implemented Phase 6 surface:
+
+- `GET /api/history`
+- `GET /api/history/by-torrent/{torrentId}`
+
+Implemented filter shape:
+
+- `torrentName`
+- `categoryKey`
+- `state`
+- `removed`
+- `fromDate`
+- `toDate`
+- `take`
+
+Implemented filter behavior:
+
+- `torrentName`: case-insensitive contains
+- `categoryKey`: case-insensitive contains
+- `state`: case-insensitive contains
+- `removed`: exact boolean match
+- `fromDate` / `toDate`: inclusive local-date filtering against submitted date
+
+The API returns a default server ordering, and later UI sorting is expected to happen locally in the browser after refresh.
 
 ## Testing Requirements
 
