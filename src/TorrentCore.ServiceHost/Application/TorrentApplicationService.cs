@@ -19,6 +19,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     ResolvedTorrentCoreServicePaths servicePaths, ITorrentEngineAdapter torrentEngineAdapter,
     IActivityLogService activityLogService, IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService, ITorrentCategoryService torrentCategoryService,
+    ITorrentHistoryService torrentHistoryService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
     StartupRecoveryState startupRecoveryState, ILaunchAgentServiceRestartScheduler restartScheduler,
     ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
@@ -290,6 +291,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             var torrent = await torrentEngineAdapter.AddMagnetAsync(
                 normalizedRequest, categorySelection, cancellationToken
             );
+            await torrentHistoryService.CreateOnAddAsync(torrent, categorySelection, cancellationToken);
 
             logger.LogInformation("Added torrent {TorrentId} named {TorrentName}", torrent.TorrentId, torrent.Name);
 

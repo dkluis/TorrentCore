@@ -127,6 +127,75 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task AddMagnet_CreatesTorrentHistoryRow()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-add");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(
+            httpClient,
+            "2121212121212121212121212121212121212121",
+            "History Creation Torrent",
+            "TV");
+        response.EnsureSuccessStatusCode();
+
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(torrent);
+
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              SELECT
+                                  torrent_id,
+                                  name,
+                                  magnet_uri,
+                                  info_hash,
+                                  category_key,
+                                  download_root_path,
+                                  save_path,
+                                  latest_torrent_state,
+                                  latest_progress_percent,
+                                  latest_downloaded_bytes,
+                                  submitted_at_utc,
+                                  last_updated_at_utc,
+                                  invoke_completion_callback,
+                                  completion_callback_label,
+                                  data_deleted,
+                                  removed_by_cleanup_policy
+                              FROM torrent_history
+                              WHERE torrent_id = $torrent_id;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrent.TorrentId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(torrent.TorrentId.ToString(), reader.GetString(0));
+        Assert.Equal(torrent.Name, reader.GetString(1));
+        Assert.Equal(torrent.MagnetUri, reader.GetString(2));
+        Assert.Equal(torrent.InfoHash, reader.GetString(3));
+        Assert.Equal("TV", reader.GetString(4));
+        Assert.Equal(Path.Combine(downloadPath, "TV"), reader.GetString(5));
+        Assert.Equal(torrent.SavePath, reader.GetString(6));
+        Assert.Equal(torrent.State.ToString(), reader.GetString(7));
+        Assert.Equal(torrent.ProgressPercent, reader.GetDouble(8));
+        Assert.Equal(torrent.DownloadedBytes, reader.GetInt64(9));
+        Assert.False(reader.IsDBNull(10));
+        Assert.False(reader.IsDBNull(11));
+        Assert.True(reader.GetInt64(12) != 0);
+        Assert.Equal("TV", reader.GetString(13));
+        Assert.Equal(0, reader.GetInt64(14));
+        Assert.Equal(0, reader.GetInt64(15));
+        Assert.False(await reader.ReadAsync());
+    }
+
+    [Fact]
     public async Task GetRuntimeSettings_ReturnsEffectiveDefaults()
     {
         await using var factory = CreateFactory();

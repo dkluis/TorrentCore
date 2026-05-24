@@ -4,9 +4,11 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using TorrentCore.Core.Categories;
 using TorrentCore.Core.Diagnostics;
+using TorrentCore.Core.History;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Persistence.Sqlite.Categories;
 using TorrentCore.Persistence.Sqlite.Configuration;
+using TorrentCore.Persistence.Sqlite.History;
 using TorrentCore.Persistence.Sqlite.Logging;
 using TorrentCore.Persistence.Sqlite.Schema;
 using TorrentCore.Persistence.Sqlite.Torrents;
@@ -92,8 +94,15 @@ builder.Services.AddSingleton<ITorrentStateStore>(serviceProvider =>
         return new SqliteTorrentStateStore(servicePaths.DatabaseFilePath);
     }
 );
+builder.Services.AddSingleton<ITorrentHistoryStore>(serviceProvider =>
+    {
+        var servicePaths = serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>();
+        return new SqliteTorrentHistoryStore(servicePaths.DatabaseFilePath);
+    }
+);
 builder.Services.AddSingleton<IRuntimeSettingsService, RuntimeSettingsService>();
 builder.Services.AddSingleton<ITorrentCategoryService, TorrentCategoryService>();
+builder.Services.AddSingleton<ITorrentHistoryService, TorrentHistoryService>();
 builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentCompletionFinalizationChecker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackInvoker, TorrentCompletionCallbackInvoker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackProcessor, TorrentCompletionCallbackProcessor>();

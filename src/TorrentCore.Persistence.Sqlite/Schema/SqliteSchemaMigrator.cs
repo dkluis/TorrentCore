@@ -376,6 +376,64 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     }
                 }
             ),
+            new SqliteMigrationDefinition(
+                11, "create_torrent_history", async (connection, cancellationToken) =>
+                {
+                    if (!await TableExistsAsync(connection, "torrent_history", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText = """
+                                              CREATE TABLE torrent_history (
+                                                  torrent_id TEXT PRIMARY KEY,
+                                                  name TEXT NOT NULL,
+                                                  magnet_uri TEXT NOT NULL,
+                                                  info_hash TEXT NULL,
+                                                  category_key TEXT NULL,
+                                                  download_root_path TEXT NULL,
+                                                  save_path TEXT NOT NULL,
+                                                  latest_torrent_state TEXT NOT NULL,
+                                                  latest_wait_reason TEXT NULL,
+                                                  latest_error_message TEXT NULL,
+                                                  latest_progress_percent REAL NOT NULL,
+                                                  latest_downloaded_bytes INTEGER NOT NULL,
+                                                  latest_uploaded_bytes INTEGER NOT NULL,
+                                                  latest_total_bytes INTEGER NULL,
+                                                  latest_download_rate_bytes_per_second INTEGER NOT NULL,
+                                                  latest_upload_rate_bytes_per_second INTEGER NOT NULL,
+                                                  latest_tracker_count INTEGER NOT NULL,
+                                                  latest_connected_peer_count INTEGER NOT NULL,
+                                                  submitted_at_utc TEXT NOT NULL,
+                                                  metadata_resolved_at_utc TEXT NULL,
+                                                  download_started_at_utc TEXT NULL,
+                                                  download_completed_at_utc TEXT NULL,
+                                                  seeding_started_at_utc TEXT NULL,
+                                                  last_activity_at_utc TEXT NULL,
+                                                  last_updated_at_utc TEXT NOT NULL,
+                                                  removed_at_utc TEXT NULL,
+                                                  invoke_completion_callback INTEGER NOT NULL,
+                                                  completion_callback_label TEXT NULL,
+                                                  latest_callback_status TEXT NULL,
+                                                  callback_started_at_utc TEXT NULL,
+                                                  callback_completed_at_utc TEXT NULL,
+                                                  callback_last_error TEXT NULL,
+                                                  data_deleted INTEGER NOT NULL DEFAULT 0,
+                                                  removal_reason TEXT NULL,
+                                                  removed_by_cleanup_policy INTEGER NOT NULL DEFAULT 0,
+                                                  final_payload_path TEXT NULL,
+                                                  service_instance_id_last_seen TEXT NULL
+                                              );
+
+                                              CREATE INDEX IF NOT EXISTS idx_torrent_history_submitted_at_utc
+                                                  ON torrent_history (submitted_at_utc DESC, torrent_id DESC);
+
+                                              CREATE INDEX IF NOT EXISTS idx_torrent_history_info_hash
+                                                  ON torrent_history (info_hash)
+                                                  WHERE info_hash IS NOT NULL;
+                                              """;
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
         ];
     }
 

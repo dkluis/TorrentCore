@@ -6,6 +6,15 @@ Planning document only.
 
 This document captures the agreed design for adding a durable torrent history table without changing the current purpose or behavior of the live `torrents` table.
 
+Current execution status:
+
+- Slice A complete
+- Phase 1 complete
+- Phase 2 complete
+- Phases 3-7 pending
+
+Last updated: `2026-05-24`
+
 ## Agreed Constraints
 
 - `torrents` remains dedicated to live MonoTorrent state and restart/recovery persistence.
@@ -81,7 +90,6 @@ The history row should include the fields requested during planning, plus the cu
 
 ### Identity And Routing
 
-- `history_id`
 - `torrent_id`
 - `name`
 - `magnet_uri`
@@ -368,6 +376,19 @@ Estimated time:
 
 - about 3-5 hours
 
+Status:
+
+- `Complete`
+
+Delivered:
+
+- SQLite migration `11` adds `torrent_history`
+- `torrent_id` is the row primary key for the current lifecycle
+- full agreed initial column set is present in the schema
+- dedicated history store boundary is implemented
+- SQLite history store implementation is in place
+- migration/store coverage exists
+
 ### Phase 2 - Row Creation On Torrent Add
 
 Goal:
@@ -389,6 +410,17 @@ Review points:
 Estimated time:
 
 - about 2-4 hours
+
+Status:
+
+- `Complete`
+
+Delivered:
+
+- add-magnet flow now creates a history row
+- the inserted row captures the agreed Slice A identity/routing/latest-state baseline
+- no semantic or behavioral change was made to the live `torrents` table
+- add-flow coverage verifies the history row is created
 
 ### Phase 3 - Core Lifecycle Updates
 
@@ -415,6 +447,10 @@ Estimated time:
 
 - about 6-10 hours
 
+Status:
+
+- `Pending`
+
 ### Phase 4 - Callback Lifecycle Updates
 
 Goal:
@@ -438,6 +474,10 @@ Review points:
 Estimated time:
 
 - about 3-5 hours
+
+Status:
+
+- `Pending`
 
 ### Phase 5 - Removal And Cleanup Retention
 
@@ -464,6 +504,10 @@ Estimated time:
 
 - about 3-5 hours
 
+Status:
+
+- `Pending`
+
 ### Phase 6 - Read API
 
 Goal:
@@ -489,6 +533,10 @@ Estimated time:
 
 - about 3-5 hours
 
+Status:
+
+- `Pending`
+
 ### Phase 7 - Hardening And Gaps
 
 Goal:
@@ -512,6 +560,10 @@ Estimated time:
 
 - about 2-4 hours
 
+Status:
+
+- `Pending`
+
 ## Delivery Slices
 
 For execution and review, the phases group into four practical slices.
@@ -528,6 +580,10 @@ Outcome:
 Estimated time:
 
 - about half a day
+
+Status:
+
+- `Complete`
 
 ### Slice B
 

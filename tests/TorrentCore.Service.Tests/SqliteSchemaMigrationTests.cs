@@ -34,7 +34,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], versions);
     }
 
     [Fact]
@@ -207,6 +207,30 @@ public sealed class SqliteSchemaMigrationTests
         var tableName = await command.ExecuteScalarAsync();
 
         Assert.Equal("torrent_categories", tableName);
+    }
+
+    [Fact]
+    public async Task Startup_CreatesTorrentHistoryTable()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath, storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.GetAsync("api/host/status");
+        response.EnsureSuccessStatusCode();
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+
+        var command = verifyConnection.CreateCommand();
+        command.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'torrent_history';";
+        var tableName = await command.ExecuteScalarAsync();
+
+        Assert.Equal("torrent_history", tableName);
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string downloadPath, string storagePath)
