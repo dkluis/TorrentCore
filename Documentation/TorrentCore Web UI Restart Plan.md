@@ -4,9 +4,9 @@
 
 Active planning document for the supported operator UI.
 
-Current status: `Phase 0 Complete`, `Phase 1 Complete`, `Phase 2 Complete`, `Phases 3-6 Complete`, `Phase 7 In Progress`
+Current status: `Phases 0-8 Complete`
 
-Last updated: `2026-04-10`
+Last updated: `2026-05-24`
 
 Current checkpoint:
 
@@ -41,6 +41,8 @@ Current checkpoint:
 - runtime settings updates now flow through the shared WebUI API adapter, and successful group saves surface toast feedback instead of inline page-only messages
 - the per-setting help icon pattern on the settings page has now been operator-reviewed and is considered part of the current WebUI baseline
 - the `Service Connection` page now also uses the shared help affordance for current endpoint status, the service base URL field, and the `Test` / `Save` / `Recheck` actions
+- the Phase 7 settings and service-connection work is complete and verified against the supported runtime
+- the Phase 8 hardening and cutover work is complete; `TorrentCore.WebUI` is the production operator surface and has now been exercised in production for multiple weeks
 
 ## Purpose
 
@@ -571,7 +573,7 @@ Verify:
 
 Status:
 
-`Pending`
+`Complete`
 
 ### Phase 5 - Torrent Detail Slice
 
@@ -592,7 +594,7 @@ Verify:
 
 Status:
 
-`Pending`
+`Complete`
 
 ### Phase 6 - Logs Slice
 
@@ -613,7 +615,7 @@ Verify:
 
 Status:
 
-`Pending`
+`Complete`
 
 ### Phase 7 - Settings + Service Connection Slice
 
@@ -634,7 +636,7 @@ Verify:
 
 Status:
 
-`In Progress`
+`Complete`
 
 ### Phase 8 - Hardening And Cutover
 
@@ -656,7 +658,7 @@ Verify:
 
 Status:
 
-`Pending`
+`Complete`
 
 ## Testing Strategy
 

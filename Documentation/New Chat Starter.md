@@ -24,7 +24,9 @@ Continue from these agreed decisions:
 Current repo status:
 - standalone solution and projects have been scaffolded
 - the maintained operator surface is now `TorrentCore.WebUI`
-- the next work should extend the real v1 torrent boundary, not re-argue repo structure
+- the supported UI work is complete, including settings and service connection flows
+- the product has now been exercised in production for multiple weeks
+- the remaining documented open product item is defining the v1 authentication and authorization model
 
 Useful original context from TVMaze:
 - `/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TVMaze/Documentation/Torrent Engine Service Summary.md`

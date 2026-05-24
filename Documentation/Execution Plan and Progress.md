@@ -466,13 +466,9 @@ Reviewed and accepted on March 10, 2026:
 - adding TVMaze integration before TorrentCore behavior is stable
 - treating preallocated file size as proof of completion instead of using engine-verified completion and explicit finalization rules
 
-## Current Next Steps
+## Current Open Item
 
-1. Add explicit incomplete-file handling with `.part` suffix compatibility.
-2. Add configurable seeding stop policy covering immediate stop, ratio, time, ratio-or-time, and unlimited seeding.
-3. Persist and test file finalization state across restart.
-4. Surface seeding and finalization policy through service configuration and later through the web UI.
-5. Continue expanding runtime diagnostics and operator controls around the real engine slice.
+1. Authentication and authorization are still required, but the exact v1 model remains pending.
 
 ## Change Log
 
