@@ -20,6 +20,7 @@ namespace TorrentCore.Service.Engine;
 
 public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService, ITorrentCompletionCallbackProcessor completionCallbackProcessor,
+    ITorrentHistoryService torrentHistoryService,
     ITorrentCompletionFinalizationChecker finalizationChecker, ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions, IRuntimeSettingsService runtimeSettingsService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
@@ -172,6 +173,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     }
 
                     await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+                    await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
 
                     if (previousState != updatedSnapshot.State)
                     {
@@ -198,6 +200,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     snapshot.ErrorMessage      = exception.Message;
                     snapshot.LastActivityAtUtc = now;
                     await torrentStateStore.UpdateAsync(snapshot, cancellationToken);
+                    await torrentHistoryService.ObserveSnapshotAsync(snapshot, cancellationToken);
 
                     changes.Add(
                         new TorrentRecoveryChange
@@ -1075,6 +1078,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
 
             if (updatedSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
             {
@@ -1102,6 +1106,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             await torrentStateStore.UpdateAsync(callbackSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(callbackSnapshot, cancellationToken);
         }
     }
 
@@ -1138,6 +1143,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 updatedSnapshot.ErrorMessage      =   null;
                 updatedSnapshot.LastActivityAtUtc ??= now;
                 await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
                 continue;
             }
 
@@ -1146,9 +1152,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 await EnsureManagerStoppedAsync(manager, cancellationToken);
             }
 
-            await torrentStateStore.UpdateAsync(
-                CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now), cancellationToken
-            );
+            var queuedSnapshot = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(queuedSnapshot, cancellationToken);
         }
     }
 
@@ -1181,6 +1187,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             updatedSnapshot.State = ContractTorrentState.Seeding;
             updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(updatedSnapshot, manager, now, cancellationToken);
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
         }
     }
 
@@ -1219,6 +1226,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 }
 
                 await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
                 continue;
             }
 
@@ -1227,9 +1235,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 await EnsureManagerStoppedAsync(manager, cancellationToken);
             }
 
-            await torrentStateStore.UpdateAsync(
-                CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now), cancellationToken
-            );
+            var queuedSnapshot = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(queuedSnapshot, cancellationToken);
         }
     }
 

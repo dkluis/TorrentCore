@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
+using TorrentCore.Service.Application;
 using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
 
@@ -14,6 +15,7 @@ namespace TorrentCore.Service.Engine;
 
 public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService, ITorrentCompletionCallbackProcessor completionCallbackProcessor,
+    ITorrentHistoryService torrentHistoryService,
     ServiceInstanceContext serviceInstanceContext, IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService, ILogger<FakeTorrentRuntimeService> logger) : BackgroundService
 {
@@ -140,6 +142,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 torrent.LastActivityAtUtc          = now;
                 torrent.ErrorMessage               = null;
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
                 continue;
             }
 
@@ -154,6 +157,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.UploadRateBytesPerSecond   = 0;
             torrent.LastActivityAtUtc          = now;
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
         }
     }
 
@@ -180,6 +184,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.ErrorMessage               =   null;
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
             await LogTorrentEventAsync(
                 "torrent.metadata.resolved", $"Resolved metadata for torrent '{torrent.Name}'.", torrent, new
                 {
@@ -219,6 +224,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.ErrorMessage               =   null;
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
             await LogTorrentEventAsync(
                 "torrent.download.started", $"Started download for torrent '{torrent.Name}'.", torrent, new
                 {
@@ -268,6 +274,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                     );
 
                     await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                    await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
                     await LogTorrentEventAsync(
                         "torrent.download.completed", $"Completed download for torrent '{torrent.Name}'.", torrent, new
                         {
@@ -298,6 +305,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 );
 
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
                 await LogTorrentEventAsync(
                     "torrent.download.completed", $"Completed download for torrent '{torrent.Name}'.", torrent, new
                     {
@@ -315,6 +323,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.UploadRateBytesPerSecond   = CalculateUploadRate(torrent);
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
         }
     }
 
@@ -333,6 +342,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             }
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
         }
     }
 
@@ -363,6 +373,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 torrent.UploadRateBytesPerSecond = 0;
 
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
                 await LogTorrentEventAsync(
                     "torrent.seeding.stopped_policy",
                     $"Stopped seeding for torrent '{torrent.Name}' because the '{seedingDecision.Reason}' policy was reached.",
@@ -378,6 +389,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             }
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
         }
     }
 

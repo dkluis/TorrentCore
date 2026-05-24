@@ -8,10 +8,11 @@ This document captures the agreed design for adding a durable torrent history ta
 
 Current execution status:
 
-- Slice A complete
+- Slices A-B complete
 - Phase 1 complete
 - Phase 2 complete
-- Phases 3-7 pending
+- Phase 3 complete
+- Phases 4-7 pending
 
 Last updated: `2026-05-24`
 
@@ -140,7 +141,7 @@ The history row should include the fields requested during planning, plus the cu
 
 ### Optional But Recommended In The Same Table
 
-- `final_payload_path`
+- `final_download_path`
 - `service_instance_id_last_seen`
 
 ## Notes On Field Meaning
@@ -155,6 +156,33 @@ Reason:
 - `deleted` is ambiguous because payload file deletion and removal from TorrentCore tracking are different things.
 
 If a later UI wants to label the column as `Deleted`, that can be a presentation choice rather than the storage name.
+
+### `save_path`
+
+`save_path` is the directory where the torrent content is being stored.
+
+This is not necessarily a torrent-specific file or folder path.
+
+In the current production model:
+
+- the download location and finished location are the same
+- incomplete media is distinguished by MonoTorrent's `.!mt` suffix
+- when the torrent completes, MonoTorrent removes that suffix
+
+Accordingly, `save_path` should not be interpreted as the final file path for the payload.
+
+### `final_download_path`
+
+`final_download_path` is the full path to the actual torrent payload when TorrentCore can know it confidently.
+
+Examples:
+
+- single-file torrent: the final media file path
+- multi-file torrent: the torrent content directory path
+
+This should remain `null` until TorrentCore genuinely knows the final file or directory path.
+
+It should not be pre-populated during add flow from `save_path`.
 
 ### `last_updated_at_utc`
 
@@ -449,7 +477,19 @@ Estimated time:
 
 Status:
 
-- `Pending`
+- `Complete`
+
+Delivered:
+
+- history observation now updates rows from the existing runtime/synchronization snapshot flow
+- missing history rows are auto-created when an active torrent is observed
+- metadata resolution stamps `metadata_resolved_at_utc` when the torrent exits `ResolvingMetadata`
+- download start stamps `download_started_at_utc`
+- completion stamps `download_completed_at_utc`
+- seeding stamps `seeding_started_at_utc`
+- latest summary fields refresh only when meaningful values changed
+- `last_updated_at_utc` only advances when the history row is actually written
+- `final_download_path` is no longer populated during add flow
 
 ### Phase 4 - Callback Lifecycle Updates
 
@@ -596,6 +636,10 @@ Outcome:
 Estimated time:
 
 - about one day
+
+Status:
+
+- `Complete`
 
 ### Slice C
 

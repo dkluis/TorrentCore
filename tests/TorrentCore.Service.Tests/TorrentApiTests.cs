@@ -196,6 +196,56 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_HistoryRow_TracksCoreLifecycleMilestones()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-lifecycle");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 25,
+            seedingStopMode: SeedingStopMode.Unlimited);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(
+            httpClient,
+            "2323232323232323232323232323232323232323",
+            "History Lifecycle Torrent",
+            "Movie");
+        response.EnsureSuccessStatusCode();
+
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(torrent);
+
+        var historyRow = await WaitForAsync(
+            async () => await GetTorrentHistoryRowAsync(databaseFilePath, torrent!.TorrentId),
+            row => row is not null &&
+                   row.MetadataResolvedAtUtc is not null &&
+                   row.DownloadStartedAtUtc is not null &&
+                   row.DownloadCompletedAtUtc is not null &&
+                   row.SeedingStartedAtUtc is not null &&
+                   row.LastUpdatedAtUtc >= row.DownloadStartedAtUtc,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(historyRow);
+        Assert.Equal(TorrentState.Seeding.ToString(), historyRow.LatestTorrentState);
+        Assert.NotNull(historyRow.MetadataResolvedAtUtc);
+        Assert.NotNull(historyRow.DownloadStartedAtUtc);
+        Assert.NotNull(historyRow.DownloadCompletedAtUtc);
+        Assert.NotNull(historyRow.SeedingStartedAtUtc);
+        Assert.True(historyRow.DownloadStartedAtUtc >= historyRow.MetadataResolvedAtUtc);
+        Assert.True(historyRow.DownloadCompletedAtUtc >= historyRow.DownloadStartedAtUtc);
+        Assert.True(historyRow.SeedingStartedAtUtc >= historyRow.DownloadCompletedAtUtc);
+        Assert.True(historyRow.LastUpdatedAtUtc >= historyRow.SeedingStartedAtUtc);
+        Assert.Equal(100, historyRow.LatestProgressPercent);
+    }
+
+    [Fact]
     public async Task GetRuntimeSettings_ReturnsEffectiveDefaults()
     {
         await using var factory = CreateFactory();
@@ -2731,6 +2781,56 @@ public sealed class TorrentApiTests
             MagnetUri = $"magnet:?xt=urn:btih:{infoHash}&dn={Uri.EscapeDataString(name)}",
             CategoryKey = categoryKey,
         });
+    }
+
+    private sealed class TorrentHistoryRow
+    {
+        public string? LatestTorrentState { get; init; }
+        public double LatestProgressPercent { get; init; }
+        public DateTimeOffset? MetadataResolvedAtUtc { get; init; }
+        public DateTimeOffset? DownloadStartedAtUtc { get; init; }
+        public DateTimeOffset? DownloadCompletedAtUtc { get; init; }
+        public DateTimeOffset? SeedingStartedAtUtc { get; init; }
+        public DateTimeOffset LastUpdatedAtUtc { get; init; }
+    }
+
+    private static async Task<TorrentHistoryRow?> GetTorrentHistoryRowAsync(string databaseFilePath, Guid torrentId)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              SELECT
+                                  latest_torrent_state,
+                                  latest_progress_percent,
+                                  metadata_resolved_at_utc,
+                                  download_started_at_utc,
+                                  download_completed_at_utc,
+                                  seeding_started_at_utc,
+                                  last_updated_at_utc
+                              FROM torrent_history
+                              WHERE torrent_id = $torrent_id
+                              LIMIT 1;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+
+        return new TorrentHistoryRow
+        {
+            LatestTorrentState = reader.GetString(0),
+            LatestProgressPercent = reader.GetDouble(1),
+            MetadataResolvedAtUtc = reader.IsDBNull(2) ? null : DateTimeOffset.Parse(reader.GetString(2)),
+            DownloadStartedAtUtc = reader.IsDBNull(3) ? null : DateTimeOffset.Parse(reader.GetString(3)),
+            DownloadCompletedAtUtc = reader.IsDBNull(4) ? null : DateTimeOffset.Parse(reader.GetString(4)),
+            SeedingStartedAtUtc = reader.IsDBNull(5) ? null : DateTimeOffset.Parse(reader.GetString(5)),
+            LastUpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(6)),
+        };
     }
 
     private static async Task ForcePersistedTorrentSnapshotAsync(

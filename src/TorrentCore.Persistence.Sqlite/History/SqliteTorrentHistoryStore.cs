@@ -194,6 +194,60 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task UpdateAsync(TorrentHistoryRecord record, CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              UPDATE torrent_history
+                              SET
+                                  name = $name,
+                                  magnet_uri = $magnet_uri,
+                                  info_hash = $info_hash,
+                                  category_key = $category_key,
+                                  download_root_path = $download_root_path,
+                                  save_path = $save_path,
+                                  latest_torrent_state = $latest_torrent_state,
+                                  latest_wait_reason = $latest_wait_reason,
+                                  latest_error_message = $latest_error_message,
+                                  latest_progress_percent = $latest_progress_percent,
+                                  latest_downloaded_bytes = $latest_downloaded_bytes,
+                                  latest_uploaded_bytes = $latest_uploaded_bytes,
+                                  latest_total_bytes = $latest_total_bytes,
+                                  latest_download_rate_bytes_per_second = $latest_download_rate_bytes_per_second,
+                                  latest_upload_rate_bytes_per_second = $latest_upload_rate_bytes_per_second,
+                                  latest_tracker_count = $latest_tracker_count,
+                                  latest_connected_peer_count = $latest_connected_peer_count,
+                                  submitted_at_utc = $submitted_at_utc,
+                                  metadata_resolved_at_utc = $metadata_resolved_at_utc,
+                                  download_started_at_utc = $download_started_at_utc,
+                                  download_completed_at_utc = $download_completed_at_utc,
+                                  seeding_started_at_utc = $seeding_started_at_utc,
+                                  last_activity_at_utc = $last_activity_at_utc,
+                                  last_updated_at_utc = $last_updated_at_utc,
+                                  removed_at_utc = $removed_at_utc,
+                                  invoke_completion_callback = $invoke_completion_callback,
+                                  completion_callback_label = $completion_callback_label,
+                                  latest_callback_status = $latest_callback_status,
+                                  callback_started_at_utc = $callback_started_at_utc,
+                                  callback_completed_at_utc = $callback_completed_at_utc,
+                                  callback_last_error = $callback_last_error,
+                                  data_deleted = $data_deleted,
+                                  removal_reason = $removal_reason,
+                                  removed_by_cleanup_policy = $removed_by_cleanup_policy,
+                                  final_payload_path = $final_payload_path,
+                                  service_instance_id_last_seen = $service_instance_id_last_seen
+                              WHERE torrent_id = $torrent_id;
+                              """;
+
+        BindRecord(command, record);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static async Task<TorrentHistoryRecord?> ReadSingleAsync(SqliteCommand command,
         CancellationToken                                                                    cancellationToken)
     {
