@@ -13,4 +13,6 @@ public interface ITorrentHistoryService
     Task CreateOnAddAsync(TorrentDetailDto torrent, ResolvedTorrentCategorySelection categorySelection,
         CancellationToken cancellationToken);
     Task ObserveSnapshotAsync(TorrentSnapshot snapshot, CancellationToken cancellationToken);
+    Task MarkRemovedAsync(Guid torrentId, bool dataDeleted, string removalReason, bool removedByCleanupPolicy,
+        DateTimeOffset removedAtUtc, CancellationToken cancellationToken);
 }

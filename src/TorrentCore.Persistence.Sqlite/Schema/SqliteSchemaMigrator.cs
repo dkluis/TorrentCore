@@ -390,7 +390,6 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                                                   info_hash TEXT NULL,
                                                   category_key TEXT NULL,
                                                   download_root_path TEXT NULL,
-                                                  save_path TEXT NOT NULL,
                                                   latest_torrent_state TEXT NOT NULL,
                                                   latest_wait_reason TEXT NULL,
                                                   latest_error_message TEXT NULL,
@@ -432,6 +431,147 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                                               """;
                         await command.ExecuteNonQueryAsync(cancellationToken);
                     }
+                }
+            ),
+            new SqliteMigrationDefinition(
+                12, "remove_torrent_history_save_path", async (connection, cancellationToken) =>
+                {
+                    if (!await TableExistsAsync(connection, "torrent_history", cancellationToken) ||
+                        !await ColumnExistsAsync(connection, "torrent_history", "save_path", cancellationToken))
+                    {
+                        return;
+                    }
+
+                    var command = connection.CreateCommand();
+                    command.CommandText = """
+                                          ALTER TABLE torrent_history RENAME TO torrent_history_legacy_save_path;
+
+                                          CREATE TABLE torrent_history (
+                                              torrent_id TEXT PRIMARY KEY,
+                                              name TEXT NOT NULL,
+                                              magnet_uri TEXT NOT NULL,
+                                              info_hash TEXT NULL,
+                                              category_key TEXT NULL,
+                                              download_root_path TEXT NULL,
+                                              latest_torrent_state TEXT NOT NULL,
+                                              latest_wait_reason TEXT NULL,
+                                              latest_error_message TEXT NULL,
+                                              latest_progress_percent REAL NOT NULL,
+                                              latest_downloaded_bytes INTEGER NOT NULL,
+                                              latest_uploaded_bytes INTEGER NOT NULL,
+                                              latest_total_bytes INTEGER NULL,
+                                              latest_download_rate_bytes_per_second INTEGER NOT NULL,
+                                              latest_upload_rate_bytes_per_second INTEGER NOT NULL,
+                                              latest_tracker_count INTEGER NOT NULL,
+                                              latest_connected_peer_count INTEGER NOT NULL,
+                                              submitted_at_utc TEXT NOT NULL,
+                                              metadata_resolved_at_utc TEXT NULL,
+                                              download_started_at_utc TEXT NULL,
+                                              download_completed_at_utc TEXT NULL,
+                                              seeding_started_at_utc TEXT NULL,
+                                              last_activity_at_utc TEXT NULL,
+                                              last_updated_at_utc TEXT NOT NULL,
+                                              removed_at_utc TEXT NULL,
+                                              invoke_completion_callback INTEGER NOT NULL,
+                                              completion_callback_label TEXT NULL,
+                                              latest_callback_status TEXT NULL,
+                                              callback_started_at_utc TEXT NULL,
+                                              callback_completed_at_utc TEXT NULL,
+                                              callback_last_error TEXT NULL,
+                                              data_deleted INTEGER NOT NULL DEFAULT 0,
+                                              removal_reason TEXT NULL,
+                                              removed_by_cleanup_policy INTEGER NOT NULL DEFAULT 0,
+                                              final_payload_path TEXT NULL,
+                                              service_instance_id_last_seen TEXT NULL
+                                          );
+
+                                          INSERT INTO torrent_history (
+                                              torrent_id,
+                                              name,
+                                              magnet_uri,
+                                              info_hash,
+                                              category_key,
+                                              download_root_path,
+                                              latest_torrent_state,
+                                              latest_wait_reason,
+                                              latest_error_message,
+                                              latest_progress_percent,
+                                              latest_downloaded_bytes,
+                                              latest_uploaded_bytes,
+                                              latest_total_bytes,
+                                              latest_download_rate_bytes_per_second,
+                                              latest_upload_rate_bytes_per_second,
+                                              latest_tracker_count,
+                                              latest_connected_peer_count,
+                                              submitted_at_utc,
+                                              metadata_resolved_at_utc,
+                                              download_started_at_utc,
+                                              download_completed_at_utc,
+                                              seeding_started_at_utc,
+                                              last_activity_at_utc,
+                                              last_updated_at_utc,
+                                              removed_at_utc,
+                                              invoke_completion_callback,
+                                              completion_callback_label,
+                                              latest_callback_status,
+                                              callback_started_at_utc,
+                                              callback_completed_at_utc,
+                                              callback_last_error,
+                                              data_deleted,
+                                              removal_reason,
+                                              removed_by_cleanup_policy,
+                                              final_payload_path,
+                                              service_instance_id_last_seen
+                                          )
+                                          SELECT
+                                              torrent_id,
+                                              name,
+                                              magnet_uri,
+                                              info_hash,
+                                              category_key,
+                                              download_root_path,
+                                              latest_torrent_state,
+                                              latest_wait_reason,
+                                              latest_error_message,
+                                              latest_progress_percent,
+                                              latest_downloaded_bytes,
+                                              latest_uploaded_bytes,
+                                              latest_total_bytes,
+                                              latest_download_rate_bytes_per_second,
+                                              latest_upload_rate_bytes_per_second,
+                                              latest_tracker_count,
+                                              latest_connected_peer_count,
+                                              submitted_at_utc,
+                                              metadata_resolved_at_utc,
+                                              download_started_at_utc,
+                                              download_completed_at_utc,
+                                              seeding_started_at_utc,
+                                              last_activity_at_utc,
+                                              last_updated_at_utc,
+                                              removed_at_utc,
+                                              invoke_completion_callback,
+                                              completion_callback_label,
+                                              latest_callback_status,
+                                              callback_started_at_utc,
+                                              callback_completed_at_utc,
+                                              callback_last_error,
+                                              data_deleted,
+                                              removal_reason,
+                                              removed_by_cleanup_policy,
+                                              final_payload_path,
+                                              service_instance_id_last_seen
+                                          FROM torrent_history_legacy_save_path;
+
+                                          DROP TABLE torrent_history_legacy_save_path;
+
+                                          CREATE INDEX IF NOT EXISTS idx_torrent_history_submitted_at_utc
+                                              ON torrent_history (submitted_at_utc DESC, torrent_id DESC);
+
+                                          CREATE INDEX IF NOT EXISTS idx_torrent_history_info_hash
+                                              ON torrent_history (info_hash)
+                                              WHERE info_hash IS NOT NULL;
+                                          """;
+                    await command.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
         ];

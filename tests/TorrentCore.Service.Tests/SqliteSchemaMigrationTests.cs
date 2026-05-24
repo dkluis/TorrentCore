@@ -34,7 +34,20 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], versions);
+
+        var historyColumnsCommand = connection.CreateCommand();
+        historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";
+
+        var historyColumns = new List<string>();
+        await using var historyReader = await historyColumnsCommand.ExecuteReaderAsync();
+        while (await historyReader.ReadAsync())
+        {
+            historyColumns.Add(historyReader.GetString(1));
+        }
+
+        Assert.Contains("download_root_path", historyColumns);
+        Assert.DoesNotContain("save_path", historyColumns);
     }
 
     [Fact]

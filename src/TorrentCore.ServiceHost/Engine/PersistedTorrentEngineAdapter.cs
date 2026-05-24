@@ -325,6 +325,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         CancellationToken                                      cancellationToken)
     {
         var torrent = await GetRequiredSnapshotAsync(torrentId, cancellationToken);
+        var removedAtUtc = DateTimeOffset.UtcNow;
         await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
 
         if (request.DeleteData)
@@ -334,12 +335,20 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             TorrentDataPathCleanup.DeleteEmptyDirectories(downloadRootPath, [torrent.SavePath]);
         }
 
+        await torrentHistoryService.MarkRemovedAsync(
+            torrentId,
+            dataDeleted: request.DeleteData,
+            removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
+            removedByCleanupPolicy: false,
+            removedAtUtc,
+            cancellationToken);
+
         return new TorrentActionResultDto
         {
             TorrentId      = torrent.TorrentId,
             Action         = "remove",
             State          = TorrentState.Removed,
-            ProcessedAtUtc = DateTimeOffset.UtcNow,
+            ProcessedAtUtc = removedAtUtc,
             DataDeleted    = request.DeleteData,
         };
     }

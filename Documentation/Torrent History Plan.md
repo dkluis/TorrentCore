@@ -8,12 +8,13 @@ This document captures the agreed design for adding a durable torrent history ta
 
 Current execution status:
 
-- Slices A-B complete
+- Slices A-C complete
 - Phase 1 complete
 - Phase 2 complete
 - Phase 3 complete
 - Phase 4 complete
-- Phases 5-7 pending
+- Phase 5 complete
+- Phases 6-7 pending
 
 Last updated: `2026-05-24`
 
@@ -98,7 +99,6 @@ The history row should include the fields requested during planning, plus the cu
 - `info_hash`
 - `category_key`
 - `download_root_path`
-- `save_path`
 
 ### Latest Operator State
 
@@ -158,19 +158,17 @@ Reason:
 
 If a later UI wants to label the column as `Deleted`, that can be a presentation choice rather than the storage name.
 
-### `save_path`
+### `download_root_path`
 
-`save_path` is the directory where the torrent content is being stored.
+For history, `download_root_path` is the only stored directory field.
 
-This is not necessarily a torrent-specific file or folder path.
+This is the directory where the torrent content is being stored.
 
 In the current production model:
 
 - the download location and finished location are the same
 - incomplete media is distinguished by MonoTorrent's `.!mt` suffix
 - when the torrent completes, MonoTorrent removes that suffix
-
-Accordingly, `save_path` should not be interpreted as the final file path for the payload.
 
 ### `final_download_path`
 
@@ -183,7 +181,7 @@ Examples:
 
 This should remain `null` until TorrentCore genuinely knows the final file or directory path.
 
-It should not be pre-populated during add flow from `save_path`.
+It should not be pre-populated during add flow from `download_root_path`.
 
 ### `last_updated_at_utc`
 
@@ -557,7 +555,17 @@ Estimated time:
 
 Status:
 
-- `Pending`
+- `Complete`
+
+Delivered:
+
+- manual remove now stamps `removed_at_utc`, `data_deleted`, `removal_reason`, and `removed_by_cleanup_policy`
+- remove-with-data now records successful payload deletion in history
+- automatic completed-torrent cleanup now stamps removal history and preserves the durable history row
+- focused coverage now verifies:
+  - manual remove retention
+  - remove-with-data retention
+  - automatic cleanup retention
 
 ### Phase 6 - Read API
 

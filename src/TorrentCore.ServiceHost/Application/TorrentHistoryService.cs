@@ -25,7 +25,6 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
                 InfoHash = torrent.InfoHash,
                 CategoryKey = torrent.CategoryKey,
                 DownloadRootPath = categorySelection.DownloadRootPath,
-                SavePath = torrent.SavePath,
                 LatestTorrentState = torrent.State.ToString(),
                 LatestWaitReason = torrent.WaitReason?.ToString(),
                 LatestErrorMessage = torrent.ErrorMessage,
@@ -81,6 +80,31 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
     }
 
+    public async Task MarkRemovedAsync(Guid torrentId, bool dataDeleted, string removalReason, bool removedByCleanupPolicy,
+        DateTimeOffset removedAtUtc, CancellationToken cancellationToken)
+    {
+        var existing = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);
+        if (existing is null)
+        {
+            return;
+        }
+
+        var updated = Clone(existing);
+        updated.RemovedAtUtc = removedAtUtc;
+        updated.DataDeleted = dataDeleted;
+        updated.RemovalReason = removalReason;
+        updated.RemovedByCleanupPolicy = removedByCleanupPolicy;
+        updated.LastUpdatedAtUtc = removedAtUtc;
+        updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
+
+        if (!HasMeaningfulChanges(existing, updated))
+        {
+            return;
+        }
+
+        await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
+    }
+
     private TorrentHistoryRecord CreateFromSnapshot(TorrentSnapshot snapshot, DateTimeOffset now)
     {
         var latestState = snapshot.State.ToString();
@@ -97,7 +121,6 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             InfoHash = snapshot.InfoHash,
             CategoryKey = snapshot.CategoryKey,
             DownloadRootPath = snapshot.DownloadRootPath,
-            SavePath = snapshot.SavePath,
             LatestTorrentState = latestState,
             LatestWaitReason = null,
             LatestErrorMessage = snapshot.ErrorMessage,
@@ -141,7 +164,6 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         updated.InfoHash = snapshot.InfoHash;
         updated.CategoryKey = snapshot.CategoryKey;
         updated.DownloadRootPath = snapshot.DownloadRootPath;
-        updated.SavePath = snapshot.SavePath;
         updated.LatestTorrentState = latestState;
         updated.LatestErrorMessage = snapshot.ErrorMessage;
         updated.LatestProgressPercent = snapshot.ProgressPercent;
@@ -227,7 +249,6 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             existing.InfoHash != updated.InfoHash ||
             existing.CategoryKey != updated.CategoryKey ||
             existing.DownloadRootPath != updated.DownloadRootPath ||
-            existing.SavePath != updated.SavePath ||
             existing.LatestTorrentState != updated.LatestTorrentState ||
             existing.LatestWaitReason != updated.LatestWaitReason ||
             existing.LatestErrorMessage != updated.LatestErrorMessage ||
@@ -250,6 +271,10 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             existing.CallbackStartedAtUtc != updated.CallbackStartedAtUtc ||
             existing.CallbackCompletedAtUtc != updated.CallbackCompletedAtUtc ||
             existing.CallbackLastError != updated.CallbackLastError ||
+            existing.RemovedAtUtc != updated.RemovedAtUtc ||
+            existing.DataDeleted != updated.DataDeleted ||
+            existing.RemovalReason != updated.RemovalReason ||
+            existing.RemovedByCleanupPolicy != updated.RemovedByCleanupPolicy ||
             existing.ServiceInstanceIdLastSeen != updated.ServiceInstanceIdLastSeen;
     }
 
@@ -274,7 +299,6 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             InfoHash = source.InfoHash,
             CategoryKey = source.CategoryKey,
             DownloadRootPath = source.DownloadRootPath,
-            SavePath = source.SavePath,
             LatestTorrentState = source.LatestTorrentState,
             LatestWaitReason = source.LatestWaitReason,
             LatestErrorMessage = source.LatestErrorMessage,

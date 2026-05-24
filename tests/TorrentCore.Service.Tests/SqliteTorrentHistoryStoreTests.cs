@@ -32,7 +32,6 @@ public sealed class SqliteTorrentHistoryStoreTests
             Assert.Equal(record.InfoHash, reloaded.InfoHash);
             Assert.Equal(record.CategoryKey, reloaded.CategoryKey);
             Assert.Equal(record.DownloadRootPath, reloaded.DownloadRootPath);
-            Assert.Equal(record.SavePath, reloaded.SavePath);
             Assert.Equal(record.LatestTorrentState, reloaded.LatestTorrentState);
             Assert.Equal(record.LatestProgressPercent, reloaded.LatestProgressPercent);
             Assert.Equal(record.LatestDownloadedBytes, reloaded.LatestDownloadedBytes);
@@ -63,7 +62,6 @@ public sealed class SqliteTorrentHistoryStoreTests
             InfoHash = "2222222222222222222222222222222222222222",
             CategoryKey = "TV",
             DownloadRootPath = "/tmp/torrentcore-tests/downloads",
-            SavePath = "/tmp/torrentcore-tests/downloads/History Regression Torrent",
             LatestTorrentState = "ResolvingMetadata",
             LatestWaitReason = null,
             LatestErrorMessage = null,

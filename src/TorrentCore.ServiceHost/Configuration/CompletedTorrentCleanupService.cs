@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
+using TorrentCore.Service.Application;
 using TorrentCore.Service.Engine;
 
 #endregion
@@ -12,7 +13,8 @@ using TorrentCore.Service.Engine;
 namespace TorrentCore.Service.Configuration;
 
 public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentStateStore,
-    ITorrentEngineAdapter torrentEngineAdapter, IRuntimeSettingsService runtimeSettingsService,
+    ITorrentEngineAdapter torrentEngineAdapter, ITorrentHistoryService torrentHistoryService,
+    IRuntimeSettingsService runtimeSettingsService,
     IActivityLogService activityLogService, ServiceInstanceContext serviceInstanceContext,
     IOptions<TorrentCoreServiceOptions> serviceOptions, ILogger<CompletedTorrentCleanupService> logger)
         : BackgroundService
@@ -99,6 +101,14 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                             DeleteData = false,
                         }, cancellationToken
                     );
+
+                    await torrentHistoryService.MarkRemovedAsync(
+                        torrent.TorrentId,
+                        dataDeleted: false,
+                        removalReason: "automatic_cleanup",
+                        removedByCleanupPolicy: true,
+                        removedAtUtc: DateTimeOffset.UtcNow,
+                        cancellationToken);
 
                     await activityLogService.WriteAsync(
                         new ActivityLogWriteRequest

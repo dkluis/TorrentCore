@@ -159,7 +159,6 @@ public sealed class TorrentApiTests
                                   info_hash,
                                   category_key,
                                   download_root_path,
-                                  save_path,
                                   latest_torrent_state,
                                   latest_progress_percent,
                                   latest_downloaded_bytes,
@@ -182,16 +181,15 @@ public sealed class TorrentApiTests
         Assert.Equal(torrent.InfoHash, reader.GetString(3));
         Assert.Equal("TV", reader.GetString(4));
         Assert.Equal(Path.Combine(downloadPath, "TV"), reader.GetString(5));
-        Assert.Equal(torrent.SavePath, reader.GetString(6));
-        Assert.Equal(torrent.State.ToString(), reader.GetString(7));
-        Assert.Equal(torrent.ProgressPercent, reader.GetDouble(8));
-        Assert.Equal(torrent.DownloadedBytes, reader.GetInt64(9));
+        Assert.Equal(torrent.State.ToString(), reader.GetString(6));
+        Assert.Equal(torrent.ProgressPercent, reader.GetDouble(7));
+        Assert.Equal(torrent.DownloadedBytes, reader.GetInt64(8));
+        Assert.False(reader.IsDBNull(9));
         Assert.False(reader.IsDBNull(10));
-        Assert.False(reader.IsDBNull(11));
-        Assert.True(reader.GetInt64(12) != 0);
-        Assert.Equal("TV", reader.GetString(13));
+        Assert.True(reader.GetInt64(11) != 0);
+        Assert.Equal("TV", reader.GetString(12));
+        Assert.Equal(0, reader.GetInt64(13));
         Assert.Equal(0, reader.GetInt64(14));
-        Assert.Equal(0, reader.GetInt64(15));
         Assert.False(await reader.ReadAsync());
     }
 
@@ -243,6 +241,124 @@ public sealed class TorrentApiTests
         Assert.True(historyRow.SeedingStartedAtUtc >= historyRow.DownloadCompletedAtUtc);
         Assert.True(historyRow.LastUpdatedAtUtc >= historyRow.SeedingStartedAtUtc);
         Assert.Equal(100, historyRow.LatestProgressPercent);
+    }
+
+    [Fact]
+    public async Task Remove_LeavesHistoryRow_AndStampsManualRemoval()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-remove");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(
+            httpClient,
+            "2424242424242424242424242424242424242424",
+            "History Remove Torrent",
+            "Movie");
+        response.EnsureSuccessStatusCode();
+
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(torrent);
+
+        var removeResponse = await httpClient.PostAsync($"api/torrents/{torrent.TorrentId}/remove", content: null);
+        removeResponse.EnsureSuccessStatusCode();
+
+        var historyRow = await WaitForAsync(
+            async () => await GetRemovalHistoryRowAsync(databaseFilePath, torrent.TorrentId),
+            row => row is not null && row.RemovedAtUtc is not null,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(historyRow);
+        Assert.NotNull(historyRow.RemovedAtUtc);
+        Assert.False(historyRow.DataDeleted);
+        Assert.Equal("manual_remove", historyRow.RemovalReason);
+        Assert.False(historyRow.RemovedByCleanupPolicy);
+    }
+
+    [Fact]
+    public async Task RemoveWithDeleteData_LeavesHistoryRow_AndStampsDeleteData()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-remove-data");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(
+            httpClient,
+            "2525252525252525252525252525252525252525",
+            "History Remove Data Torrent",
+            "Movie");
+        response.EnsureSuccessStatusCode();
+
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(torrent);
+
+        var removeResponse = await httpClient.PostAsJsonAsync(
+            $"api/torrents/{torrent.TorrentId}/remove",
+            new RemoveTorrentRequest
+            {
+                DeleteData = true,
+            });
+        removeResponse.EnsureSuccessStatusCode();
+
+        var historyRow = await WaitForAsync(
+            async () => await GetRemovalHistoryRowAsync(databaseFilePath, torrent.TorrentId),
+            row => row is not null && row.RemovedAtUtc is not null && row.DataDeleted,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(historyRow);
+        Assert.NotNull(historyRow.RemovedAtUtc);
+        Assert.True(historyRow.DataDeleted);
+        Assert.Equal("manual_remove_delete_data", historyRow.RemovalReason);
+        Assert.False(historyRow.RemovedByCleanupPolicy);
+    }
+
+    [Fact]
+    public async Task CleanupRemove_LeavesHistoryRow_AndStampsAutomaticCleanup()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-cleanup");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 100,
+            seedingStopMode: SeedingStopMode.StopImmediately,
+            seedingStopRatio: 1,
+            completedTorrentCleanupMode: CompletedTorrentCleanupMode.AfterCompletedMinutes,
+            completedTorrentCleanupMinutes: 0);
+        using var httpClient = factory.CreateClient();
+
+        var response = await AddMagnetAsync(
+            httpClient,
+            "2626262626262626262626262626262626262626",
+            "History Cleanup Torrent");
+        response.EnsureSuccessStatusCode();
+
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(torrent);
+
+        var historyRow = await WaitForAsync(
+            async () => await GetRemovalHistoryRowAsync(databaseFilePath, torrent.TorrentId),
+            row => row is not null && row.RemovedAtUtc is not null && row.RemovedByCleanupPolicy,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(historyRow);
+        Assert.NotNull(historyRow.RemovedAtUtc);
+        Assert.False(historyRow.DataDeleted);
+        Assert.Equal("automatic_cleanup", historyRow.RemovalReason);
+        Assert.True(historyRow.RemovedByCleanupPolicy);
     }
 
     [Fact]
@@ -2647,6 +2763,8 @@ public sealed class TorrentApiTests
         SeedingStopMode? seedingStopMode = null,
         double? seedingStopRatio = null,
         int? seedingStopMinutes = null,
+        CompletedTorrentCleanupMode? completedTorrentCleanupMode = null,
+        int? completedTorrentCleanupMinutes = null,
         int? maxActiveMetadataResolutions = null,
         int? maxActiveDownloads = null,
         int? runtimeTickIntervalMilliseconds = null,
@@ -2744,6 +2862,16 @@ public sealed class TorrentApiTests
                         settings[$"{TorrentCoreServiceOptions.SectionName}:SeedingStopMinutes"] = seedingStopMinutes.Value.ToString();
                     }
 
+                    if (completedTorrentCleanupMode is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:CompletedTorrentCleanupMode"] = completedTorrentCleanupMode.Value.ToString();
+                    }
+
+                    if (completedTorrentCleanupMinutes is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:CompletedTorrentCleanupMinutes"] = completedTorrentCleanupMinutes.Value.ToString();
+                    }
+
                     if (maxActiveMetadataResolutions is not null)
                     {
                         settings[$"{TorrentCoreServiceOptions.SectionName}:MaxActiveMetadataResolutions"] = maxActiveMetadataResolutions.Value.ToString();
@@ -2792,6 +2920,10 @@ public sealed class TorrentApiTests
         public DateTimeOffset? DownloadCompletedAtUtc { get; init; }
         public DateTimeOffset? SeedingStartedAtUtc { get; init; }
         public DateTimeOffset LastUpdatedAtUtc { get; init; }
+        public DateTimeOffset? RemovedAtUtc { get; init; }
+        public bool DataDeleted { get; init; }
+        public string? RemovalReason { get; init; }
+        public bool RemovedByCleanupPolicy { get; init; }
     }
 
     private static async Task<TorrentHistoryRow?> GetTorrentHistoryRowAsync(string databaseFilePath, Guid torrentId)
@@ -2830,6 +2962,45 @@ public sealed class TorrentApiTests
             DownloadCompletedAtUtc = reader.IsDBNull(4) ? null : DateTimeOffset.Parse(reader.GetString(4)),
             SeedingStartedAtUtc = reader.IsDBNull(5) ? null : DateTimeOffset.Parse(reader.GetString(5)),
             LastUpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(6)),
+        };
+    }
+
+    private static async Task<TorrentHistoryRow?> GetRemovalHistoryRowAsync(string databaseFilePath, Guid torrentId)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              SELECT
+                                  removed_at_utc,
+                                  data_deleted,
+                                  removal_reason,
+                                  removed_by_cleanup_policy,
+                                  last_updated_at_utc,
+                                  latest_torrent_state,
+                                  latest_progress_percent
+                              FROM torrent_history
+                              WHERE torrent_id = $torrent_id
+                              LIMIT 1;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+
+        return new TorrentHistoryRow
+        {
+            RemovedAtUtc = reader.IsDBNull(0) ? null : DateTimeOffset.Parse(reader.GetString(0)),
+            DataDeleted = reader.GetInt64(1) != 0,
+            RemovalReason = reader.IsDBNull(2) ? null : reader.GetString(2),
+            RemovedByCleanupPolicy = reader.GetInt64(3) != 0,
+            LastUpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(4)),
+            LatestTorrentState = reader.GetString(5),
+            LatestProgressPercent = reader.GetDouble(6),
         };
     }
 

@@ -676,6 +676,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         CancellationToken                                      cancellationToken)
     {
         var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+        var removedAtUtc = DateTimeOffset.UtcNow;
         var cleanupCandidatePaths = request.DeleteData ? GetCleanupCandidatePaths(manager) : Array.Empty<string>();
 
         await RemoveManagedTorrentAsync(torrentId, manager, request.DeleteData, cancellationToken);
@@ -689,13 +690,20 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         await SynchronizeWithoutAutomaticRecoveryAsync(cancellationToken);
+        await torrentHistoryService.MarkRemovedAsync(
+            torrentId,
+            dataDeleted: request.DeleteData,
+            removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
+            removedByCleanupPolicy: false,
+            removedAtUtc,
+            cancellationToken);
 
         return new TorrentActionResultDto
         {
             TorrentId      = torrentId,
             Action         = "remove",
             State          = ContractTorrentState.Removed,
-            ProcessedAtUtc = DateTimeOffset.UtcNow,
+            ProcessedAtUtc = removedAtUtc,
             DataDeleted    = request.DeleteData,
         };
     }

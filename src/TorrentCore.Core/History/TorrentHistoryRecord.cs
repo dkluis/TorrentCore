@@ -8,7 +8,6 @@ public sealed class TorrentHistoryRecord
     public          string?         InfoHash                           { get; set; }
     public          string?         CategoryKey                        { get; set; }
     public          string?         DownloadRootPath                   { get; set; }
-    public required string          SavePath                           { get; set; }
     public required string          LatestTorrentState                 { get; set; }
     public          string?         LatestWaitReason                   { get; set; }
     public          string?         LatestErrorMessage                 { get; set; }
