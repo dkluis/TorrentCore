@@ -7,6 +7,7 @@ using TorrentCore.Contracts;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 
 #endregion
@@ -84,6 +85,62 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
         using var response = await httpClient.GetAsync(BuildRequestUri("api/torrents"), cancellationToken);
         return await ReadResponseAsync<IReadOnlyList<TorrentSummaryDto>>(response, cancellationToken) ??
                 Array.Empty<TorrentSummaryDto>();
+    }
+
+    public async Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(
+        TorrentHistoryQueryRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(request.TorrentName))
+        {
+            query.Add($"torrentName={Uri.EscapeDataString(request.TorrentName)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.CategoryKey))
+        {
+            query.Add($"categoryKey={Uri.EscapeDataString(request.CategoryKey)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.State))
+        {
+            query.Add($"state={Uri.EscapeDataString(request.State)}");
+        }
+
+        if (request.Removed is not null)
+        {
+            query.Add($"removed={request.Removed.Value.ToString().ToLowerInvariant()}");
+        }
+
+        if (request.FromDate is not null)
+        {
+            query.Add($"fromDate={request.FromDate.Value:yyyy-MM-dd}");
+        }
+
+        if (request.ToDate is not null)
+        {
+            query.Add($"toDate={request.ToDate.Value:yyyy-MM-dd}");
+        }
+
+        if (request.Take is > 0)
+        {
+            query.Add($"take={request.Take.Value}");
+        }
+
+        var relativePath = query.Count == 0 ? "api/history" : $"api/history?{string.Join("&", query)}";
+        using var response = await httpClient.GetAsync(BuildRequestUri(relativePath), cancellationToken);
+        return await ReadResponseAsync<IReadOnlyList<TorrentHistorySummaryDto>>(response, cancellationToken) ??
+                Array.Empty<TorrentHistorySummaryDto>();
+    }
+
+    public async Task<TorrentHistoryDetailDto?> GetHistoryByTorrentIdAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(
+            BuildRequestUri($"api/history/by-torrent/{torrentId}"), cancellationToken
+        );
+        return await ReadResponseAsync<TorrentHistoryDetailDto>(response, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ActivityLogEntryDto>> GetRecentLogsAsync(int take = 100, string? category = null,

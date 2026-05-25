@@ -74,7 +74,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             return;
         }
 
-        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await _gate.WaitAsync(cancellationToken);
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
 
         try
         {
@@ -489,6 +496,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var now             = DateTimeOffset.UtcNow;
             var updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
 
             await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
@@ -527,6 +535,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var queuedSnapshot  = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
             queuedSnapshot.ErrorMessage = null;
             await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(queuedSnapshot, cancellationToken);
 
             await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
 
@@ -568,6 +577,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             await RequestMetadataDiscoveryRefreshAsync(currentSnapshot, manager, now, "manual", cancellationToken);
             var persistedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
             await torrentStateStore.UpdateAsync(persistedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(persistedSnapshot, cancellationToken);
 
             return new TorrentActionResultDto
             {

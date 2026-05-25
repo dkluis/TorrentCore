@@ -26,17 +26,19 @@ Current repo status:
 - the maintained operator surface is now `TorrentCore.WebUI`
 - the supported UI work is complete, including settings and service connection flows
 - the product has now been exercised in production for multiple weeks
-- the torrent history implementation is through `Slice D / Phase 6`, including:
+- the torrent history implementation is through `Slice D / Phase 7`, including:
   - separate `torrent_history` table
   - lifecycle updates
   - callback/removal retention
   - read API with explicit local-date filters
+  - Phase 7 hardening across recovery, explicit action paths, and history-row creation races
+  - a WebUI `History` page with explicit filters, results grid, and selected-entry detail panel
 - the remaining documented open product item is defining the v1 authentication and authorization model
 
 Current implementation start point:
 - continue at `Documentation/Torrent History Plan.md`
-- next engineering slice is `Slice D / Phase 7`
-- Phase 7 is the history hardening and lifecycle-gap review pass
+- Phase 7 is complete
+- next implementation slice should be chosen from the remaining product backlog rather than the history hardening pass
 
 Useful original context from TVMaze:
 - `/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TVMaze/Documentation/Torrent Engine Service Summary.md`

@@ -16,52 +16,30 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
 {
     private static readonly TimeZoneInfo LocalTimeZone = TimeZoneInfo.Local;
 
-    public Task CreateOnAddAsync(TorrentCore.Contracts.Torrents.TorrentDetailDto torrent,
+    public async Task CreateOnAddAsync(TorrentCore.Contracts.Torrents.TorrentDetailDto torrent,
         ResolvedTorrentCategorySelection categorySelection, CancellationToken cancellationToken)
     {
         var submittedAtUtc = torrent.AddedAtUtc;
+        var record = CreateFromAdd(torrent, categorySelection, submittedAtUtc);
+        if (await torrentHistoryStore.TryInsertAsync(record, cancellationToken))
+        {
+            return;
+        }
 
-        return torrentHistoryStore.InsertAsync(
-            new TorrentHistoryRecord
-            {
-                TorrentId = torrent.TorrentId,
-                Name = torrent.Name,
-                MagnetUri = torrent.MagnetUri,
-                InfoHash = torrent.InfoHash,
-                CategoryKey = torrent.CategoryKey,
-                DownloadRootPath = categorySelection.DownloadRootPath,
-                LatestTorrentState = torrent.State.ToString(),
-                LatestWaitReason = torrent.WaitReason?.ToString(),
-                LatestErrorMessage = torrent.ErrorMessage,
-                LatestProgressPercent = torrent.ProgressPercent,
-                LatestDownloadedBytes = torrent.DownloadedBytes,
-                LatestUploadedBytes = 0,
-                LatestTotalBytes = torrent.TotalBytes,
-                LatestDownloadRateBytesPerSecond = torrent.DownloadRateBytesPerSecond,
-                LatestUploadRateBytesPerSecond = torrent.UploadRateBytesPerSecond,
-                LatestTrackerCount = torrent.TrackerCount,
-                LatestConnectedPeerCount = torrent.ConnectedPeerCount,
-                SubmittedAtUtc = submittedAtUtc,
-                MetadataResolvedAtUtc = torrent.InfoHash is not null && torrent.TotalBytes is not null ? submittedAtUtc : null,
-                DownloadStartedAtUtc = null,
-                DownloadCompletedAtUtc = torrent.CompletedAtUtc,
-                SeedingStartedAtUtc = null,
-                LastActivityAtUtc = torrent.LastActivityAtUtc,
-                LastUpdatedAtUtc = submittedAtUtc,
-                RemovedAtUtc = null,
-                InvokeCompletionCallback = categorySelection.InvokeCompletionCallback,
-                CompletionCallbackLabel = categorySelection.CompletionCallbackLabel,
-                LatestCallbackStatus = torrent.CompletionCallbackState,
-                CallbackStartedAtUtc = torrent.CompletionCallbackPendingSinceUtc,
-                CallbackCompletedAtUtc = torrent.CompletionCallbackInvokedAtUtc,
-                CallbackLastError = torrent.CompletionCallbackLastError,
-                DataDeleted = false,
-                RemovalReason = null,
-                RemovedByCleanupPolicy = false,
-                FinalPayloadPath = null,
-                ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId,
-            },
-            cancellationToken);
+        var existing = await torrentHistoryStore.GetAsync(torrent.TorrentId, cancellationToken);
+        if (existing is null)
+        {
+            return;
+        }
+
+        var updated = MergeAddedTorrent(existing, torrent, categorySelection);
+        if (!HasMeaningfulChanges(existing, updated))
+        {
+            return;
+        }
+
+        updated.LastUpdatedAtUtc = submittedAtUtc;
+        await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
@@ -101,8 +79,16 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         if (existing is null)
         {
             var created = CreateFromSnapshot(snapshot, now);
-            await torrentHistoryStore.InsertAsync(created, cancellationToken);
-            return;
+            if (await torrentHistoryStore.TryInsertAsync(created, cancellationToken))
+            {
+                return;
+            }
+
+            existing = await torrentHistoryStore.GetAsync(snapshot.TorrentId, cancellationToken);
+            if (existing is null)
+            {
+                return;
+            }
         }
 
         var updated = MergeSnapshot(existing, snapshot, now);
@@ -187,6 +173,85 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             FinalPayloadPath = null,
             ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId,
         };
+    }
+
+    private TorrentHistoryRecord CreateFromAdd(TorrentCore.Contracts.Torrents.TorrentDetailDto torrent,
+        ResolvedTorrentCategorySelection categorySelection, DateTimeOffset submittedAtUtc)
+    {
+        return new TorrentHistoryRecord
+        {
+            TorrentId = torrent.TorrentId,
+            Name = torrent.Name,
+            MagnetUri = torrent.MagnetUri,
+            InfoHash = torrent.InfoHash,
+            CategoryKey = torrent.CategoryKey,
+            DownloadRootPath = categorySelection.DownloadRootPath,
+            LatestTorrentState = torrent.State.ToString(),
+            LatestWaitReason = torrent.WaitReason?.ToString(),
+            LatestErrorMessage = torrent.ErrorMessage,
+            LatestProgressPercent = torrent.ProgressPercent,
+            LatestDownloadedBytes = torrent.DownloadedBytes,
+            LatestUploadedBytes = 0,
+            LatestTotalBytes = torrent.TotalBytes,
+            LatestDownloadRateBytesPerSecond = torrent.DownloadRateBytesPerSecond,
+            LatestUploadRateBytesPerSecond = torrent.UploadRateBytesPerSecond,
+            LatestTrackerCount = torrent.TrackerCount,
+            LatestConnectedPeerCount = torrent.ConnectedPeerCount,
+            SubmittedAtUtc = submittedAtUtc,
+            MetadataResolvedAtUtc = torrent.InfoHash is not null && torrent.TotalBytes is not null ? submittedAtUtc : null,
+            DownloadStartedAtUtc = null,
+            DownloadCompletedAtUtc = torrent.CompletedAtUtc,
+            SeedingStartedAtUtc = null,
+            LastActivityAtUtc = torrent.LastActivityAtUtc,
+            LastUpdatedAtUtc = submittedAtUtc,
+            RemovedAtUtc = null,
+            InvokeCompletionCallback = categorySelection.InvokeCompletionCallback,
+            CompletionCallbackLabel = categorySelection.CompletionCallbackLabel,
+            LatestCallbackStatus = torrent.CompletionCallbackState,
+            CallbackStartedAtUtc = torrent.CompletionCallbackPendingSinceUtc,
+            CallbackCompletedAtUtc = torrent.CompletionCallbackInvokedAtUtc,
+            CallbackLastError = torrent.CompletionCallbackLastError,
+            DataDeleted = false,
+            RemovalReason = null,
+            RemovedByCleanupPolicy = false,
+            FinalPayloadPath = null,
+            ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId,
+        };
+    }
+
+    private TorrentHistoryRecord MergeAddedTorrent(TorrentHistoryRecord existing,
+        TorrentCore.Contracts.Torrents.TorrentDetailDto torrent,
+        ResolvedTorrentCategorySelection categorySelection)
+    {
+        var updated = Clone(existing);
+        updated.Name = torrent.Name;
+        updated.MagnetUri = torrent.MagnetUri;
+        updated.InfoHash = torrent.InfoHash;
+        updated.CategoryKey = torrent.CategoryKey;
+        updated.DownloadRootPath = categorySelection.DownloadRootPath;
+        updated.LatestTorrentState = torrent.State.ToString();
+        updated.LatestWaitReason = torrent.WaitReason?.ToString();
+        updated.LatestErrorMessage = torrent.ErrorMessage;
+        updated.LatestProgressPercent = torrent.ProgressPercent;
+        updated.LatestDownloadedBytes = torrent.DownloadedBytes;
+        updated.LatestTotalBytes = torrent.TotalBytes;
+        updated.LatestDownloadRateBytesPerSecond = torrent.DownloadRateBytesPerSecond;
+        updated.LatestUploadRateBytesPerSecond = torrent.UploadRateBytesPerSecond;
+        updated.LatestTrackerCount = torrent.TrackerCount;
+        updated.LatestConnectedPeerCount = torrent.ConnectedPeerCount;
+        updated.LastActivityAtUtc = torrent.LastActivityAtUtc;
+        updated.InvokeCompletionCallback = categorySelection.InvokeCompletionCallback;
+        updated.CompletionCallbackLabel = categorySelection.CompletionCallbackLabel;
+        updated.LatestCallbackStatus = torrent.CompletionCallbackState;
+        updated.CallbackStartedAtUtc = existing.CallbackStartedAtUtc ?? torrent.CompletionCallbackPendingSinceUtc;
+        updated.CallbackCompletedAtUtc = existing.CallbackCompletedAtUtc ?? torrent.CompletionCallbackInvokedAtUtc;
+        updated.CallbackLastError = torrent.CompletionCallbackLastError;
+        updated.MetadataResolvedAtUtc ??= torrent.InfoHash is not null && torrent.TotalBytes is not null
+            ? torrent.AddedAtUtc
+            : null;
+        updated.DownloadCompletedAtUtc ??= torrent.CompletedAtUtc;
+        updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
+        return updated;
     }
 
     private TorrentHistoryRecord MergeSnapshot(TorrentHistoryRecord existing, TorrentSnapshot snapshot, DateTimeOffset now)

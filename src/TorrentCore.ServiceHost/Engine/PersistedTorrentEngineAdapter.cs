@@ -72,6 +72,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             {
                 torrent.LastActivityAtUtc = now;
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
             }
         }
 
@@ -190,6 +191,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         torrent.LastActivityAtUtc          = DateTimeOffset.UtcNow;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
 
         return new TorrentActionResultDto
         {
@@ -221,6 +223,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         torrent.LastActivityAtUtc = DateTimeOffset.UtcNow;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
 
         return new TorrentActionResultDto
         {
@@ -248,6 +251,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         torrent.ErrorMessage      = null;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
 
         return new TorrentActionResultDto
         {
@@ -276,6 +280,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         torrent.ErrorMessage      = null;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
 
         return new TorrentActionResultDto
         {

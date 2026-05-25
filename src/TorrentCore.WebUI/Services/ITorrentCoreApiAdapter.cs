@@ -1,6 +1,7 @@
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.WebUI.Services;
@@ -27,6 +28,14 @@ public interface ITorrentCoreApiAdapter
         CancellationToken cancellationToken = default
     );
     Task<ServiceCallResult<IReadOnlyList<TorrentSummaryDto>>> GetTorrentsAsync(CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<IReadOnlyList<TorrentHistorySummaryDto>>> GetHistoryAsync(
+        TorrentHistoryQueryRequest request,
+        CancellationToken cancellationToken = default
+    );
+    Task<ServiceCallResult<TorrentHistoryDetailDto?>> GetHistoryByTorrentIdAsync(
+        Guid torrentId,
+        CancellationToken cancellationToken = default
+    );
     Task<ServiceCallResult<IReadOnlyList<ActivityLogEntryDto>>> GetRecentLogsAsync(
         int take = 100,
         string? category = null,

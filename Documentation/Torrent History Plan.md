@@ -8,17 +8,16 @@ This document captures the agreed design for adding a durable torrent history ta
 
 Current execution status:
 
-- Slices A-C complete
-- Slice D in progress
+- Slices A-D complete
 - Phase 6 complete
 - Phase 1 complete
 - Phase 2 complete
 - Phase 3 complete
 - Phase 4 complete
 - Phase 5 complete
-- Phase 7 pending
+- Phase 7 complete
 
-Last updated: `2026-05-24`
+Last updated: `2026-05-25`
 
 ## Agreed Constraints
 
@@ -74,10 +73,14 @@ Included:
 
 Not included:
 
-- history UI
 - history retention cleanup
 - event-sourced secondary history table
 - reuse of `activity_logs` as the source of truth
+
+Follow-up implementation note:
+
+- a WebUI `History` page has now been added after the original API-first slice
+- the page uses explicit local-date and text filters, a grid with browser-side sorting, and a selected-entry detail panel
 
 ## Estimated Effort
 
@@ -643,12 +646,19 @@ Estimated time:
 
 Status:
 
-- `Pending`
+- `Complete`
 
-Next start point:
+Completed validation and fixes:
 
-- resume at `Slice D / Phase 7`
-- first task is a lifecycle hardening pass over history update call sites and restart/recovery behavior
+- persisted startup recovery now updates history when it normalizes active torrent state
+- explicit pause, resume, refresh-metadata, and reset-metadata action paths now update history consistently in both persisted and MonoTorrent adapters
+- history row creation is now idempotent so add-flow writes and sync observation writes cannot race into a duplicate-row host failure
+- MonoTorrent stop handling now tolerates shutdown/disposal during teardown so regression tests do not fail on a disposed internal gate
+
+Phase 7 focused verification:
+
+- `dotnet build TorrentCore.sln`
+- `dotnet test tests/TorrentCore.Service.Tests/TorrentCore.Service.Tests.csproj --filter "FullyQualifiedName~TorrentHistoryServiceTests|FullyQualifiedName~SqliteTorrentHistoryStoreTests|FullyQualifiedName~FakeRuntime_HistoryRow_TracksCoreLifecycleMilestones|FullyQualifiedName~AddMagnet_CreatesTorrentHistoryRow|FullyQualifiedName~PersistedRecovery_NormalizesHistoryState_OnStartup|FullyQualifiedName~FakeRuntime_PauseAndResumeWhileDownloading_PreservesPausedStateUntilResumed|FullyQualifiedName~MonoTorrentEngine_RefreshMetadata_RequestsDiscoveryRefresh_AndWritesEngineLog|FullyQualifiedName~MonoTorrentEngine_ResetMetadataSession_RecreatesManager_AndWritesEngineLog"`
 
 ## Delivery Slices
 
@@ -715,7 +725,7 @@ Estimated time:
 
 Status:
 
-- `In Progress`
+- `Complete`
 
 ## Recommended Review Cadence
 

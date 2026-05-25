@@ -1550,6 +1550,7 @@ public sealed class TorrentApiTests
         using var httpClient = factory.CreateClient();
 
         var addResponse = await AddMagnetAsync(httpClient, "8484848484848484848484848484848484848484", "MonoTorrent Metadata Refresh");
+        addResponse.EnsureSuccessStatusCode();
         var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
 
         var resolvingTorrent = await WaitForAsync(
@@ -1558,6 +1559,8 @@ public sealed class TorrentApiTests
             timeout: TimeSpan.FromSeconds(5));
 
         Assert.NotNull(resolvingTorrent);
+        var historyBefore = await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}");
+        Assert.NotNull(historyBefore);
 
         var refreshResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/metadata/refresh", content: null);
         refreshResponse.EnsureSuccessStatusCode();
@@ -1565,6 +1568,15 @@ public sealed class TorrentApiTests
         var refreshResult = await refreshResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
         Assert.NotNull(refreshResult);
         Assert.Equal("refresh_metadata", refreshResult.Action);
+
+        var historyAfter = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}"),
+            history => history is not null && history.LastUpdatedAt >= historyBefore!.LastUpdatedAt,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(historyAfter);
+        Assert.Equal(TorrentState.ResolvingMetadata.ToString(), historyAfter.LatestTorrentState);
+        Assert.True(historyAfter.LastUpdatedAt >= historyBefore.LastUpdatedAt);
 
         var logs = await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={addedTorrent.TorrentId}"),
@@ -1592,7 +1604,8 @@ public sealed class TorrentApiTests
             runtimeTickIntervalMilliseconds: 50);
         using var httpClient = factory.CreateClient();
 
-        var addResponse = await AddMagnetAsync(httpClient, "9494949494949494949494949494949494949494", "MonoTorrent Metadata Reset");
+        var addResponse = await AddMagnetAsync(httpClient, "9595959595959595959595959595959595959595", "MonoTorrent Metadata Reset");
+        addResponse.EnsureSuccessStatusCode();
         var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
 
         var resolvingTorrent = await WaitForAsync(
@@ -1601,6 +1614,8 @@ public sealed class TorrentApiTests
             timeout: TimeSpan.FromSeconds(5));
 
         Assert.NotNull(resolvingTorrent);
+        var historyBefore = await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}");
+        Assert.NotNull(historyBefore);
 
         var resetResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/metadata/reset", content: null);
         resetResponse.EnsureSuccessStatusCode();
@@ -1608,6 +1623,15 @@ public sealed class TorrentApiTests
         var resetResult = await resetResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
         Assert.NotNull(resetResult);
         Assert.Equal("reset_metadata_session", resetResult.Action);
+
+        var historyAfter = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}"),
+            history => history is not null && history.LastUpdatedAt >= historyBefore!.LastUpdatedAt,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(historyAfter);
+        Assert.Equal(TorrentState.ResolvingMetadata.ToString(), historyAfter.LatestTorrentState);
+        Assert.True(historyAfter.LastUpdatedAt >= historyBefore.LastUpdatedAt);
 
         var logs = await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=150&torrentId={addedTorrent.TorrentId}"),
@@ -2284,7 +2308,13 @@ public sealed class TorrentApiTests
     [Fact]
     public async Task FakeRuntime_PauseAndResumeWhileDownloading_PreservesPausedStateUntilResumed()
     {
+        var rootPath = CreateTempRootPath("torrentcore-pause-history");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
         await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
             runtimeTickIntervalMilliseconds: 100,
             metadataResolutionDelayMilliseconds: 0,
             downloadProgressPercentPerTick: 0.5,
@@ -2323,6 +2353,14 @@ public sealed class TorrentApiTests
         Assert.Equal(TorrentWaitReason.PausedByOperator, pausedAfterDelay.WaitReason);
         Assert.Equal(pausedProgress, pausedAfterDelay.ProgressPercent);
 
+        var pausedHistory = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}"),
+            history => history is not null && history.LatestTorrentState == TorrentState.Paused.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(pausedHistory);
+        Assert.Equal(TorrentState.Paused.ToString(), pausedHistory.LatestTorrentState);
+
         var resumeResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent.TorrentId}/resume", content: null);
         resumeResponse.EnsureSuccessStatusCode();
 
@@ -2333,6 +2371,72 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(resumedTorrent);
         Assert.Equal(TorrentState.Downloading, resumedTorrent.State);
+
+        var resumedHistory = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}"),
+            history => history is not null && history.LatestTorrentState == TorrentState.Downloading.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(resumedHistory);
+        Assert.Equal(TorrentState.Downloading.ToString(), resumedHistory.LatestTorrentState);
+    }
+
+    [Fact]
+    public async Task PersistedRecovery_NormalizesHistoryState_OnStartup()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-recovery");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        Guid torrentId;
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         runtimeTickIntervalMilliseconds: 60_000))
+        {
+            using var httpClient = factory.CreateClient();
+            var response = await AddMagnetAsync(httpClient, "3535353535353535353535353535353535353535", "Recovery History Torrent");
+            var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            Assert.NotNull(torrent);
+            torrentId = torrent.TorrentId;
+        }
+
+        await ForcePersistedTorrentSnapshotAsync(
+            storagePath,
+            torrentId,
+            TorrentState.Downloading,
+            TorrentDesiredState.Runnable,
+            errorMessage: null);
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        var forcedHistoryTime = DateTimeOffset.UtcNow.AddMinutes(-5);
+        await UpdateHistoryRowAsync(
+            databaseFilePath,
+            torrentId,
+            forcedHistoryTime,
+            TorrentState.Downloading.ToString(),
+            removedAtUtc: null);
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         runtimeTickIntervalMilliseconds: 60_000))
+        {
+            using var httpClient = factory.CreateClient();
+
+            var history = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{torrentId}"),
+                item => item is not null &&
+                        item.LatestTorrentState != TorrentState.Downloading.ToString() &&
+                        item.LastUpdatedAt > TimeZoneInfo.ConvertTime(forcedHistoryTime, TimeZoneInfo.Local),
+                timeout: TimeSpan.FromSeconds(5));
+            var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+
+            Assert.NotNull(history);
+            Assert.DoesNotContain(history.LatestTorrentState, new[] { TorrentState.Downloading.ToString() });
+            Assert.NotNull(hostStatus);
+            Assert.Equal(1, hostStatus.StartupNormalizedTorrentCount);
+        }
     }
 
     [Fact]

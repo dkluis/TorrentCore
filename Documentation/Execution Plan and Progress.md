@@ -22,13 +22,22 @@ This document follows:
 
 ## Current Active Step
 
-- history work is currently at `Slice D / Phase 7`
+- history work through `Slice D / Phase 7` is complete
 - Phase 6 is complete:
   - history read API is implemented
   - local-time history responses are implemented
   - explicit local-date filters are implemented
   - string filters use case-insensitive contains matching
-- the next engineering task is the Phase 7 hardening and lifecycle-gap review pass
+- Phase 7 is complete:
+  - recovery normalization now updates history
+  - explicit pause/resume and metadata action paths now update history consistently
+  - history creation is idempotent across add-flow and sync observation races
+- the WebUI now includes a dedicated `History` page between `Dashboard` and `Torrents`
+  - explicit `From Date`, `To Date`, `Torrent Name`, `Category`, `State`, and `Removed` filters
+  - `Search`, `Clear Filters`, and `Refresh` operator actions
+  - results grid with browser-side sorting and paging
+  - selected-entry detail panel for the full stored history row
+- the next engineering task should be selected from the remaining product backlog rather than the history hardening pass
 
 ## Current Baseline
 

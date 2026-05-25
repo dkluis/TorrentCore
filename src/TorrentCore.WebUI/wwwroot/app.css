@@ -2035,6 +2035,79 @@ h1:focus {
     justify-content: flex-end;
 }
 
+.history-page {
+    height: 100%;
+    min-height: 0;
+}
+
+.history-tab-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.history-grid {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 0.75rem;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+.history-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.history-panel--filters {
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.history-panel--table {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.history-panel--detail {
+    overflow: auto;
+}
+
+.history-table-frame {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.history-table {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+}
+
+.history-table .mud-table-container {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    height: auto !important;
+}
+
+.history-table .mud-table-pagination {
+    flex: 0 0 auto;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--tvz-surface);
+}
+
 .logs-page {
     height: 100%;
     min-height: 0;

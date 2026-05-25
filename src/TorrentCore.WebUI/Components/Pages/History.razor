@@ -1,0 +1,773 @@
+@page "/history"
+@inject ITorrentCoreApiAdapter Api
+@inject IOperatorFeedbackService Feedback
+@inject IPageStateStore PageStateStore
+
+<PageTitle>History</PageTitle>
+
+<OperatorPage Kicker="Archive"
+              Title="History"
+              Summary="TVMaze-style history grid with explicit filters, one selected-entry panel, and browser-side sorting from the loaded result set."
+              Class="history-page"
+              StatusLine="Search applies the filter form against TorrentCore history. Sort from grid headers after rows are loaded.">
+    <HeaderActions>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   Size="Size.Small"
+                   Disabled="@(_isRefreshing || _isLoadingSelectedDetail)"
+                   OnClick="RefreshAsync">
+            Refresh
+        </MudButton>
+    </HeaderActions>
+
+    <ChildContent>
+        <StateView Mode="@_mode"
+                   Title="History unavailable"
+                   Message="@_errorMessage"
+                   ActionText="Retry"
+                   OnAction="RefreshAsync">
+            <div class="dashboard-tab-content history-tab-content">
+                <div class="history-grid">
+                    <OperatorCard Class="section-card history-panel history-panel--filters">
+                        <div class="dashboard-panel-header">
+                            <div>
+                                <div class="operator-section-header">
+                                    <h2>Filters</h2>
+                                    <SettingHelpTrigger Content="@HistoryHelpCatalog.Filters" IconOnly="true" />
+                                </div>
+                                <p class="dashboard-panel-copy">Search reloads history from the service. Clear resets the form and reloads the unfiltered list.</p>
+                            </div>
+                            <div class="dashboard-inline-actions dashboard-inline-actions--compact operator-action-help-strip">
+                                <div class="operator-action-with-help">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Primary"
+                                               Size="Size.Small"
+                                               Disabled="@(_isRefreshing || _isLoadingSelectedDetail)"
+                                               OnClick="SearchAsync">
+                                        Search
+                                    </MudButton>
+                                    <SettingHelpTrigger Content="@HistoryHelpCatalog.Refresh" IconOnly="true" />
+                                </div>
+                                <div class="operator-action-with-help">
+                                    <MudButton Variant="Variant.Outlined"
+                                               Color="Color.Secondary"
+                                               Size="Size.Small"
+                                               Disabled="@(_isRefreshing || _isLoadingSelectedDetail)"
+                                               OnClick="ClearFiltersAsync">
+                                        Clear Filters
+                                    </MudButton>
+                                    <SettingHelpTrigger Content="@HistoryHelpCatalog.Clear" IconOnly="true" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="operations-filters">
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.FromDate" />
+                                <MudTextField T="string"
+                                              Value="_state.FromDate"
+                                              ValueChanged="OnFromDateChanged"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="yyyy-MM-dd"
+                                              Immediate="true" />
+                            </div>
+
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.ToDate" />
+                                <MudTextField T="string"
+                                              Value="_state.ToDate"
+                                              ValueChanged="OnToDateChanged"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Placeholder="yyyy-MM-dd"
+                                              Immediate="true" />
+                            </div>
+
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.TorrentName" />
+                                <MudTextField T="string"
+                                              Value="_state.TorrentName"
+                                              ValueChanged="OnTorrentNameChanged"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Immediate="true" />
+                            </div>
+
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.Category" />
+                                <MudTextField T="string"
+                                              Value="_state.CategoryKey"
+                                              ValueChanged="OnCategoryChanged"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Immediate="true" />
+                            </div>
+
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.State" />
+                                <MudTextField T="string"
+                                              Value="_state.State"
+                                              ValueChanged="OnStateChanged"
+                                              Variant="Variant.Outlined"
+                                              Margin="Margin.Dense"
+                                              Immediate="true" />
+                            </div>
+
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.Removed" />
+                                <MudSelect T="string"
+                                           Value="_state.RemovedFilter"
+                                           ValueChanged="OnRemovedFilterChanged"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Dense="true">
+                                    <MudSelectItem T="string" Value="@RemovedAllValue">All</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@RemovedActiveOnlyValue">Active Only</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@RemovedRemovedOnlyValue">Removed Only</MudSelectItem>
+                                </MudSelect>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_filterValidationMessage))
+                        {
+                            <p class="dashboard-panel-copy tc-error-text">@_filterValidationMessage</p>
+                        }
+                    </OperatorCard>
+
+                    <OperatorCard Class="section-card history-panel history-panel--table">
+                        <div class="dashboard-panel-header">
+                            <div>
+                                <div class="operator-section-header">
+                                    <h2>History Results</h2>
+                                    <SettingHelpTrigger Content="@HistoryHelpCatalog.HistoryResults" IconOnly="true" />
+                                </div>
+                                <p class="dashboard-panel-copy">@BuildHistorySummary()</p>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_actionMessage))
+                        {
+                            <p class="@GetActionMessageClass()">@_actionMessage</p>
+                        }
+
+                        <div class="operations-table-frame history-table-frame">
+                            <MudTable T="TorrentHistorySummaryDto"
+                                      Items="_historyRows"
+                                      Dense="true"
+                                      Hover="true"
+                                      Bordered="true"
+                                      Striped="true"
+                                      FixedHeader="true"
+                                      Loading="_isRefreshing"
+                                      Breakpoint="Breakpoint.Md"
+                                      Height="100%"
+                                      RowsPerPage="@_state.PageSize"
+                                      RowsPerPageChanged="OnRowsPerPageChanged"
+                                      OnRowClick="OnHistoryRowClickAsync"
+                                      RowClassFunc="GetHistoryRowClass"
+                                      Class="operations-table history-table"
+                                      Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.SubmittedAt)">Submitted</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.Name)">Name</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.CategoryKey ?? string.Empty)">Category</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestTorrentState)">State</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestProgressPercent)">Progress</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestDownloadedBytes)">Downloaded</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestTotalBytes ?? 0)">Total</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestCallbackStatus ?? string.Empty)">Callback</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.RemovedAt ?? DateTimeOffset.MinValue)">Removed</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.RemovalReason ?? string.Empty)">Removal Reason</MudTableSortLabel>
+                                    </MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd DataLabel="Submitted">@FormatDateTime(context.SubmittedAt)</MudTd>
+                                    <MudTd DataLabel="Name" Class="operations-table-wrap">@context.Name</MudTd>
+                                    <MudTd DataLabel="Category">@FormatCategory(context.CategoryKey)</MudTd>
+                                    <MudTd DataLabel="State">@context.LatestTorrentState</MudTd>
+                                    <MudTd DataLabel="Progress">@context.LatestProgressPercent.ToString("0.0")%</MudTd>
+                                    <MudTd DataLabel="Downloaded">@FormatBytes(context.LatestDownloadedBytes)</MudTd>
+                                    <MudTd DataLabel="Total">@FormatNullableBytes(context.LatestTotalBytes)</MudTd>
+                                    <MudTd DataLabel="Callback">@ValueOrNotAvailable(context.LatestCallbackStatus)</MudTd>
+                                    <MudTd DataLabel="Removed">@FormatDateTime(context.RemovedAt)</MudTd>
+                                    <MudTd DataLabel="Removal Reason">@FormatRemovalReason(context.RemovalReason)</MudTd>
+                                </RowTemplate>
+                                <NoRecordsContent>
+                                    <MudText Typo="Typo.body2">No history rows match the current filters.</MudText>
+                                </NoRecordsContent>
+                                <PagerContent>
+                                    <MudTablePager PageSizeOptions="new[] { 25, 50, 100, 250 }"
+                                                   RowsPerPageString="Rows" />
+                                </PagerContent>
+                            </MudTable>
+                        </div>
+                    </OperatorCard>
+
+                    <OperatorCard Class="section-card history-panel history-panel--detail">
+                        <div class="dashboard-panel-header">
+                            <div>
+                                <div class="operator-section-header">
+                                    <h2>Selected History Entry</h2>
+                                    <SettingHelpTrigger Content="@HistoryHelpCatalog.SelectedHistoryEntry" IconOnly="true" />
+                                </div>
+                                <p class="dashboard-panel-copy">@BuildSelectionSummary()</p>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_selectedDetailErrorMessage))
+                        {
+                            <p class="dashboard-panel-copy tc-error-text">@_selectedDetailErrorMessage</p>
+                        }
+
+                        @if (_isLoadingSelectedDetail)
+                        {
+                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                        }
+
+                        @if (_selectedHistoryDetail is null)
+                        {
+                            <div class="dashboard-callout">
+                                <p class="dashboard-callout-title">No history row selected</p>
+                                <p class="dashboard-callout-copy">Click a history row to inspect its full stored details.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="dashboard-detail-grid">
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Torrent Id</p>
+                                    <p class="dashboard-detail-value">@_selectedHistoryDetail.TorrentId</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Name</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@_selectedHistoryDetail.Name</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Category</p>
+                                    <p class="dashboard-detail-value">@FormatCategory(_selectedHistoryDetail.CategoryKey)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">State</p>
+                                    <p class="dashboard-detail-value">@_selectedHistoryDetail.LatestTorrentState</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Wait</p>
+                                    <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedHistoryDetail.LatestWaitReason)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Progress</p>
+                                    <p class="dashboard-detail-value">@_selectedHistoryDetail.LatestProgressPercent.ToString("0.0")%</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Downloaded</p>
+                                    <p class="dashboard-detail-value">@FormatBytes(_selectedHistoryDetail.LatestDownloadedBytes)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Uploaded</p>
+                                    <p class="dashboard-detail-value">@FormatBytes(_selectedHistoryDetail.LatestUploadedBytes)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Total</p>
+                                    <p class="dashboard-detail-value">@FormatNullableBytes(_selectedHistoryDetail.LatestTotalBytes)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Download Rate</p>
+                                    <p class="dashboard-detail-value">@FormatRate(_selectedHistoryDetail.LatestDownloadRateBytesPerSecond)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Upload Rate</p>
+                                    <p class="dashboard-detail-value">@FormatRate(_selectedHistoryDetail.LatestUploadRateBytesPerSecond)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Peers</p>
+                                    <p class="dashboard-detail-value">@_selectedHistoryDetail.LatestConnectedPeerCount</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Trackers</p>
+                                    <p class="dashboard-detail-value">@_selectedHistoryDetail.LatestTrackerCount</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Submitted</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.SubmittedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Metadata Resolved</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.MetadataResolvedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Download Started</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.DownloadStartedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Download Completed</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.DownloadCompletedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Seeding Started</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.SeedingStartedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Activity</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.LastActivityAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Updated</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.LastUpdatedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Removed</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.RemovedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Removal Reason</p>
+                                    <p class="dashboard-detail-value">@FormatRemovalReason(_selectedHistoryDetail.RemovalReason)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Data Deleted</p>
+                                    <p class="dashboard-detail-value">@FormatBoolean(_selectedHistoryDetail.DataDeleted)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Removed By Cleanup Policy</p>
+                                    <p class="dashboard-detail-value">@FormatBoolean(_selectedHistoryDetail.RemovedByCleanupPolicy)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Invoke Completion Callback</p>
+                                    <p class="dashboard-detail-value">@FormatBoolean(_selectedHistoryDetail.InvokeCompletionCallback)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Callback Label</p>
+                                    <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedHistoryDetail.CompletionCallbackLabel)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Latest Callback Status</p>
+                                    <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedHistoryDetail.LatestCallbackStatus)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Callback Started</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.CallbackStartedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Callback Completed</p>
+                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.CallbackCompletedAt)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                    <p class="dashboard-detail-label">Callback Last Error</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.CallbackLastError)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                    <p class="dashboard-detail-label">Download Root Path</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.DownloadRootPath)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                    <p class="dashboard-detail-label">Final Download Path</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.FinalPayloadPath)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                    <p class="dashboard-detail-label">Info Hash</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.InfoHash)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                    <p class="dashboard-detail-label">Magnet</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@_selectedHistoryDetail.MagnetUri</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                    <p class="dashboard-detail-label">Latest Error</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.LatestErrorMessage)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Service Instance</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@FormatGuid(_selectedHistoryDetail.ServiceInstanceIdLastSeen)</p>
+                                </div>
+                            </div>
+                        }
+                    </OperatorCard>
+                </div>
+            </div>
+        </StateView>
+    </ChildContent>
+</OperatorPage>
+
+@code {
+    private const string StateKey = "history:list";
+    private const string RemovedAllValue = "";
+    private const string RemovedActiveOnlyValue = "active";
+    private const string RemovedRemovedOnlyValue = "removed";
+
+    private readonly List<TorrentHistorySummaryDto> _historyRows = [];
+    private HistoryPageState _state = new();
+    private StateViewMode _mode = StateViewMode.Loading;
+    private bool _isRefreshing;
+    private bool _isLoadingSelectedDetail;
+    private string? _errorMessage;
+    private string? _actionMessage;
+    private bool _actionIsError;
+    private string? _filterValidationMessage;
+    private TorrentHistoryDetailDto? _selectedHistoryDetail;
+    private string? _selectedDetailErrorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _state = PageStateStore.GetOrCreate(
+            StateKey,
+            () => new HistoryPageState
+            {
+                PageSize = 25,
+            }
+        );
+
+        if (_state.PageSize <= 0)
+        {
+            _state.PageSize = 25;
+        }
+
+        await LoadAsync(showSuccessToast: false, showLoadingState: true);
+    }
+
+    private Task OnTorrentNameChanged(string value)
+    {
+        _state.TorrentName = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnCategoryChanged(string value)
+    {
+        _state.CategoryKey = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnStateChanged(string value)
+    {
+        _state.State = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnRemovedFilterChanged(string value)
+    {
+        _state.RemovedFilter = value;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnFromDateChanged(string value)
+    {
+        _state.FromDate = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnToDateChanged(string value)
+    {
+        _state.ToDate = value.Trim();
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnRowsPerPageChanged(int value)
+    {
+        _state.PageSize = value;
+        PersistState();
+        _actionMessage = $"Rows per page: {value}";
+        _actionIsError = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync(showSuccessToast: true, showLoadingState: false);
+    }
+
+    private async Task SearchAsync()
+    {
+        await LoadAsync(showSuccessToast: true, showLoadingState: false);
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        _state.TorrentName = string.Empty;
+        _state.CategoryKey = string.Empty;
+        _state.State = string.Empty;
+        _state.RemovedFilter = RemovedAllValue;
+        _state.FromDate = string.Empty;
+        _state.ToDate = string.Empty;
+        PersistState();
+        await LoadAsync(showSuccessToast: false, showLoadingState: false);
+        Feedback.Info("History filters cleared.");
+        _actionMessage = "History filters cleared.";
+        _actionIsError = false;
+    }
+
+    private async Task LoadAsync(bool showSuccessToast, bool showLoadingState)
+    {
+        if (_isRefreshing)
+        {
+            return;
+        }
+
+        _filterValidationMessage = null;
+        var request = BuildQueryRequest();
+        if (request is null)
+        {
+            _mode = _historyRows.Count == 0 ? StateViewMode.Error : StateViewMode.Ready;
+            return;
+        }
+
+        _isRefreshing = true;
+        if (showLoadingState)
+        {
+            _mode = StateViewMode.Loading;
+        }
+
+        _errorMessage = null;
+
+        var historyResult = await Api.GetHistoryAsync(request);
+        if (!historyResult.IsSuccess)
+        {
+            var errorMessage = historyResult.ErrorMessage ?? "History request failed.";
+            _errorMessage = errorMessage;
+            _mode = _historyRows.Count == 0 ? StateViewMode.Error : StateViewMode.Ready;
+            _isRefreshing = false;
+            _actionMessage = errorMessage;
+            _actionIsError = true;
+            Feedback.Error(errorMessage);
+            return;
+        }
+
+        _historyRows.Clear();
+        if (historyResult.Value is not null)
+        {
+            _historyRows.AddRange(historyResult.Value);
+        }
+
+        if (_state.SelectedTorrentId is not null &&
+            _historyRows.All(row => row.TorrentId != _state.SelectedTorrentId.Value))
+        {
+            _state.SelectedTorrentId = null;
+            _selectedHistoryDetail = null;
+            _selectedDetailErrorMessage = null;
+            PersistState();
+        }
+        else if (_state.SelectedTorrentId is not null)
+        {
+            await LoadSelectedHistoryDetailAsync(_state.SelectedTorrentId.Value, fromRefresh: true);
+        }
+
+        _mode = StateViewMode.Ready;
+        _isRefreshing = false;
+
+        if (showSuccessToast)
+        {
+            Feedback.Success("History refreshed.");
+        }
+    }
+
+    private async Task OnHistoryRowClickAsync(TableRowClickEventArgs<TorrentHistorySummaryDto> args)
+    {
+        if (args.Item is null)
+        {
+            return;
+        }
+
+        _state.SelectedTorrentId = args.Item.TorrentId;
+        PersistState();
+        await LoadSelectedHistoryDetailAsync(args.Item.TorrentId, fromRefresh: false);
+    }
+
+    private async Task LoadSelectedHistoryDetailAsync(Guid torrentId, bool fromRefresh)
+    {
+        _isLoadingSelectedDetail = true;
+        _selectedDetailErrorMessage = null;
+
+        var detailResult = await Api.GetHistoryByTorrentIdAsync(torrentId);
+        if (!detailResult.IsSuccess)
+        {
+            _selectedHistoryDetail = null;
+            _selectedDetailErrorMessage = detailResult.ErrorMessage ?? "Selected history row unavailable.";
+
+            if (!fromRefresh)
+            {
+                Feedback.Error(_selectedDetailErrorMessage);
+            }
+
+            _isLoadingSelectedDetail = false;
+            return;
+        }
+
+        _selectedHistoryDetail = detailResult.Value;
+        if (_selectedHistoryDetail is null)
+        {
+            _selectedDetailErrorMessage = "Selected history row was not found.";
+        }
+
+        _isLoadingSelectedDetail = false;
+    }
+
+    private TorrentHistoryQueryRequest? BuildQueryRequest()
+    {
+        if (!TryParseDate(_state.FromDate, out var fromDate, out var fromError))
+        {
+            _filterValidationMessage = fromError;
+            return null;
+        }
+
+        if (!TryParseDate(_state.ToDate, out var toDate, out var toError))
+        {
+            _filterValidationMessage = toError;
+            return null;
+        }
+
+        if (fromDate is not null && toDate is not null && fromDate > toDate)
+        {
+            _filterValidationMessage = "From Date must be earlier than or equal to To Date.";
+            return null;
+        }
+
+        return new TorrentHistoryQueryRequest
+        {
+            TorrentName = string.IsNullOrWhiteSpace(_state.TorrentName) ? null : _state.TorrentName,
+            CategoryKey = string.IsNullOrWhiteSpace(_state.CategoryKey) ? null : _state.CategoryKey,
+            State = string.IsNullOrWhiteSpace(_state.State) ? null : _state.State,
+            Removed = _state.RemovedFilter switch
+            {
+                RemovedActiveOnlyValue => false,
+                RemovedRemovedOnlyValue => true,
+                _ => null,
+            },
+            FromDate = fromDate,
+            ToDate = toDate,
+            Take = 500,
+        };
+    }
+
+    private void PersistState()
+    {
+        PageStateStore.Save(StateKey, _state);
+    }
+
+    private string GetHistoryRowClass(TorrentHistorySummaryDto row, int rowNumber)
+    {
+        return _state.SelectedTorrentId == row.TorrentId ? "operations-table-row--selected" : string.Empty;
+    }
+
+    private string BuildHistorySummary()
+    {
+        return $"{_historyRows.Count:n0} result(s) loaded. Click a column header to sort or a row to inspect full details.";
+    }
+
+    private string BuildSelectionSummary()
+    {
+        if (_selectedHistoryDetail is null)
+        {
+            return "No active selection.";
+        }
+
+        return $"{_selectedHistoryDetail.Name} | {_selectedHistoryDetail.LatestTorrentState} | {FormatDateTime(_selectedHistoryDetail.SubmittedAt)}";
+    }
+
+    private string GetActionMessageClass()
+    {
+        return _actionIsError ? "dashboard-panel-copy tc-error-text" : "dashboard-panel-copy";
+    }
+
+    private static bool TryParseDate(string? value, out DateOnly? parsedDate, out string? errorMessage)
+    {
+        parsedDate = null;
+        errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (DateOnly.TryParseExact(value.Trim(), "yyyy-MM-dd", out var parsed))
+        {
+            parsedDate = parsed;
+            return true;
+        }
+
+        errorMessage = $"Invalid date '{value}'. Use yyyy-MM-dd.";
+        return false;
+    }
+
+    private static string FormatCategory(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Uncategorized" : value;
+    }
+
+    private static string FormatRemovalReason(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Active" : value;
+    }
+
+    private static string FormatBoolean(bool value)
+    {
+        return value ? "Yes" : "No";
+    }
+
+    private static string ValueOrNotAvailable(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Not available" : value;
+    }
+
+    private static string FormatDateTime(DateTimeOffset value)
+    {
+        return value.LocalDateTime.ToString("g");
+    }
+
+    private static string FormatDateTime(DateTimeOffset? value)
+    {
+        return value is null ? "Not available" : FormatDateTime(value.Value);
+    }
+
+    private static string FormatNullableBytes(long? value)
+    {
+        return value is null ? "Not available" : FormatBytes(value.Value);
+    }
+
+    private static string FormatBytes(long value)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = value;
+        var unitIndex = 0;
+
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return $"{size:0.##} {units[unitIndex]}";
+    }
+
+    private static string FormatRate(long bytesPerSecond)
+    {
+        return $"{FormatBytes(bytesPerSecond)}/s";
+    }
+
+    private static string FormatGuid(Guid? value)
+    {
+        return value?.ToString() ?? "Not available";
+    }
+}
