@@ -1808,6 +1808,7 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(completedTorrent);
         Assert.Equal("0", callbackInvocation["TR_TORRENT_ID"]);
+        Assert.Equal(addedTorrent.TorrentId.ToString("D"), callbackInvocation["TORRENTCORE_TORRENT_ID"]);
         Assert.Equal("7373737373737373737373737373737373737373", callbackInvocation["TR_TORRENT_HASH"]);
         Assert.Equal("Callback Movie", callbackInvocation["TR_TORRENT_NAME"]);
         Assert.Equal(Path.Combine(downloadPath, "Movie"), callbackInvocation["TR_TORRENT_DIR"]);
@@ -3495,6 +3496,7 @@ public sealed class TorrentApiTests
             #!/bin/sh
             {
               printf 'TR_TORRENT_ID=%s\n' "${TR_TORRENT_ID}"
+              printf 'TORRENTCORE_TORRENT_ID=%s\n' "${TORRENTCORE_TORRENT_ID}"
               printf 'TR_TORRENT_HASH=%s\n' "${TR_TORRENT_HASH}"
               printf 'TR_TORRENT_NAME=%s\n' "${TR_TORRENT_NAME}"
               printf 'TR_TORRENT_DIR=%s\n' "${TR_TORRENT_DIR}"
