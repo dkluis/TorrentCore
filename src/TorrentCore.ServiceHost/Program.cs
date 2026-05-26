@@ -106,6 +106,10 @@ builder.Services.AddSingleton<ITorrentHistoryService, TorrentHistoryService>();
 builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentCompletionFinalizationChecker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackInvoker, TorrentCompletionCallbackInvoker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackProcessor, TorrentCompletionCallbackProcessor>();
+builder.Services.AddSingleton<TorrentRemovalCleanupService>();
+builder.Services.AddSingleton<ITorrentRemovalCleanupScheduler>(
+    serviceProvider => serviceProvider.GetRequiredService<TorrentRemovalCleanupService>()
+);
 builder.Services.AddSingleton<PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<MonoTorrentEngineAdapter>();
 builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider

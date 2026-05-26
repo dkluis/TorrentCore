@@ -24,6 +24,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     ITorrentCompletionFinalizationChecker finalizationChecker, ResolvedTorrentCoreServicePaths servicePaths,
     IOptions<TorrentCoreServiceOptions> serviceOptions, IRuntimeSettingsService runtimeSettingsService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
+    ITorrentRemovalCleanupScheduler torrentRemovalCleanupScheduler,
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
     private readonly ConnectionFailureLogThrottle                             _connectionFailureLogThrottle = new();
@@ -687,19 +688,16 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
         var removedAtUtc = DateTimeOffset.UtcNow;
-        var cleanupCandidatePaths = request.DeleteData ? GetCleanupCandidatePaths(manager) : Array.Empty<string>();
+        var cleanupCandidatePaths = request.DeleteData ?
+                GetCleanupCandidatePaths(manager)
+                    .Concat(string.IsNullOrWhiteSpace(snapshot.SavePath) ? [] : [Path.GetFullPath(snapshot.SavePath)])
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray() :
+                Array.Empty<string>();
+        var downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
 
         await RemoveManagedTorrentAsync(torrentId, manager, request.DeleteData, cancellationToken);
         await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
-
-        if (request.DeleteData)
-        {
-            var downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
-            TorrentDataPathCleanup.DeletePayloadArtifacts(downloadRootPath, cleanupCandidatePaths);
-            TorrentDataPathCleanup.DeleteEmptyDirectories(downloadRootPath, cleanupCandidatePaths);
-        }
-
-        await SynchronizeWithoutAutomaticRecoveryAsync(cancellationToken);
         await torrentHistoryService.MarkRemovedAsync(
             torrentId,
             dataDeleted: request.DeleteData,
@@ -707,6 +705,15 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             removedByCleanupPolicy: false,
             removedAtUtc,
             cancellationToken);
+
+        if (request.DeleteData)
+        {
+            torrentRemovalCleanupScheduler.ScheduleDeleteDataCleanup(
+                torrentId,
+                downloadRootPath,
+                cleanupCandidatePaths
+            );
+        }
 
         return new TorrentActionResultDto
         {

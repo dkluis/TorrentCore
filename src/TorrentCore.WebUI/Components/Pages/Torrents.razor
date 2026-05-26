@@ -867,24 +867,28 @@
         _isActingOnSelected = true;
         _actionMessage = null;
         _actionIsError = false;
-
-        var result = await operation(_selectedTorrentId.Value);
-        if (!result.IsSuccess)
+        try
         {
-            _actionMessage = result.ErrorMessage ?? $"{actionName} failed.";
-            _actionIsError = true;
-            Feedback.Error(_actionMessage);
-            _isActingOnSelected = false;
-            return;
+            var result = await operation(_selectedTorrentId.Value);
+            if (!result.IsSuccess)
+            {
+                _actionMessage = result.ErrorMessage ?? $"{actionName} failed.";
+                _actionIsError = true;
+                Feedback.Error(_actionMessage);
+                return;
+            }
+
+            var processedAt = result.Value?.ProcessedAtUtc.LocalDateTime.ToString("g") ?? "now";
+            _actionMessage = $"{actionName} completed at {processedAt}.";
+            _actionIsError = false;
+            Feedback.Success(_actionMessage);
+
+            await LoadAsync(showSuccessToast: false, showLoadingState: false, fromAutoRefresh: false);
         }
-
-        var processedAt = result.Value?.ProcessedAtUtc.LocalDateTime.ToString("g") ?? "now";
-        _actionMessage = $"{actionName} completed at {processedAt}.";
-        _actionIsError = false;
-        Feedback.Success(_actionMessage);
-
-        await LoadAsync(showSuccessToast: false, showLoadingState: false, fromAutoRefresh: false);
-        _isActingOnSelected = false;
+        finally
+        {
+            _isActingOnSelected = false;
+        }
     }
 
     private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)

@@ -925,6 +925,44 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_RemoveActiveTorrent_WithDeleteData_ReturnsAndRemoves()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-delete-data");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            downloadPath: downloadPath,
+            storagePath: storagePath
+        );
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(
+            httpClient,
+            "6767676767676767676767676767676767676768",
+            "MonoTorrent Delete Data"
+        );
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
+
+        var removeResponse = await httpClient.PostAsJsonAsync(
+            $"api/torrents/{addedTorrent.TorrentId}/remove",
+            new RemoveTorrentRequest { DeleteData = true }
+        );
+        Assert.Equal(HttpStatusCode.OK, removeResponse.StatusCode);
+
+        var actionResult = await removeResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.NotNull(actionResult);
+        Assert.Equal("remove", actionResult.Action);
+        Assert.True(actionResult.DataDeleted);
+        Assert.NotNull(torrents);
+        Assert.DoesNotContain(torrents, torrent => torrent.TorrentId == addedTorrent.TorrentId);
+    }
+
+    [Fact]
     public async Task MonoTorrentEngine_ResumePausedTorrent_LeavesPausedState()
     {
         await using var factory = CreateFactory(engineMode: TorrentEngineMode.MonoTorrent);
