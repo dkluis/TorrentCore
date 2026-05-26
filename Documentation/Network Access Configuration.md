@@ -11,7 +11,7 @@ The implemented model is:
 - the supported UI tests `/api/health` before saving a new endpoint
 
 Legacy note:
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer supported operator clients
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo
 - references to them in older docs are historical only
 
 This slice is intentionally HTTP-only. HTTPS, certificates, and internet-facing hardening are out of scope here.

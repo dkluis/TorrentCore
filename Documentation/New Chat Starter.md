@@ -3,7 +3,7 @@
 ## Status
 
 - `TorrentCore.WebUI` is the supported operator client for ongoing work.
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only surfaces and are no longer receiving feature updates or support maintenance.
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo.
 - Use this file only as a starter summary; current product direction should still be verified against:
   - [Project Brief.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Project%20Brief.md)
   - [Execution Plan and Progress.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Execution%20Plan%20and%20Progress.md)
@@ -19,7 +19,7 @@ Continue from these agreed decisions:
 - TorrentCore owns the engine, persistence, API, and dedicated admin UI
 - TVMaze remains a lightweight integration client
 - the supported rich admin UI is `TorrentCore.WebUI`
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer active product targets
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer part of the repo
 
 Current repo status:
 - standalone solution and projects have been scaffolded
@@ -58,7 +58,7 @@ Continue with the agreed boundary:
 - dedicated TorrentCore admin UI is primary
 - TVMaze is a lightweight client only
 - `TorrentCore.WebUI` is the supported operator UI
-- legacy Web and Avalonia clients are not active delivery targets
+- deleted Web and Avalonia projects are not active delivery targets
 
 Current task:
 - [describe the next concrete implementation task here]

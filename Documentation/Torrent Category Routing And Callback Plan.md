@@ -3,7 +3,7 @@
 ## Status
 
 `TorrentCore.WebUI` is the supported operator client for this slice.
-`TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
+`TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo.
 
 Phases 1 through 3 are implemented.
 

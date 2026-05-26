@@ -5,7 +5,7 @@
 This is a historical scaffold snapshot from the first repo-construction chat.
 
 - The supported operator client is now `TorrentCore.WebUI`.
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo.
 - Treat the project list and decisions below as the initial baseline, not the current delivery target.
 
 ## Created In This Chat
@@ -34,7 +34,7 @@ This is a historical scaffold snapshot from the first repo-construction chat.
 
 - separate repo from TVMaze
 - `TorrentCore.WebUI` is the supported rich management UI
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are not active delivery targets
+- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer part of the repo
 - TVMaze remains a lightweight integration client only
 
 ## What Has Not Been Built Yet

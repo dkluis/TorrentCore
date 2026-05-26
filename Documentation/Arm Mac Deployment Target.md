@@ -11,7 +11,7 @@ The target is:
 
 Current support note:
 - the supported deployment pair is `TorrentCore.Service` plus `TorrentCore.WebUI`
-- Avalonia deployment details below are retained only as historical/reference information and are no longer part of the supported operator path
+- the earlier Avalonia deployment path has been removed from the repo
 
 ## Deployment Layout
 
@@ -21,8 +21,6 @@ Default target base path on the Arm Mac host:
 Planned runtime layout:
 - `~/TorrentCore/Service`
 - `~/TorrentCore/WebUI`
-- `~/TorrentCore/Avalonia`
-- `~/TorrentCore/Applications`
 - `~/TorrentCore/Scripts`
 
 The runtime start/stop/restart scripts are shared with the Intel deployment. Only the publish/deploy wrappers differ.
@@ -50,20 +48,11 @@ Available commands:
 - `./Scripts/deploy-service-arm.zsh`
 - `./Scripts/deploy-webui-arm.zsh`
 - `./Scripts/deploy-all-arm.zsh`
-- `./Scripts/deploy-avalonia-arm.zsh`
 
 These wrappers:
 - publish to `artifacts/publish/arm/...`
 - sync the publish output to the Arm target base path
 - sync only the shared runtime scripts into `~/TorrentCore/Scripts`
-
-The Avalonia wrapper specifically:
-- publishes `src/TorrentCore.Avalonia/TorrentCore.Avalonia.csproj`
-- creates a macOS `.app` bundle for `osx-arm64`
-- syncs raw publish output to `~/TorrentCore/Avalonia` by default
-- syncs the `.app` bundle to `~/TorrentCore/Applications` by default
-- when the deploy target is local to the current ARM machine, also mirrors the bundle into `/Applications` by default
-- can be overridden to install directly into `/Applications` or to suppress the automatic system-app mirror
 
 Optional restart:
 - each deploy script supports `--restart`
@@ -76,28 +65,10 @@ Current arm deploy defaults:
 - deploy base: `~/TorrentCore`
 - publish runtime: `osx-arm64`
 - publish mode: framework-dependent
-- Avalonia raw publish target: `~/TorrentCore/Avalonia`
-- Avalonia app target: `~/TorrentCore/Applications`
-- Avalonia system app mirror target: `/Applications` for local ARM-host deploys
 
 These are driven through:
 - `TORRENTCORE_DEPLOY_BASE_ARM`
 - `TORRENTCORE_PUBLISH_RUNTIME_ARM`
-- `TORRENTCORE_AVALONIA_PUBLISH_TARGET`
-- `TORRENTCORE_AVALONIA_APP_TARGET`
-- `TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET`
-- `TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR`
-
-Current app-bundle defaults:
-- bundle name: `TorrentCore`
-- display name: `TorrentCore Control Center`
-- executable name inside the bundle: `TorrentCore.Avalonia`
-- bundle identifier: `com.torrentcore.controlcenter`
-
-Current icon behavior:
-- the default deploy path now uses the checked-in TorrentCore `.icns` asset at `src/TorrentCore.Avalonia/Assets/TorrentCore.icns`
-- the current icon design is the `Core + Orbit` concept
-- operators can override the icon with `TORRENTCORE_AVALONIA_ICON_PATH`
 
 If needed, they can be overridden in:
 - [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example)
@@ -118,10 +89,8 @@ What is validated in-repo:
 - arm deploy wrappers are syntax checked
 - arm publish/sync works to a temp target directory
 - the shared runtime scripts can start and stop the published arm service and web on the development machine
-- the Avalonia arm deploy wrapper should be validated by publishing to temp targets and confirming the `.app` bundle is created
 
 What should still be validated on the actual Arm deployment host:
 - final chosen target path if not `~/TorrentCore`
 - operator startup flow on that host
 - any host-specific firewall/network expectations for remote browser access
-- whether the target host should keep the app bundle under `~/TorrentCore/Applications` or mirror it into `/Applications`

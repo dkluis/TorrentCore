@@ -5,7 +5,7 @@
 This is a historical starter for the original repo/solution-boundary discussion.
 
 - The supported operator client is now `TorrentCore.WebUI`.
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo.
 - For current TorrentCore implementation work, prefer:
   - [Project Brief.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Project%20Brief.md)
   - [Execution Plan and Progress.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Execution%20Plan%20and%20Progress.md)

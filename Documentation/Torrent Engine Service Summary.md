@@ -5,8 +5,8 @@
 This is a historical architecture summary from the pre-WebUI planning stage.
 
 - The supported operator client is now `TorrentCore.WebUI`.
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving feature updates or support maintenance.
-- The Avalonia-specific language below reflects the original planning context and should not be treated as the current product direction.
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo.
+- The Avalonia-specific language below reflects the original planning context and should not be treated as the current repo shape or product direction.
 
 ## Purpose
 

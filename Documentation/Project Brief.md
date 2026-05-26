@@ -61,7 +61,7 @@ Primary components:
 - `TorrentCore.Core`
 - `TorrentCore.Persistence.Sqlite`
 
-Legacy components retained in-repo for historical/reference purposes only:
+Removed components:
 - `TorrentCore.Web`
 - `TorrentCore.Avalonia`
 
@@ -76,7 +76,7 @@ Reasoning:
 
 Current support status:
 - `TorrentCore.WebUI` is the maintained operator client
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are no longer receiving feature work or support updates
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo
 
 ## Reuse From TVMaze
 

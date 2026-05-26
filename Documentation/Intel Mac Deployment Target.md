@@ -14,7 +14,7 @@ This is now a tracked product/deployment requirement, not an informal note.
 
 Current support note:
 - the supported deployment pair is `TorrentCore.Service` plus `TorrentCore.WebUI`
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are legacy/reference-only and are no longer receiving updates or support
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo
 
 ## Deployment Layout
 

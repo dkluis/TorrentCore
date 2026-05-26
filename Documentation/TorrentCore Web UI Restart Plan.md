@@ -12,7 +12,7 @@ Current checkpoint:
 
 - ground rules are agreed for the supported `TorrentCore.WebUI` operator surface
 - `TorrentCore.WebUI` has replaced the earlier Web and Avalonia operator clients for ongoing work
-- `TorrentCore.Web` and `TorrentCore.Avalonia` are now legacy/reference-only and are no longer receiving feature updates or support maintenance
+- `TorrentCore.Web` and `TorrentCore.Avalonia` have been deleted from the repo
 - TVMazeWeb baseline conventions have been captured from live source files to guide Phase 1 implementation
 - project naming direction is now `TorrentCore.WebUI`
 - visual baseline should stay as close as practical to TVMazeWeb, with TorrentCore-specific favicon/brand assets
@@ -60,7 +60,6 @@ Primary planning references:
 - [TvmazeWeb.csproj](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TVMaze/ProdWebApps/TvmazeWeb/TvmazeWeb.csproj)
 - [TVMaze Web UI Restart Plan.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TVMaze/Documentation/Refactor%20Activities/UI/TVMaze%20Web%20UI%20Restart%20Plan.md)
 - [Execution Plan and Progress.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TorrentCore/Documentation/Execution%20Plan%20and%20Progress.md)
-- [TorrentCore.Web.csproj](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TorrentCore/src/TorrentCore.Web/TorrentCore.Web.csproj)
 - [TorrentCoreClient.cs](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TorrentCore/src/TorrentCore.Client/TorrentCoreClient.cs)
 
 ## Problem Statement
@@ -93,8 +92,8 @@ The following are fixed decisions:
 ## Working Assumptions
 
 - Working project name is `TorrentCore.WebUI`.
-- Existing `TorrentCore.Web` is legacy/reference-only and no longer receives updates.
-- Existing `TorrentCore.Avalonia` is legacy/reference-only and no longer receives updates.
+- Existing `TorrentCore.Web` has been deleted from the repo.
+- Existing `TorrentCore.Avalonia` has been deleted from the repo.
 - Existing `TorrentCore.Client` and `TorrentCore.Contracts` remain the primary service boundary for web UI calls.
 - If a needed workflow is not available through current contracts, extend service/contracts instead of leaking logic into
   the UI.
