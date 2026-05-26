@@ -17,6 +17,8 @@ public sealed class TorrentSnapshot
     public          DateTimeOffset?                 CompletionCallbackPendingSinceUtc { get; set; }
     public          DateTimeOffset?                 CompletionCallbackInvokedAtUtc    { get; set; }
     public          string?                         CompletionCallbackLastError       { get; set; }
+    public          DateTimeOffset?                 CompletionCallbackFeedbackReceivedAtUtc { get; set; }
+    public          string?                         CompletionCallbackFeedbackJson    { get; set; }
     public required TorrentState                    State                             { get; set; }
     public required TorrentDesiredState             DesiredState                      { get; set; }
     public required string                          MagnetUri                         { get; init; }

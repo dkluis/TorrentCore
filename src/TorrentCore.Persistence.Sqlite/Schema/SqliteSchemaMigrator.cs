@@ -574,6 +574,42 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     await command.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
+            new SqliteMigrationDefinition(
+                13, "add_callback_feedback_storage", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_feedback_received_at_utc", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText =
+                            "ALTER TABLE torrents ADD COLUMN completion_callback_feedback_received_at_utc TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrents", "completion_callback_feedback_json", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText =
+                            "ALTER TABLE torrents ADD COLUMN completion_callback_feedback_json TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrent_history", "latest_completion_callback_feedback_received_at_utc", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText =
+                            "ALTER TABLE torrent_history ADD COLUMN latest_completion_callback_feedback_received_at_utc TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(connection, "torrent_history", "latest_completion_callback_feedback_json", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText =
+                            "ALTER TABLE torrent_history ADD COLUMN latest_completion_callback_feedback_json TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
         ];
     }
 

@@ -1,10 +1,11 @@
 #region
 
+using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using TorrentCore.Contracts.History;
 using TorrentCore.Core.Diagnostics;
-using TorrentCore.Core.Torrents;
 using TorrentCore.Core.History;
+using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
 
 #endregion
@@ -167,6 +168,8 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             CallbackStartedAtUtc = snapshot.CompletionCallbackPendingSinceUtc,
             CallbackCompletedAtUtc = snapshot.CompletionCallbackInvokedAtUtc,
             CallbackLastError = snapshot.CompletionCallbackLastError,
+            LatestCompletionCallbackFeedbackReceivedAtUtc = snapshot.CompletionCallbackFeedbackReceivedAtUtc,
+            LatestCompletionCallbackFeedbackJson = snapshot.CompletionCallbackFeedbackJson,
             DataDeleted = false,
             RemovalReason = null,
             RemovedByCleanupPolicy = false,
@@ -211,6 +214,8 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             CallbackStartedAtUtc = torrent.CompletionCallbackPendingSinceUtc,
             CallbackCompletedAtUtc = torrent.CompletionCallbackInvokedAtUtc,
             CallbackLastError = torrent.CompletionCallbackLastError,
+            LatestCompletionCallbackFeedbackReceivedAtUtc = torrent.CompletionCallbackFeedback?.ReceivedAtUtc,
+            LatestCompletionCallbackFeedbackJson = torrent.CompletionCallbackFeedback is null ? null : JsonSerializer.Serialize(torrent.CompletionCallbackFeedback),
             DataDeleted = false,
             RemovalReason = null,
             RemovedByCleanupPolicy = false,
@@ -246,6 +251,11 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         updated.CallbackStartedAtUtc = existing.CallbackStartedAtUtc ?? torrent.CompletionCallbackPendingSinceUtc;
         updated.CallbackCompletedAtUtc = existing.CallbackCompletedAtUtc ?? torrent.CompletionCallbackInvokedAtUtc;
         updated.CallbackLastError = torrent.CompletionCallbackLastError;
+        updated.LatestCompletionCallbackFeedbackReceivedAtUtc =
+            torrent.CompletionCallbackFeedback?.ReceivedAtUtc ?? existing.LatestCompletionCallbackFeedbackReceivedAtUtc;
+        updated.LatestCompletionCallbackFeedbackJson = torrent.CompletionCallbackFeedback is null
+            ? existing.LatestCompletionCallbackFeedbackJson
+            : JsonSerializer.Serialize(torrent.CompletionCallbackFeedback);
         updated.MetadataResolvedAtUtc ??= torrent.InfoHash is not null && torrent.TotalBytes is not null
             ? torrent.AddedAtUtc
             : null;
@@ -278,6 +288,8 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         updated.InvokeCompletionCallback = snapshot.InvokeCompletionCallback;
         updated.CompletionCallbackLabel = snapshot.CompletionCallbackLabel;
         updated.LatestCallbackStatus = snapshot.CompletionCallbackState?.ToString();
+        updated.LatestCompletionCallbackFeedbackReceivedAtUtc = snapshot.CompletionCallbackFeedbackReceivedAtUtc;
+        updated.LatestCompletionCallbackFeedbackJson = snapshot.CompletionCallbackFeedbackJson;
         updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
 
         var snapshotPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc;
@@ -371,6 +383,8 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             existing.CallbackStartedAtUtc != updated.CallbackStartedAtUtc ||
             existing.CallbackCompletedAtUtc != updated.CallbackCompletedAtUtc ||
             existing.CallbackLastError != updated.CallbackLastError ||
+            existing.LatestCompletionCallbackFeedbackReceivedAtUtc != updated.LatestCompletionCallbackFeedbackReceivedAtUtc ||
+            existing.LatestCompletionCallbackFeedbackJson != updated.LatestCompletionCallbackFeedbackJson ||
             existing.RemovedAtUtc != updated.RemovedAtUtc ||
             existing.DataDeleted != updated.DataDeleted ||
             existing.RemovalReason != updated.RemovalReason ||
@@ -501,6 +515,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             CallbackStartedAt = ToLocalTime(record.CallbackStartedAtUtc),
             CallbackCompletedAt = ToLocalTime(record.CallbackCompletedAtUtc),
             CallbackLastError = record.CallbackLastError,
+            CompletionCallbackFeedback = CompletionCallbackFeedbackMapper.Deserialize(record.LatestCompletionCallbackFeedbackJson),
             DataDeleted = record.DataDeleted,
             RemovalReason = record.RemovalReason,
             RemovedByCleanupPolicy = record.RemovedByCleanupPolicy,
@@ -559,6 +574,8 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             CallbackStartedAtUtc = source.CallbackStartedAtUtc,
             CallbackCompletedAtUtc = source.CallbackCompletedAtUtc,
             CallbackLastError = source.CallbackLastError,
+            LatestCompletionCallbackFeedbackReceivedAtUtc = source.LatestCompletionCallbackFeedbackReceivedAtUtc,
+            LatestCompletionCallbackFeedbackJson = source.LatestCompletionCallbackFeedbackJson,
             DataDeleted = source.DataDeleted,
             RemovalReason = source.RemovalReason,
             RemovedByCleanupPolicy = source.RemovedByCleanupPolicy,

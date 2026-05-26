@@ -33,6 +33,8 @@ public sealed class TorrentHistoryRecord
     public          DateTimeOffset? CallbackStartedAtUtc               { get; set; }
     public          DateTimeOffset? CallbackCompletedAtUtc             { get; set; }
     public          string?         CallbackLastError                  { get; set; }
+    public          DateTimeOffset? LatestCompletionCallbackFeedbackReceivedAtUtc { get; set; }
+    public          string?         LatestCompletionCallbackFeedbackJson { get; set; }
     public required bool            DataDeleted                        { get; set; }
     public          string?         RemovalReason                      { get; set; }
     public required bool            RemovedByCleanupPolicy             { get; set; }

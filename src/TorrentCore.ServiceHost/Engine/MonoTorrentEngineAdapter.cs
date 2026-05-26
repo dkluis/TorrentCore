@@ -415,6 +415,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             CompletionCallbackPendingSinceUtc = null,
             CompletionCallbackInvokedAtUtc = null,
             CompletionCallbackLastError = null,
+            CompletionCallbackFeedbackReceivedAtUtc = null,
+            CompletionCallbackFeedbackJson = null,
             State = ContractTorrentState.Queued,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = request.MagnetUri.Trim(),
@@ -1106,7 +1108,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
 
-            if (updatedSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
+            if (updatedSnapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
+                TorrentCompletionCallbackState.WaitingForFeedback)
             {
                 pendingCallbackSnapshots.Add(updatedSnapshot);
             }
@@ -1294,6 +1297,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             CompletionCallbackPendingSinceUtc = existing.CompletionCallbackPendingSinceUtc,
             CompletionCallbackInvokedAtUtc    = existing.CompletionCallbackInvokedAtUtc,
             CompletionCallbackLastError       = existing.CompletionCallbackLastError,
+            CompletionCallbackFeedbackReceivedAtUtc = existing.CompletionCallbackFeedbackReceivedAtUtc,
+            CompletionCallbackFeedbackJson = existing.CompletionCallbackFeedbackJson,
             State                             = state,
             DesiredState                      = existing.DesiredState,
             MagnetUri                         = existing.MagnetUri,
@@ -1357,6 +1362,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             CompletionCallbackPendingSinceUtc = existing.CompletionCallbackPendingSinceUtc,
             CompletionCallbackInvokedAtUtc = existing.CompletionCallbackInvokedAtUtc,
             CompletionCallbackLastError = existing.CompletionCallbackLastError,
+            CompletionCallbackFeedbackReceivedAtUtc = existing.CompletionCallbackFeedbackReceivedAtUtc,
+            CompletionCallbackFeedbackJson = existing.CompletionCallbackFeedbackJson,
             State = state,
             DesiredState = existing.DesiredState,
             MagnetUri = existing.MagnetUri,
@@ -2144,6 +2151,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             CompletionCallbackPendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc,
             CompletionCallbackInvokedAtUtc    = snapshot.CompletionCallbackInvokedAtUtc,
             CompletionCallbackLastError       = snapshot.CompletionCallbackLastError,
+            CompletionCallbackFeedbackReceivedAtUtc = snapshot.CompletionCallbackFeedbackReceivedAtUtc,
+            CompletionCallbackFeedbackJson = snapshot.CompletionCallbackFeedbackJson,
             State                             = ContractTorrentState.Completed,
             DesiredState                      = snapshot.DesiredState,
             MagnetUri                         = snapshot.MagnetUri,

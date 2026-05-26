@@ -331,7 +331,8 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
         RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken)
     {
         foreach (var torrent in torrents.Where(torrent
-                        => torrent.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization
+                        => torrent.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
+                           TorrentCompletionCallbackState.WaitingForFeedback
                 ))
         {
             if (!await completionCallbackProcessor.ProcessPendingAsync(

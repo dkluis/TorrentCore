@@ -260,7 +260,7 @@
                             {
                                 <div class="dashboard-callout">
                                     <p class="dashboard-callout-title">No callback watch items</p>
-                                    <p class="dashboard-callout-copy">No torrents currently need callback finalization visibility, retry, or timeout review.</p>
+                                    <p class="dashboard-callout-copy">No torrents currently need callback finalization, TVMaze feedback, retry, or timeout review.</p>
                                 </div>
                             }
                             else
@@ -279,7 +279,7 @@
                                             {
                                                 <tr>
                                                     <td class="dashboard-work-cell dashboard-work-cell--wrap">@torrent.Name</td>
-                                                    <td class="dashboard-work-cell">@ValueOrNotAvailable(torrent.CompletionCallbackState)</td>
+                                                    <td class="dashboard-work-cell">@FormatCallbackState(torrent.CompletionCallbackState)</td>
                                                     <td class="dashboard-work-cell dashboard-work-cell--wrap">@BuildCallbackDetail(torrent)</td>
                                                 </tr>
                                             }
@@ -506,7 +506,7 @@
 
     private string BuildCallbackWatchlistSummary()
     {
-        return $"{VisibleCallbackWatchItems.Count:n0} of {_allTorrents.Count(IsCallbackWatchItem):n0} shown. Pending finalization plus retryable callback states.";
+        return $"{VisibleCallbackWatchItems.Count:n0} of {_allTorrents.Count(IsCallbackWatchItem):n0} shown. Finalization waits, TVMaze waits, and retryable callback states.";
     }
 
     private string BuildAttentionSummary()
@@ -522,6 +522,7 @@
     private static bool IsCallbackWatchItem(TorrentSummaryDto torrent)
     {
         return HasCallbackState(torrent, "PendingFinalization") ||
+               HasCallbackState(torrent, "WaitingForFeedback") ||
                HasCallbackState(torrent, "Failed") ||
                HasCallbackState(torrent, "TimedOut");
     }
@@ -587,16 +588,13 @@
 
     private static string BuildCallbackDetail(TorrentSummaryDto torrent)
     {
-        if (HasCallbackState(torrent, "PendingFinalization"))
-        {
-            return torrent.CompletionCallbackPendingSinceUtc is null
-                ? "Waiting for final payload visibility."
-                : $"Pending since {FormatTimestamp(torrent.CompletionCallbackPendingSinceUtc)}";
-        }
-
-        return string.IsNullOrWhiteSpace(torrent.CompletionCallbackLastError)
-            ? "Review torrent detail or logs for more callback context."
-            : torrent.CompletionCallbackLastError;
+        return CompletionCallbackDisplayText.BuildWaitingDetail(
+            torrent.CompletionCallbackState,
+            torrent.CompletionCallbackPendingSinceUtc,
+            torrent.CompletionCallbackInvokedAtUtc,
+            torrent.CompletionCallbackLastError,
+            FormatTimestamp
+        );
     }
 
     private static string FormatLifecycleEventType(string eventType)
@@ -613,7 +611,10 @@
             "torrent.metadata.restart_requested" => "Metadata Restart Requested",
             "torrent.callback.pending_finalization" => "Callback Pending Finalization",
             "torrent.callback.retry_requested" => "Callback Retry Requested",
-            "torrent.callback.invoked" => "Callback Invoked",
+            "torrent.callback.invoked" => "Callback Submitted",
+            "torrent.callback.feedback.received" => "Callback Feedback Received",
+            "torrent.callback.feedback.applied" => "Callback Feedback Applied",
+            "torrent.callback.feedback_timed_out" => "Callback Feedback Timed Out",
             "torrent.callback.failed" => "Callback Failed",
             "torrent.callback.finalization_timed_out" => "Callback Timed Out",
             "torrent.cleanup.auto_removed" => "Completed Torrent Auto Removed",
@@ -656,6 +657,11 @@
     private static string ValueOrNotAvailable(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "N/A" : value;
+    }
+
+    private static string FormatCallbackState(string? state)
+    {
+        return CompletionCallbackDisplayText.FormatState(state);
     }
 
     private static string FormatAge(TimeSpan duration)

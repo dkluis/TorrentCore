@@ -34,7 +34,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], versions);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";
@@ -47,6 +47,8 @@ public sealed class SqliteSchemaMigrationTests
         }
 
         Assert.Contains("download_root_path", historyColumns);
+        Assert.Contains("latest_completion_callback_feedback_received_at_utc", historyColumns);
+        Assert.Contains("latest_completion_callback_feedback_json", historyColumns);
         Assert.DoesNotContain("save_path", historyColumns);
     }
 

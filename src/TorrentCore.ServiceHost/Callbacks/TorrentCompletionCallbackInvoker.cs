@@ -145,7 +145,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
 
         await WriteCallbackLogAsync(
             ActivityLogLevel.Information, "torrent.callback.invoked",
-            $"Invoked completion callback for torrent '{currentSnapshot.Name}'.", currentSnapshot, runtimeSettings,
+            $"Submitted completion callback for torrent '{currentSnapshot.Name}' and waiting for TVMaze feedback.", currentSnapshot, runtimeSettings,
             finalPayloadPath, processId, process.ExitCode, workingDirectory, null, cancellationToken
         );
 

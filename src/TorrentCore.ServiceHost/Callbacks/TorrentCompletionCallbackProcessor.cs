@@ -43,7 +43,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
     {
         if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.PendingFinalization)
         {
-            return false;
+            return await ProcessWaitingForFeedbackAsync(snapshot, runtimeSettings, now, cancellationToken);
         }
 
         var pendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc ?? snapshot.CompletedAtUtc ?? now;
@@ -82,7 +82,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             case TorrentCompletionCallbackInvocationStatus.Skipped:
                 return changed;
             case TorrentCompletionCallbackInvocationStatus.Invoked:
-                snapshot.CompletionCallbackState        = TorrentCompletionCallbackState.Invoked;
+                snapshot.CompletionCallbackState        = TorrentCompletionCallbackState.WaitingForFeedback;
                 snapshot.CompletionCallbackInvokedAtUtc = now;
                 snapshot.CompletionCallbackLastError    = null;
                 return true;
@@ -103,6 +103,35 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             default:
                 return changed;
         }
+    }
+
+    private async Task<bool> ProcessWaitingForFeedbackAsync(TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.WaitingForFeedback ||
+            !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackFeedbackJson))
+        {
+            return false;
+        }
+
+        var submittedAtUtc = snapshot.CompletionCallbackInvokedAtUtc ?? snapshot.CompletionCallbackPendingSinceUtc ?? snapshot.CompletedAtUtc ?? now;
+        var changed = false;
+        if (snapshot.CompletionCallbackInvokedAtUtc is null)
+        {
+            snapshot.CompletionCallbackInvokedAtUtc = submittedAtUtc;
+            changed = true;
+        }
+
+        if (now - submittedAtUtc < TimeSpan.FromSeconds(runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds))
+        {
+            return changed;
+        }
+
+        snapshot.CompletionCallbackState = TorrentCompletionCallbackState.TimedOut;
+        snapshot.CompletionCallbackLastError =
+            $"Timed out waiting for TVMaze callback feedback after successful submission. No report-back was received within {runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds} seconds.";
+        await WriteFeedbackTimeoutLogAsync(snapshot, runtimeSettings, submittedAtUtc, cancellationToken);
+        return true;
     }
 
     private static string? BuildPostAttemptError(string? error, string finalPayloadPath)
@@ -182,5 +211,32 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
                 ),
             }, cancellationToken
         );
+    }
+
+    private async Task WriteFeedbackTimeoutLogAsync(TorrentSnapshot snapshot,
+        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset submittedAtUtc, CancellationToken cancellationToken)
+    {
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Warning,
+                Category = "torrent",
+                EventType = "torrent.callback.feedback_timed_out",
+                Message = $"TVMaze callback feedback timed out for torrent '{snapshot.Name}'.",
+                TorrentId = snapshot.TorrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        snapshot.Name,
+                        snapshot.CategoryKey,
+                        snapshot.InfoHash,
+                        snapshot.DownloadRootPath,
+                        snapshot.CompletionCallbackLabel,
+                        SubmittedAtUtc = submittedAtUtc,
+                        runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds,
+                    }),
+            },
+            cancellationToken);
     }
 }

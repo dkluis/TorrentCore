@@ -43,6 +43,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                              callback_started_at_utc,
                                              callback_completed_at_utc,
                                              callback_last_error,
+                                             latest_completion_callback_feedback_received_at_utc,
+                                             latest_completion_callback_feedback_json,
                                              data_deleted,
                                              removal_reason,
                                              removed_by_cleanup_policy,
@@ -160,6 +162,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   callback_started_at_utc,
                                   callback_completed_at_utc,
                                   callback_last_error,
+                                  latest_completion_callback_feedback_received_at_utc,
+                                  latest_completion_callback_feedback_json,
                                   data_deleted,
                                   removal_reason,
                                   removed_by_cleanup_policy,
@@ -198,6 +202,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   $callback_started_at_utc,
                                   $callback_completed_at_utc,
                                   $callback_last_error,
+                                  $latest_completion_callback_feedback_received_at_utc,
+                                  $latest_completion_callback_feedback_json,
                                   $data_deleted,
                                   $removal_reason,
                                   $removed_by_cleanup_policy,
@@ -251,6 +257,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   callback_started_at_utc,
                                   callback_completed_at_utc,
                                   callback_last_error,
+                                  latest_completion_callback_feedback_received_at_utc,
+                                  latest_completion_callback_feedback_json,
                                   data_deleted,
                                   removal_reason,
                                   removed_by_cleanup_policy,
@@ -289,6 +297,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   $callback_started_at_utc,
                                   $callback_completed_at_utc,
                                   $callback_last_error,
+                                  $latest_completion_callback_feedback_received_at_utc,
+                                  $latest_completion_callback_feedback_json,
                                   $data_deleted,
                                   $removal_reason,
                                   $removed_by_cleanup_policy,
@@ -342,6 +352,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   callback_started_at_utc = $callback_started_at_utc,
                                   callback_completed_at_utc = $callback_completed_at_utc,
                                   callback_last_error = $callback_last_error,
+                                  latest_completion_callback_feedback_received_at_utc = $latest_completion_callback_feedback_received_at_utc,
+                                  latest_completion_callback_feedback_json = $latest_completion_callback_feedback_json,
                                   data_deleted = $data_deleted,
                                   removal_reason = $removal_reason,
                                   removed_by_cleanup_policy = $removed_by_cleanup_policy,
@@ -401,11 +413,13 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
             CallbackStartedAtUtc = reader.IsDBNull(28) ? null : ParseDateTime(reader.GetString(28)),
             CallbackCompletedAtUtc = reader.IsDBNull(29) ? null : ParseDateTime(reader.GetString(29)),
             CallbackLastError = reader.IsDBNull(30) ? null : reader.GetString(30),
-            DataDeleted = reader.GetInt64(31) != 0,
-            RemovalReason = reader.IsDBNull(32) ? null : reader.GetString(32),
-            RemovedByCleanupPolicy = reader.GetInt64(33) != 0,
-            FinalPayloadPath = reader.IsDBNull(34) ? null : reader.GetString(34),
-            ServiceInstanceIdLastSeen = reader.IsDBNull(35) ? null : Guid.Parse(reader.GetString(35)),
+            LatestCompletionCallbackFeedbackReceivedAtUtc = reader.IsDBNull(31) ? null : ParseDateTime(reader.GetString(31)),
+            LatestCompletionCallbackFeedbackJson = reader.IsDBNull(32) ? null : reader.GetString(32),
+            DataDeleted = reader.GetInt64(33) != 0,
+            RemovalReason = reader.IsDBNull(34) ? null : reader.GetString(34),
+            RemovedByCleanupPolicy = reader.GetInt64(35) != 0,
+            FinalPayloadPath = reader.IsDBNull(36) ? null : reader.GetString(36),
+            ServiceInstanceIdLastSeen = reader.IsDBNull(37) ? null : Guid.Parse(reader.GetString(37)),
         };
     }
 
@@ -442,6 +456,14 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         command.Parameters.AddWithValue("$callback_started_at_utc", ToDbValue(record.CallbackStartedAtUtc));
         command.Parameters.AddWithValue("$callback_completed_at_utc", ToDbValue(record.CallbackCompletedAtUtc));
         command.Parameters.AddWithValue("$callback_last_error", (object?)record.CallbackLastError ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$latest_completion_callback_feedback_received_at_utc",
+            ToDbValue(record.LatestCompletionCallbackFeedbackReceivedAtUtc)
+        );
+        command.Parameters.AddWithValue(
+            "$latest_completion_callback_feedback_json",
+            (object?)record.LatestCompletionCallbackFeedbackJson ?? DBNull.Value
+        );
         command.Parameters.AddWithValue("$data_deleted", record.DataDeleted ? 1 : 0);
         command.Parameters.AddWithValue("$removal_reason", (object?)record.RemovalReason ?? DBNull.Value);
         command.Parameters.AddWithValue("$removed_by_cleanup_policy", record.RemovedByCleanupPolicy ? 1 : 0);

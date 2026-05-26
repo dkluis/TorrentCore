@@ -1447,21 +1447,21 @@ public sealed class TorrentApiTests
                 invocations => invocations.Count == 1,
                 timeout: TimeSpan.FromSeconds(5));
 
-            var invokedTorrent = await WaitForAsync(
+            var waitingTorrent = await WaitForAsync(
                 async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
-                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
                 timeout: TimeSpan.FromSeconds(5));
 
             var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
 
-            Assert.NotNull(invokedTorrent);
-            Assert.False(invokedTorrent.CanRetryCompletionCallback);
-            Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+            Assert.NotNull(waitingTorrent);
+            Assert.False(waitingTorrent.CanRetryCompletionCallback);
+            Assert.NotNull(waitingTorrent.CompletionCallbackInvokedAtUtc);
             Assert.NotNull(torrents);
             Assert.Contains(
                 torrents,
                 torrent => torrent.TorrentId == torrentId &&
-                           torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString());
+                           torrent.CompletionCallbackState == TorrentCompletionCallbackState.WaitingForFeedback.ToString());
             Assert.True(File.Exists(finalPayloadPath));
             Assert.True(await ReadPersistedTorrentExistsAsync(storagePath, torrentId));
 
@@ -1548,20 +1548,20 @@ public sealed class TorrentApiTests
                 invocations => invocations.Count == 1,
                 timeout: TimeSpan.FromSeconds(5));
 
-            var invokedTorrent = await WaitForAsync(
+            var waitingTorrent = await WaitForAsync(
                 async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
-                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+                torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
                 timeout: TimeSpan.FromSeconds(5));
 
             var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
 
-            Assert.NotNull(invokedTorrent);
-            Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+            Assert.NotNull(waitingTorrent);
+            Assert.NotNull(waitingTorrent.CompletionCallbackInvokedAtUtc);
             Assert.NotNull(torrents);
             Assert.Contains(
                 torrents,
                 torrent => torrent.TorrentId == torrentId &&
-                           torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString());
+                           torrent.CompletionCallbackState == TorrentCompletionCallbackState.WaitingForFeedback.ToString());
             Assert.True(File.Exists(finalPayloadPath));
             Assert.True(await ReadPersistedTorrentExistsAsync(storagePath, torrentId));
 
@@ -1928,12 +1928,12 @@ public sealed class TorrentApiTests
             invocations => invocations.Count == 1,
             timeout: TimeSpan.FromSeconds(5));
 
-        var invokedState = await WaitForAsync(
+        var waitingState = await WaitForAsync(
             async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId),
-            state => state.State == TorrentCompletionCallbackState.Invoked.ToString(),
+            state => state.State == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
             timeout: TimeSpan.FromSeconds(5));
-        Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
-        Assert.NotNull(invokedState.InvokedAtUtc);
+        Assert.Equal(TorrentCompletionCallbackState.WaitingForFeedback.ToString(), waitingState.State);
+        Assert.NotNull(waitingState.InvokedAtUtc);
 
         var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=50&torrentId={addedTorrent.TorrentId}");
         Assert.NotNull(logs);
@@ -1990,11 +1990,11 @@ public sealed class TorrentApiTests
             invocations => invocations.Count == 1,
             timeout: TimeSpan.FromSeconds(5));
 
-        var invokedState = await WaitForAsync(
+        var waitingState = await WaitForAsync(
             async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId),
-            state => state.State == TorrentCompletionCallbackState.Invoked.ToString(),
+            state => state.State == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
             timeout: TimeSpan.FromSeconds(5));
-        Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
+        Assert.Equal(TorrentCompletionCallbackState.WaitingForFeedback.ToString(), waitingState.State);
     }
 
     [Fact]
@@ -2049,9 +2049,9 @@ public sealed class TorrentApiTests
                 invocations => invocations.Count == 1,
                 timeout: TimeSpan.FromSeconds(5));
 
-            var invokedState = await ReadPersistedCallbackStateAsync(storagePath, torrentId);
-            Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), invokedState.State);
-            Assert.NotNull(invokedState.InvokedAtUtc);
+            var waitingState = await ReadPersistedCallbackStateAsync(storagePath, torrentId);
+            Assert.Equal(TorrentCompletionCallbackState.WaitingForFeedback.ToString(), waitingState.State);
+            Assert.NotNull(waitingState.InvokedAtUtc);
 
             var hostStatusResponse = await httpClient.GetAsync("api/host/status");
             hostStatusResponse.EnsureSuccessStatusCode();
@@ -2238,6 +2238,58 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_CompletionCallback_FeedbackTimeout_PersistsTimedOutState_WhenTvmazeNeverReportsBack()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-feedback-timeout");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
+        var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 50);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCompletionCallbackSettingsAsync(
+            httpClient,
+            "/bin/sh",
+            callbackScriptPath,
+            rootPath,
+            finalizationTimeoutSeconds: 1);
+
+        var response = await AddMagnetAsync(httpClient, "7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B", "Feedback Timeout Movie", "Movie");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Feedback Timeout Movie"));
+
+        var timedOutState = await WaitForAsync(
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId),
+            state => state.State == TorrentCompletionCallbackState.TimedOut.ToString(),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(timedOutState.LastError);
+        Assert.Contains("Timed out waiting for TVMaze callback feedback", timedOutState.LastError, StringComparison.Ordinal);
+        Assert.NotNull(timedOutState.InvokedAtUtc);
+
+        var torrentDetail = await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}");
+        Assert.NotNull(torrentDetail);
+        Assert.Equal(TorrentCompletionCallbackState.TimedOut.ToString(), torrentDetail.CompletionCallbackState);
+        Assert.True(torrentDetail.CanRetryCompletionCallback);
+        Assert.Contains("Timed out waiting for TVMaze callback feedback", torrentDetail.CompletionCallbackLastError ?? string.Empty, StringComparison.Ordinal);
+        Assert.Null(torrentDetail.CompletionCallbackFeedback);
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={addedTorrent.TorrentId}");
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.invoked");
+        var feedbackTimedOutLog = Assert.Single(logs, log => log.EventType == "torrent.callback.feedback_timed_out");
+        var feedbackTimedOutDetails = ParseLogDetails(feedbackTimedOutLog);
+        Assert.Equal(1, feedbackTimedOutDetails.GetProperty("CompletionCallbackFinalizationTimeoutSeconds").GetInt32());
+    }
+
+    [Fact]
     public async Task FakeRuntime_RetryCompletionCallback_RequeuesTimedOutState_AndInvokesWhenPayloadAppears()
     {
         var rootPath = CreateTempRootPath("torrentcore-callback-retry-timeout");
@@ -2295,14 +2347,14 @@ public sealed class TorrentApiTests
             invocations => invocations.Count == 1,
             timeout: TimeSpan.FromSeconds(5));
 
-        var invokedTorrent = await WaitForAsync(
+        var waitingTorrent = await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
-            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
             timeout: TimeSpan.FromSeconds(5));
 
-        Assert.NotNull(invokedTorrent);
-        Assert.False(invokedTorrent.CanRetryCompletionCallback);
-        Assert.NotNull(invokedTorrent.CompletionCallbackInvokedAtUtc);
+        Assert.NotNull(waitingTorrent);
+        Assert.False(waitingTorrent.CanRetryCompletionCallback);
+        Assert.NotNull(waitingTorrent.CompletionCallbackInvokedAtUtc);
 
         var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>($"api/logs?take=100&torrentId={addedTorrent.TorrentId}");
         Assert.NotNull(logs);
@@ -2310,7 +2362,7 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
-    public async Task FakeRuntime_RetryCompletionCallback_ReturnsConflict_ForInvokedState()
+    public async Task FakeRuntime_RetryCompletionCallback_ReturnsConflict_ForWaitingForFeedbackState()
     {
         var rootPath = CreateTempRootPath("torrentcore-callback-retry-conflict");
         var downloadPath = Path.Combine(rootPath, "downloads");
@@ -2334,7 +2386,7 @@ public sealed class TorrentApiTests
 
         await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
-            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.Invoked.ToString(),
+            torrent => torrent is not null && torrent.CompletionCallbackState == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
             timeout: TimeSpan.FromSeconds(5));
 
         var retryResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/completion-callback/retry", content: null);
@@ -2345,7 +2397,7 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
-    public async Task ReportCompletionCallbackResult_ReturnsOk_AndWritesReceiptLog()
+    public async Task ReportCompletionCallbackResult_ReturnsOk_AndPersistsFeedbackToTorrentAndHistory()
     {
         await using var factory = CreateFactory();
         using var httpClient = factory.CreateClient();
@@ -2390,16 +2442,46 @@ public sealed class TorrentApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
+        var updatedTorrent = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent?.CompletionCallbackFeedback?.CorrelationId == request.CorrelationId,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(updatedTorrent);
+        Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), updatedTorrent.CompletionCallbackState);
+        Assert.NotNull(updatedTorrent.CompletionCallbackFeedback);
+        Assert.Equal(request.TorrentId, updatedTorrent.CompletionCallbackFeedback.TorrentId);
+        Assert.Equal(request.FinalState, updatedTorrent.CompletionCallbackFeedback.FinalState);
+        Assert.Equal(request.ReasonCode, updatedTorrent.CompletionCallbackFeedback.ReasonCode);
+        Assert.Equal(request.DisplayMessage, updatedTorrent.CompletionCallbackFeedback.DisplayMessage);
+        Assert.Equal(request.AllowResubmit, updatedTorrent.CompletionCallbackFeedback.AllowResubmit);
+        Assert.Equal(request.NeedsManualIntervention, updatedTorrent.CompletionCallbackFeedback.NeedsManualIntervention);
+        Assert.True(updatedTorrent.CompletionCallbackFeedback.ReceivedAtUtc > DateTimeOffset.MinValue);
+
+        var history = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}"),
+            detail => detail?.CompletionCallbackFeedback?.CorrelationId == request.CorrelationId,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(history);
+        Assert.NotNull(history.CompletionCallbackFeedback);
+        Assert.Equal(request.TorrentId, history.CompletionCallbackFeedback.TorrentId);
+        Assert.Equal(request.FinalState, history.CompletionCallbackFeedback.FinalState);
+        Assert.Equal(request.ReasonCode, history.CompletionCallbackFeedback.ReasonCode);
+        Assert.Equal(request.DisplayMessage, history.CompletionCallbackFeedback.DisplayMessage);
+
         var logs = await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
                 $"api/logs?take=50&torrentId={addedTorrent.TorrentId}"
             ),
             entries => entries is not null &&
-                       entries.Any(entry => entry.EventType == "torrent.callback.feedback.received"),
+                       entries.Any(entry => entry.EventType == "torrent.callback.feedback.received") &&
+                       entries.Any(entry => entry.EventType == "torrent.callback.feedback.applied"),
             timeout: TimeSpan.FromSeconds(5));
 
         Assert.NotNull(logs);
         Assert.Contains(logs, log => log.EventType == "torrent.callback.feedback.received");
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.feedback.applied");
     }
 
     [Fact]

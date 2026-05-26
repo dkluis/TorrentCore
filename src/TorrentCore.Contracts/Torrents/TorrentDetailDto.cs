@@ -27,6 +27,7 @@ public sealed class TorrentDetailDto
     public          string?            CompletionCallbackFinalPayloadPath { get; init; }
     public          string?            CompletionCallbackPendingReason    { get; init; }
     public          string?            CompletionCallbackLastError        { get; init; }
+    public          CompletionCallbackFeedbackDto? CompletionCallbackFeedback { get; init; }
     public          string?            ErrorMessage                       { get; init; }
     public required bool               CanRefreshMetadata                 { get; init; }
     public required bool               CanRetryCompletionCallback         { get; init; }

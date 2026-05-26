@@ -1,3 +1,5 @@
+using TorrentCore.Contracts.Torrents;
+
 namespace TorrentCore.Contracts.History;
 
 public sealed class TorrentHistoryDetailDto
@@ -33,6 +35,7 @@ public sealed class TorrentHistoryDetailDto
     public          DateTimeOffset? CallbackStartedAt                { get; init; }
     public          DateTimeOffset? CallbackCompletedAt              { get; init; }
     public          string?         CallbackLastError                { get; init; }
+    public          CompletionCallbackFeedbackDto? CompletionCallbackFeedback { get; init; }
     public required bool            DataDeleted                      { get; init; }
     public          string?         RemovalReason                    { get; init; }
     public required bool            RemovedByCleanupPolicy           { get; init; }

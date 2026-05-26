@@ -177,6 +177,9 @@
                                     <MudTh>
                                         <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => (int?)torrent.WaitReason ?? -1)">Wait</MudTableSortLabel>
                                     </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.CompletionCallbackState ?? string.Empty)">Callback</MudTableSortLabel>
+                                    </MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
                                     <MudTd DataLabel="Name" Class="operations-table-wrap">@context.Name</MudTd>
@@ -187,6 +190,7 @@
                                     <MudTd DataLabel="Up">@FormatRate(context.UploadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Peers">@context.ConnectedPeerCount</MudTd>
                                     <MudTd DataLabel="Wait" Class="operations-table-wrap">@FormatWaitReason(context.WaitReason, context.QueuePosition)</MudTd>
+                                    <MudTd DataLabel="Callback" Class="operations-table-wrap">@FormatCallbackState(context.CompletionCallbackState)</MudTd>
                                 </RowTemplate>
                                 <NoRecordsContent>
                                     <MudText Typo="Typo.body2">No torrents match the current filters.</MudText>
@@ -427,7 +431,15 @@
                                 {
                                     <div class="dashboard-detail-item">
                                         <p class="dashboard-detail-label">Callback State</p>
-                                        <p class="dashboard-detail-value">@_selectedTorrentDetail.CompletionCallbackState</p>
+                                        <p class="dashboard-detail-value">@FormatCallbackState(_selectedTorrentDetail.CompletionCallbackState)</p>
+                                    </div>
+                                }
+                                @if (string.Equals(_selectedTorrentDetail.CompletionCallbackState, "WaitingForFeedback", StringComparison.OrdinalIgnoreCase) &&
+                                     _selectedTorrentDetail.CompletionCallbackFeedback is null)
+                                {
+                                    <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                        <p class="dashboard-detail-label">Callback Feedback</p>
+                                        <p class="dashboard-detail-value">Waiting for TVMaze to report the final callback result.</p>
                                     </div>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(_selectedTorrentDetail.CompletionCallbackPendingReason))
@@ -442,6 +454,49 @@
                                     <div class="dashboard-detail-item dashboard-detail-item--span-2">
                                         <p class="dashboard-detail-label">Callback Last Error</p>
                                         <p class="dashboard-detail-value">@_selectedTorrentDetail.CompletionCallbackLastError</p>
+                                    </div>
+                                }
+                                @if (_selectedTorrentDetail.CompletionCallbackFeedback is not null)
+                                {
+                                    <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                        <p class="dashboard-detail-label">Callback Feedback Summary</p>
+                                        <p class="dashboard-detail-value">@BuildFeedbackSummary(_selectedTorrentDetail.CompletionCallbackFeedback)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Feedback Received</p>
+                                        <p class="dashboard-detail-value">@FormatTimestamp(_selectedTorrentDetail.CompletionCallbackFeedback.ReceivedAtUtc)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Final Result</p>
+                                        <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedTorrentDetail.CompletionCallbackFeedback.FinalState)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Reason Code</p>
+                                        <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedTorrentDetail.CompletionCallbackFeedback.ReasonCode)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Recommended Action</p>
+                                        <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedTorrentDetail.CompletionCallbackFeedback.RecommendedAction)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Allow Resubmit</p>
+                                        <p class="dashboard-detail-value">@(_selectedTorrentDetail.CompletionCallbackFeedback.AllowResubmit ? "Yes" : "No")</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Needs Manual Intervention</p>
+                                        <p class="dashboard-detail-value">@(_selectedTorrentDetail.CompletionCallbackFeedback.NeedsManualIntervention ? "Yes" : "No")</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Callback Source</p>
+                                        <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedTorrentDetail.CompletionCallbackFeedback.CallbackSource)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item">
+                                        <p class="dashboard-detail-label">Callback Machine</p>
+                                        <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedTorrentDetail.CompletionCallbackFeedback.CallbackMachine)</p>
+                                    </div>
+                                    <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                        <p class="dashboard-detail-label">Feedback Detail</p>
+                                        <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedTorrentDetail.CompletionCallbackFeedback.DetailMessage)</p>
                                     </div>
                                 }
                                 @if (!string.IsNullOrWhiteSpace(_selectedTorrentDetail.ErrorMessage))
@@ -956,7 +1011,7 @@
             return "No active selection.";
         }
 
-        return $"{_selectedTorrentDetail.Name} | {_selectedTorrentDetail.State} | {_selectedTorrentDetail.ProgressPercent:0.0}%";
+        return $"{_selectedTorrentDetail.Name} | {_selectedTorrentDetail.State} | {FormatCallbackState(_selectedTorrentDetail.CompletionCallbackState)}";
     }
 
     private string BuildCurrentTorrentsSummary()
@@ -1023,5 +1078,20 @@
     private static bool CanDeleteData(TorrentDetailDto torrent)
     {
         return torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or TorrentState.Error or TorrentState.Paused;
+    }
+
+    private static string FormatCallbackState(string? state)
+    {
+        return CompletionCallbackDisplayText.FormatState(state);
+    }
+
+    private static string BuildFeedbackSummary(CompletionCallbackFeedbackDto? feedback)
+    {
+        return CompletionCallbackDisplayText.BuildFeedbackSummary(feedback);
+    }
+
+    private static string ValueOrNotAvailable(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "N/A" : value;
     }
 }

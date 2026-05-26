@@ -133,7 +133,7 @@ public static class SettingsHelpCatalog
     public static readonly SettingHelpContent CompletionCallbackFinalizationTimeoutSeconds = new(
         "Finalization Wait Seconds",
         "Limits how long TorrentCore waits for the final visible payload path before giving up on callback finalization.",
-        "TorrentCore does not fire the shared callback the moment the engine first reports completion. It waits until the final payload is visible and incomplete-suffix files are no longer the active payload. If that finalization window exceeds this value, TorrentCore marks the callback path as timed out."
+        "TorrentCore does not fire the shared callback the moment the engine first reports completion. It waits until the final payload is visible and incomplete-suffix files are no longer the active payload. In the current async TVMaze callback flow, this same timeout budget also covers the follow-up wait for TVMaze to report the final callback result back to TorrentCore."
     );
 
     public static readonly SettingHelpContent CompletionCallbackApiBaseUrlOverride = new(

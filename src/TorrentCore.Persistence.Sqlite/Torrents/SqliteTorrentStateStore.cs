@@ -92,6 +92,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   completion_callback_pending_since_utc,
                                   completion_callback_invoked_at_utc,
                                   completion_callback_last_error,
+                                  completion_callback_feedback_received_at_utc,
+                                  completion_callback_feedback_json,
                                   state,
                                   desired_state,
                                   magnet_uri,
@@ -137,6 +139,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   completion_callback_pending_since_utc,
                                   completion_callback_invoked_at_utc,
                                   completion_callback_last_error,
+                                  completion_callback_feedback_received_at_utc,
+                                  completion_callback_feedback_json,
                                   state,
                                   desired_state,
                                   magnet_uri,
@@ -226,33 +230,37 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                         reader.GetString(7), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
                     ),
                     CompletionCallbackLastError = reader.IsDBNull(8) ? null : reader.GetString(8),
-                    State                       = Enum.Parse<TorrentState>(reader.GetString(9), true),
-                    DesiredState                = Enum.Parse<TorrentDesiredState>(reader.GetString(10), true),
-                    MagnetUri                   = reader.GetString(11),
-                    InfoHash                    = reader.IsDBNull(12) ? null : reader.GetString(12),
-                    DownloadRootPath            = reader.IsDBNull(13) ? null : reader.GetString(13),
-                    SavePath                    = reader.GetString(14),
-                    ProgressPercent             = reader.GetDouble(15),
-                    DownloadedBytes             = reader.GetInt64(16),
-                    UploadedBytes               = reader.GetInt64(17),
-                    TotalBytes                  = reader.IsDBNull(18) ? null : reader.GetInt64(18),
-                    DownloadRateBytesPerSecond  = reader.GetInt64(19),
-                    UploadRateBytesPerSecond    = reader.GetInt64(20),
-                    TrackerCount                = reader.GetInt32(21),
-                    ConnectedPeerCount          = reader.GetInt32(22),
+                    CompletionCallbackFeedbackReceivedAtUtc = reader.IsDBNull(9) ? null : DateTimeOffset.Parse(
+                        reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    CompletionCallbackFeedbackJson = reader.IsDBNull(10) ? null : reader.GetString(10),
+                    State                       = Enum.Parse<TorrentState>(reader.GetString(11), true),
+                    DesiredState                = Enum.Parse<TorrentDesiredState>(reader.GetString(12), true),
+                    MagnetUri                   = reader.GetString(13),
+                    InfoHash                    = reader.IsDBNull(14) ? null : reader.GetString(14),
+                    DownloadRootPath            = reader.IsDBNull(15) ? null : reader.GetString(15),
+                    SavePath                    = reader.GetString(16),
+                    ProgressPercent             = reader.GetDouble(17),
+                    DownloadedBytes             = reader.GetInt64(18),
+                    UploadedBytes               = reader.GetInt64(19),
+                    TotalBytes                  = reader.IsDBNull(20) ? null : reader.GetInt64(20),
+                    DownloadRateBytesPerSecond  = reader.GetInt64(21),
+                    UploadRateBytesPerSecond    = reader.GetInt64(22),
+                    TrackerCount                = reader.GetInt32(23),
+                    ConnectedPeerCount          = reader.GetInt32(24),
                     AddedAtUtc = DateTimeOffset.Parse(
-                        reader.GetString(23), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
-                    ),
-                    CompletedAtUtc = reader.IsDBNull(24) ? null : DateTimeOffset.Parse(
-                        reader.GetString(24), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
-                    ),
-                    SeedingStartedAtUtc = reader.IsDBNull(25) ? null : DateTimeOffset.Parse(
                         reader.GetString(25), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
                     ),
-                    LastActivityAtUtc = reader.IsDBNull(26) ? null : DateTimeOffset.Parse(
+                    CompletedAtUtc = reader.IsDBNull(26) ? null : DateTimeOffset.Parse(
                         reader.GetString(26), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
                     ),
-                    ErrorMessage = reader.IsDBNull(27) ? null : reader.GetString(27),
+                    SeedingStartedAtUtc = reader.IsDBNull(27) ? null : DateTimeOffset.Parse(
+                        reader.GetString(27), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    LastActivityAtUtc = reader.IsDBNull(28) ? null : DateTimeOffset.Parse(
+                        reader.GetString(28), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    ErrorMessage = reader.IsDBNull(29) ? null : reader.GetString(29),
                 }
             );
         }
@@ -274,6 +282,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   completion_callback_pending_since_utc,
                                   completion_callback_invoked_at_utc,
                                   completion_callback_last_error,
+                                  completion_callback_feedback_received_at_utc,
+                                  completion_callback_feedback_json,
                                   state,
                                   desired_state,
                                   magnet_uri,
@@ -304,6 +314,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   $completion_callback_pending_since_utc,
                                   $completion_callback_invoked_at_utc,
                                   $completion_callback_last_error,
+                                  $completion_callback_feedback_received_at_utc,
+                                  $completion_callback_feedback_json,
                                   $state,
                                   $desired_state,
                                   $magnet_uri,
@@ -344,6 +356,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   completion_callback_pending_since_utc = $completion_callback_pending_since_utc,
                                   completion_callback_invoked_at_utc = $completion_callback_invoked_at_utc,
                                   completion_callback_last_error = $completion_callback_last_error,
+                                  completion_callback_feedback_received_at_utc = $completion_callback_feedback_received_at_utc,
+                                  completion_callback_feedback_json = $completion_callback_feedback_json,
                                   state = $state,
                                   desired_state = $desired_state,
                                   magnet_uri = $magnet_uri,
@@ -393,6 +407,15 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         );
         command.Parameters.AddWithValue(
             "$completion_callback_last_error", torrent.CompletionCallbackLastError ?? (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$completion_callback_feedback_received_at_utc",
+            torrent.CompletionCallbackFeedbackReceivedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ??
+            (object)DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$completion_callback_feedback_json",
+            torrent.CompletionCallbackFeedbackJson ?? (object)DBNull.Value
         );
         command.Parameters.AddWithValue("$state", torrent.State.ToString());
         command.Parameters.AddWithValue("$desired_state", torrent.DesiredState.ToString());

@@ -8,6 +8,7 @@ using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
+using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
@@ -18,6 +19,7 @@ namespace TorrentCore.Service.Application;
 
 public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     ResolvedTorrentCoreServicePaths servicePaths, ITorrentEngineAdapter torrentEngineAdapter,
+    ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService, IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService, ITorrentCategoryService torrentCategoryService,
     ITorrentHistoryService torrentHistoryService,
@@ -38,6 +40,9 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         "torrent.callback.pending_finalization",
         "torrent.callback.retry_requested",
         "torrent.callback.invoked",
+        "torrent.callback.feedback.received",
+        "torrent.callback.feedback.applied",
+        "torrent.callback.feedback_timed_out",
         "torrent.callback.failed",
         "torrent.callback.finalization_timed_out",
         "torrent.cleanup.auto_removed",
@@ -156,7 +161,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             MetadataRestartRequestedCount = logs.Count(log => log.EventType == "torrent.metadata.restart_requested"),
             CallbackInvokedCount = logs.Count(log => log.EventType == "torrent.callback.invoked"),
             CallbackFailedCount = logs.Count(log => log.EventType == "torrent.callback.failed"),
-            CallbackTimedOutCount = logs.Count(log => log.EventType == "torrent.callback.finalization_timed_out"),
+            CallbackTimedOutCount = logs.Count(log => log.EventType is "torrent.callback.finalization_timed_out" or "torrent.callback.feedback_timed_out"),
             CompletedAutoRemovedCount = logs.Count(log => log.EventType == "torrent.cleanup.auto_removed"),
             OrphanedTorrentLogsDeletedCount = logs.Count(log => log.EventType == "torrent.logs.orphaned_deleted"),
             RecentEvents = logs
@@ -288,6 +293,26 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         }
 
         var torrent = await GetTorrentAsync(torrentId, cancellationToken);
+        var snapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+        if (snapshot is null)
+        {
+            throw new ServiceOperationException(
+                "torrent_not_found",
+                $"Torrent '{torrentId}' was not found.",
+                StatusCodes.Status404NotFound,
+                nameof(torrentId));
+        }
+
+        var receivedAtUtc = DateTimeOffset.UtcNow;
+        var feedback = CompletionCallbackFeedbackMapper.Create(request, receivedAtUtc);
+        snapshot.CompletionCallbackFeedbackReceivedAtUtc = receivedAtUtc;
+        snapshot.CompletionCallbackFeedbackJson = CompletionCallbackFeedbackMapper.Serialize(feedback);
+        snapshot.CompletionCallbackState = TorrentCompletionCallbackState.Invoked;
+        snapshot.CompletionCallbackInvokedAtUtc ??= receivedAtUtc;
+        snapshot.CompletionCallbackLastError = null;
+        snapshot.LastActivityAtUtc ??= receivedAtUtc;
+        await torrentStateStore.UpdateAsync(snapshot, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(snapshot, cancellationToken);
 
         await activityLogService.WriteAsync(
             new ActivityLogWriteRequest
@@ -322,11 +347,35 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
                         request.CallbackLocalTimestamp,
                         request.AttemptCount,
                         request.RawResponseJson,
+                        receivedAtUtc,
                     }
                 ),
             },
             cancellationToken
         );
+
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Information,
+                Category = "torrent",
+                EventType = "torrent.callback.feedback.applied",
+                Message = $"Stored TVMaze callback feedback for torrent '{torrent.Name}'.",
+                TorrentId = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        feedback.FinalState,
+                        feedback.ReasonCode,
+                        feedback.CallbackFinished,
+                        feedback.MediaConsideredDone,
+                        feedback.AllowResubmit,
+                        feedback.NeedsManualIntervention,
+                        feedback.ReceivedAtUtc,
+                    }),
+            },
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId,
