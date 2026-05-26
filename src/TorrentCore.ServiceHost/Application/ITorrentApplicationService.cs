@@ -37,6 +37,8 @@ public interface ITorrentApplicationService
     Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task ReportCompletionCallbackResultAsync(Guid torrentId, ReportCompletionCallbackResultRequest request,
+        CancellationToken cancellationToken);
 
     Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request,
         CancellationToken                         cancellationToken);

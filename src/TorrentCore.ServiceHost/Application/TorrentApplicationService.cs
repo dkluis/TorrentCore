@@ -255,6 +255,80 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         }
     }
 
+    public async Task ReportCompletionCallbackResultAsync(Guid torrentId, ReportCompletionCallbackResultRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (torrentId == Guid.Empty)
+        {
+            throw new ServiceOperationException(
+                "invalid_torrent_id",
+                "Torrent id is required.",
+                StatusCodes.Status400BadRequest,
+                "torrentId");
+        }
+
+        if (request.TorrentId == Guid.Empty)
+        {
+            throw new ServiceOperationException(
+                "invalid_request_torrent_id",
+                "Request torrent id is required.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.TorrentId));
+        }
+
+        if (torrentId != request.TorrentId)
+        {
+            throw new ServiceOperationException(
+                "torrent_id_mismatch",
+                "Route torrent id does not match request torrent id.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.TorrentId));
+        }
+
+        var torrent = await GetTorrentAsync(torrentId, cancellationToken);
+
+        await activityLogService.WriteAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Information,
+                Category = "torrent",
+                EventType = "torrent.callback.feedback.received",
+                Message = $"Received TVMaze callback feedback for torrent '{torrent.Name}'.",
+                TorrentId = torrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        request.TorrentId,
+                        request.TorrentHash,
+                        request.CompletionTimestamp,
+                        request.CallbackSource,
+                        request.CallbackMachine,
+                        request.ContractVersion,
+                        request.FinalState,
+                        request.ReasonCode,
+                        request.SourceState,
+                        request.ResubmitAdvice,
+                        request.CallbackFinished,
+                        request.MediaConsideredDone,
+                        request.AllowResubmit,
+                        request.NeedsManualIntervention,
+                        request.DisplayMessage,
+                        request.DetailMessage,
+                        request.RecommendedAction,
+                        request.CorrelationId,
+                        request.CallbackLocalTimestamp,
+                        request.AttemptCount,
+                        request.RawResponseJson,
+                    }
+                ),
+            },
+            cancellationToken
+        );
+    }
+
     public async Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId,
         CancellationToken                                                      cancellationToken)
     {

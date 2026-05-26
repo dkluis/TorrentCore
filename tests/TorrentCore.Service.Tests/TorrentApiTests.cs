@@ -2345,6 +2345,104 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task ReportCompletionCallbackResult_ReturnsOk_AndWritesReceiptLog()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(
+            httpClient,
+            "8484848484848484848484848484848484848484",
+            "Callback Feedback Receipt",
+            "Movie");
+        addResponse.EnsureSuccessStatusCode();
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
+
+        var request = new ReportCompletionCallbackResultRequest
+        {
+            TorrentId = addedTorrent.TorrentId,
+            TorrentHash = "8484848484848484848484848484848484848484",
+            CompletionTimestamp = DateTimeOffset.Parse("2026-05-26T10:30:00-04:00"),
+            CallbackSource = "TorrentCore",
+            CallbackMachine = "CA-Desktop",
+            ContractVersion = "1",
+            FinalState = "Success",
+            ReasonCode = "DestinationAlreadyExists",
+            SourceState = "SourceConsumed",
+            ResubmitAdvice = "NoResubmitNeeded",
+            CallbackFinished = true,
+            MediaConsideredDone = true,
+            AllowResubmit = false,
+            NeedsManualIntervention = false,
+            DisplayMessage = "Completed successfully.",
+            DetailMessage = "Detailed callback feedback.",
+            RecommendedAction = "None",
+            CorrelationId = "corr-123",
+            CallbackLocalTimestamp = DateTimeOffset.Parse("2026-05-26T10:29:58-04:00"),
+            AttemptCount = 1,
+            RawResponseJson = "{\"handled\":true}",
+        };
+
+        var response = await httpClient.PostAsJsonAsync(
+            $"api/torrents/{addedTorrent.TorrentId}/completion-callback/result",
+            request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var logs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+                $"api/logs?take=50&torrentId={addedTorrent.TorrentId}"
+            ),
+            entries => entries is not null &&
+                       entries.Any(entry => entry.EventType == "torrent.callback.feedback.received"),
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "torrent.callback.feedback.received");
+    }
+
+    [Fact]
+    public async Task ReportCompletionCallbackResult_WhenRouteAndBodyTorrentIdsDiffer_ReturnsBadRequest()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var routeTorrentId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var bodyTorrentId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+
+        var response = await httpClient.PostAsJsonAsync(
+            $"api/torrents/{routeTorrentId}/completion-callback/result",
+            new ReportCompletionCallbackResultRequest
+            {
+                TorrentId = bodyTorrentId,
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("torrent_id_mismatch", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ReportCompletionCallbackResult_WhenTorrentDoesNotExist_ReturnsNotFound()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var torrentId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var response = await httpClient.PostAsJsonAsync(
+            $"api/torrents/{torrentId}/completion-callback/result",
+            new ReportCompletionCallbackResultRequest
+            {
+                TorrentId = torrentId,
+            });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("torrent_not_found", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task FakeRuntime_PauseAndResumeWhileDownloading_PreservesPausedStateUntilResumed()
     {
         var rootPath = CreateTempRootPath("torrentcore-pause-history");

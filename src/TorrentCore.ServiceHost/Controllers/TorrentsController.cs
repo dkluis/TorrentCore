@@ -114,6 +114,17 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
         return Ok(result);
     }
 
+    [HttpPost("{torrentId:guid}/completion-callback/result")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ProblemDetails))]
+    public async Task<IActionResult> ReportCompletionCallbackResult(Guid torrentId,
+        [FromBody] ReportCompletionCallbackResultRequest request, CancellationToken cancellationToken)
+    {
+        await torrentApplicationService.ReportCompletionCallbackResultAsync(torrentId, request, cancellationToken);
+        return Ok();
+    }
+
     [HttpPost("{torrentId:guid}/remove")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
