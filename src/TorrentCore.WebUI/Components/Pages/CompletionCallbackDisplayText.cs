@@ -8,7 +8,8 @@ internal static class CompletionCallbackDisplayText
     {
         return state switch
         {
-            null or "" => "Not available",
+            null or "" => "--",
+            "Unknown" => "--",
             "PendingFinalization" => "Waiting For Final Payload",
             "WaitingForFeedback" => "Waiting For TVMaze",
             "Invoked" => "Final Feedback Received",
