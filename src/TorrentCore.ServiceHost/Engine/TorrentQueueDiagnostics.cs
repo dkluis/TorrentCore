@@ -56,6 +56,11 @@ internal static class TorrentQueueDiagnostics
             diagnostics[pausedTorrent.TorrentId] = new TorrentQueueDiagnostic(TorrentWaitReason.PausedByOperator, null);
         }
 
+        foreach (var waitingTorrent in snapshots.Where(snapshot => snapshot.State == TorrentState.WaitingForFileCompletion))
+        {
+            diagnostics[waitingTorrent.TorrentId] = new TorrentQueueDiagnostic(TorrentWaitReason.WaitingForFileCompletion, null);
+        }
+
         foreach (var errorTorrent in snapshots.Where(snapshot => snapshot.State == TorrentState.Error))
         {
             diagnostics[errorTorrent.TorrentId] = new TorrentQueueDiagnostic(TorrentWaitReason.BlockedByError, null);

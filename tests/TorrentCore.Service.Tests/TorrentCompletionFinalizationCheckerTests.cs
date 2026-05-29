@@ -93,6 +93,7 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
         Assert.Null(result.PendingReason);
     }
 
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))

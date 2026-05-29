@@ -19,7 +19,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         CancellationToken cancellationToken, TorrentCompletionFinalizationCheckResult? finalizationResult = null)
     {
         if (previousCompletedAtUtc is not null || snapshot.CompletedAtUtc is null ||
-            snapshot.State is not TorrentState.Completed and not TorrentState.Seeding ||
+            snapshot.State is not TorrentState.Completed and not TorrentState.Seeding and not TorrentState.Queued ||
             !snapshot.InvokeCompletionCallback || string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLabel) ||
             snapshot.CompletionCallbackState is not null)
         {
@@ -43,7 +43,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
     {
         if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.PendingFinalization)
         {
-            return await ProcessWaitingForFeedbackAsync(snapshot, runtimeSettings, now, cancellationToken);
+            return ProcessWaitingForFeedback(snapshot, now);
         }
 
         var pendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc ?? snapshot.CompletedAtUtc ?? now;
@@ -105,8 +105,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         }
     }
 
-    private async Task<bool> ProcessWaitingForFeedbackAsync(TorrentSnapshot snapshot,
-        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken)
+    private static bool ProcessWaitingForFeedback(TorrentSnapshot snapshot, DateTimeOffset now)
     {
         if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.WaitingForFeedback ||
             !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackFeedbackJson))
@@ -122,16 +121,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             changed = true;
         }
 
-        if (now - submittedAtUtc < TimeSpan.FromSeconds(runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds))
-        {
-            return changed;
-        }
-
-        snapshot.CompletionCallbackState = TorrentCompletionCallbackState.TimedOut;
-        snapshot.CompletionCallbackLastError =
-            $"Timed out waiting for TVMaze callback feedback after successful submission. No report-back was received within {runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds} seconds.";
-        await WriteFeedbackTimeoutLogAsync(snapshot, runtimeSettings, submittedAtUtc, cancellationToken);
-        return true;
+        return changed;
     }
 
     private static string? BuildPostAttemptError(string? error, string finalPayloadPath)
@@ -213,30 +203,4 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         );
     }
 
-    private async Task WriteFeedbackTimeoutLogAsync(TorrentSnapshot snapshot,
-        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset submittedAtUtc, CancellationToken cancellationToken)
-    {
-        await activityLogService.WriteAsync(
-            new ActivityLogWriteRequest
-            {
-                Level = ActivityLogLevel.Warning,
-                Category = "torrent",
-                EventType = "torrent.callback.feedback_timed_out",
-                Message = $"TVMaze callback feedback timed out for torrent '{snapshot.Name}'.",
-                TorrentId = snapshot.TorrentId,
-                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                DetailsJson = JsonSerializer.Serialize(
-                    new
-                    {
-                        snapshot.Name,
-                        snapshot.CategoryKey,
-                        snapshot.InfoHash,
-                        snapshot.DownloadRootPath,
-                        snapshot.CompletionCallbackLabel,
-                        SubmittedAtUtc = submittedAtUtc,
-                        runtimeSettings.CompletionCallbackFinalizationTimeoutSeconds,
-                    }),
-            },
-            cancellationToken);
-    }
 }

@@ -13,8 +13,9 @@ public enum TorrentState
     Queued            = 1,
     Downloading       = 2,
     Seeding           = 3,
-    Paused            = 4,
-    Completed         = 5,
-    Error             = 6,
-    Removed           = 7,
+    WaitingForFileCompletion = 4,
+    Paused            = 5,
+    Completed         = 6,
+    Error             = 7,
+    Removed           = 8,
 }

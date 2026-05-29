@@ -15,6 +15,7 @@ namespace TorrentCore.Service.Engine;
 
 public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateStore,
     IActivityLogService activityLogService, ITorrentCompletionCallbackProcessor completionCallbackProcessor,
+    ITorrentCompletionFinalizationChecker finalizationChecker,
     ITorrentHistoryService torrentHistoryService,
     ServiceInstanceContext serviceInstanceContext, IOptions<TorrentCoreServiceOptions> serviceOptions,
     IRuntimeSettingsService runtimeSettingsService, ILogger<FakeTorrentRuntimeService> logger) : BackgroundService
@@ -99,6 +100,14 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
         torrents = await torrentStateStore.ListAsync(cancellationToken);
         await AdvanceSeedingAsync(
             torrents.Where(torrent => torrent.State == TorrentState.Seeding).ToList(), runtimeSettings, now,
+            cancellationToken
+        );
+
+        torrents = await torrentStateStore.ListAsync(cancellationToken);
+        await AdvanceFileCompletionAsync(
+            torrents.Where(torrent => torrent.State == TorrentState.WaitingForFileCompletion).ToList(),
+            runtimeSettings,
+            now,
             cancellationToken
         );
 
@@ -254,6 +263,21 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
 
             if (nextProgress >= 100)
             {
+                var finalizationResult = finalizationChecker.Check(torrent, runtimeSettings);
+                if (!finalizationResult.IsReady)
+                {
+                    torrent.State = TorrentState.WaitingForFileCompletion;
+                    torrent.CompletedAtUtc = null;
+                    torrent.SeedingStartedAtUtc = null;
+                    torrent.ConnectedPeerCount = 0;
+                    torrent.DownloadRateBytesPerSecond = 0;
+                    torrent.UploadRateBytesPerSecond = 0;
+
+                    await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                    await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
+                    continue;
+                }
+
                 torrent.CompletedAtUtc      ??= now;
                 torrent.SeedingStartedAtUtc ??= now;
 
@@ -352,6 +376,22 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
     {
         foreach (var torrent in torrents.Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable))
         {
+            var finalizationResult = finalizationChecker.Check(torrent, runtimeSettings);
+            if (!finalizationResult.IsReady)
+            {
+                torrent.State = TorrentState.WaitingForFileCompletion;
+                torrent.CompletedAtUtc = null;
+                torrent.SeedingStartedAtUtc = null;
+                torrent.DownloadRateBytesPerSecond = 0;
+                torrent.UploadRateBytesPerSecond = 0;
+                torrent.ConnectedPeerCount = 0;
+                torrent.LastActivityAtUtc = now;
+
+                await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
+                continue;
+            }
+
             torrent.CompletedAtUtc             ??= now;
             torrent.SeedingStartedAtUtc        ??= torrent.CompletedAtUtc ?? now;
             torrent.DownloadRateBytesPerSecond =   0;
@@ -389,6 +429,53 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 continue;
             }
 
+            await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
+        }
+    }
+
+    private async Task AdvanceFileCompletionAsync(IReadOnlyList<TorrentSnapshot> torrents,
+        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        foreach (var torrent in torrents.Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable))
+        {
+            var finalizationResult = finalizationChecker.Check(torrent, runtimeSettings);
+            if (!finalizationResult.IsReady)
+            {
+                continue;
+            }
+
+            var previousCompletedAtUtc = torrent.CompletedAtUtc;
+            torrent.CompletedAtUtc ??= now;
+            torrent.SeedingStartedAtUtc ??= now;
+
+            var seedingDecision = SeedingPolicyEvaluator.Evaluate(
+                runtimeSettings.SeedingStopMode, runtimeSettings.SeedingStopRatio, runtimeSettings.SeedingStopMinutes,
+                torrent.UploadedBytes, torrent.TotalBytes, torrent.SeedingStartedAtUtc, now
+            );
+
+            if (seedingDecision.ShouldStop)
+            {
+                torrent.State = TorrentState.Completed;
+                torrent.ConnectedPeerCount = 0;
+                torrent.DownloadRateBytesPerSecond = 0;
+                torrent.UploadRateBytesPerSecond = 0;
+                await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
+                    previousCompletedAtUtc, torrent, runtimeSettings, now, cancellationToken
+                );
+            }
+            else
+            {
+                torrent.State = TorrentState.Seeding;
+                torrent.ConnectedPeerCount = CalculatePeerCount(torrent);
+                torrent.DownloadRateBytesPerSecond = 0;
+                torrent.UploadRateBytesPerSecond = CalculateUploadRate(torrent);
+                await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
+                    previousCompletedAtUtc, torrent, runtimeSettings, now, cancellationToken
+                );
+            }
+
+            torrent.LastActivityAtUtc = now;
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
         }

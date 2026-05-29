@@ -1062,6 +1062,7 @@
             TorrentWaitReason.WaitingForMetadataSlot => "Waiting for metadata slot",
             TorrentWaitReason.PendingDownloadDispatch => "Pending download dispatch",
             TorrentWaitReason.WaitingForDownloadSlot => "Waiting for download slot",
+            TorrentWaitReason.WaitingForFileCompletion => "Waiting for file completion",
             TorrentWaitReason.PausedByOperator => "Paused by operator",
             TorrentWaitReason.BlockedByError => "Blocked by error",
             _ => string.Empty,
@@ -1077,7 +1078,8 @@
 
     private static bool CanDeleteData(TorrentDetailDto torrent)
     {
-        return torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or TorrentState.Error or TorrentState.Paused;
+        return torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or
+                TorrentState.WaitingForFileCompletion or TorrentState.Error or TorrentState.Paused;
     }
 
     private static string FormatCallbackState(string? state)
