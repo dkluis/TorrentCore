@@ -374,8 +374,12 @@
                                             <span class="history-detail-inline-value">@FormatDateTime(_selectedHistoryDetail.CallbackCompletedAt)</span>
                                         </div>
                                         <div class="history-detail-inline-item">
-                                            <span class="history-detail-inline-key">Last Error</span>
+                                            <span class="history-detail-inline-key">Callback Error</span>
                                             <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CallbackLastError)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Torrent Error</span>
+                                            <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.LatestErrorMessage)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -420,10 +424,13 @@
                                                 <span class="history-detail-inline-key">Machine</span>
                                                 <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.CallbackMachine)</span>
                                             </div>
-                                            <div class="history-detail-inline-item">
-                                                <span class="history-detail-inline-key">Detail</span>
-                                                <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.DetailMessage)</span>
-                                            </div>
+                                            @if (ShouldShowFeedbackDetail(_selectedHistoryDetail.CompletionCallbackFeedback))
+                                            {
+                                                <div class="history-detail-inline-item">
+                                                    <span class="history-detail-inline-key">Detail</span>
+                                                    <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.DetailMessage)</span>
+                                                </div>
+                                            }
                                         </div>
                                     </div>
                                 }
@@ -440,21 +447,17 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="dashboard-detail-item dashboard-detail-item--span-2 history-detail-item--half-on-wide">
+                                <div class="dashboard-detail-item history-detail-item--half-on-wide">
                                     <p class="dashboard-detail-label">Info Hash</p>
                                     <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrDash(_selectedHistoryDetail.InfoHash)</p>
-                                </div>
-                                <div class="dashboard-detail-item dashboard-detail-item--span-2 history-detail-item--half-on-wide">
-                                    <p class="dashboard-detail-label">Magnet</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@_selectedHistoryDetail.MagnetUri</p>
-                                </div>
-                                <div class="dashboard-detail-item history-detail-item--half-on-wide">
-                                    <p class="dashboard-detail-label">Latest Error</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrDash(_selectedHistoryDetail.LatestErrorMessage)</p>
                                 </div>
                                 <div class="dashboard-detail-item history-detail-item--half-on-wide">
                                     <p class="dashboard-detail-label">Service Instance</p>
                                     <p class="dashboard-detail-value dashboard-detail-value--wrap">@FormatGuid(_selectedHistoryDetail.ServiceInstanceIdLastSeen)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2 history-detail-item--half-on-wide">
+                                    <p class="dashboard-detail-label">Magnet</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@_selectedHistoryDetail.MagnetUri</p>
                                 </div>
                             </div>
                         }
@@ -851,5 +854,20 @@
     private static string BuildFeedbackSummary(CompletionCallbackFeedbackDto? feedback)
     {
         return CompletionCallbackDisplayText.BuildFeedbackSummary(feedback);
+    }
+
+    private static bool ShouldShowFeedbackDetail(CompletionCallbackFeedbackDto? feedback)
+    {
+        if (feedback is null || string.IsNullOrWhiteSpace(feedback.DetailMessage))
+        {
+            return false;
+        }
+
+        var summary = BuildFeedbackSummary(feedback);
+        return !string.Equals(
+            feedback.DetailMessage.Trim(),
+            summary.Trim(),
+            StringComparison.OrdinalIgnoreCase
+        );
     }
 }
