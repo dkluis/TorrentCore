@@ -2425,6 +2425,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             CompletionCallbackFinalPayloadPath = callbackFinalPayloadPath,
             CompletionCallbackPendingReason    = callbackPendingReason,
             CompletionCallbackLastError        = snapshot.CompletionCallbackLastError,
+            CompletionCallbackFeedback         = CompletionCallbackFeedbackMapper.Deserialize(snapshot.CompletionCallbackFeedbackJson),
             ErrorMessage                       = snapshot.ErrorMessage,
             CanRefreshMetadata                 = CanRefreshMetadata(snapshot.State),
             CanRetryCompletionCallback         = CanRetryCompletionCallback(snapshot.CompletionCallbackState),
