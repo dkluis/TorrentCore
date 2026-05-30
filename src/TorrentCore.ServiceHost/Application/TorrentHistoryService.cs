@@ -102,29 +102,32 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
     }
 
+    public Task MarkRemovedAsync(TorrentSnapshot snapshot, bool dataDeleted, string removalReason, bool removedByCleanupPolicy,
+        DateTimeOffset removedAtUtc, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        return MarkRemovedCoreAsync(
+            snapshot.TorrentId,
+            () => CreateRemovedFromSnapshot(snapshot, removedAtUtc, dataDeleted, removalReason, removedByCleanupPolicy),
+            dataDeleted,
+            removalReason,
+            removedByCleanupPolicy,
+            removedAtUtc,
+            cancellationToken);
+    }
+
     public async Task MarkRemovedAsync(Guid torrentId, bool dataDeleted, string removalReason, bool removedByCleanupPolicy,
         DateTimeOffset removedAtUtc, CancellationToken cancellationToken)
     {
-        var existing = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);
-        if (existing is null)
-        {
-            return;
-        }
-
-        var updated = Clone(existing);
-        updated.RemovedAtUtc = removedAtUtc;
-        updated.DataDeleted = dataDeleted;
-        updated.RemovalReason = removalReason;
-        updated.RemovedByCleanupPolicy = removedByCleanupPolicy;
-        updated.LastUpdatedAtUtc = removedAtUtc;
-        updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
-
-        if (!HasMeaningfulChanges(existing, updated))
-        {
-            return;
-        }
-
-        await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
+        await MarkRemovedCoreAsync(
+            torrentId,
+            createWhenMissing: null,
+            dataDeleted,
+            removalReason,
+            removedByCleanupPolicy,
+            removedAtUtc,
+            cancellationToken);
     }
 
     private TorrentHistoryRecord CreateFromSnapshot(TorrentSnapshot snapshot, DateTimeOffset now)
@@ -222,6 +225,19 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             FinalPayloadPath = null,
             ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId,
         };
+    }
+
+    private TorrentHistoryRecord CreateRemovedFromSnapshot(TorrentSnapshot snapshot, DateTimeOffset removedAtUtc,
+        bool dataDeleted, string removalReason, bool removedByCleanupPolicy)
+    {
+        var record = CreateFromSnapshot(snapshot, removedAtUtc);
+        record.RemovedAtUtc = removedAtUtc;
+        record.DataDeleted = dataDeleted;
+        record.RemovalReason = removalReason;
+        record.RemovedByCleanupPolicy = removedByCleanupPolicy;
+        record.LastUpdatedAtUtc = removedAtUtc;
+        record.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
+        return record;
     }
 
     private TorrentHistoryRecord MergeAddedTorrent(TorrentHistoryRecord existing,
@@ -401,6 +417,37 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
     private static bool IsTerminalCallbackStatus(TorrentCompletionCallbackState? status)
     {
         return status is TorrentCompletionCallbackState.Invoked or TorrentCompletionCallbackState.Failed or TorrentCompletionCallbackState.TimedOut;
+    }
+
+    private async Task MarkRemovedCoreAsync(Guid torrentId, Func<TorrentHistoryRecord>? createWhenMissing, bool dataDeleted,
+        string removalReason, bool removedByCleanupPolicy, DateTimeOffset removedAtUtc, CancellationToken cancellationToken)
+    {
+        var existing = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);
+        if (existing is null)
+        {
+            if (createWhenMissing is null)
+            {
+                return;
+            }
+
+            await torrentHistoryStore.TryInsertAsync(createWhenMissing(), cancellationToken);
+            return;
+        }
+
+        var updated = Clone(existing);
+        updated.RemovedAtUtc = removedAtUtc;
+        updated.DataDeleted = dataDeleted;
+        updated.RemovalReason = removalReason;
+        updated.RemovedByCleanupPolicy = removedByCleanupPolicy;
+        updated.LastUpdatedAtUtc = removedAtUtc;
+        updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
+
+        if (!HasMeaningfulChanges(existing, updated))
+        {
+            return;
+        }
+
+        await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
     }
 
     private static IEnumerable<TorrentHistoryRecord> ApplyFilters(IEnumerable<TorrentHistoryRecord> records,

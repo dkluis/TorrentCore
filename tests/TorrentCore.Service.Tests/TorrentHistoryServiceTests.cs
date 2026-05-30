@@ -185,6 +185,63 @@ public sealed class TorrentHistoryServiceTests
         }
     }
 
+    [Fact]
+    public async Task MarkRemovedAsync_CreatesHistoryRowFromSnapshot_WhenMissing()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-remove-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var store = new SqliteTorrentHistoryStore(databaseFilePath);
+            var service = new TorrentHistoryService(
+                store,
+                new ServiceInstanceContext
+                {
+                    ServiceInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                });
+
+            var addedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+            var completedAt = addedAt.AddMinutes(5);
+            var removedAt = addedAt.AddMinutes(6);
+
+            await service.MarkRemovedAsync(
+                CreateSnapshot(
+                    TorrentState.Completed,
+                    addedAt,
+                    completedAt,
+                    1_024,
+                    100,
+                    completedAtUtc: completedAt),
+                dataDeleted: false,
+                removalReason: "automatic_cleanup",
+                removedByCleanupPolicy: true,
+                removedAt,
+                CancellationToken.None);
+
+            var history = await store.GetAsync(TorrentId, CancellationToken.None);
+
+            Assert.NotNull(history);
+            Assert.Equal(TorrentState.Completed.ToString(), history.LatestTorrentState);
+            Assert.Equal(removedAt, history.RemovedAtUtc);
+            Assert.False(history.DataDeleted);
+            Assert.Equal("automatic_cleanup", history.RemovalReason);
+            Assert.True(history.RemovedByCleanupPolicy);
+            Assert.Equal(removedAt, history.LastUpdatedAtUtc);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
     private static readonly Guid TorrentId = Guid.Parse("22222222-2222-2222-2222-222222222222");
 
     private static TorrentSnapshot CreateSnapshot(TorrentState state, DateTimeOffset addedAtUtc,

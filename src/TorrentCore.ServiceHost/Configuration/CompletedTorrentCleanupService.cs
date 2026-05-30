@@ -103,7 +103,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                     );
 
                     await torrentHistoryService.MarkRemovedAsync(
-                        torrent.TorrentId,
+                        torrent,
                         dataDeleted: false,
                         removalReason: "automatic_cleanup",
                         removedByCleanupPolicy: true,

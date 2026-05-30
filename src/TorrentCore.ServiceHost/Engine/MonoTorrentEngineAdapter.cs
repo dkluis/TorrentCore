@@ -709,7 +709,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await RemoveManagedTorrentAsync(torrentId, manager, request.DeleteData, cancellationToken);
         await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
         await torrentHistoryService.MarkRemovedAsync(
-            torrentId,
+            snapshot,
             dataDeleted: request.DeleteData,
             removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
             removedByCleanupPolicy: false,

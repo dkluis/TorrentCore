@@ -343,7 +343,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         }
 
         await torrentHistoryService.MarkRemovedAsync(
-            torrentId,
+            torrent,
             dataDeleted: request.DeleteData,
             removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
             removedByCleanupPolicy: false,
