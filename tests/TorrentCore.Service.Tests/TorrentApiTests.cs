@@ -29,6 +29,7 @@ public sealed class TorrentApiTests
         Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);
         Assert.Equal(55_124, hostStatus.EngineDhtPort);
+        Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), hostStatus.EngineEncryptionMode);
         Assert.Equal(150, hostStatus.EngineMaximumConnections);
         Assert.Equal(8, hostStatus.EngineMaximumHalfOpenConnections);
         Assert.Equal(0, hostStatus.EngineMaximumDownloadRateBytesPerSecond);
@@ -91,6 +92,7 @@ public sealed class TorrentApiTests
         var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
 
         Assert.NotNull(hostStatus);
+        Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), hostStatus.EngineEncryptionMode);
         Assert.Equal(60, hostStatus.EngineMaximumConnections);
         Assert.Equal(4, hostStatus.EngineMaximumHalfOpenConnections);
         Assert.Equal(12_500_000, hostStatus.EngineMaximumDownloadRateBytesPerSecond);
@@ -494,6 +496,7 @@ public sealed class TorrentApiTests
         Assert.False(settings.DeleteLogsForCompletedTorrents);
         Assert.Equal(5, settings.EngineConnectionFailureLogBurstLimit);
         Assert.Equal(60, settings.EngineConnectionFailureLogWindowSeconds);
+        Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), settings.EngineEncryptionMode);
         Assert.Equal(150, settings.EngineMaximumConnections);
         Assert.Equal(8, settings.EngineMaximumHalfOpenConnections);
         Assert.Equal(0, settings.EngineMaximumDownloadRateBytesPerSecond);
@@ -512,6 +515,7 @@ public sealed class TorrentApiTests
         Assert.Null(settings.CompletionCallbackApiKeyOverride);
         Assert.Equal(150, settings.AppliedEngineMaximumConnections);
         Assert.Equal(8, settings.AppliedEngineMaximumHalfOpenConnections);
+        Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), settings.AppliedEngineEncryptionMode);
         Assert.Equal(0, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
         Assert.Equal(0, settings.AppliedEngineMaximumUploadRateBytesPerSecond);
         Assert.False(settings.EngineSettingsRequireRestart);
@@ -538,6 +542,7 @@ public sealed class TorrentApiTests
             DeleteLogsForCompletedTorrents = true,
             EngineConnectionFailureLogBurstLimit = 2,
                 EngineConnectionFailureLogWindowSeconds = 180,
+                EngineEncryptionMode = TorrentEncryptionMode.EncryptedRequired.ToString(),
                 EngineMaximumConnections = 70,
                 EngineMaximumHalfOpenConnections = 6,
                 EngineMaximumDownloadRateBytesPerSecond = 4_000_000,
@@ -570,6 +575,7 @@ public sealed class TorrentApiTests
             Assert.True(settings.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.EngineMaximumConnections);
             Assert.Equal(6, settings.EngineMaximumHalfOpenConnections);
             Assert.Equal(4_000_000, settings.EngineMaximumDownloadRateBytesPerSecond);
@@ -598,6 +604,7 @@ public sealed class TorrentApiTests
             Assert.True(hostStatus.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), hostStatus.EngineEncryptionMode);
             Assert.Equal(150, hostStatus.EngineMaximumConnections);
             Assert.Equal(8, hostStatus.EngineMaximumHalfOpenConnections);
             Assert.Equal(0, hostStatus.EngineMaximumDownloadRateBytesPerSecond);
@@ -640,8 +647,10 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.CompletionCallbackFinalizationTimeoutSeconds);
             Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
             Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
+            Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
             Assert.Equal(6, settings.AppliedEngineMaximumHalfOpenConnections);
+            Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.AppliedEngineEncryptionMode);
             Assert.Equal(4_000_000, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
             Assert.Equal(1_500_000, settings.AppliedEngineMaximumUploadRateBytesPerSecond);
             Assert.False(settings.EngineSettingsRequireRestart);
@@ -652,6 +661,7 @@ public sealed class TorrentApiTests
             Assert.True(hostStatus.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+            Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), hostStatus.EngineEncryptionMode);
             Assert.Equal(70, hostStatus.EngineMaximumConnections);
             Assert.Equal(6, hostStatus.EngineMaximumHalfOpenConnections);
             Assert.Equal(4_000_000, hostStatus.EngineMaximumDownloadRateBytesPerSecond);

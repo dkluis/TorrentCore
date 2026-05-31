@@ -88,6 +88,7 @@ public sealed class TorrentCompletionCallbackProcessorTests
             DeleteLogsForCompletedTorrents = false,
             EngineConnectionFailureLogBurstLimit = 5,
             EngineConnectionFailureLogWindowSeconds = 60,
+            EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred,
             EngineMaximumConnections = 150,
             EngineMaximumHalfOpenConnections = 8,
             EngineMaximumDownloadRateBytesPerSecond = 0,

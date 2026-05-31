@@ -80,7 +80,7 @@ Practical interpretation:
 - When the threshold is reached, TorrentCore asks MonoTorrent to do a DHT announce and a forced tracker announce for that torrent.
 - TorrentCore currently reuses this same stale window for `Downloading` torrents that already have metadata but still show zero open peer sessions and zero payload progress.
 - TorrentCore now treats only live peer connectivity as meaningful metadata activity; peer-discovery callbacks with zero open connections do not reset the stale window by themselves.
-- TorrentCore now prefers plaintext outgoing peer handshakes first and keeps RC4 as fallback, which reduces the amount of metadata time spent burning the first connection attempt on encrypted negotiation before retrying the same peer in plaintext.
+- TorrentCore's outbound handshake order now follows `Engine Encryption Mode`. The default is `EncryptedPreferred`, which tries RC4 first and only falls back to plaintext when needed.
 - Lower values make TorrentCore react sooner to a cold magnet, but also increase how often it prods trackers and DHT for weak swarms.
 
 Unit:
@@ -163,6 +163,26 @@ What to compare against another client:
 ## MonoTorrent Engine Throttle Settings
 
 These settings are global to the engine host, not per torrent.
+
+### Engine Encryption Mode
+
+Meaning:
+- Controls whether TorrentCore prefers plaintext peers, prefers encrypted peers, or requires encrypted peers only.
+
+Practical interpretation:
+- `PlainTextPreferred` tries plaintext first and falls back to RC4 if needed.
+- `EncryptedPreferred` tries RC4 first and falls back to plaintext when a peer only supports that path.
+- `EncryptedRequired` disables plaintext entirely and allows only encrypted peer sessions.
+- This setting affects MonoTorrent's outbound handshake policy. It does not disable incoming encrypted peers when the selected mode still allows encryption.
+- `EncryptedPreferred` is the recommended default. It matches Transmission's common "encryption preferred" behavior more closely and avoids real swarm failures where plaintext-first negotiation can strand a torrent with discovered peers but no usable sessions.
+
+When to compare this against another client:
+- the same torrent downloads immediately in Transmission or another client on the same host
+- TorrentCore reaches `peer_connected` or metadata resolution but then logs repeated `EncryptionNegiotiationFailed` or `HandshakeFailed` on outbound peers
+- TorrentCore discovers public peers but never turns them into stable download sessions
+
+Applies:
+- On service restart.
 
 ### Engine Max Connections
 

@@ -82,6 +82,12 @@ public static class SettingsHelpCatalog
         "This is not a torrent count. One torrent can use multiple peer sessions, and the total is shared across all torrents. Higher values can improve swarm participation but also increase socket, memory, and CPU usage. This setting is saved immediately but only applies after TorrentCore.Service restarts."
     );
 
+    public static readonly SettingHelpContent EngineEncryptionMode = new(
+        "Saved Encryption Mode",
+        "Controls whether TorrentCore prefers plaintext, prefers encrypted peers, or requires encryption.",
+        "Use PlainTextPreferred for maximum compatibility when unencrypted peers are acceptable. Use EncryptedPreferred to behave more like Transmission's encryption-preferred mode, where TorrentCore tries RC4 first and only falls back to plaintext if needed. Use EncryptedRequired to disable plaintext entirely. This is a MonoTorrent engine setting and requires a service restart to apply."
+    );
+
     public static readonly SettingHelpContent EngineMaximumHalfOpenConnections = new(
         "Saved Max Half-Open Connections",
         "Sets the global cap on outbound peer connection attempts that are still in progress.",

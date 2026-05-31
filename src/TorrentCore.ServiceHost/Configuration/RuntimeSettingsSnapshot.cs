@@ -13,6 +13,7 @@ public sealed class RuntimeSettingsSnapshot
     public required bool                        DeleteLogsForCompletedTorrents              { get; init; }
     public required int                         EngineConnectionFailureLogBurstLimit         { get; init; }
     public required int                         EngineConnectionFailureLogWindowSeconds      { get; init; }
+    public TorrentEncryptionMode                EngineEncryptionMode                        { get; init; } = TorrentEncryptionMode.EncryptedPreferred;
     public required int                         EngineMaximumConnections                     { get; init; }
     public required int                         EngineMaximumHalfOpenConnections             { get; init; }
     public required int                         EngineMaximumDownloadRateBytesPerSecond      { get; init; }

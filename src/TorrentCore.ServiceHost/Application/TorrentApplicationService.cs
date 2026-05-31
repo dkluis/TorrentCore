@@ -80,6 +80,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             EngineDhtPort                    = serviceOptions.Value.EngineDhtPort,
             EnginePortForwardingEnabled      = serviceOptions.Value.EngineAllowPortForwarding,
             EngineLocalPeerDiscoveryEnabled  = serviceOptions.Value.EngineAllowLocalPeerDiscovery,
+            EngineEncryptionMode             = appliedEngineSettingsState.EngineEncryptionMode.ToString(),
             EngineMaximumConnections         = appliedEngineSettingsState.EngineMaximumConnections,
             EngineMaximumHalfOpenConnections = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
             EngineMaximumDownloadRateBytesPerSecond =

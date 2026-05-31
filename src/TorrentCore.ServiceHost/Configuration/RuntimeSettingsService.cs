@@ -90,6 +90,15 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             );
         }
 
+        if (!Enum.TryParse<TorrentEncryptionMode>(request.EngineEncryptionMode, true, out var engineEncryptionMode) ||
+            !Enum.IsDefined(engineEncryptionMode))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", "EngineEncryptionMode is invalid.", StatusCodes.Status400BadRequest,
+                nameof(request.EngineEncryptionMode)
+            );
+        }
+
         if (request.EngineMaximumConnections < 1)
         {
             throw new Application.ServiceOperationException(
@@ -218,6 +227,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                         request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
                 [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] =
                         request.EngineConnectionFailureLogWindowSeconds.ToString(CultureInfo.InvariantCulture),
+                [RuntimeSettingsKeys.EngineEncryptionMode] = engineEncryptionMode.ToString(),
                 [RuntimeSettingsKeys.EngineMaximumConnections] =
                         request.EngineMaximumConnections.ToString(CultureInfo.InvariantCulture),
                 [RuntimeSettingsKeys.EngineMaximumHalfOpenConnections] =
@@ -269,6 +279,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                         request.DeleteLogsForCompletedTorrents,
                         request.EngineConnectionFailureLogBurstLimit,
                         request.EngineConnectionFailureLogWindowSeconds,
+                        engineEncryptionMode,
                         request.EngineMaximumConnections,
                         request.EngineMaximumHalfOpenConnections,
                         request.EngineMaximumDownloadRateBytesPerSecond,
@@ -364,6 +375,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             parsedWindowSeconds > 0)
         {
             windowSeconds = parsedWindowSeconds;
+        }
+
+        var engineEncryptionMode = baseOptions.EngineEncryptionMode;
+        if (values.TryGetValue(RuntimeSettingsKeys.EngineEncryptionMode, out var engineEncryptionModeValue) &&
+            Enum.TryParse<TorrentEncryptionMode>(engineEncryptionModeValue, true, out var parsedEngineEncryptionMode) &&
+            Enum.IsDefined(parsedEngineEncryptionMode))
+        {
+            engineEncryptionMode = parsedEngineEncryptionMode;
         }
 
         var engineMaximumConnections = baseOptions.EngineMaximumConnections;
@@ -517,6 +536,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             DeleteLogsForCompletedTorrents              = deleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit         = burstLimit,
             EngineConnectionFailureLogWindowSeconds      = windowSeconds,
+            EngineEncryptionMode                        = engineEncryptionMode,
             EngineMaximumConnections                     = engineMaximumConnections,
             EngineMaximumHalfOpenConnections             = engineMaximumHalfOpenConnections,
             EngineMaximumDownloadRateBytesPerSecond      = engineMaximumDownloadRateBytesPerSecond,
@@ -534,6 +554,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             CompletionCallbackApiBaseUrlOverride         = completionCallbackApiBaseUrlOverride,
             CompletionCallbackApiKeyOverride             = completionCallbackApiKeyOverride,
             EngineSettingsRequireRestart =
+                    engineEncryptionMode             != appliedEngineSettingsState.EngineEncryptionMode             ||
                     engineMaximumConnections         != appliedEngineSettingsState.EngineMaximumConnections         ||
                     engineMaximumHalfOpenConnections != appliedEngineSettingsState.EngineMaximumHalfOpenConnections ||
                     engineMaximumDownloadRateBytesPerSecond !=
@@ -561,6 +582,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             DeleteLogsForCompletedTorrents              = settings.DeleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit         = settings.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds      = settings.EngineConnectionFailureLogWindowSeconds,
+            EngineEncryptionMode                        = settings.EngineEncryptionMode.ToString(),
             EngineMaximumConnections                     = settings.EngineMaximumConnections,
             EngineMaximumHalfOpenConnections             = settings.EngineMaximumHalfOpenConnections,
             EngineMaximumDownloadRateBytesPerSecond      = settings.EngineMaximumDownloadRateBytesPerSecond,
@@ -579,6 +601,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             CompletionCallbackApiKeyOverride             = settings.CompletionCallbackApiKeyOverride,
             AppliedEngineMaximumConnections              = appliedEngineSettingsState.EngineMaximumConnections,
             AppliedEngineMaximumHalfOpenConnections      = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
+            AppliedEngineEncryptionMode                  = appliedEngineSettingsState.EngineEncryptionMode.ToString(),
             AppliedEngineMaximumDownloadRateBytesPerSecond =
                     appliedEngineSettingsState.EngineMaximumDownloadRateBytesPerSecond,
             AppliedEngineMaximumUploadRateBytesPerSecond =

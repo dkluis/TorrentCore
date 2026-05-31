@@ -845,7 +845,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
             var engineSettingsBuilder = new EngineSettingsBuilder
             {
-                AllowedEncryption            = MonoTorrentConnectionPolicy.CreateAllowedEncryption(),
+                AllowedEncryption            = MonoTorrentConnectionPolicy.CreateAllowedEncryption(runtimeSettings.EngineEncryptionMode),
                 AllowLocalPeerDiscovery        = _serviceOptions.EngineAllowLocalPeerDiscovery,
                 AllowPortForwarding            = _serviceOptions.EngineAllowPortForwarding,
                 CacheDirectory                 = cacheDirectory,
@@ -862,7 +862,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
             _engine = new ClientEngine(engineSettingsBuilder.ToSettings());
             appliedEngineSettingsState.Set(
-                runtimeSettings.EngineMaximumConnections, runtimeSettings.EngineMaximumHalfOpenConnections,
+                runtimeSettings.EngineEncryptionMode, runtimeSettings.EngineMaximumConnections,
+                runtimeSettings.EngineMaximumHalfOpenConnections,
                 runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
                 runtimeSettings.EngineMaximumUploadRateBytesPerSecond
             );
@@ -886,6 +887,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                             _serviceOptions.EngineDhtPort,
                             _serviceOptions.EngineAllowPortForwarding,
                             _serviceOptions.EngineAllowLocalPeerDiscovery,
+                            runtimeSettings.EngineEncryptionMode,
                             AllowedEncryption = engineSettingsBuilder.AllowedEncryption.Select(item => item.ToString()).ToArray(),
                             ListenEndPoints = engineSettingsBuilder.ListenEndPoints.ToDictionary(
                                 item => item.Key, item => item.Value.ToString()

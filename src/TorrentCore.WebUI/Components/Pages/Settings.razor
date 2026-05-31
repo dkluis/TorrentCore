@@ -48,7 +48,7 @@
                             <div class="settings-summary-chip">
                                 <span class="settings-summary-label">Applied Throttles</span>
                                 <strong>@_runtimeSnapshot.AppliedEngineMaximumConnections conn / @_runtimeSnapshot.AppliedEngineMaximumHalfOpenConnections half-open</strong>
-                                <span class="settings-summary-meta">Down @FormatRate(_runtimeSnapshot.AppliedEngineMaximumDownloadRateBytesPerSecond) | Up @FormatRate(_runtimeSnapshot.AppliedEngineMaximumUploadRateBytesPerSecond)</span>
+                                <span class="settings-summary-meta">@_runtimeSnapshot.AppliedEngineEncryptionMode | Down @FormatRate(_runtimeSnapshot.AppliedEngineMaximumDownloadRateBytesPerSecond) | Up @FormatRate(_runtimeSnapshot.AppliedEngineMaximumUploadRateBytesPerSecond)</span>
                             </div>
 
                             <div class="settings-summary-chip">
@@ -336,6 +336,10 @@
 
                                 <div class="settings-readonly-grid">
                                     <div class="settings-readonly-item">
+                                        <span class="settings-readonly-label">Applied encryption</span>
+                                        <strong>@_runtimeSnapshot.AppliedEngineEncryptionMode</strong>
+                                    </div>
+                                    <div class="settings-readonly-item">
                                         <span class="settings-readonly-label">Applied max connections</span>
                                         <strong>@_runtimeSnapshot.AppliedEngineMaximumConnections</strong>
                                     </div>
@@ -354,6 +358,21 @@
                                 </div>
 
                                 <div class="settings-field-grid">
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineEncryptionMode" />
+                                        <MudSelect T="string"
+                                                   Value="_engine.EngineEncryptionMode"
+                                                   ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineEncryptionMode = next)"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Dense="true">
+                                            @foreach (var encryptionMode in EncryptionModes)
+                                            {
+                                                <MudSelectItem T="string" Value="@encryptionMode">@encryptionMode</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
+
                                     <div class="settings-field-block">
                                         <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineMaximumConnections" />
                                         <MudNumericField T="int"
@@ -674,6 +693,10 @@
         "Unlimited", "StopImmediately", "StopAfterRatio", "StopAfterTime", "StopAfterRatioOrTime",
     ];
 
+    private static readonly IReadOnlyList<string> EncryptionModes =
+    [
+        "PlainTextPreferred", "EncryptedPreferred", "EncryptedRequired",
+    ];
     private static readonly IReadOnlyList<string> CleanupModes = ["Never", "AfterCompletedMinutes"];
 
     private StateViewMode _mode = StateViewMode.Loading;
@@ -995,6 +1018,7 @@
 
         _engine.EngineMaximumConnections = _runtimeSnapshot.EngineMaximumConnections;
         _engine.EngineMaximumHalfOpenConnections = _runtimeSnapshot.EngineMaximumHalfOpenConnections;
+        _engine.EngineEncryptionMode = _runtimeSnapshot.EngineEncryptionMode;
         _engine.EngineMaximumDownloadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond;
         _engine.EngineMaximumUploadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond;
     }
@@ -1028,6 +1052,7 @@
             DeleteLogsForCompletedTorrents = _lifecycle.DeleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit = _queue.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = _queue.EngineConnectionFailureLogWindowSeconds,
+            EngineEncryptionMode = _engine.EngineEncryptionMode,
             EngineMaximumConnections = _engine.EngineMaximumConnections,
             EngineMaximumHalfOpenConnections = _engine.EngineMaximumHalfOpenConnections,
             EngineMaximumDownloadRateBytesPerSecond = _engine.EngineMaximumDownloadRateBytesPerSecond,
@@ -1139,7 +1164,8 @@
     private bool IsEngineDirty()
     {
         return _runtimeSnapshot is not null &&
-               (_engine.EngineMaximumConnections != _runtimeSnapshot.EngineMaximumConnections ||
+               (_engine.EngineEncryptionMode != _runtimeSnapshot.EngineEncryptionMode ||
+                _engine.EngineMaximumConnections != _runtimeSnapshot.EngineMaximumConnections ||
                 _engine.EngineMaximumHalfOpenConnections != _runtimeSnapshot.EngineMaximumHalfOpenConnections ||
                 _engine.EngineMaximumDownloadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond ||
                 _engine.EngineMaximumUploadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond);
@@ -1261,6 +1287,7 @@
 
     private sealed class EngineThrottleSettingsGroup
     {
+        public string EngineEncryptionMode { get; set; } = "EncryptedPreferred";
         public int EngineMaximumConnections { get; set; } = 150;
         public int EngineMaximumHalfOpenConnections { get; set; } = 8;
         public int EngineMaximumDownloadRateBytesPerSecond { get; set; }
