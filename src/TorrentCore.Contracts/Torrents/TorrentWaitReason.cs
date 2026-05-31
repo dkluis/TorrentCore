@@ -13,6 +13,7 @@ public enum TorrentWaitReason
     WaitingForMetadataSlot  = 1,
     PendingDownloadDispatch = 2,
     WaitingForDownloadSlot  = 3,
-    PausedByOperator        = 4,
-    BlockedByError          = 5,
+    WaitingForFileCompletion = 4,
+    PausedByOperator        = 5,
+    BlockedByError          = 6,
 }

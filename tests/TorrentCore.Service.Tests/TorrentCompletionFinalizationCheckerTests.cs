@@ -93,6 +93,7 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
         Assert.Null(result.PendingReason);
     }
 
+
     public void Dispose()
     {
         if (Directory.Exists(_rootPath))
@@ -163,6 +164,7 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
             DeleteLogsForCompletedTorrents = false,
             EngineConnectionFailureLogBurstLimit = 10,
             EngineConnectionFailureLogWindowSeconds = 60,
+            EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred,
             EngineMaximumConnections = 200,
             EngineMaximumHalfOpenConnections = 8,
             EngineMaximumDownloadRateBytesPerSecond = 0,

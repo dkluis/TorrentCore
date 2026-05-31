@@ -150,6 +150,8 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             CompletionCallbackPendingSinceUtc = null,
             CompletionCallbackInvokedAtUtc = null,
             CompletionCallbackLastError = null,
+            CompletionCallbackFeedbackReceivedAtUtc = null,
+            CompletionCallbackFeedbackJson = null,
             MagnetUri = request.MagnetUri.Trim(),
             InfoHash = magnet.InfoHash,
             DownloadRootPath = categorySelection.DownloadRootPath,
@@ -341,7 +343,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         }
 
         await torrentHistoryService.MarkRemovedAsync(
-            torrentId,
+            torrent,
             dataDeleted: request.DeleteData,
             removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
             removedByCleanupPolicy: false,
@@ -478,10 +480,11 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         );
         string? callbackPendingReason = null;
         if (runtimeSettings is not null &&
-            TorrentCompletionCallbackDiagnostics.ShouldSurfaceFinalizationStatus(
-                snapshot.CompletionCallbackState,
-                snapshot.CompletionCallbackLastError
-            ))
+            (snapshot.State == TorrentState.WaitingForFileCompletion ||
+             TorrentCompletionCallbackDiagnostics.ShouldSurfaceFinalizationStatus(
+                 snapshot.CompletionCallbackState,
+                 snapshot.CompletionCallbackLastError
+             )))
         {
             var finalizationResult = finalizationChecker.Check(snapshot, runtimeSettings);
             callbackFinalPayloadPath = finalizationResult.FinalPayloadPath;
@@ -515,6 +518,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             CompletionCallbackFinalPayloadPath = callbackFinalPayloadPath,
             CompletionCallbackPendingReason    = callbackPendingReason,
             CompletionCallbackLastError        = snapshot.CompletionCallbackLastError,
+            CompletionCallbackFeedback         = CompletionCallbackFeedbackMapper.Deserialize(snapshot.CompletionCallbackFeedbackJson),
             ErrorMessage                       = snapshot.ErrorMessage,
             CanRefreshMetadata                 = CanRefreshMetadata(snapshot.State),
             CanRetryCompletionCallback         = CanRetryCompletionCallback(snapshot.CompletionCallbackState),

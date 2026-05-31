@@ -15,6 +15,7 @@ public sealed class RuntimeSettingsDto
     public required bool            DeleteLogsForCompletedTorrents                { get; init; }
     public required int             EngineConnectionFailureLogBurstLimit           { get; init; }
     public required int             EngineConnectionFailureLogWindowSeconds        { get; init; }
+    public string                   EngineEncryptionMode                           { get; init; } = "EncryptedPreferred";
     public required int             EngineMaximumConnections                       { get; init; }
     public required int             EngineMaximumHalfOpenConnections               { get; init; }
     public required int             EngineMaximumDownloadRateBytesPerSecond        { get; init; }
@@ -33,6 +34,7 @@ public sealed class RuntimeSettingsDto
     public          string?         CompletionCallbackApiKeyOverride               { get; init; }
     public required int             AppliedEngineMaximumConnections                { get; init; }
     public required int             AppliedEngineMaximumHalfOpenConnections        { get; init; }
+    public string                   AppliedEngineEncryptionMode                    { get; init; } = "EncryptedPreferred";
     public required int             AppliedEngineMaximumDownloadRateBytesPerSecond { get; init; }
     public required int             AppliedEngineMaximumUploadRateBytesPerSecond   { get; init; }
     public required bool            EngineSettingsRequireRestart                   { get; init; }

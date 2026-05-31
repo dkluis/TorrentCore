@@ -56,6 +56,7 @@ builder.Services.AddSingleton(serviceProvider =>
         var options = serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value;
         var state   = new AppliedEngineSettingsState();
         state.Set(
+            options.EngineEncryptionMode,
             options.EngineMaximumConnections, options.EngineMaximumHalfOpenConnections,
             options.EngineMaximumDownloadRateBytesPerSecond, options.EngineMaximumUploadRateBytesPerSecond
         );

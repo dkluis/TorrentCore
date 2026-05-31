@@ -22,17 +22,6 @@ fi
 : "${TORRENTCORE_SERVICE_URLS:=http://127.0.0.1:7033}"
 : "${TORRENTCORE_WEBUI_URLS:=http://127.0.0.1:7053}"
 : "${TORRENTCORE_WEBUI_SERVICE_BASE_URL:=http://127.0.0.1:7033/}"
-: "${TORRENTCORE_AVALONIA_PUBLISH_TARGET:=}"
-: "${TORRENTCORE_AVALONIA_APP_TARGET:=}"
-: "${TORRENTCORE_AVALONIA_APP_MIRROR_TARGET:=}"
-: "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET:=/Applications}"
-: "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR:=auto}"
-: "${TORRENTCORE_AVALONIA_BUNDLE_NAME:=TorrentCore}"
-: "${TORRENTCORE_AVALONIA_DISPLAY_NAME:=TorrentCore Control Center}"
-: "${TORRENTCORE_AVALONIA_BUNDLE_IDENTIFIER:=com.torrentcore.controlcenter}"
-: "${TORRENTCORE_AVALONIA_EXECUTABLE_NAME:=TorrentCore.Avalonia}"
-: "${TORRENTCORE_AVALONIA_ICON_PATH:=}"
-: "${TORRENTCORE_AVALONIA_ICON_NAME:=TorrentCore.icns}"
 : "${TORRENTCORE_ARTIFACT_SEGMENT:=intel}"
 : "${TORRENTCORE_LAUNCH_AGENT_TARGET_DIR:=${HOME}/Library/LaunchAgents}"
 : "${TORRENTCORE_LAUNCH_AGENT_LOG_DIR:=${TORRENTCORE_BASE_DIR}/Logs}"
@@ -390,52 +379,6 @@ tc_sync_app_bundle() {
   bundle_name="$(basename "${app_bundle}")"
   rm -rf "${target_dir}/${bundle_name}"
   rsync -a "${app_bundle}" "${target_dir}/"
-}
-
-tc_apply_avalonia_target_defaults() {
-  local repo_root=""
-  local default_icon_path=""
-  local should_enable_system_mirror=false
-
-  if [[ -z "${TORRENTCORE_AVALONIA_PUBLISH_TARGET}" ]]; then
-    export TORRENTCORE_AVALONIA_PUBLISH_TARGET="${TORRENTCORE_DEPLOY_BASE}/Avalonia"
-  fi
-
-  if [[ -z "${TORRENTCORE_AVALONIA_APP_TARGET}" ]]; then
-    export TORRENTCORE_AVALONIA_APP_TARGET="${TORRENTCORE_DEPLOY_BASE}/Applications"
-  fi
-
-  if [[ -z "${TORRENTCORE_AVALONIA_ICON_PATH}" ]]; then
-    repo_root="$(tc_resolve_repo_root)"
-    default_icon_path="${repo_root}/src/TorrentCore.Avalonia/Assets/TorrentCore.icns"
-    if [[ -f "${default_icon_path}" ]]; then
-      export TORRENTCORE_AVALONIA_ICON_PATH="${default_icon_path}"
-    fi
-  fi
-
-  case "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR}" in
-    auto)
-      if tc_path_is_within_home "${TORRENTCORE_DEPLOY_BASE}"; then
-        should_enable_system_mirror=true
-      fi
-      ;;
-    always)
-      should_enable_system_mirror=true
-      ;;
-    never)
-      should_enable_system_mirror=false
-      ;;
-    *)
-      tc_log_error "Unknown TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR value '${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_MIRROR}'. Expected auto, always, or never."
-      return 1
-      ;;
-  esac
-
-  if [[ "${should_enable_system_mirror}" == true &&
-        -z "${TORRENTCORE_AVALONIA_APP_MIRROR_TARGET}" &&
-        "${TORRENTCORE_AVALONIA_APP_TARGET}" != "${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET}" ]]; then
-    export TORRENTCORE_AVALONIA_APP_MIRROR_TARGET="${TORRENTCORE_AVALONIA_SYSTEM_APPLICATIONS_TARGET}"
-  fi
 }
 
 tc_sync_scripts_to_target() {

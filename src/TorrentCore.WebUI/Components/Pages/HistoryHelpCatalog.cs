@@ -65,6 +65,6 @@ public static class HistoryHelpCatalog
     public static readonly SettingHelpContent SelectedHistoryEntry = new(
         "Selected History Entry",
         "Shows the full stored history record for the selected row.",
-        "Click a row in the grid to inspect lifecycle timestamps, callback state, removal outcome, paths, and the latest recorded torrent summary."
+        "Click a row in the grid to inspect lifecycle timestamps, callback state, stored TVMaze feedback, removal outcome, paths, and the latest recorded torrent summary."
     );
 }

@@ -68,8 +68,7 @@ public sealed class TorrentCompletionFinalizationChecker(ResolvedTorrentCoreServ
     }
 
     private static TorrentCompletionFinalizationCheckResult CheckObservedFiles(string defaultFinalPayloadPath,
-        string                                                                     partialSuffix,
-        IReadOnlyList<TorrentCompletionObservedFilePaths>                          observedFiles)
+        string partialSuffix, IReadOnlyList<TorrentCompletionObservedFilePaths> observedFiles)
     {
         var finalPayloadPath = observedFiles.Count == 1 &&
                 !string.IsNullOrWhiteSpace(observedFiles[0].CompletePath) ? observedFiles[0].CompletePath :

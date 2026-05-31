@@ -161,7 +161,7 @@
                                       FixedHeader="true"
                                       Loading="_isRefreshing"
                                       Breakpoint="Breakpoint.Md"
-                                      Height="100%"
+                                      Height="@GetHistoryTableHeight()"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
                                       OnRowClick="OnHistoryRowClickAsync"
@@ -208,7 +208,7 @@
                                     <MudTd DataLabel="Progress">@context.LatestProgressPercent.ToString("0.0")%</MudTd>
                                     <MudTd DataLabel="Downloaded">@FormatBytes(context.LatestDownloadedBytes)</MudTd>
                                     <MudTd DataLabel="Total">@FormatNullableBytes(context.LatestTotalBytes)</MudTd>
-                                    <MudTd DataLabel="Callback">@ValueOrNotAvailable(context.LatestCallbackStatus)</MudTd>
+                                    <MudTd DataLabel="Callback">@FormatCallbackState(context.LatestCallbackStatus)</MudTd>
                                     <MudTd DataLabel="Removed">@FormatDateTime(context.RemovedAt)</MudTd>
                                     <MudTd DataLabel="Removal Reason">@FormatRemovalReason(context.RemovalReason)</MudTd>
                                 </RowTemplate>
@@ -253,7 +253,7 @@
                         }
                         else
                         {
-                            <div class="dashboard-detail-grid">
+                            <div class="dashboard-detail-grid history-detail-grid">
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Torrent Id</p>
                                     <p class="dashboard-detail-value">@_selectedHistoryDetail.TorrentId</p>
@@ -272,7 +272,7 @@
                                 </div>
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Wait</p>
-                                    <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedHistoryDetail.LatestWaitReason)</p>
+                                    <p class="dashboard-detail-value">@ValueOrDash(_selectedHistoryDetail.LatestWaitReason)</p>
                                 </div>
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Progress</p>
@@ -350,53 +350,114 @@
                                     <p class="dashboard-detail-label">Removed By Cleanup Policy</p>
                                     <p class="dashboard-detail-value">@FormatBoolean(_selectedHistoryDetail.RemovedByCleanupPolicy)</p>
                                 </div>
-                                <div class="dashboard-detail-item">
-                                    <p class="dashboard-detail-label">Invoke Completion Callback</p>
-                                    <p class="dashboard-detail-value">@FormatBoolean(_selectedHistoryDetail.InvokeCompletionCallback)</p>
-                                </div>
-                                <div class="dashboard-detail-item">
-                                    <p class="dashboard-detail-label">Callback Label</p>
-                                    <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedHistoryDetail.CompletionCallbackLabel)</p>
-                                </div>
-                                <div class="dashboard-detail-item">
-                                    <p class="dashboard-detail-label">Latest Callback Status</p>
-                                    <p class="dashboard-detail-value">@ValueOrNotAvailable(_selectedHistoryDetail.LatestCallbackStatus)</p>
-                                </div>
-                                <div class="dashboard-detail-item">
-                                    <p class="dashboard-detail-label">Callback Started</p>
-                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.CallbackStartedAt)</p>
-                                </div>
-                                <div class="dashboard-detail-item">
-                                    <p class="dashboard-detail-label">Callback Completed</p>
-                                    <p class="dashboard-detail-value">@FormatDateTime(_selectedHistoryDetail.CallbackCompletedAt)</p>
-                                </div>
                                 <div class="dashboard-detail-item dashboard-detail-item--span-2">
-                                    <p class="dashboard-detail-label">Callback Last Error</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.CallbackLastError)</p>
+                                    <p class="dashboard-detail-label">Callback</p>
+                                    <div class="history-detail-inline-grid history-detail-inline-grid--callback">
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Invoke</span>
+                                            <span class="history-detail-inline-value">@FormatBoolean(_selectedHistoryDetail.InvokeCompletionCallback)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Label</span>
+                                            <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackLabel)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Status</span>
+                                            <span class="history-detail-inline-value">@FormatCallbackState(_selectedHistoryDetail.LatestCallbackStatus)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Started</span>
+                                            <span class="history-detail-inline-value">@FormatDateTime(_selectedHistoryDetail.CallbackStartedAt)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Completed</span>
+                                            <span class="history-detail-inline-value">@FormatDateTime(_selectedHistoryDetail.CallbackCompletedAt)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Callback Error</span>
+                                            <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CallbackLastError)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Torrent Error</span>
+                                            <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.LatestErrorMessage)</span>
+                                        </div>
+                                    </div>
                                 </div>
+                                @if (_selectedHistoryDetail.CompletionCallbackFeedback is not null)
+                                {
+                                    <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                        <p class="dashboard-detail-label">Feedback</p>
+                                        <div class="history-detail-inline-grid history-detail-inline-grid--feedback">
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Summary</span>
+                                                <span class="history-detail-inline-value">@BuildFeedbackSummary(_selectedHistoryDetail.CompletionCallbackFeedback)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Received</span>
+                                                <span class="history-detail-inline-value">@FormatDateTime(_selectedHistoryDetail.CompletionCallbackFeedback.ReceivedAtUtc)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Final Result</span>
+                                                <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.FinalState)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Reason</span>
+                                                <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.ReasonCode)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Action</span>
+                                                <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.RecommendedAction)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Allow Resubmit</span>
+                                                <span class="history-detail-inline-value">@FormatBoolean(_selectedHistoryDetail.CompletionCallbackFeedback.AllowResubmit)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Manual</span>
+                                                <span class="history-detail-inline-value">@FormatBoolean(_selectedHistoryDetail.CompletionCallbackFeedback.NeedsManualIntervention)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Source</span>
+                                                <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.CallbackSource)</span>
+                                            </div>
+                                            <div class="history-detail-inline-item">
+                                                <span class="history-detail-inline-key">Machine</span>
+                                                <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.CallbackMachine)</span>
+                                            </div>
+                                            @if (ShouldShowFeedbackDetail(_selectedHistoryDetail.CompletionCallbackFeedback))
+                                            {
+                                                <div class="history-detail-inline-item">
+                                                    <span class="history-detail-inline-key">Detail</span>
+                                                    <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.CompletionCallbackFeedback.DetailMessage)</span>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
                                 <div class="dashboard-detail-item dashboard-detail-item--span-2">
-                                    <p class="dashboard-detail-label">Download Root Path</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.DownloadRootPath)</p>
+                                    <p class="dashboard-detail-label">Paths</p>
+                                    <div class="history-detail-inline-grid history-detail-inline-grid--paths">
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Download Root</span>
+                                            <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.DownloadRootPath)</span>
+                                        </div>
+                                        <div class="history-detail-inline-item">
+                                            <span class="history-detail-inline-key">Final Download</span>
+                                            <span class="history-detail-inline-value">@ValueOrDash(_selectedHistoryDetail.FinalPayloadPath)</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
-                                    <p class="dashboard-detail-label">Final Download Path</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.FinalPayloadPath)</p>
-                                </div>
-                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
+                                <div class="dashboard-detail-item history-detail-item--half-on-wide">
                                     <p class="dashboard-detail-label">Info Hash</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.InfoHash)</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrDash(_selectedHistoryDetail.InfoHash)</p>
                                 </div>
-                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
-                                    <p class="dashboard-detail-label">Magnet</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@_selectedHistoryDetail.MagnetUri</p>
-                                </div>
-                                <div class="dashboard-detail-item dashboard-detail-item--span-2">
-                                    <p class="dashboard-detail-label">Latest Error</p>
-                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@ValueOrNotAvailable(_selectedHistoryDetail.LatestErrorMessage)</p>
-                                </div>
-                                <div class="dashboard-detail-item">
+                                <div class="dashboard-detail-item history-detail-item--half-on-wide">
                                     <p class="dashboard-detail-label">Service Instance</p>
                                     <p class="dashboard-detail-value dashboard-detail-value--wrap">@FormatGuid(_selectedHistoryDetail.ServiceInstanceIdLastSeen)</p>
+                                </div>
+                                <div class="dashboard-detail-item dashboard-detail-item--span-2 history-detail-item--half-on-wide">
+                                    <p class="dashboard-detail-label">Magnet</p>
+                                    <p class="dashboard-detail-value dashboard-detail-value--wrap">@_selectedHistoryDetail.MagnetUri</p>
                                 </div>
                             </div>
                         }
@@ -512,6 +573,7 @@
         _state.RemovedFilter = RemovedAllValue;
         _state.FromDate = string.Empty;
         _state.ToDate = string.Empty;
+        ClearSelectedHistoryEntry();
         PersistState();
         await LoadAsync(showSuccessToast: false, showLoadingState: false);
         Feedback.Info("History filters cleared.");
@@ -565,8 +627,7 @@
             _historyRows.All(row => row.TorrentId != _state.SelectedTorrentId.Value))
         {
             _state.SelectedTorrentId = null;
-            _selectedHistoryDetail = null;
-            _selectedDetailErrorMessage = null;
+            ClearSelectedHistoryEntry();
             PersistState();
         }
         else if (_state.SelectedTorrentId is not null)
@@ -661,6 +722,13 @@
         };
     }
 
+    private void ClearSelectedHistoryEntry()
+    {
+        _state.SelectedTorrentId = null;
+        _selectedHistoryDetail = null;
+        _selectedDetailErrorMessage = null;
+    }
+
     private void PersistState()
     {
         PageStateStore.Save(StateKey, _state);
@@ -683,12 +751,17 @@
             return "No active selection.";
         }
 
-        return $"{_selectedHistoryDetail.Name} | {_selectedHistoryDetail.LatestTorrentState} | {FormatDateTime(_selectedHistoryDetail.SubmittedAt)}";
+        return $"{_selectedHistoryDetail.Name} | {FormatCallbackState(_selectedHistoryDetail.LatestCallbackStatus)} | {FormatDateTime(_selectedHistoryDetail.SubmittedAt)}";
     }
 
     private string GetActionMessageClass()
     {
         return _actionIsError ? "dashboard-panel-copy tc-error-text" : "dashboard-panel-copy";
+    }
+
+    private string GetHistoryTableHeight()
+    {
+        return _selectedHistoryDetail is null && !_isLoadingSelectedDetail ? "min(50dvh, 40rem)" : "28rem";
     }
 
     private static bool TryParseDate(string? value, out DateOnly? parsedDate, out string? errorMessage)
@@ -718,7 +791,7 @@
 
     private static string FormatRemovalReason(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "Active" : value;
+        return ValueOrDash(value);
     }
 
     private static string FormatBoolean(bool value)
@@ -726,9 +799,11 @@
         return value ? "Yes" : "No";
     }
 
-    private static string ValueOrNotAvailable(string? value)
+    private static string ValueOrDash(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "Not available" : value;
+        return string.IsNullOrWhiteSpace(value) || string.Equals(value, "Unknown", StringComparison.OrdinalIgnoreCase)
+            ? "--"
+            : value;
     }
 
     private static string FormatDateTime(DateTimeOffset value)
@@ -738,12 +813,12 @@
 
     private static string FormatDateTime(DateTimeOffset? value)
     {
-        return value is null ? "Not available" : FormatDateTime(value.Value);
+        return value is null ? "--" : FormatDateTime(value.Value);
     }
 
     private static string FormatNullableBytes(long? value)
     {
-        return value is null ? "Not available" : FormatBytes(value.Value);
+        return value is null ? "--" : FormatBytes(value.Value);
     }
 
     private static string FormatBytes(long value)
@@ -768,6 +843,31 @@
 
     private static string FormatGuid(Guid? value)
     {
-        return value?.ToString() ?? "Not available";
+        return value?.ToString() ?? "--";
+    }
+
+    private static string FormatCallbackState(string? state)
+    {
+        return CompletionCallbackDisplayText.FormatState(state);
+    }
+
+    private static string BuildFeedbackSummary(CompletionCallbackFeedbackDto? feedback)
+    {
+        return CompletionCallbackDisplayText.BuildFeedbackSummary(feedback);
+    }
+
+    private static bool ShouldShowFeedbackDetail(CompletionCallbackFeedbackDto? feedback)
+    {
+        if (feedback is null || string.IsNullOrWhiteSpace(feedback.DetailMessage))
+        {
+            return false;
+        }
+
+        var summary = BuildFeedbackSummary(feedback);
+        return !string.Equals(
+            feedback.DetailMessage.Trim(),
+            summary.Trim(),
+            StringComparison.OrdinalIgnoreCase
+        );
     }
 }

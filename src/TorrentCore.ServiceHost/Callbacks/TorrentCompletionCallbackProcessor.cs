@@ -19,7 +19,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         CancellationToken cancellationToken, TorrentCompletionFinalizationCheckResult? finalizationResult = null)
     {
         if (previousCompletedAtUtc is not null || snapshot.CompletedAtUtc is null ||
-            snapshot.State is not TorrentState.Completed and not TorrentState.Seeding ||
+            snapshot.State is not TorrentState.Completed and not TorrentState.Seeding and not TorrentState.Queued ||
             !snapshot.InvokeCompletionCallback || string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLabel) ||
             snapshot.CompletionCallbackState is not null)
         {
@@ -43,7 +43,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
     {
         if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.PendingFinalization)
         {
-            return false;
+            return ProcessWaitingForFeedback(snapshot, now);
         }
 
         var pendingSinceUtc = snapshot.CompletionCallbackPendingSinceUtc ?? snapshot.CompletedAtUtc ?? now;
@@ -82,7 +82,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             case TorrentCompletionCallbackInvocationStatus.Skipped:
                 return changed;
             case TorrentCompletionCallbackInvocationStatus.Invoked:
-                snapshot.CompletionCallbackState        = TorrentCompletionCallbackState.Invoked;
+                snapshot.CompletionCallbackState        = TorrentCompletionCallbackState.WaitingForFeedback;
                 snapshot.CompletionCallbackInvokedAtUtc = now;
                 snapshot.CompletionCallbackLastError    = null;
                 return true;
@@ -103,6 +103,25 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             default:
                 return changed;
         }
+    }
+
+    private static bool ProcessWaitingForFeedback(TorrentSnapshot snapshot, DateTimeOffset now)
+    {
+        if (snapshot.CompletionCallbackState != TorrentCompletionCallbackState.WaitingForFeedback ||
+            !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackFeedbackJson))
+        {
+            return false;
+        }
+
+        var submittedAtUtc = snapshot.CompletionCallbackInvokedAtUtc ?? snapshot.CompletionCallbackPendingSinceUtc ?? snapshot.CompletedAtUtc ?? now;
+        var changed = false;
+        if (snapshot.CompletionCallbackInvokedAtUtc is null)
+        {
+            snapshot.CompletionCallbackInvokedAtUtc = submittedAtUtc;
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static string? BuildPostAttemptError(string? error, string finalPayloadPath)
@@ -183,4 +202,5 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
             }, cancellationToken
         );
     }
+
 }

@@ -82,6 +82,12 @@ public static class SettingsHelpCatalog
         "This is not a torrent count. One torrent can use multiple peer sessions, and the total is shared across all torrents. Higher values can improve swarm participation but also increase socket, memory, and CPU usage. This setting is saved immediately but only applies after TorrentCore.Service restarts."
     );
 
+    public static readonly SettingHelpContent EngineEncryptionMode = new(
+        "Saved Encryption Mode",
+        "Controls whether TorrentCore prefers plaintext, prefers encrypted peers, or requires encryption.",
+        "Use PlainTextPreferred for maximum compatibility when unencrypted peers are acceptable. Use EncryptedPreferred to behave more like Transmission's encryption-preferred mode, where TorrentCore tries RC4 first and only falls back to plaintext if needed. Use EncryptedRequired to disable plaintext entirely. This is a MonoTorrent engine setting and requires a service restart to apply."
+    );
+
     public static readonly SettingHelpContent EngineMaximumHalfOpenConnections = new(
         "Saved Max Half-Open Connections",
         "Sets the global cap on outbound peer connection attempts that are still in progress.",
@@ -133,7 +139,7 @@ public static class SettingsHelpCatalog
     public static readonly SettingHelpContent CompletionCallbackFinalizationTimeoutSeconds = new(
         "Finalization Wait Seconds",
         "Limits how long TorrentCore waits for the final visible payload path before giving up on callback finalization.",
-        "TorrentCore does not fire the shared callback the moment the engine first reports completion. It waits until the final payload is visible and incomplete-suffix files are no longer the active payload. If that finalization window exceeds this value, TorrentCore marks the callback path as timed out."
+        "TorrentCore does not fire the shared callback the moment the engine first reports completion. It waits until the final payload is visible and incomplete-suffix files are no longer the active payload. In the current async TVMaze callback flow, this same timeout budget also covers the follow-up wait for TVMaze to report the final callback result back to TorrentCore."
     );
 
     public static readonly SettingHelpContent CompletionCallbackApiBaseUrlOverride = new(

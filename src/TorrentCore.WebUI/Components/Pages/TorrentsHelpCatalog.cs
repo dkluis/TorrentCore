@@ -63,7 +63,7 @@ public static class TorrentsHelpCatalog
     public static readonly SettingHelpContent SelectedTorrent = new(
         "Selected Torrent",
         "Shows full details and available actions for the selected torrent.",
-        "Click one row in the grid to open the selected-torrent panel. This section is the operator workspace for one torrent's state, transfer details, callback status, and action buttons."
+        "Click one row in the grid to open the selected-torrent panel. This section is the operator workspace for one torrent's state, transfer details, callback status, stored TVMaze feedback, and action buttons."
     );
 
     public static readonly SettingHelpContent Pause = new(

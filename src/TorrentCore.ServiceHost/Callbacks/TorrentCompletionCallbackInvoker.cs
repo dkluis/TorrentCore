@@ -18,6 +18,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
     private const string TvmazeApiCompleteApiKeyEnvironmentVariable      = "TVMAZE_API_COMPLETE_API_KEY";
     private const string TvmazeApiCompleteUrlEnvironmentVariable         = "TVMAZE_API_COMPLETE_URL";
     private const string TorrentCoreFinalPayloadPathEnvironmentVariable  = "TORRENTCORE_FINAL_PAYLOAD_PATH";
+    private const string TorrentCoreTorrentIdEnvironmentVariable         = "TORRENTCORE_TORRENT_ID";
     private const string TransmissionTorrentDirectoryEnvironmentVariable = "TR_TORRENT_DIR";
     private const string TransmissionTorrentHashEnvironmentVariable      = "TR_TORRENT_HASH";
     private const string TransmissionTorrentIdEnvironmentVariable        = "TR_TORRENT_ID";
@@ -144,7 +145,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
 
         await WriteCallbackLogAsync(
             ActivityLogLevel.Information, "torrent.callback.invoked",
-            $"Invoked completion callback for torrent '{currentSnapshot.Name}'.", currentSnapshot, runtimeSettings,
+            $"Submitted completion callback for torrent '{currentSnapshot.Name}' and waiting for TVMaze feedback.", currentSnapshot, runtimeSettings,
             finalPayloadPath, processId, process.ExitCode, workingDirectory, null, cancellationToken
         );
 
@@ -165,6 +166,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
             UseShellExecute  = false,
         };
 
+        startInfo.Environment[TorrentCoreTorrentIdEnvironmentVariable]      = snapshot.TorrentId.ToString("D");
         startInfo.Environment[TransmissionTorrentIdEnvironmentVariable]   = "0";
         startInfo.Environment[TransmissionTorrentHashEnvironmentVariable] = snapshot.InfoHash ?? string.Empty;
         startInfo.Environment[TransmissionTorrentNameEnvironmentVariable] = snapshot.Name;

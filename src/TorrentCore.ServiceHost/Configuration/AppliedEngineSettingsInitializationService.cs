@@ -7,8 +7,9 @@ public sealed class AppliedEngineSettingsInitializationService(IRuntimeSettingsS
     {
         var settings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         appliedEngineSettingsState.Set(
-            settings.EngineMaximumConnections, settings.EngineMaximumHalfOpenConnections,
-            settings.EngineMaximumDownloadRateBytesPerSecond, settings.EngineMaximumUploadRateBytesPerSecond
+            settings.EngineEncryptionMode, settings.EngineMaximumConnections,
+            settings.EngineMaximumHalfOpenConnections, settings.EngineMaximumDownloadRateBytesPerSecond,
+            settings.EngineMaximumUploadRateBytesPerSecond
         );
     }
 

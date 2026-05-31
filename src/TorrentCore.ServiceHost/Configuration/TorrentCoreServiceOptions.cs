@@ -4,6 +4,7 @@ public sealed class TorrentCoreServiceOptions
 {
     public const string SectionName = "TorrentCore";
     public TorrentEngineMode EngineMode { get; init; } = TorrentEngineMode.MonoTorrent;
+    public TorrentEncryptionMode EngineEncryptionMode { get; init; } = TorrentEncryptionMode.EncryptedPreferred;
     public int EngineListenPort { get; init; } = 55_123;
     public int EngineDhtPort { get; init; } = 55_124;
     public bool EngineAllowPortForwarding { get; init; } = true;
