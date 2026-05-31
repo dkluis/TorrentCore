@@ -54,4 +54,24 @@ public sealed class TorrentMetadataRecoveryStateTests
         var resetDecision = state.Evaluate(start.AddSeconds(93), staleSeconds: 60, restartDelaySeconds: 15);
         Assert.Equal(MetadataRecoveryAction.Reset, resetDecision.Action);
     }
+
+    [Fact]
+    public void MarkReset_StartsAFreshRecoveryCycle_WhenNoUsefulPeerActivityOccursAfterReset()
+    {
+        var state = new TorrentMetadataRecoveryState();
+        var start = new DateTimeOffset(2026, 4, 3, 9, 53, 48, TimeSpan.Zero);
+
+        state.Observe(start, isResolvingMetadata: true, hasMetadata: false);
+        state.MarkRefresh(start.AddSeconds(61));
+        state.MarkRestart(start.AddSeconds(77));
+        state.MarkReset(start.AddSeconds(93));
+
+        var beforeStaleDecision = state.Evaluate(start.AddSeconds(152), staleSeconds: 60, restartDelaySeconds: 15);
+        Assert.Equal(MetadataRecoveryAction.None, beforeStaleDecision.Action);
+
+        var restartDecision = state.Evaluate(start.AddSeconds(169), staleSeconds: 60, restartDelaySeconds: 15);
+        Assert.Equal(MetadataRecoveryAction.Restart, restartDecision.Action);
+        Assert.Equal(start.AddSeconds(93), restartDecision.ResolvingSinceUtc);
+        Assert.Null(restartDecision.LastDiscoveryActivityAtUtc);
+    }
 }

@@ -107,10 +107,11 @@ internal sealed class TorrentMetadataRecoveryState
     {
         lock (_gate)
         {
-            _resolvingSinceUtc ??= now;
-            _lastResetAtUtc    =   now;
-            _lastRestartAtUtc  =   now;
-            _lastRefreshAtUtc  =   now;
+            _resolvingSinceUtc          = now;
+            _lastDiscoveryActivityAtUtc = null;
+            _lastResetAtUtc             = now;
+            _lastRestartAtUtc           = null;
+            _lastRefreshAtUtc           = now;
         }
     }
 
