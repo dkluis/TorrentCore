@@ -1,28 +1,18 @@
 # TorrentCore
 
-TorrentCore is a standalone torrent engine product kept separate from TVMaze.
+TorrentCore is a standalone torrent engine product built with C# 14 and .NET 10.
 
-Current repo scope:
-- standalone service host
-- standalone web admin UI
-- shared contracts and client library
-- SQLite persistence layer
-- explicit handoff docs for continuation in Rider
+TVMaze is a client and integration surface. It does not own TorrentCore internals.
 
-Key boundary:
-- TorrentCore owns torrent engine state, policy, persistence, and management UX
-- TVMaze is only a lightweight client/integration surface
+Start here:
 
-Start with these docs:
-- `Documentation/Project Brief.md`
-- `Documentation/TVMaze Integration Boundary.md`
-- `Documentation/Initial Scaffold Status.md`
-- `Documentation/New Chat Starter.md`
-- `Documentation/Operator Settings Reference.md`
-- `Documentation/Intel Mac Deployment Target.md`
-- `Documentation/Arm Mac Deployment Target.md`
-- `Scripts/README.md`
+- [AGENTS.md](AGENTS.md)
+- [docs/architecture.md](docs/architecture.md)
+- [docs/development.md](docs/development.md)
+- [docs/database.md](docs/database.md)
+- [docs/operator-settings.md](docs/operator-settings.md)
+- [docs/troubleshooting.md](docs/troubleshooting.md)
+- [docs/testing.md](docs/testing.md)
+- [docs/deployment.md](docs/deployment.md)
 
-Repository legal documents:
-- `LICENSE.md`
-- `DISCLAIMER.md`
+Historical planning and handoff material lives under [docs/archive/](docs/archive/).

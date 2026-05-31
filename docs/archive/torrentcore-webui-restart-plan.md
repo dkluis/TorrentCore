@@ -1,3 +1,5 @@
+> Archived historical document. Do not use this as the active source of truth. Prefer the active docs in `docs/`.
+
 # TorrentCore Web UI Restart Plan
 
 ## Status
@@ -57,10 +59,10 @@ This is a controlled restart with clear architecture, UX, and cutover rules.
 
 Primary planning references:
 
-- [TvmazeWeb.csproj](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TVMaze/ProdWebApps/TvmazeWeb/TvmazeWeb.csproj)
-- [TVMaze Web UI Restart Plan.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TVMaze/Documentation/Refactor%20Activities/UI/TVMaze%20Web%20UI%20Restart%20Plan.md)
-- [Execution Plan and Progress.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TorrentCore/Documentation/Execution%20Plan%20and%20Progress.md)
-- [TorrentCoreClient.cs](/Volumes/HD-Desktop-Misc-L5/Development/Source/C%23/TorrentCore/src/TorrentCore.Client/TorrentCoreClient.cs)
+- `TvmazeWeb.csproj` in the TVMaze repo
+- `TVMaze Web UI Restart Plan.md` in the TVMaze repo
+- [execution-plan-and-progress.md](execution-plan-and-progress.md)
+- [`src/TorrentCore.Client/TorrentCoreClient.cs`](../../src/TorrentCore.Client/TorrentCoreClient.cs)
 
 ## Problem Statement
 

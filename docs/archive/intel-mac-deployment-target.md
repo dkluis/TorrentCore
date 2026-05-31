@@ -1,3 +1,5 @@
+> Archived historical document. Do not use this as the active source of truth. Prefer the active docs in `docs/`.
+
 # TorrentCore Intel Mac Deployment Target
 
 ## Purpose
@@ -71,7 +73,7 @@ Deployment scripts:
 - `deploy-all-intel.zsh`
 
 These now live in:
-- [Scripts](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts)
+- [`Scripts/`](../../Scripts/README.md)
 
 Important split:
 - `start/stop/restart` scripts are target-host runtime scripts
@@ -159,7 +161,7 @@ Current script-created state files:
 - `~/TorrentCore/Scripts/logs/webui.log`
 
 Current environment template:
-- [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example)
+- [`Scripts/torrentcore.env.example`](../../Scripts/torrentcore.env.example)
 
 Required first-start step on each deployed host:
 - copy `~/TorrentCore/Scripts/torrentcore.env.example` to `~/TorrentCore/Scripts/torrentcore.env`

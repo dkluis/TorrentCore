@@ -1,3 +1,5 @@
+> Archived historical document. Do not use this as the active source of truth. Prefer the active docs in `docs/`.
+
 # TorrentCore Arm Mac Deployment Target
 
 ## Purpose
@@ -42,7 +44,7 @@ Current publish target:
 ## Deploy Scripts
 
 Arm deploy wrappers now live in:
-- [Scripts](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts)
+- [`Scripts/`](../../Scripts/README.md)
 
 Available commands:
 - `./Scripts/deploy-service-arm.zsh`
@@ -71,7 +73,7 @@ These are driven through:
 - `TORRENTCORE_PUBLISH_RUNTIME_ARM`
 
 If needed, they can be overridden in:
-- [torrentcore.env.example](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Scripts/torrentcore.env.example)
+- [`Scripts/torrentcore.env.example`](../../Scripts/torrentcore.env.example)
 
 ## Runtime Control
 

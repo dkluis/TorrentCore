@@ -1,3 +1,5 @@
+> Archived historical document. Do not use this as the active source of truth. Prefer the active docs in `docs/`.
+
 # TorrentCore Execution Plan and Progress
 
 ## Purpose
@@ -14,11 +16,11 @@ It records:
 ## Source of Truth
 
 This document follows:
-- [Project Brief.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Project%20Brief.md)
-- [TVMaze Integration Boundary.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/TVMaze%20Integration%20Boundary.md)
-- [Initial Scaffold Status.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Initial%20Scaffold%20Status.md)
-- [Torrent Category Routing And Callback Plan.md](/Volumes/HD-Desktop-Misc-L5/Development/Source/C#/TorrentCore/Documentation/Torrent%20Category%20Routing%20And%20Callback%20Plan.md)
-- [Torrent History Plan.md](/Volumes/CA-Desktop-HD-2/Development/Source/C#/TorrentCore/Documentation/Torrent%20History%20Plan.md)
+- [project-brief.md](project-brief.md)
+- [tvmaze-integration-boundary.md](tvmaze-integration-boundary.md)
+- [initial-scaffold-status.md](initial-scaffold-status.md)
+- [torrent-category-routing-and-callback-plan.md](torrent-category-routing-and-callback-plan.md)
+- [torrent-history-plan.md](torrent-history-plan.md)
 
 ## Current Active Step
 

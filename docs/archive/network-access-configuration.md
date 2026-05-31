@@ -1,3 +1,5 @@
+> Archived historical document. Do not use this as the active source of truth. Prefer the active docs in `docs/`.
+
 # Network Access Configuration
 
 ## Purpose
