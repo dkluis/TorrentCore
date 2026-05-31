@@ -8,7 +8,7 @@
 
 <OperatorPage Kicker="Diagnostics"
               Title="Logs"
-              Summary="TVMaze-style diagnostics table with one pager, explicit filter actions, and grid-contained scrolling."
+              Summary="TVMaze-style diagnostics table with one pager, explicit filter actions, and selected-entry details below the grid."
               Class="logs-page"
               StatusLine="Shows recent activity from the current TorrentCore endpoint.">
     <HeaderActions>
@@ -174,7 +174,7 @@
                                       FixedHeader="true"
                                       Loading="_isRefreshing"
                                       Breakpoint="Breakpoint.Md"
-                                      Height="100%"
+                                      Height="@GetLogsTableHeight()"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
                                       OnRowClick="OnLogRowClickAsync"
@@ -672,6 +672,11 @@
     private string BuildRecentActivitySummary()
     {
         return $"{FilteredLogs.Count:n0} result(s) of {_allLogs.Count:n0} loaded. Click a column header to sort.";
+    }
+
+    private string GetLogsTableHeight()
+    {
+        return SelectedLog is null ? "min(50dvh, 40rem)" : "28rem";
     }
 
     private static string ValueOrNotAvailable(string? value)

@@ -10,7 +10,7 @@
 
 <OperatorPage Kicker="Workflow"
               Title="Torrents"
-              Summary="Single-grid torrent workflow with selected detail/actions, TVMaze-style panel composition, and periodic refresh."
+              Summary="Single-grid torrent workflow with selected detail/actions below the grid, TVMaze-style panel composition, and periodic refresh."
               Class="torrents-page"
               StatusLine="Auto refresh runs every 5 seconds. Select a row to manage one torrent from the detail panel. Sort from grid headers.">
     <HeaderActions>
@@ -145,7 +145,7 @@
                                       FixedHeader="true"
                                       Loading="_isRefreshing"
                                       Breakpoint="Breakpoint.Md"
-                                      Height="100%"
+                                      Height="@GetTorrentsTableHeight()"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
                                       OnRowClick="OnTorrentRowClickAsync"
@@ -1017,6 +1017,11 @@
     private string BuildCurrentTorrentsSummary()
     {
         return $"{FilteredTorrents.Count:n0} result(s). Click a column header to sort.";
+    }
+
+    private string GetTorrentsTableHeight()
+    {
+        return _selectedTorrentDetail is null && !_isLoadingSelectedDetail ? "min(50dvh, 40rem)" : "28rem";
     }
 
     private string GetActionMessageClass()
