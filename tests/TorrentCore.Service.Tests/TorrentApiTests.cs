@@ -2874,11 +2874,22 @@ public sealed class TorrentApiTests
     [Fact]
     public async Task FakeRuntime_AutoCleanup_RemovesCompletedTorrentWithoutDeletingData()
     {
+        var rootPath = CreateTempRootPath("torrentcore-auto-cleanup");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var finalPayloadPath = Path.Combine(downloadPath, "Auto Cleanup Torrent");
+
         await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
             runtimeTickIntervalMilliseconds: 50,
             metadataResolutionDelayMilliseconds: 0,
-            downloadProgressPercentPerTick: 50);
+            downloadProgressPercentPerTick: 50,
+            usePartialFiles: false);
         using var httpClient = factory.CreateClient();
+
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
+        File.WriteAllText(finalPayloadPath, "final");
 
         var updateResponse = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
         {
@@ -2919,11 +2930,22 @@ public sealed class TorrentApiTests
     [Fact]
     public async Task FakeRuntime_DeleteLogsForCompletedTorrents_PrunesTorrentScopedLogs_WithoutRemovingTorrent()
     {
+        var rootPath = CreateTempRootPath("torrentcore-auto-log-cleanup");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var finalPayloadPath = Path.Combine(downloadPath, "Auto Log Cleanup Torrent");
+
         await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
             runtimeTickIntervalMilliseconds: 50,
             metadataResolutionDelayMilliseconds: 0,
-            downloadProgressPercentPerTick: 50);
+            downloadProgressPercentPerTick: 50,
+            usePartialFiles: false);
         using var httpClient = factory.CreateClient();
+
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
+        File.WriteAllText(finalPayloadPath, "final");
 
         var updateResponse = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
         {

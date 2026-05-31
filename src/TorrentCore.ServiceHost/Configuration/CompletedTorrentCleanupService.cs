@@ -187,10 +187,10 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
     private async Task TryDeleteCompletedTorrentLogsAsync(TorrentSnapshot torrent, CancellationToken cancellationToken)
     {
         var deletedCount = await activityLogService.DeleteByTorrentIdAsync(torrent.TorrentId, cancellationToken);
-        _prunedTorrentLogIds.Add(torrent.TorrentId);
 
         if (deletedCount <= 0)
         {
+            _prunedTorrentLogIds.Add(torrent.TorrentId);
             return;
         }
 
