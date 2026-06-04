@@ -1,16 +1,25 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
+using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
+using TorrentCore.Persistence.Sqlite.Configuration;
+using TorrentCore.Persistence.Sqlite.Logging;
+using TorrentCore.Service.Application;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 
 namespace TorrentCore.Service.Tests;
 
@@ -762,6 +771,37 @@ public sealed class TorrentApiTests
         Assert.Equal("category_download_root_unavailable", error.GetProperty("code").GetString());
         Assert.Equal(nameof(UpdateTorrentCategoryRequest.DownloadRootPath), error.GetProperty("target").GetString());
         Assert.Contains(blockedPath, error.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AddMagnet_Succeeds_WhenActivityLogWriteFails_AfterTorrentIsPersisted()
+    {
+        var logFailureSwitch = new TestActivityLogFailureSwitch();
+
+        await using var factory = CreateFactory(configureServices: services =>
+        {
+            services.RemoveAll<IActivityLogService>();
+            services.AddSingleton<IActivityLogService>(serviceProvider =>
+                new FailingActivityLogService(
+                    new SqliteActivityLogService(
+                        serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>().DatabaseFilePath,
+                        20_000
+                    ),
+                    logFailureSwitch
+                ));
+        });
+        using var httpClient = factory.CreateClient();
+
+        logFailureSwitch.FailWrites = true;
+
+        var response = await AddMagnetAsync(httpClient, "C2C2C2C2C2C2C2C2C2C2C2C2C2C2C2C2C2C2C2C2", "Log Failure Success");
+        var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.NotNull(torrent);
+        Assert.NotNull(torrents);
+        Assert.Contains(torrents, item => item.TorrentId == torrent.TorrentId);
     }
 
     [Fact]
@@ -3380,6 +3420,98 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task AddMagnet_PreservesStructuredError_WhenFailureLoggingAlsoFails()
+    {
+        var logFailureSwitch = new TestActivityLogFailureSwitch();
+
+        await using var factory = CreateFactory(configureServices: services =>
+        {
+            services.RemoveAll<IActivityLogService>();
+            services.AddSingleton<IActivityLogService>(serviceProvider =>
+                new FailingActivityLogService(
+                    new SqliteActivityLogService(
+                        serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>().DatabaseFilePath,
+                        20_000
+                    ),
+                    logFailureSwitch
+                ));
+        });
+        using var httpClient = factory.CreateClient();
+
+        logFailureSwitch.FailWrites = true;
+
+        var response = await httpClient.PostAsJsonAsync("api/torrents", new AddMagnetRequest
+        {
+            MagnetUri = "magnet:?xt=urn:btih:1234123412341234123412341234123412341234&dn=Unknown%20Category",
+            CategoryKey = "Podcast",
+        });
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_category", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task RuntimeSettingsService_GetRuntimeSettings_ThrowsStructuredError_WhenStorageIsUnavailable()
+    {
+        var service = CreateRuntimeSettingsServiceWithBlockedStoragePath();
+
+        var exception = await Assert.ThrowsAsync<ServiceOperationException>(
+            () => service.GetRuntimeSettingsDtoAsync(CancellationToken.None)
+        );
+
+        Assert.Equal("storage_unavailable", exception.Code);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task RuntimeSettingsService_UpdateRuntimeSettings_ThrowsStructuredError_WhenStorageIsUnavailable()
+    {
+        var service = CreateRuntimeSettingsServiceWithBlockedStoragePath();
+
+        var exception = await Assert.ThrowsAsync<ServiceOperationException>(
+            () => service.UpdateAsync(CreateDefaultRuntimeSettingsUpdateRequest(), CancellationToken.None)
+        );
+
+        Assert.Equal("storage_unavailable", exception.Code);
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, exception.StatusCode);
+    }
+
+    [Fact]
+    public async Task RestartService_ReturnsStructuredError_WhenLaunchdRestartSchedulingIsUnavailable()
+    {
+        await using var factory = CreateFactory(configureServices: services =>
+        {
+            services.RemoveAll<ILaunchAgentServiceRestartScheduler>();
+            services.AddSingleton<ILaunchAgentServiceRestartScheduler>(new FailingRestartScheduler());
+        });
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PostAsync("api/host/restart-service", content: null);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("service_restart_unavailable", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task DeleteOrphanedTorrentLogs_ReturnsStructuredError_WhenStorageIsUnavailable()
+    {
+        await using var factory = CreateFactory(configureServices: services =>
+        {
+            services.RemoveAll<IActivityLogService>();
+            services.AddSingleton<IActivityLogService>(new ThrowingActivityLogService(deleteOrphanedFailure: new IOException("blocked")));
+        });
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PostAsync("api/logs/delete-orphaned-torrent-logs", content: null);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("storage_unavailable", error.GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task AddMagnet_ReturnsConflict_ForPersistedDuplicate()
     {
         var rootPath = CreateTempRootPath("torrentcore-duplicate");
@@ -3429,7 +3561,8 @@ public sealed class TorrentApiTests
         int? maxActiveDownloads = null,
         int? runtimeTickIntervalMilliseconds = null,
         int? metadataResolutionDelayMilliseconds = null,
-        double? downloadProgressPercentPerTick = null)
+        double? downloadProgressPercentPerTick = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var rootPath = CreateTempRootPath("torrentcore-api");
         var resolvedDownloadPath = downloadPath ?? Path.Combine(rootPath, "downloads");
@@ -3559,7 +3692,71 @@ public sealed class TorrentApiTests
 
                     configurationBuilder.AddInMemoryCollection(settings);
                 });
+
+                if (configureServices is not null)
+                {
+                    builder.ConfigureServices(configureServices);
+                }
             });
+    }
+
+    private static UpdateRuntimeSettingsRequest CreateDefaultRuntimeSettingsUpdateRequest()
+    {
+        return new UpdateRuntimeSettingsRequest
+        {
+            SeedingStopMode = SeedingStopMode.Unlimited.ToString(),
+            SeedingStopRatio = 1.5,
+            SeedingStopMinutes = 90,
+            CompletedTorrentCleanupMode = CompletedTorrentCleanupMode.Never.ToString(),
+            CompletedTorrentCleanupMinutes = 60,
+            DeleteLogsForCompletedTorrents = false,
+            EngineConnectionFailureLogBurstLimit = 5,
+            EngineConnectionFailureLogWindowSeconds = 60,
+            EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred.ToString(),
+            EngineMaximumConnections = 150,
+            EngineMaximumHalfOpenConnections = 8,
+            EngineMaximumDownloadRateBytesPerSecond = 0,
+            EngineMaximumUploadRateBytesPerSecond = 0,
+            MaxActiveMetadataResolutions = 4,
+            MaxActiveDownloads = 4,
+            MetadataRefreshStaleSeconds = 90,
+            MetadataRefreshRestartDelaySeconds = 30,
+            CompletionCallbackEnabled = false,
+            CompletionCallbackCommandPath = null,
+            CompletionCallbackArguments = null,
+            CompletionCallbackWorkingDirectory = null,
+            CompletionCallbackTimeoutSeconds = 30,
+            CompletionCallbackFinalizationTimeoutSeconds = 120,
+            CompletionCallbackApiBaseUrlOverride = null,
+            CompletionCallbackApiKeyOverride = null,
+        };
+    }
+
+    private static RuntimeSettingsService CreateRuntimeSettingsServiceWithBlockedStoragePath()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-runtime-settings-service-unavailable");
+        var blockedParentPath = Path.Combine(rootPath, "blocked-parent");
+        Directory.CreateDirectory(rootPath);
+        File.WriteAllText(blockedParentPath, "blocked");
+
+        var options = Options.Create(new TorrentCoreServiceOptions());
+        var store = new SqliteRuntimeSettingsStore(Path.Combine(blockedParentPath, "torrentcore.db"));
+        var appliedEngineSettingsState = new AppliedEngineSettingsState();
+        appliedEngineSettingsState.Set(
+            TorrentEncryptionMode.EncryptedPreferred,
+            150,
+            8,
+            0,
+            0
+        );
+
+        return new RuntimeSettingsService(
+            options,
+            store,
+            new NoOpActivityLogService(),
+            new ServiceInstanceContext(),
+            appliedEngineSettingsState
+        );
     }
 
     private static async Task<HttpResponseMessage> AddMagnetAsync(HttpClient httpClient, string infoHash, string name, string? categoryKey = null)
@@ -3587,6 +3784,83 @@ public sealed class TorrentApiTests
 
         var rowsAffected = await command.ExecuteNonQueryAsync();
         Assert.Equal(1, rowsAffected);
+    }
+
+    private sealed class TestActivityLogFailureSwitch
+    {
+        public bool FailWrites { get; set; }
+    }
+
+    private sealed class FailingActivityLogService(IActivityLogService inner, TestActivityLogFailureSwitch failureSwitch)
+        : IActivityLogService
+    {
+        public Task EnsureInitializedAsync(CancellationToken cancellationToken)
+        {
+            return inner.EnsureInitializedAsync(cancellationToken);
+        }
+
+        public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken)
+        {
+            return failureSwitch.FailWrites
+                ? throw new IOException("Simulated activity log storage failure.")
+                : inner.WriteAsync(request, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(ActivityLogQuery query, CancellationToken cancellationToken)
+        {
+            return inner.GetRecentAsync(query, cancellationToken);
+        }
+
+        public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
+        {
+            return inner.DeleteByTorrentIdAsync(torrentId, cancellationToken);
+        }
+
+        public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
+        {
+            return inner.DeleteOrphanedTorrentLogsAsync(cancellationToken);
+        }
+    }
+
+    private sealed class FailingRestartScheduler : ILaunchAgentServiceRestartScheduler
+    {
+        public Task<ServiceRestartScheduleResult> ScheduleRestartAsync(CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("Service restart is only supported when TorrentCore.Service is running under launchd.");
+        }
+    }
+
+    private sealed class NoOpActivityLogService : IActivityLogService
+    {
+        public Task EnsureInitializedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(ActivityLogQuery query, CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<ActivityLogEntry>>(Array.Empty<ActivityLogEntry>());
+        public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+    }
+
+    private sealed class ThrowingActivityLogService(Exception? getRecentFailure = null, Exception? deleteOrphanedFailure = null)
+        : IActivityLogService
+    {
+        public Task EnsureInitializedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(ActivityLogQuery query, CancellationToken cancellationToken)
+        {
+            return getRecentFailure is null
+                ? Task.FromResult<IReadOnlyList<ActivityLogEntry>>(Array.Empty<ActivityLogEntry>())
+                : Task.FromException<IReadOnlyList<ActivityLogEntry>>(getRecentFailure);
+        }
+
+        public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken) => Task.FromResult(0);
+
+        public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
+        {
+            return deleteOrphanedFailure is null
+                ? Task.FromResult(0)
+                : Task.FromException<int>(deleteOrphanedFailure);
+        }
     }
 
     private sealed class TorrentHistoryRow

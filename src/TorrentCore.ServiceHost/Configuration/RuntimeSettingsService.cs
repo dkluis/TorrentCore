@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Persistence.Sqlite.Configuration;
+using TorrentCore.Service.Application;
 
 #endregion
 
@@ -18,8 +19,18 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
 {
     public async Task<RuntimeSettingsSnapshot> GetEffectiveSettingsAsync(CancellationToken cancellationToken)
     {
-        var persistedSettings = await runtimeSettingsStore.GetAsync(cancellationToken);
-        return BuildSnapshot(serviceOptions.Value, persistedSettings);
+        try
+        {
+            var persistedSettings = await runtimeSettingsStore.GetAsync(cancellationToken);
+            return BuildSnapshot(serviceOptions.Value, persistedSettings);
+        }
+        catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
+        {
+            throw ServiceBoundaryExceptionMapper.CreateStorageUnavailable(
+                "TorrentCore runtime settings storage is unavailable.",
+                null
+            );
+        }
     }
 
     public async Task<RuntimeSettingsDto> GetRuntimeSettingsDtoAsync(CancellationToken cancellationToken)
@@ -210,94 +221,111 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             );
         }
 
-        await runtimeSettingsStore.UpsertAsync(
-            new Dictionary<string, string>
-            {
-                [RuntimeSettingsKeys.SeedingStopMode] = seedingStopMode.ToString(),
-                [RuntimeSettingsKeys.SeedingStopRatio] =
-                        request.SeedingStopRatio.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.SeedingStopMinutes] =
-                        request.SeedingStopMinutes.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.CompletedTorrentCleanupMode] = completedTorrentCleanupMode.ToString(),
-                [RuntimeSettingsKeys.CompletedTorrentCleanupMinutes] =
-                        request.CompletedTorrentCleanupMinutes.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.DeleteLogsForCompletedTorrents] =
-                        request.DeleteLogsForCompletedTorrents.ToString(),
-                [RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit] =
-                        request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] =
-                        request.EngineConnectionFailureLogWindowSeconds.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.EngineEncryptionMode] = engineEncryptionMode.ToString(),
-                [RuntimeSettingsKeys.EngineMaximumConnections] =
-                        request.EngineMaximumConnections.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.EngineMaximumHalfOpenConnections] =
-                        request.EngineMaximumHalfOpenConnections.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.EngineMaximumDownloadRateBytesPerSecond] =
-                        request.EngineMaximumDownloadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.EngineMaximumUploadRateBytesPerSecond] =
-                        request.EngineMaximumUploadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.MaxActiveMetadataResolutions] =
-                        request.MaxActiveMetadataResolutions.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.MaxActiveDownloads] =
-                        request.MaxActiveDownloads.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.MetadataRefreshStaleSeconds] =
-                        request.MetadataRefreshStaleSeconds.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.MetadataRefreshRestartDelaySeconds] =
-                        request.MetadataRefreshRestartDelaySeconds.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.CompletionCallbackEnabled]     = completionCallbackEnabled.ToString(),
-                [RuntimeSettingsKeys.CompletionCallbackCommandPath] = completionCallbackCommandPath ?? string.Empty,
-                [RuntimeSettingsKeys.CompletionCallbackArguments]   = completionCallbackArguments   ?? string.Empty,
-                [RuntimeSettingsKeys.CompletionCallbackWorkingDirectory] =
-                        completionCallbackWorkingDirectory ?? string.Empty,
-                [RuntimeSettingsKeys.CompletionCallbackTimeoutSeconds] =
-                        completionCallbackTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.CompletionCallbackFinalizationTimeoutSeconds] =
-                        completionCallbackFinalizationTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
-                [RuntimeSettingsKeys.CompletionCallbackApiBaseUrlOverride] =
-                        completionCallbackApiBaseUrlOverride ?? string.Empty,
-                [RuntimeSettingsKeys.CompletionCallbackApiKeyOverride] =
-                        completionCallbackApiKeyOverride ?? string.Empty,
-            }, cancellationToken
-        );
+        try
+        {
+            await runtimeSettingsStore.UpsertAsync(
+                new Dictionary<string, string>
+                {
+                    [RuntimeSettingsKeys.SeedingStopMode] = seedingStopMode.ToString(),
+                    [RuntimeSettingsKeys.SeedingStopRatio] =
+                            request.SeedingStopRatio.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.SeedingStopMinutes] =
+                            request.SeedingStopMinutes.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.CompletedTorrentCleanupMode] = completedTorrentCleanupMode.ToString(),
+                    [RuntimeSettingsKeys.CompletedTorrentCleanupMinutes] =
+                            request.CompletedTorrentCleanupMinutes.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.DeleteLogsForCompletedTorrents] =
+                            request.DeleteLogsForCompletedTorrents.ToString(),
+                    [RuntimeSettingsKeys.EngineConnectionFailureLogBurstLimit] =
+                            request.EngineConnectionFailureLogBurstLimit.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.EngineConnectionFailureLogWindowSeconds] =
+                            request.EngineConnectionFailureLogWindowSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.EngineEncryptionMode] = engineEncryptionMode.ToString(),
+                    [RuntimeSettingsKeys.EngineMaximumConnections] =
+                            request.EngineMaximumConnections.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.EngineMaximumHalfOpenConnections] =
+                            request.EngineMaximumHalfOpenConnections.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.EngineMaximumDownloadRateBytesPerSecond] =
+                            request.EngineMaximumDownloadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.EngineMaximumUploadRateBytesPerSecond] =
+                            request.EngineMaximumUploadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.MaxActiveMetadataResolutions] =
+                            request.MaxActiveMetadataResolutions.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.MaxActiveDownloads] =
+                            request.MaxActiveDownloads.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.MetadataRefreshStaleSeconds] =
+                            request.MetadataRefreshStaleSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.MetadataRefreshRestartDelaySeconds] =
+                            request.MetadataRefreshRestartDelaySeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.CompletionCallbackEnabled]     = completionCallbackEnabled.ToString(),
+                    [RuntimeSettingsKeys.CompletionCallbackCommandPath] = completionCallbackCommandPath ?? string.Empty,
+                    [RuntimeSettingsKeys.CompletionCallbackArguments]   = completionCallbackArguments   ?? string.Empty,
+                    [RuntimeSettingsKeys.CompletionCallbackWorkingDirectory] =
+                            completionCallbackWorkingDirectory ?? string.Empty,
+                    [RuntimeSettingsKeys.CompletionCallbackTimeoutSeconds] =
+                            completionCallbackTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.CompletionCallbackFinalizationTimeoutSeconds] =
+                            completionCallbackFinalizationTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.CompletionCallbackApiBaseUrlOverride] =
+                            completionCallbackApiBaseUrlOverride ?? string.Empty,
+                    [RuntimeSettingsKeys.CompletionCallbackApiKeyOverride] =
+                            completionCallbackApiKeyOverride ?? string.Empty,
+                }, cancellationToken
+            );
+        }
+        catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
+        {
+            throw ServiceBoundaryExceptionMapper.CreateStorageUnavailable(
+                "TorrentCore runtime settings storage is unavailable.",
+                null
+            );
+        }
 
-        await activityLogService.WriteAsync(
-            new ActivityLogWriteRequest
-            {
-                Level             = ActivityLogLevel.Information,
-                Category          = "startup",
-                EventType         = "service.runtime_settings.updated",
-                Message           = "Runtime settings were updated.",
-                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                DetailsJson = JsonSerializer.Serialize(
-                    new
-                    {
-                        seedingStopMode,
-                        request.SeedingStopRatio,
-                        request.SeedingStopMinutes,
-                        completedTorrentCleanupMode,
-                        request.CompletedTorrentCleanupMinutes,
-                        request.DeleteLogsForCompletedTorrents,
-                        request.EngineConnectionFailureLogBurstLimit,
-                        request.EngineConnectionFailureLogWindowSeconds,
-                        engineEncryptionMode,
-                        request.EngineMaximumConnections,
-                        request.EngineMaximumHalfOpenConnections,
-                        request.EngineMaximumDownloadRateBytesPerSecond,
-                        request.EngineMaximumUploadRateBytesPerSecond,
-                        request.MaxActiveMetadataResolutions,
-                        request.MaxActiveDownloads,
-                        request.MetadataRefreshStaleSeconds,
-                        request.MetadataRefreshRestartDelaySeconds,
-                        completionCallbackEnabled,
-                        completionCallbackCommandPath,
-                        completionCallbackWorkingDirectory,
-                        completionCallbackTimeoutSeconds,
-                        completionCallbackFinalizationTimeoutSeconds,
-                        completionCallbackApiBaseUrlOverride,
-                    }
-                ),
-            }, cancellationToken
-        );
+        try
+        {
+            await activityLogService.WriteAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level             = ActivityLogLevel.Information,
+                    Category          = "startup",
+                    EventType         = "service.runtime_settings.updated",
+                    Message           = "Runtime settings were updated.",
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            seedingStopMode,
+                            request.SeedingStopRatio,
+                            request.SeedingStopMinutes,
+                            completedTorrentCleanupMode,
+                            request.CompletedTorrentCleanupMinutes,
+                            request.DeleteLogsForCompletedTorrents,
+                            request.EngineConnectionFailureLogBurstLimit,
+                            request.EngineConnectionFailureLogWindowSeconds,
+                            engineEncryptionMode,
+                            request.EngineMaximumConnections,
+                            request.EngineMaximumHalfOpenConnections,
+                            request.EngineMaximumDownloadRateBytesPerSecond,
+                            request.EngineMaximumUploadRateBytesPerSecond,
+                            request.MaxActiveMetadataResolutions,
+                            request.MaxActiveDownloads,
+                            request.MetadataRefreshStaleSeconds,
+                            request.MetadataRefreshRestartDelaySeconds,
+                            completionCallbackEnabled,
+                            completionCallbackCommandPath,
+                            completionCallbackWorkingDirectory,
+                            completionCallbackTimeoutSeconds,
+                            completionCallbackFinalizationTimeoutSeconds,
+                            completionCallbackApiBaseUrlOverride,
+                        }
+                    ),
+                }, cancellationToken
+            );
+        }
+        catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
+        {
+            // The settings change has already been persisted.
+        }
 
         return await GetRuntimeSettingsDtoAsync(cancellationToken);
     }
