@@ -734,6 +734,37 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task UpdateCategory_ReturnsStructuredError_WhenDownloadRootPathIsUnavailable()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-category-update-unavailable");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var blockedPath = Path.Combine(rootPath, "blocked-root");
+
+        Directory.CreateDirectory(rootPath);
+        await File.WriteAllTextAsync(blockedPath, "blocked");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var updateResponse = await httpClient.PutAsJsonAsync("api/categories/Movie", new UpdateTorrentCategoryRequest
+        {
+            DisplayName = "Movies",
+            CallbackLabel = "Movie",
+            DownloadRootPath = blockedPath,
+            Enabled = true,
+            InvokeCompletionCallback = true,
+            SortOrder = 12,
+        });
+        var error = await updateResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, updateResponse.StatusCode);
+        Assert.Equal("category_download_root_unavailable", error.GetProperty("code").GetString());
+        Assert.Equal(nameof(UpdateTorrentCategoryRequest.DownloadRootPath), error.GetProperty("target").GetString());
+        Assert.Contains(blockedPath, error.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GetTorrents_ReturnsPersistedTorrentAfterAdd()
     {
         await using var factory = CreateFactory();
@@ -3323,6 +3354,32 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task AddMagnet_ReturnsStructuredError_WhenCategoryDownloadRootIsUnavailable()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-category-add-unavailable");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var blockedPath = Path.Combine(rootPath, "blocked-tv-root");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        Directory.CreateDirectory(rootPath);
+        await File.WriteAllTextAsync(blockedPath, "blocked");
+
+        await using var factory = CreateFactory(downloadPath: downloadPath, storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        await UpdateCategoryDownloadRootPathAsync(databaseFilePath, "TV", blockedPath);
+
+        var response = await AddMagnetAsync(httpClient, "ABCDABCDABCDABCDABCDABCDABCDABCDABCDABCD", "Blocked Category", "TV");
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("category_download_root_unavailable", error.GetProperty("code").GetString());
+        Assert.Equal("requestedCategoryKey", error.GetProperty("target").GetString());
+        Assert.Contains(blockedPath, error.GetProperty("detail").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AddMagnet_ReturnsConflict_ForPersistedDuplicate()
     {
         var rootPath = CreateTempRootPath("torrentcore-duplicate");
@@ -3512,6 +3569,24 @@ public sealed class TorrentApiTests
             MagnetUri = $"magnet:?xt=urn:btih:{infoHash}&dn={Uri.EscapeDataString(name)}",
             CategoryKey = categoryKey,
         });
+    }
+
+    private static async Task UpdateCategoryDownloadRootPathAsync(string databaseFilePath, string categoryKey, string downloadRootPath)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              UPDATE torrent_categories
+                              SET download_root_path = $download_root_path
+                              WHERE category_key = $category_key;
+                              """;
+        command.Parameters.AddWithValue("$download_root_path", downloadRootPath);
+        command.Parameters.AddWithValue("$category_key", categoryKey);
+
+        var rowsAffected = await command.ExecuteNonQueryAsync();
+        Assert.Equal(1, rowsAffected);
     }
 
     private sealed class TorrentHistoryRow

@@ -25,6 +25,7 @@ public sealed class CategoriesController(ITorrentApplicationService torrentAppli
     [ProducesResponseType(StatusCodes.Status200OK,         Type = typeof(TorrentCategoryDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<TorrentCategoryDto>> Update(string key,
         [FromBody] UpdateTorrentCategoryRequest                       request, CancellationToken cancellationToken)
     {
