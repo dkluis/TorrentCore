@@ -337,6 +337,17 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             updated.CallbackLastError = snapshot.CompletionCallbackLastError;
         }
 
+        if (ShouldPreserveStoredCallbackFeedback(existing, snapshot))
+        {
+            updated.LatestCallbackStatus = existing.LatestCallbackStatus;
+            updated.CallbackStartedAtUtc = existing.CallbackStartedAtUtc;
+            updated.CallbackCompletedAtUtc = existing.CallbackCompletedAtUtc;
+            updated.CallbackLastError = existing.CallbackLastError;
+            updated.LatestCompletionCallbackFeedbackReceivedAtUtc =
+                existing.LatestCompletionCallbackFeedbackReceivedAtUtc;
+            updated.LatestCompletionCallbackFeedbackJson = existing.LatestCompletionCallbackFeedbackJson;
+        }
+
         if (updated.MetadataResolvedAtUtc is null && ShouldStampMetadataResolved(existing, snapshot))
         {
             updated.MetadataResolvedAtUtc = snapshot.LastActivityAtUtc ?? now;
@@ -412,6 +423,14 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
     {
         return snapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization &&
                existing.LatestCallbackStatus is nameof(TorrentCompletionCallbackState.Failed) or nameof(TorrentCompletionCallbackState.TimedOut);
+    }
+
+    private static bool ShouldPreserveStoredCallbackFeedback(TorrentHistoryRecord existing, TorrentSnapshot snapshot)
+    {
+        return !string.IsNullOrWhiteSpace(existing.LatestCompletionCallbackFeedbackJson) &&
+               string.IsNullOrWhiteSpace(snapshot.CompletionCallbackFeedbackJson) &&
+               existing.LatestCallbackStatus == nameof(TorrentCompletionCallbackState.Invoked) &&
+               snapshot.CompletionCallbackState != TorrentCompletionCallbackState.Invoked;
     }
 
     private static bool IsTerminalCallbackStatus(TorrentCompletionCallbackState? status)

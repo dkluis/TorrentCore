@@ -186,6 +186,76 @@ public sealed class TorrentHistoryServiceTests
     }
 
     [Fact]
+    public async Task ObserveSnapshot_DoesNotRollBackStoredInvokedFeedback_WhenLaterSnapshotIsWaiting()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-callback-stale-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var store = new SqliteTorrentHistoryStore(databaseFilePath);
+            var service = new TorrentHistoryService(
+                store,
+                new ServiceInstanceContext
+                {
+                    ServiceInstanceId = Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                });
+
+            var addedAt = DateTimeOffset.UtcNow.AddMinutes(-5);
+            var pendingAt = addedAt.AddMinutes(1);
+            var invokedAt = addedAt.AddMinutes(2);
+            const string feedbackJson = """{"FinalState":"Success"}""";
+
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(
+                    TorrentState.Completed,
+                    addedAt,
+                    invokedAt,
+                    1_024,
+                    100,
+                    completedAtUtc: addedAt,
+                    callbackState: TorrentCompletionCallbackState.Invoked,
+                    callbackPendingSinceUtc: pendingAt,
+                    callbackInvokedAtUtc: invokedAt,
+                    callbackFeedbackReceivedAtUtc: invokedAt,
+                    callbackFeedbackJson: feedbackJson),
+                CancellationToken.None);
+
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(
+                    TorrentState.Completed,
+                    addedAt,
+                    invokedAt.AddMinutes(1),
+                    1_024,
+                    100,
+                    completedAtUtc: addedAt,
+                    callbackState: TorrentCompletionCallbackState.WaitingForFeedback,
+                    callbackPendingSinceUtc: pendingAt,
+                    callbackInvokedAtUtc: pendingAt),
+                CancellationToken.None);
+
+            var history = await store.GetAsync(TorrentId, CancellationToken.None);
+
+            Assert.NotNull(history);
+            Assert.Equal("Invoked", history.LatestCallbackStatus);
+            Assert.Equal(invokedAt, history.CallbackCompletedAtUtc);
+            Assert.Equal(invokedAt, history.LatestCompletionCallbackFeedbackReceivedAtUtc);
+            Assert.Equal(feedbackJson, history.LatestCompletionCallbackFeedbackJson);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task MarkRemovedAsync_CreatesHistoryRowFromSnapshot_WhenMissing()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-remove-{Guid.NewGuid():N}");
@@ -248,7 +318,8 @@ public sealed class TorrentHistoryServiceTests
         DateTimeOffset lastActivityAtUtc, long? totalBytes, double progressPercent,
         DateTimeOffset? seedingStartedAtUtc = null, DateTimeOffset? completedAtUtc = null,
         TorrentCompletionCallbackState? callbackState = null, DateTimeOffset? callbackPendingSinceUtc = null,
-        DateTimeOffset? callbackInvokedAtUtc = null, string? callbackLastError = null)
+        DateTimeOffset? callbackInvokedAtUtc = null, string? callbackLastError = null,
+        DateTimeOffset? callbackFeedbackReceivedAtUtc = null, string? callbackFeedbackJson = null)
     {
         return new TorrentSnapshot
         {
@@ -261,6 +332,8 @@ public sealed class TorrentHistoryServiceTests
             CompletionCallbackPendingSinceUtc = callbackPendingSinceUtc,
             CompletionCallbackInvokedAtUtc = callbackInvokedAtUtc,
             CompletionCallbackLastError = callbackLastError,
+            CompletionCallbackFeedbackReceivedAtUtc = callbackFeedbackReceivedAtUtc,
+            CompletionCallbackFeedbackJson = callbackFeedbackJson,
             State = state,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = "magnet:?xt=urn:btih:3333333333333333333333333333333333333333&dn=History%20Service",
