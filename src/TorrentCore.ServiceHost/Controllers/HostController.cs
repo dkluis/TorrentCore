@@ -31,6 +31,7 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
 
     [HttpGet("runtime-settings")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RuntimeSettingsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<RuntimeSettingsDto>> GetRuntimeSettings(CancellationToken cancellationToken)
     {
         var settings = await torrentApplicationService.GetRuntimeSettingsAsync(cancellationToken);
@@ -39,6 +40,8 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
 
     [HttpPut("runtime-settings")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(RuntimeSettingsDto))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<RuntimeSettingsDto>> UpdateRuntimeSettings(
         [FromBody] UpdateRuntimeSettingsRequest request, CancellationToken cancellationToken)
     {
@@ -48,6 +51,7 @@ public sealed class HostController(ITorrentApplicationService torrentApplication
 
     [HttpPost("restart-service")]
     [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(ServiceRestartRequestResultDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<ServiceRestartRequestResultDto>> RestartService(CancellationToken cancellationToken)
     {
         var result = await torrentApplicationService.RequestServiceRestartAsync(cancellationToken);

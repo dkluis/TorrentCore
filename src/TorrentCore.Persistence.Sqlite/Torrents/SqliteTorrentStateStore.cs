@@ -187,7 +187,6 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
-
         var command = CreateUpdateCommand(connection, torrent);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -352,12 +351,60 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   category_key = $category_key,
                                   completion_callback_label = $completion_callback_label,
                                   invoke_completion_callback = $invoke_completion_callback,
-                                  completion_callback_state = $completion_callback_state,
-                                  completion_callback_pending_since_utc = $completion_callback_pending_since_utc,
-                                  completion_callback_invoked_at_utc = $completion_callback_invoked_at_utc,
-                                  completion_callback_last_error = $completion_callback_last_error,
-                                  completion_callback_feedback_received_at_utc = $completion_callback_feedback_received_at_utc,
-                                  completion_callback_feedback_json = $completion_callback_feedback_json,
+                                  completion_callback_state = CASE
+                                      WHEN (
+                                          (completion_callback_feedback_json IS NOT NULL AND completion_callback_feedback_json <> '' AND ($completion_callback_feedback_json IS NULL OR $completion_callback_feedback_json = ''))
+                                          OR
+                                          (completion_callback_state = 'Invoked' AND ($completion_callback_state IS NULL OR $completion_callback_state <> 'Invoked'))
+                                      )
+                                      THEN completion_callback_state
+                                      ELSE $completion_callback_state
+                                  END,
+                                  completion_callback_pending_since_utc = CASE
+                                      WHEN (
+                                          (completion_callback_feedback_json IS NOT NULL AND completion_callback_feedback_json <> '' AND ($completion_callback_feedback_json IS NULL OR $completion_callback_feedback_json = ''))
+                                          OR
+                                          (completion_callback_state = 'Invoked' AND ($completion_callback_state IS NULL OR $completion_callback_state <> 'Invoked'))
+                                      )
+                                      THEN completion_callback_pending_since_utc
+                                      ELSE $completion_callback_pending_since_utc
+                                  END,
+                                  completion_callback_invoked_at_utc = CASE
+                                      WHEN (
+                                          (completion_callback_feedback_json IS NOT NULL AND completion_callback_feedback_json <> '' AND ($completion_callback_feedback_json IS NULL OR $completion_callback_feedback_json = ''))
+                                          OR
+                                          (completion_callback_state = 'Invoked' AND ($completion_callback_state IS NULL OR $completion_callback_state <> 'Invoked'))
+                                      )
+                                      THEN completion_callback_invoked_at_utc
+                                      ELSE $completion_callback_invoked_at_utc
+                                  END,
+                                  completion_callback_last_error = CASE
+                                      WHEN (
+                                          (completion_callback_feedback_json IS NOT NULL AND completion_callback_feedback_json <> '' AND ($completion_callback_feedback_json IS NULL OR $completion_callback_feedback_json = ''))
+                                          OR
+                                          (completion_callback_state = 'Invoked' AND ($completion_callback_state IS NULL OR $completion_callback_state <> 'Invoked'))
+                                      )
+                                      THEN completion_callback_last_error
+                                      ELSE $completion_callback_last_error
+                                  END,
+                                  completion_callback_feedback_received_at_utc = CASE
+                                      WHEN (
+                                          (completion_callback_feedback_json IS NOT NULL AND completion_callback_feedback_json <> '' AND ($completion_callback_feedback_json IS NULL OR $completion_callback_feedback_json = ''))
+                                          OR
+                                          (completion_callback_state = 'Invoked' AND ($completion_callback_state IS NULL OR $completion_callback_state <> 'Invoked'))
+                                      )
+                                      THEN completion_callback_feedback_received_at_utc
+                                      ELSE $completion_callback_feedback_received_at_utc
+                                  END,
+                                  completion_callback_feedback_json = CASE
+                                      WHEN (
+                                          (completion_callback_feedback_json IS NOT NULL AND completion_callback_feedback_json <> '' AND ($completion_callback_feedback_json IS NULL OR $completion_callback_feedback_json = ''))
+                                          OR
+                                          (completion_callback_state = 'Invoked' AND ($completion_callback_state IS NULL OR $completion_callback_state <> 'Invoked'))
+                                      )
+                                      THEN completion_callback_feedback_json
+                                      ELSE $completion_callback_feedback_json
+                                  END,
                                   state = $state,
                                   desired_state = $desired_state,
                                   magnet_uri = $magnet_uri,

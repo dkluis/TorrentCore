@@ -190,9 +190,17 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
 
     public async Task<ServiceRestartRequestResultDto> RequestServiceRestartAsync(CancellationToken cancellationToken)
     {
-        var result = await restartScheduler.ScheduleRestartAsync(cancellationToken);
+        ServiceRestartScheduleResult result;
+        try
+        {
+            result = await restartScheduler.ScheduleRestartAsync(cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            throw ServiceBoundaryExceptionMapper.CreateRestartUnavailable(exception.Message);
+        }
 
-        await activityLogService.WriteAsync(
+        await TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level = ActivityLogLevel.Warning,
@@ -315,7 +323,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         await torrentStateStore.UpdateAsync(snapshot, cancellationToken);
         await torrentHistoryService.ObserveSnapshotAsync(snapshot, cancellationToken);
 
-        await activityLogService.WriteAsync(
+        await TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level = ActivityLogLevel.Information,
@@ -355,7 +363,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             cancellationToken
         );
 
-        await activityLogService.WriteAsync(
+        await TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level = ActivityLogLevel.Information,
@@ -440,7 +448,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
 
             logger.LogInformation("Added torrent {TorrentId} named {TorrentName}", torrent.TorrentId, torrent.Name);
 
-            await activityLogService.WriteAsync(
+            await TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level             = ActivityLogLevel.Information,
@@ -569,7 +577,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         {
             var result = await torrentEngineAdapter.RemoveAsync(torrentId, request, cancellationToken);
 
-            await activityLogService.WriteAsync(
+            await TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level = ActivityLogLevel.Information,
@@ -602,7 +610,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     {
         logger.LogInformation("{Message} TorrentId={TorrentId} State={State}", message, torrentId, state);
 
-        await activityLogService.WriteAsync(
+        await TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Information,
@@ -621,7 +629,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     {
         logger.LogWarning("{EventType}: {Message} TorrentId={TorrentId}", eventType, message, torrentId);
 
-        await activityLogService.WriteAsync(
+        await TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Warning,
@@ -632,5 +640,22 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
             }, cancellationToken
         );
+    }
+
+    private async Task TryWriteActivityLogAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await activityLogService.WriteAsync(request, cancellationToken);
+        }
+        catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
+        {
+            logger.LogWarning(
+                exception,
+                "Activity log write failed. EventType={EventType} TorrentId={TorrentId}",
+                request.EventType,
+                request.TorrentId
+            );
+        }
     }
 }

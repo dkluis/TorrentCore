@@ -54,6 +54,7 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
     [ProducesResponseType(StatusCodes.Status201Created,    Type = typeof(TorrentDetailDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
     [ProducesResponseType(StatusCodes.Status409Conflict,   Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
     public async Task<ActionResult<TorrentDetailDto>> Add([FromBody] AddMagnetRequest request,
         CancellationToken                                                             cancellationToken)
     {

@@ -21,7 +21,11 @@ public sealed class TorrentCategoryService(ITorrentCategoryStore torrentCategory
                 continue;
             }
 
-            Directory.CreateDirectory(category.DownloadRootPath);
+            EnsureDownloadRootPathAccessible(
+                category.DownloadRootPath,
+                category.Key,
+                nameof(TorrentCategoryDefinition.DownloadRootPath)
+            );
             await torrentCategoryStore.UpsertAsync(category, cancellationToken);
         }
     }
@@ -81,7 +85,11 @@ public sealed class TorrentCategoryService(ITorrentCategoryStore torrentCategory
         }
 
         var resolvedDownloadRootPath = ResolveAbsolutePath(request.DownloadRootPath);
-        Directory.CreateDirectory(resolvedDownloadRootPath);
+        EnsureDownloadRootPathAccessible(
+            resolvedDownloadRootPath,
+            category.Key,
+            nameof(request.DownloadRootPath)
+        );
 
         var updated = new TorrentCategoryDefinition
         {
@@ -133,7 +141,11 @@ public sealed class TorrentCategoryService(ITorrentCategoryStore torrentCategory
             );
         }
 
-        Directory.CreateDirectory(category.DownloadRootPath);
+        EnsureDownloadRootPathAccessible(
+            category.DownloadRootPath,
+            category.Key,
+            nameof(requestedCategoryKey)
+        );
 
         return new ResolvedTorrentCategorySelection
         {
@@ -150,6 +162,27 @@ public sealed class TorrentCategoryService(ITorrentCategoryStore torrentCategory
                 Path.Combine(hostEnvironment.ContentRootPath, configuredPath);
 
         return Path.GetFullPath(path);
+    }
+
+    private static void EnsureDownloadRootPathAccessible(string downloadRootPath, string? categoryKey, string target)
+    {
+        try
+        {
+            Directory.CreateDirectory(downloadRootPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+                NotSupportedException)
+        {
+            var categoryDescription = string.IsNullOrWhiteSpace(categoryKey) ? "requested category" :
+                    $"category '{categoryKey}'";
+
+            throw new ServiceOperationException(
+                "category_download_root_unavailable",
+                $"Download root path '{downloadRootPath}' for {categoryDescription} is unavailable or not writable.",
+                StatusCodes.Status503ServiceUnavailable,
+                target
+            );
+        }
     }
 
     private static TorrentCategoryDto MapDto(TorrentCategoryDefinition category)

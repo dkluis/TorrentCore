@@ -78,13 +78,67 @@ public sealed class SqliteTorrentStateStoreTests
         }
     }
 
-    private static TorrentSnapshot CreateSnapshot()
+    [Fact]
+    public async Task Update_PreservesStoredCallbackFeedbackAgainstStaleSnapshot()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-store-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var store = new SqliteTorrentStateStore(databaseFilePath);
+            var now = DateTimeOffset.UtcNow;
+            var stored = CreateSnapshot();
+            stored.CompletionCallbackState = TorrentCompletionCallbackState.Invoked;
+            stored.CompletionCallbackPendingSinceUtc = now;
+            stored.CompletionCallbackInvokedAtUtc = now.AddSeconds(5);
+            stored.CompletionCallbackLastError = null;
+            stored.CompletionCallbackFeedbackReceivedAtUtc = now.AddSeconds(10);
+            stored.CompletionCallbackFeedbackJson = """{"FinalState":"Success"}""";
+
+            await store.InsertAsync(stored, CancellationToken.None);
+
+            var stale = CreateSnapshot(stored.TorrentId);
+            stale.CompletionCallbackState = TorrentCompletionCallbackState.WaitingForFeedback;
+            stale.CompletionCallbackPendingSinceUtc = stored.CompletionCallbackPendingSinceUtc;
+            stale.CompletionCallbackInvokedAtUtc = stored.CompletionCallbackInvokedAtUtc;
+            stale.CompletionCallbackLastError = null;
+            stale.CompletionCallbackFeedbackReceivedAtUtc = null;
+            stale.CompletionCallbackFeedbackJson = null;
+            stale.State = TorrentState.Completed;
+            stale.ProgressPercent = 100;
+            stale.DownloadedBytes = stored.TotalBytes ?? 0;
+            stale.LastActivityAtUtc = now.AddMinutes(1);
+
+            await store.UpdateAsync(stale, CancellationToken.None);
+
+            var reloaded = await store.GetAsync(stored.TorrentId, CancellationToken.None);
+
+            Assert.NotNull(reloaded);
+            Assert.Equal(TorrentCompletionCallbackState.Invoked, reloaded.CompletionCallbackState);
+            Assert.Equal(stored.CompletionCallbackFeedbackReceivedAtUtc, reloaded.CompletionCallbackFeedbackReceivedAtUtc);
+            Assert.Equal(stored.CompletionCallbackFeedbackJson, reloaded.CompletionCallbackFeedbackJson);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    private static TorrentSnapshot CreateSnapshot(Guid? torrentId = null)
     {
         var now = DateTimeOffset.UtcNow;
 
         return new TorrentSnapshot
         {
-            TorrentId = Guid.NewGuid(),
+            TorrentId = torrentId ?? Guid.NewGuid(),
             Name = "Store Regression Torrent",
             CategoryKey = "Movie",
             CompletionCallbackLabel = "Movie",
@@ -93,6 +147,8 @@ public sealed class SqliteTorrentStateStoreTests
             CompletionCallbackPendingSinceUtc = now,
             CompletionCallbackInvokedAtUtc = now.AddMinutes(2),
             CompletionCallbackLastError = "The callback exited with code 1.",
+            CompletionCallbackFeedbackReceivedAtUtc = now.AddMinutes(3),
+            CompletionCallbackFeedbackJson = """{"FinalState":"Failed"}""",
             State = TorrentState.Queued,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=Store%20Regression",
