@@ -137,6 +137,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var                          snapshots      = Array.Empty<TorrentSnapshot>();
         var                          changes        = new List<TorrentRecoveryChange>();
         var                          now            = DateTimeOffset.UtcNow;
+        var                          runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         TorrentEngineRecoveryResult? recoveryResult = null;
 
         await _gate.WaitAsync(cancellationToken);
@@ -161,6 +162,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     if (ShouldPreservePersistedCompletion(snapshot, manager))
                     {
                         updatedSnapshot = CreateRecoveredCompletedSnapshot(snapshot, updatedSnapshot, now);
+                    }
+                    else
+                    {
+                        updatedSnapshot = NormalizeCompletedErrorIfPayloadVisible(
+                            updatedSnapshot, manager, runtimeSettings, now
+                        );
                     }
 
                     if (ShouldStartOnRecovery(snapshot))
@@ -983,7 +990,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     private async Task FlushManagedSnapshotsForShutdownAsync(CancellationToken cancellationToken)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now             = DateTimeOffset.UtcNow;
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
 
         foreach (var (torrentId, manager) in _managers)
         {
@@ -999,6 +1007,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 if (ShouldPreservePersistedCompletion(snapshot, manager))
                 {
                     updatedSnapshot = CreateRecoveredCompletedSnapshot(snapshot, updatedSnapshot, now);
+                } else
+                {
+                    updatedSnapshot = NormalizeCompletedErrorIfPayloadVisible(
+                        updatedSnapshot, manager, runtimeSettings, now
+                    );
                 }
 
                 if (manager.Complete && updatedSnapshot.ProgressPercent >= 100d &&
@@ -1096,6 +1109,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             {
                 updatedSnapshot = CreateUpdatedSnapshot(snapshot, entry.Value, now);
                 updatedSnapshot = ApplyFileCompletionVisibilityIfNeeded(updatedSnapshot, entry.Value, runtimeSettings);
+                updatedSnapshot = NormalizeCompletedErrorIfPayloadVisible(
+                    updatedSnapshot, entry.Value, runtimeSettings, now
+                );
                 if (updatedSnapshot.State == ContractTorrentState.Seeding)
                 {
                     updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(
@@ -1441,6 +1457,13 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             projectedSnapshot = CreateRecoveredCompletedSnapshot(
                 existing, projectedSnapshot,
+                existing.LastActivityAtUtc ?? existing.CompletedAtUtc ?? DateTimeOffset.UtcNow
+            );
+        }
+        else
+        {
+            projectedSnapshot = adapter.NormalizeCompletedErrorIfPayloadVisible(
+                projectedSnapshot, manager, runtimeSettings,
                 existing.LastActivityAtUtc ?? existing.CompletedAtUtc ?? DateTimeOffset.UtcNow
             );
         }
@@ -2358,6 +2381,44 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         return snapshot.State is ContractTorrentState.Completed or ContractTorrentState.Seeding ||
                snapshot.CompletedAtUtc is not null;
+    }
+
+    internal static TorrentSnapshot NormalizeCompletedErrorSnapshot(TorrentSnapshot snapshot, bool finalPayloadVisible,
+        DateTimeOffset now)
+    {
+        if (snapshot.State != ContractTorrentState.Error || !finalPayloadVisible || !LooksTransferComplete(snapshot))
+        {
+            return snapshot;
+        }
+
+        snapshot.State                      = ContractTorrentState.Completed;
+        snapshot.ProgressPercent            = Math.Max(100d, snapshot.ProgressPercent);
+        snapshot.CompletedAtUtc           ??= snapshot.SeedingStartedAtUtc ?? now;
+        snapshot.ConnectedPeerCount         = 0;
+        snapshot.DownloadRateBytesPerSecond = 0;
+        snapshot.UploadRateBytesPerSecond   = 0;
+        snapshot.ErrorMessage               = null;
+        return snapshot;
+    }
+
+    private TorrentSnapshot NormalizeCompletedErrorIfPayloadVisible(TorrentSnapshot snapshot, TorrentManager manager,
+        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now)
+    {
+        if (snapshot.State != ContractTorrentState.Error)
+        {
+            return snapshot;
+        }
+
+        var finalizationResult = CreateFinalizationCheckResult(snapshot, runtimeSettings, manager);
+        return NormalizeCompletedErrorSnapshot(snapshot, finalizationResult.IsReady, now);
+    }
+
+    private static bool LooksTransferComplete(TorrentSnapshot snapshot)
+    {
+        return snapshot.CompletedAtUtc is not null ||
+               snapshot.SeedingStartedAtUtc is not null ||
+               snapshot.ProgressPercent >= 100d ||
+               snapshot.TotalBytes is > 0 && snapshot.DownloadedBytes >= snapshot.TotalBytes.Value;
     }
 
     private static int CountTrackers(TorrentManager manager)
