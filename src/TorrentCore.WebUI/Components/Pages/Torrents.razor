@@ -78,7 +78,7 @@
                             <div class="settings-field-block">
                                 <SettingHelpTrigger Content="@TorrentsHelpCatalog.State" />
                                 <MudSelect T="string"
-                                           Value="_state.PrimaryFilter"
+                                           Value="_state.StateFilter"
                                            ValueChanged="OnStateFilterChanged"
                                            Variant="Variant.Outlined"
                                            Margin="Margin.Dense"
@@ -94,7 +94,7 @@
                             <div class="settings-field-block">
                                 <SettingHelpTrigger Content="@TorrentsHelpCatalog.Category" />
                                 <MudSelect T="string"
-                                           Value="_state.SecondaryFilter"
+                                           Value="_state.CategoryFilter"
                                            ValueChanged="OnCategoryFilterChanged"
                                            Variant="Variant.Outlined"
                                            Margin="Margin.Dense"
@@ -148,37 +148,75 @@
                                       Height="@GetTorrentsTableHeight()"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
+                                      CurrentPage="@_state.PageIndex"
+                                      CurrentPageChanged="OnCurrentPageChanged"
                                       OnRowClick="OnTorrentRowClickAsync"
                                       RowClassFunc="GetTorrentRowClass"
                                       Class="operations-table torrents-table"
                                       Elevation="0">
                                 <HeaderContent>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.Name)">Name</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortName"
+                                                           SortBy="@(torrent => torrent.Name)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortName))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortName, direction))">Name</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.CategoryKey ?? string.Empty)">Category</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortCategory"
+                                                           SortBy="@(torrent => torrent.CategoryKey ?? string.Empty)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortCategory))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortCategory, direction))">Category</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.State.ToString())">State</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortState"
+                                                           SortBy="@(torrent => torrent.State.ToString())"
+                                                           InitialDirection="@(GetInitialSortDirection(SortState))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortState, direction))">State</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.ProgressPercent)">Progress</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortProgress"
+                                                           SortBy="@(torrent => torrent.ProgressPercent)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortProgress))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortProgress, direction))">Progress</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.DownloadRateBytesPerSecond)">Down</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortDown"
+                                                           SortBy="@(torrent => torrent.DownloadRateBytesPerSecond)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortDown))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortDown, direction))">Down</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.UploadRateBytesPerSecond)">Up</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortUp"
+                                                           SortBy="@(torrent => torrent.UploadRateBytesPerSecond)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortUp))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortUp, direction))">Up</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.ConnectedPeerCount)">Peers</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortPeers"
+                                                           SortBy="@(torrent => torrent.ConnectedPeerCount)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortPeers))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortPeers, direction))">Peers</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => (int?)torrent.WaitReason ?? -1)">Wait</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortWait"
+                                                           SortBy="@(torrent => (int?)torrent.WaitReason ?? -1)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortWait))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortWait, direction))">Wait</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentSummaryDto" SortBy="@(torrent => torrent.CompletionCallbackState ?? string.Empty)">Callback</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortCallback"
+                                                           SortBy="@(torrent => torrent.CompletionCallbackState ?? string.Empty)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortCallback))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortCallback, direction))">Callback</MudTableSortLabel>
                                     </MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
@@ -519,10 +557,19 @@
     private const string StateKey = "torrents:list";
     private const int AutoRefreshSeconds = 5;
     private const string UncategorizedFilterValue = "__uncategorized";
+    private const string SortName = "name";
+    private const string SortCategory = "category";
+    private const string SortState = "state";
+    private const string SortProgress = "progress";
+    private const string SortDown = "down";
+    private const string SortUp = "up";
+    private const string SortPeers = "peers";
+    private const string SortWait = "wait";
+    private const string SortCallback = "callback";
 
     private readonly List<TorrentSummaryDto> _allTorrents = [];
 
-    private StandardListPageState _state = new()
+    private TorrentsPageState _state = new()
     {
         PageSize = 25,
     };
@@ -553,25 +600,25 @@
                 query = query.Where(torrent => torrent.Name.Contains(_state.SearchText, StringComparison.OrdinalIgnoreCase));
             }
 
-            if (!string.IsNullOrWhiteSpace(_state.PrimaryFilter))
+            if (!string.IsNullOrWhiteSpace(_state.StateFilter))
             {
                 query = query.Where(
                     torrent => string.Equals(
                         torrent.State.ToString(),
-                        _state.PrimaryFilter,
+                        _state.StateFilter,
                         StringComparison.OrdinalIgnoreCase
                     )
                 );
             }
 
-            if (!string.IsNullOrWhiteSpace(_state.SecondaryFilter))
+            if (!string.IsNullOrWhiteSpace(_state.CategoryFilter))
             {
-                query = string.Equals(_state.SecondaryFilter, UncategorizedFilterValue, StringComparison.Ordinal)
+                query = string.Equals(_state.CategoryFilter, UncategorizedFilterValue, StringComparison.Ordinal)
                     ? query.Where(torrent => string.IsNullOrWhiteSpace(torrent.CategoryKey))
                     : query.Where(
                         torrent => string.Equals(
                             torrent.CategoryKey,
-                            _state.SecondaryFilter,
+                            _state.CategoryFilter,
                             StringComparison.OrdinalIgnoreCase
                         )
                     );
@@ -602,7 +649,7 @@
     {
         _state = PageStateStore.GetOrCreate(
             StateKey,
-            () => new StandardListPageState
+            () => new TorrentsPageState
             {
                 PageSize = 25,
             }
@@ -612,6 +659,9 @@
         {
             _state.PageSize = 25;
         }
+
+        _autoRefreshEnabled = _state.AutoRefreshEnabled;
+        _selectedTorrentId = _state.SelectedTorrentId;
 
         await LoadAsync(showSuccessToast: false, showLoadingState: true, fromAutoRefresh: false);
         _refreshLoopCts = new CancellationTokenSource();
@@ -666,8 +716,10 @@
         if (_selectedTorrentId is not null && _allTorrents.All(torrent => torrent.TorrentId != _selectedTorrentId.Value))
         {
             _selectedTorrentId = null;
+            _state.SelectedTorrentId = null;
             _selectedTorrentDetail = null;
             _selectedDetailErrorMessage = null;
+            PersistState();
         }
         else if (_selectedTorrentId is not null)
         {
@@ -691,6 +743,8 @@
         }
 
         _selectedTorrentId = args.Item.TorrentId;
+        _state.SelectedTorrentId = args.Item.TorrentId;
+        PersistState();
         await LoadSelectedTorrentDetailAsync(args.Item.TorrentId, fromRefresh: false);
     }
 
@@ -726,13 +780,15 @@
     private Task OnSearchChanged(string value)
     {
         _state.SearchText = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
 
     private Task OnStateFilterChanged(string value)
     {
-        _state.PrimaryFilter = value;
+        _state.StateFilter = value;
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -749,6 +805,8 @@
     private Task OnAutoRefreshChanged(bool value)
     {
         _autoRefreshEnabled = value;
+        _state.AutoRefreshEnabled = value;
+        PersistState();
         _actionMessage = value ? "Auto refresh enabled." : "Auto refresh paused.";
         _actionIsError = false;
         return Task.CompletedTask;
@@ -757,8 +815,9 @@
     private Task ClearFiltersAsync()
     {
         _state.SearchText = string.Empty;
-        _state.PrimaryFilter = string.Empty;
-        _state.SecondaryFilter = string.Empty;
+        _state.StateFilter = string.Empty;
+        _state.CategoryFilter = string.Empty;
+        _state.PageIndex = 0;
         PersistState();
         Feedback.Info("Filters cleared.");
         _actionMessage = "Filters cleared.";
@@ -768,9 +827,47 @@
 
     private Task OnCategoryFilterChanged(string value)
     {
-        _state.SecondaryFilter = value;
+        _state.CategoryFilter = value;
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
+    }
+
+    private Task OnCurrentPageChanged(int value)
+    {
+        _state.PageIndex = value;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSortDirectionChanged(string sortBy, SortDirection direction)
+    {
+        if (direction == SortDirection.None)
+        {
+            if (string.Equals(_state.SortBy, sortBy, StringComparison.Ordinal))
+            {
+                _state.SortBy = string.Empty;
+                PersistState();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        _state.SortBy = sortBy;
+        _state.SortDescending = direction == SortDirection.Descending;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private SortDirection GetInitialSortDirection(string sortBy)
+    {
+        if (!string.Equals(_state.SortBy, sortBy, StringComparison.Ordinal))
+        {
+            return SortDirection.None;
+        }
+
+        return _state.SortDescending ? SortDirection.Descending : SortDirection.Ascending;
     }
 
     private async Task PauseSelectedAsync()

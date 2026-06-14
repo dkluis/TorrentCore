@@ -164,40 +164,82 @@
                                       Height="@GetHistoryTableHeight()"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
+                                      CurrentPage="@_state.PageIndex"
+                                      CurrentPageChanged="OnCurrentPageChanged"
                                       OnRowClick="OnHistoryRowClickAsync"
                                       RowClassFunc="GetHistoryRowClass"
                                       Class="operations-table history-table"
                                       Elevation="0">
                                 <HeaderContent>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.SubmittedAt)">Submitted</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortSubmitted"
+                                                           SortBy="@(row => row.SubmittedAt)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortSubmitted))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortSubmitted, direction))">Submitted</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.Name)">Name</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortName"
+                                                           SortBy="@(row => row.Name)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortName))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortName, direction))">Name</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.CategoryKey ?? string.Empty)">Category</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortCategory"
+                                                           SortBy="@(row => row.CategoryKey ?? string.Empty)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortCategory))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortCategory, direction))">Category</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestTorrentState)">State</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortState"
+                                                           SortBy="@(row => row.LatestTorrentState)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortState))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortState, direction))">State</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestProgressPercent)">Progress</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortProgress"
+                                                           SortBy="@(row => row.LatestProgressPercent)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortProgress))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortProgress, direction))">Progress</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestDownloadedBytes)">Downloaded</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortDownloaded"
+                                                           SortBy="@(row => row.LatestDownloadedBytes)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortDownloaded))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortDownloaded, direction))">Downloaded</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestTotalBytes ?? 0)">Total</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortTotal"
+                                                           SortBy="@(row => row.LatestTotalBytes ?? 0)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortTotal))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortTotal, direction))">Total</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.LatestCallbackStatus ?? string.Empty)">Callback</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortCallback"
+                                                           SortBy="@(row => row.LatestCallbackStatus ?? string.Empty)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortCallback))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortCallback, direction))">Callback</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.RemovedAt ?? DateTimeOffset.MinValue)">Removed</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortRemoved"
+                                                           SortBy="@(row => row.RemovedAt ?? DateTimeOffset.MinValue)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortRemoved))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortRemoved, direction))">Removed</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="TorrentHistorySummaryDto" SortBy="@(row => row.RemovalReason ?? string.Empty)">Removal Reason</MudTableSortLabel>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortRemovalReason"
+                                                           SortBy="@(row => row.RemovalReason ?? string.Empty)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortRemovalReason))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortRemovalReason, direction))">Removal Reason</MudTableSortLabel>
                                     </MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
@@ -473,6 +515,16 @@
     private const string RemovedAllValue = "";
     private const string RemovedActiveOnlyValue = "active";
     private const string RemovedRemovedOnlyValue = "removed";
+    private const string SortSubmitted = "submitted";
+    private const string SortName = "name";
+    private const string SortCategory = "category";
+    private const string SortState = "state";
+    private const string SortProgress = "progress";
+    private const string SortDownloaded = "downloaded";
+    private const string SortTotal = "total";
+    private const string SortCallback = "callback";
+    private const string SortRemoved = "removed";
+    private const string SortRemovalReason = "removal-reason";
 
     private readonly List<TorrentHistorySummaryDto> _historyRows = [];
     private HistoryPageState _state = new();
@@ -492,6 +544,7 @@
             StateKey,
             () => new HistoryPageState
             {
+                FromDate = BuildTodayDateFilter(),
                 PageSize = 25,
             }
         );
@@ -501,12 +554,19 @@
             _state.PageSize = 25;
         }
 
+        if (string.IsNullOrWhiteSpace(_state.FromDate))
+        {
+            _state.FromDate = BuildTodayDateFilter();
+            PersistState();
+        }
+
         await LoadAsync(showSuccessToast: false, showLoadingState: true);
     }
 
     private Task OnTorrentNameChanged(string value)
     {
         _state.TorrentName = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -514,6 +574,7 @@
     private Task OnCategoryChanged(string value)
     {
         _state.CategoryKey = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -521,6 +582,7 @@
     private Task OnStateChanged(string value)
     {
         _state.State = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -528,6 +590,7 @@
     private Task OnRemovedFilterChanged(string value)
     {
         _state.RemovedFilter = value;
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -535,6 +598,7 @@
     private Task OnFromDateChanged(string value)
     {
         _state.FromDate = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -542,6 +606,7 @@
     private Task OnToDateChanged(string value)
     {
         _state.ToDate = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -571,8 +636,9 @@
         _state.CategoryKey = string.Empty;
         _state.State = string.Empty;
         _state.RemovedFilter = RemovedAllValue;
-        _state.FromDate = string.Empty;
+        _state.FromDate = BuildTodayDateFilter();
         _state.ToDate = string.Empty;
+        _state.PageIndex = 0;
         ClearSelectedHistoryEntry();
         PersistState();
         await LoadAsync(showSuccessToast: false, showLoadingState: false);
@@ -656,6 +722,43 @@
         await LoadSelectedHistoryDetailAsync(args.Item.TorrentId, fromRefresh: false);
     }
 
+    private Task OnCurrentPageChanged(int value)
+    {
+        _state.PageIndex = value;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSortDirectionChanged(string sortBy, SortDirection direction)
+    {
+        if (direction == SortDirection.None)
+        {
+            if (string.Equals(_state.SortBy, sortBy, StringComparison.Ordinal))
+            {
+                _state.SortBy = string.Empty;
+                PersistState();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        _state.SortBy = sortBy;
+        _state.SortDescending = direction == SortDirection.Descending;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private SortDirection GetInitialSortDirection(string sortBy)
+    {
+        if (!string.Equals(_state.SortBy, sortBy, StringComparison.Ordinal))
+        {
+            return SortDirection.None;
+        }
+
+        return _state.SortDescending ? SortDirection.Descending : SortDirection.Ascending;
+    }
+
     private async Task LoadSelectedHistoryDetailAsync(Guid torrentId, bool fromRefresh)
     {
         _isLoadingSelectedDetail = true;
@@ -732,6 +835,11 @@
     private void PersistState()
     {
         PageStateStore.Save(StateKey, _state);
+    }
+
+    private static string BuildTodayDateFilter()
+    {
+        return DateTimeOffset.Now.LocalDateTime.ToString("yyyy-MM-dd");
     }
 
     private string GetHistoryRowClass(TorrentHistorySummaryDto row, int rowNumber)

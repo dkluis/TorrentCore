@@ -86,7 +86,7 @@
                         <div class="settings-field-block">
                             <SettingHelpTrigger Content="@LogsHelpCatalog.Level" />
                             <MudSelect T="string"
-                                       Value="_state.PrimaryFilter"
+                                       Value="_state.LevelFilter"
                                        ValueChanged="OnLevelChanged"
                                        Variant="Variant.Outlined"
                                        Margin="Margin.Dense"
@@ -104,7 +104,7 @@
                         <div class="settings-field-block">
                             <SettingHelpTrigger Content="@LogsHelpCatalog.Category" />
                             <MudTextField T="string"
-                                          Value="_state.SecondaryFilter"
+                                          Value="_state.CategoryFilter"
                                           ValueChanged="OnCategoryChanged"
                                           Variant="Variant.Outlined"
                                           Margin="Margin.Dense"
@@ -114,7 +114,7 @@
                         <div class="settings-field-block">
                             <SettingHelpTrigger Content="@LogsHelpCatalog.TorrentId" />
                             <MudTextField T="string"
-                                          Value="_torrentIdFilter"
+                                          Value="_state.TorrentIdFilter"
                                           ValueChanged="OnTorrentIdChanged"
                                           Variant="Variant.Outlined"
                                           Margin="Margin.Dense"
@@ -124,7 +124,7 @@
                         <div class="settings-field-block">
                             <SettingHelpTrigger Content="@LogsHelpCatalog.FromLocalDateTime" />
                             <MudTextField T="string"
-                                          Value="_fromLocalFilter"
+                                          Value="_state.FromLocalFilter"
                                           ValueChanged="OnFromLocalChanged"
                                           Variant="Variant.Outlined"
                                           Margin="Margin.Dense"
@@ -134,7 +134,7 @@
                         <div class="settings-field-block">
                             <SettingHelpTrigger Content="@LogsHelpCatalog.ToLocalDateTime" />
                             <MudTextField T="string"
-                                          Value="_toLocalFilter"
+                                          Value="_state.ToLocalFilter"
                                           ValueChanged="OnToLocalChanged"
                                           Variant="Variant.Outlined"
                                           Margin="Margin.Dense"
@@ -177,25 +177,47 @@
                                       Height="@GetLogsTableHeight()"
                                       RowsPerPage="@_state.PageSize"
                                       RowsPerPageChanged="OnRowsPerPageChanged"
+                                      CurrentPage="@_state.PageIndex"
+                                      CurrentPageChanged="OnCurrentPageChanged"
                                       OnRowClick="OnLogRowClickAsync"
                                       RowClassFunc="GetLogRowClass"
                                       Class="operations-table logs-table"
                                       Elevation="0">
                                 <HeaderContent>
                                     <MudTh>
-                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.OccurredAtUtc)">When</MudTableSortLabel>
+                                        <MudTableSortLabel T="ActivityLogEntryDto"
+                                                           SortLabel="@SortWhen"
+                                                           SortBy="@(log => log.OccurredAtUtc)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortWhen))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortWhen, direction))">When</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.Level)">Level</MudTableSortLabel>
+                                        <MudTableSortLabel T="ActivityLogEntryDto"
+                                                           SortLabel="@SortLevel"
+                                                           SortBy="@(log => log.Level)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortLevel))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortLevel, direction))">Level</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.Category)">Category</MudTableSortLabel>
+                                        <MudTableSortLabel T="ActivityLogEntryDto"
+                                                           SortLabel="@SortCategory"
+                                                           SortBy="@(log => log.Category)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortCategory))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortCategory, direction))">Category</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.EventType)">Event</MudTableSortLabel>
+                                        <MudTableSortLabel T="ActivityLogEntryDto"
+                                                           SortLabel="@SortEvent"
+                                                           SortBy="@(log => log.EventType)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortEvent))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortEvent, direction))">Event</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
-                                        <MudTableSortLabel T="ActivityLogEntryDto" SortBy="@(log => log.Message)">Message</MudTableSortLabel>
+                                        <MudTableSortLabel T="ActivityLogEntryDto"
+                                                           SortLabel="@SortMessage"
+                                                           SortBy="@(log => log.Message)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortMessage))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortMessage, direction))">Message</MudTableSortLabel>
                                     </MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
@@ -292,13 +314,18 @@
 
 @code {
     private const string StateKey = "logs:list";
+    private const string SortWhen = "when";
+    private const string SortLevel = "level";
+    private const string SortCategory = "category";
+    private const string SortEvent = "event";
+    private const string SortMessage = "message";
 
     [Parameter]
     [SupplyParameterFromQuery(Name = "torrentId")]
     public string? TorrentId { get; set; }
 
     private readonly List<ActivityLogEntryDto> _allLogs = [];
-    private StandardListPageState _state = new()
+    private LogsPageState _state = new()
     {
         PageSize = 25,
     };
@@ -308,11 +335,7 @@
     private string? _errorMessage;
     private string? _actionMessage;
     private bool _actionIsError;
-    private string _torrentIdFilter = string.Empty;
-    private string _fromLocalFilter = string.Empty;
-    private string _toLocalFilter = string.Empty;
     private string? _filterValidationMessage;
-    private long? _selectedLogEntryId;
     private ActivityLogEntryDto? _selectedLog;
     private bool _suppressFilterInputCallbacks;
     private string _appliedSearchText = string.Empty;
@@ -371,7 +394,7 @@
     {
         _state = PageStateStore.GetOrCreate(
             StateKey,
-            () => new StandardListPageState
+            () => new LogsPageState
             {
                 PageSize = 25,
             }
@@ -383,11 +406,11 @@
         }
 
         _suppressFilterInputCallbacks = true;
-        ResetFilters(includeTorrentIdQuery: true);
+        ApplyQueryOverrides();
         ApplyDraftFilters();
-        PersistState();
         ValidateFilters();
         await LoadAsync(showSuccessToast: false, showLoadingState: true);
+        RestoreSelectedLog();
         _suppressFilterInputCallbacks = false;
     }
 
@@ -441,14 +464,7 @@
             _allLogs.AddRange(logsResult.Value);
         }
 
-        if (_selectedLogEntryId is not null)
-        {
-            _selectedLog = _allLogs.FirstOrDefault(log => log.LogEntryId == _selectedLogEntryId.Value);
-            if (_selectedLog is null)
-            {
-                _selectedLogEntryId = null;
-            }
-        }
+        RestoreSelectedLog();
 
         _mode = StateViewMode.Ready;
         _isRefreshing = false;
@@ -473,7 +489,7 @@
     private async Task ClearFiltersAsync()
     {
         _suppressFilterInputCallbacks = true;
-        ResetFilters(includeTorrentIdQuery: false);
+        ResetFilters();
         ApplyDraftFilters();
         PersistState();
         NavigationManager.NavigateTo("/logs", replace: true);
@@ -481,7 +497,7 @@
 
         // Enforce an explicit post-refresh reset to avoid stale input events
         // reapplying date values while Clear is processing.
-        ResetFilters(includeTorrentIdQuery: false);
+        ResetFilters();
         ApplyDraftFilters();
         PersistState();
         ValidateFilters();
@@ -548,8 +564,46 @@
         }
 
         _state.SearchText = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
+    }
+
+    private Task OnCurrentPageChanged(int value)
+    {
+        _state.PageIndex = value;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSortDirectionChanged(string sortBy, SortDirection direction)
+    {
+        if (direction == SortDirection.None)
+        {
+            if (string.Equals(_state.SortBy, sortBy, StringComparison.Ordinal))
+            {
+                _state.SortBy = string.Empty;
+                PersistState();
+            }
+
+            return Task.CompletedTask;
+        }
+
+        _state.SortBy = sortBy;
+        _state.SortDescending = direction == SortDirection.Descending;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private SortDirection GetInitialSortDirection(string sortBy)
+    {
+        if (!string.Equals(_state.SortBy, sortBy, StringComparison.Ordinal))
+        {
+            return SortDirection.None;
+        }
+
+        return _state.SortDescending ? SortDirection.Descending : SortDirection.Ascending;
     }
 
     private Task OnLevelChanged(string value)
@@ -559,7 +613,8 @@
             return Task.CompletedTask;
         }
 
-        _state.PrimaryFilter = value;
+        _state.LevelFilter = value;
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -571,7 +626,8 @@
             return Task.CompletedTask;
         }
 
-        _state.SecondaryFilter = value.Trim();
+        _state.CategoryFilter = value.Trim();
+        _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
     }
@@ -583,7 +639,9 @@
             return Task.CompletedTask;
         }
 
-        _torrentIdFilter = value.Trim();
+        _state.TorrentIdFilter = value.Trim();
+        _state.PageIndex = 0;
+        PersistState();
         ValidateFilters();
         return Task.CompletedTask;
     }
@@ -595,7 +653,9 @@
             return Task.CompletedTask;
         }
 
-        _fromLocalFilter = value.Trim();
+        _state.FromLocalFilter = value.Trim();
+        _state.PageIndex = 0;
+        PersistState();
         ValidateFilters();
         return Task.CompletedTask;
     }
@@ -607,32 +667,21 @@
             return Task.CompletedTask;
         }
 
-        _toLocalFilter = value.Trim();
+        _state.ToLocalFilter = value.Trim();
+        _state.PageIndex = 0;
+        PersistState();
         ValidateFilters();
         return Task.CompletedTask;
-    }
-
-    private void ResetFilters(bool includeTorrentIdQuery)
-    {
-        _state.SearchText = string.Empty;
-        _state.PrimaryFilter = string.Empty;
-        _state.SecondaryFilter = string.Empty;
-        _torrentIdFilter = includeTorrentIdQuery ? (TorrentId ?? string.Empty).Trim() : string.Empty;
-        _fromLocalFilter = string.Empty;
-        _toLocalFilter = string.Empty;
-        _filterValidationMessage = null;
-        _selectedLogEntryId = null;
-        _selectedLog = null;
     }
 
     private void ApplyDraftFilters()
     {
         _appliedSearchText = _state.SearchText;
-        _appliedLevelFilter = _state.PrimaryFilter;
-        _appliedCategoryFilter = _state.SecondaryFilter;
-        _appliedTorrentIdFilter = _torrentIdFilter;
-        _appliedFromLocalFilter = _fromLocalFilter;
-        _appliedToLocalFilter = _toLocalFilter;
+        _appliedLevelFilter = _state.LevelFilter;
+        _appliedCategoryFilter = _state.CategoryFilter;
+        _appliedTorrentIdFilter = _state.TorrentIdFilter;
+        _appliedFromLocalFilter = _state.FromLocalFilter;
+        _appliedToLocalFilter = _state.ToLocalFilter;
     }
 
     private Task OnLogRowClickAsync(TableRowClickEventArgs<ActivityLogEntryDto> args)
@@ -642,8 +691,9 @@
             return Task.CompletedTask;
         }
 
-        _selectedLogEntryId = args.Item.LogEntryId;
+        _state.SelectedLogEntryId = args.Item.LogEntryId;
         _selectedLog = args.Item;
+        PersistState();
         return Task.CompletedTask;
     }
 
@@ -654,7 +704,7 @@
 
     private string GetLogRowClass(ActivityLogEntryDto log, int rowNumber)
     {
-        return _selectedLogEntryId == log.LogEntryId ? "operations-table-row--selected" : string.Empty;
+        return _state.SelectedLogEntryId == log.LogEntryId ? "operations-table-row--selected" : string.Empty;
     }
 
     private ActivityLogEntryDto? SelectedLog => _selectedLog;
@@ -689,14 +739,58 @@
         return value?.ToString("D") ?? "N/A";
     }
 
+    private void ApplyQueryOverrides()
+    {
+        if (!string.IsNullOrWhiteSpace(TorrentId))
+        {
+            _state.TorrentIdFilter = TorrentId.Trim();
+            _state.PageIndex = 0;
+            _state.SelectedLogEntryId = null;
+        }
+
+        PersistState();
+    }
+
+    private void ResetFilters()
+    {
+        _state.SearchText = string.Empty;
+        _state.LevelFilter = string.Empty;
+        _state.CategoryFilter = string.Empty;
+        _state.TorrentIdFilter = string.Empty;
+        _state.FromLocalFilter = string.Empty;
+        _state.ToLocalFilter = string.Empty;
+        _state.PageIndex = 0;
+        _filterValidationMessage = null;
+        _state.SelectedLogEntryId = null;
+        _selectedLog = null;
+    }
+
+    private void RestoreSelectedLog()
+    {
+        if (_state.SelectedLogEntryId is null)
+        {
+            _selectedLog = null;
+            return;
+        }
+
+        _selectedLog = _allLogs.FirstOrDefault(log => log.LogEntryId == _state.SelectedLogEntryId.Value);
+        if (_selectedLog is not null)
+        {
+            return;
+        }
+
+        _state.SelectedLogEntryId = null;
+        PersistState();
+    }
+
     private bool TryGetTorrentIdFilter(out Guid? torrentIdFilter)
     {
-        return TryGetTorrentIdFilter(_torrentIdFilter, out torrentIdFilter, out _);
+        return TryGetTorrentIdFilter(_state.TorrentIdFilter, out torrentIdFilter, out _);
     }
 
     private bool TryGetTorrentIdFilter(out Guid? torrentIdFilter, out string? errorMessage)
     {
-        return TryGetTorrentIdFilter(_torrentIdFilter, out torrentIdFilter, out errorMessage);
+        return TryGetTorrentIdFilter(_state.TorrentIdFilter, out torrentIdFilter, out errorMessage);
     }
 
     private static bool TryGetTorrentIdFilter(string value, out Guid? torrentIdFilter, out string? errorMessage)
@@ -722,12 +816,12 @@
 
     private bool TryGetFromUtcFilter(out DateTimeOffset fromUtc)
     {
-        return TryGetDateTimeFilter(_fromLocalFilter, out fromUtc, out _);
+        return TryGetDateTimeFilter(_state.FromLocalFilter, out fromUtc, out _);
     }
 
     private bool TryGetToUtcFilter(out DateTimeOffset toUtc)
     {
-        return TryGetDateTimeFilter(_toLocalFilter, out toUtc, out _);
+        return TryGetDateTimeFilter(_state.ToLocalFilter, out toUtc, out _);
     }
 
     private static bool TryGetDateTimeFilter(string value, out DateTimeOffset utcValue, out string? errorMessage)
@@ -765,14 +859,14 @@
             return;
         }
 
-        var hasFrom = TryGetDateTimeFilter(_fromLocalFilter, out var fromUtc, out var fromError);
+        var hasFrom = TryGetDateTimeFilter(_state.FromLocalFilter, out var fromUtc, out var fromError);
         if (fromError is not null)
         {
             _filterValidationMessage = fromError;
             return;
         }
 
-        var hasTo = TryGetDateTimeFilter(_toLocalFilter, out var toUtc, out var toError);
+        var hasTo = TryGetDateTimeFilter(_state.ToLocalFilter, out var toUtc, out var toError);
         if (toError is not null)
         {
             _filterValidationMessage = toError;
