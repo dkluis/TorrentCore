@@ -8,6 +8,23 @@ namespace TorrentCore.Service.Tests;
 public sealed class SqliteSchemaMigrationTests
 {
     [Fact]
+    public async Task SqliteNativeLibraryVersion_IsNotVulnerableToCve20256965()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT sqlite_version();";
+
+        var version = Assert.IsType<string>(await command.ExecuteScalarAsync());
+
+        Assert.True(
+            Version.Parse(version) >= new Version(3, 50, 2),
+            $"SQLite native library version '{version}' must be 3.50.2 or newer."
+        );
+    }
+
+    [Fact]
     public async Task Startup_CreatesSchemaMigrationsTable_AndRecordsAppliedVersions()
     {
         var rootPath = CreateTempRootPath("torrentcore-migrations");
