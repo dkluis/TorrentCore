@@ -7,6 +7,7 @@ using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
 using TorrentCore.Service.Engine;
+using TorrentCore.Service.Infrastructure;
 
 #endregion
 
@@ -110,7 +111,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                         removedAtUtc: DateTimeOffset.UtcNow,
                         cancellationToken);
 
-                    await activityLogService.WriteAsync(
+                    await activityLogService.TryWriteActivityLogAsync(
                         new ActivityLogWriteRequest
                         {
                             Level     = ActivityLogLevel.Information,
@@ -149,7 +150,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                         exception, "Automatic cleanup failed for completed torrent {TorrentId}", torrent.TorrentId
                     );
 
-                    await activityLogService.WriteAsync(
+                    await activityLogService.TryWriteActivityLogAsync(
                         new ActivityLogWriteRequest
                         {
                             Level             = ActivityLogLevel.Warning,
@@ -194,7 +195,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
             return;
         }
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Information,

@@ -5,6 +5,7 @@ using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 
 #endregion
 
@@ -140,7 +141,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         RuntimeSettingsSnapshot runtimeSettings, TorrentCompletionFinalizationCheckResult finalizationResult,
         CancellationToken cancellationToken)
     {
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Warning,
@@ -173,7 +174,7 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
         RuntimeSettingsSnapshot runtimeSettings, TorrentCompletionFinalizationCheckResult finalizationResult,
         CancellationToken cancellationToken)
     {
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level     = ActivityLogLevel.Information,

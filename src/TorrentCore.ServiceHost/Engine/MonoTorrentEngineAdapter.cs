@@ -12,6 +12,7 @@ using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
 using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 using ContractTorrentState = TorrentCore.Contracts.Torrents.TorrentState;
 
 #endregion
@@ -878,7 +879,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
             logger.LogInformation("MonoTorrent engine initialized. CacheDirectory={CacheDirectory}", cacheDirectory);
 
-            await activityLogService.WriteAsync(
+            await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level             = ActivityLogLevel.Information,
@@ -1511,7 +1512,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             var snapshot = await torrentStateStore.GetAsync(torrentId, CancellationToken.None);
 
-            await activityLogService.WriteAsync(
+            await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level = ActivityLogLevel.Information,
@@ -1554,7 +1555,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
             }
 
-            await activityLogService.WriteAsync(
+            await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level             = ActivityLogLevel.Information,
@@ -1587,7 +1588,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
 
-            await activityLogService.WriteAsync(
+            await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level             = ActivityLogLevel.Information,
@@ -1622,7 +1623,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
-            await activityLogService.WriteAsync(
+            await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level             = ActivityLogLevel.Information,
@@ -1796,7 +1797,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         recoveryState.MarkRefresh(now);
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Information,
@@ -1838,7 +1839,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         );
         recoveryState.MarkRestart(now);
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Warning,
@@ -1885,7 +1886,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         recoveryState.MarkRefresh(now);
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Information,
@@ -1934,7 +1935,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var trackerCount        = CountTrackers(manager);
         var usedTrackerAnnounce = await RunPeerDiscoveryAnnounceAsync(manager, cancellationToken);
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Warning,
@@ -1979,7 +1980,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             decision
         );
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Warning,
@@ -2015,7 +2016,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         );
         recoveryState.MarkReset(now);
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Warning,
@@ -2106,7 +2107,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 return;
             }
 
-            await activityLogService.WriteAsync(
+            await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
                     Level = decision == ConnectionFailureLogDecision.ThrottleNotice ? ActivityLogLevel.Information :
@@ -2269,7 +2270,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             ErrorMessage                      = snapshot.ErrorMessage,
         };
 
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level     = ActivityLogLevel.Information,

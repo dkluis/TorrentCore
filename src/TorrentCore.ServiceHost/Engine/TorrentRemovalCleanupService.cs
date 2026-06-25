@@ -1,6 +1,7 @@
 using System.Text.Json;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 
 namespace TorrentCore.Service.Engine;
 
@@ -32,7 +33,7 @@ public sealed class TorrentRemovalCleanupService(
                     downloadRootPath
                 );
 
-                await activityLogService.WriteAsync(
+                await activityLogService.TryWriteActivityLogAsync(
                     new ActivityLogWriteRequest
                     {
                         Level = ActivityLogLevel.Warning,

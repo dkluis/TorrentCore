@@ -644,18 +644,6 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
 
     private async Task TryWriteActivityLogAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken)
     {
-        try
-        {
-            await activityLogService.WriteAsync(request, cancellationToken);
-        }
-        catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
-        {
-            logger.LogWarning(
-                exception,
-                "Activity log write failed. EventType={EventType} TorrentId={TorrentId}",
-                request.EventType,
-                request.TorrentId
-            );
-        }
+        await activityLogService.TryWriteActivityLogAsync(request, cancellationToken);
     }
 }

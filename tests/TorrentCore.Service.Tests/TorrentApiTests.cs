@@ -2737,7 +2737,11 @@ public sealed class TorrentApiTests
             ),
             logs => logs is not null && logs.Count == 0,
             timeout: TimeSpan.FromSeconds(5));
-        var allLogs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=100");
+        var allLogs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=100"),
+            logs => logs is not null &&
+                    logs.Any(log => log.EventType == "torrent.logs.auto_deleted" && log.TorrentId is null),
+            timeout: TimeSpan.FromSeconds(5));
 
         Assert.NotNull(completedTorrent);
         Assert.NotNull(remainingTorrents);

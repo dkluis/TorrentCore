@@ -5,6 +5,7 @@ using System.Text.Json;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 
 #endregion
 
@@ -210,7 +211,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
         TorrentSnapshot snapshot, RuntimeSettingsSnapshot runtimeSettings, string? finalPayloadPath, int? processId, int? exitCode,
         string workingDirectory, string? error, CancellationToken cancellationToken)
     {
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = level,

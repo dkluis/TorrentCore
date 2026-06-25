@@ -19,7 +19,135 @@ public sealed class TorrentCompletionCallbackProcessorTests
         );
 
         var now = DateTimeOffset.UtcNow;
-        var snapshot = new TorrentSnapshot
+        var snapshot = CreateCompletedSnapshot(now);
+
+        var changed = await processor.MarkPendingIfTriggeredAsync(
+            previousCompletedAtUtc: null,
+            snapshot,
+            CreateRuntimeSettings(),
+            now,
+            CancellationToken.None,
+            new TorrentCompletionFinalizationCheckResult
+            {
+                IsReady = true,
+                FinalPayloadPath = snapshot.SavePath,
+            }
+        );
+
+        Assert.True(changed);
+        Assert.Equal(TorrentCompletionCallbackState.PendingFinalization, snapshot.CompletionCallbackState);
+        Assert.Equal(now, snapshot.CompletionCallbackPendingSinceUtc);
+        Assert.Null(snapshot.CompletionCallbackInvokedAtUtc);
+        Assert.Null(snapshot.CompletionCallbackLastError);
+    }
+
+    [Fact]
+    public async Task MarkPendingIfTriggered_Succeeds_WhenActivityLogWriteFails()
+    {
+        var processor = new TorrentCompletionCallbackProcessor(
+            new StubFinalizationChecker(),
+            new StubCompletionCallbackInvoker(),
+            new ThrowingActivityLogService(new IOException("activity log unavailable")),
+            new ServiceInstanceContext()
+        );
+
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = CreateCompletedSnapshot(now);
+
+        var changed = await processor.MarkPendingIfTriggeredAsync(
+            previousCompletedAtUtc: null,
+            snapshot,
+            CreateRuntimeSettings(),
+            now,
+            CancellationToken.None,
+            new TorrentCompletionFinalizationCheckResult
+            {
+                IsReady = true,
+                FinalPayloadPath = snapshot.SavePath,
+            }
+        );
+
+        Assert.True(changed);
+        Assert.Equal(TorrentCompletionCallbackState.PendingFinalization, snapshot.CompletionCallbackState);
+        Assert.Equal(now, snapshot.CompletionCallbackPendingSinceUtc);
+    }
+
+    [Fact]
+    public async Task ProcessPendingAsync_TimesOut_WhenActivityLogWriteFails()
+    {
+        var processor = new TorrentCompletionCallbackProcessor(
+            new StubFinalizationChecker(),
+            new StubCompletionCallbackInvoker(),
+            new ThrowingActivityLogService(new IOException("activity log unavailable")),
+            new ServiceInstanceContext()
+        );
+
+        var now = DateTimeOffset.UtcNow;
+        var snapshot = CreateCompletedSnapshot(now);
+        snapshot.CompletionCallbackState           = TorrentCompletionCallbackState.PendingFinalization;
+        snapshot.CompletionCallbackPendingSinceUtc = now.AddSeconds(-10);
+
+        var changed = await processor.ProcessPendingAsync(
+            snapshot,
+            CreateRuntimeSettings(completionCallbackFinalizationTimeoutSeconds: 1),
+            now,
+            CancellationToken.None,
+            new TorrentCompletionFinalizationCheckResult
+            {
+                IsReady = false,
+                FinalPayloadPath = snapshot.SavePath,
+                PendingReason = "The final payload is not visible yet.",
+            }
+        );
+
+        Assert.True(changed);
+        Assert.Equal(TorrentCompletionCallbackState.TimedOut, snapshot.CompletionCallbackState);
+        Assert.Contains("Timed out waiting for final payload visibility", snapshot.CompletionCallbackLastError);
+    }
+
+    private static RuntimeSettingsSnapshot CreateRuntimeSettings(
+        int completionCallbackFinalizationTimeoutSeconds = 120,
+        string completionCallbackCommandPath = "/bin/sh",
+        string? completionCallbackArguments = null)
+    {
+        return new RuntimeSettingsSnapshot
+        {
+            UsesPersistedOverrides = false,
+            PartialFilesEnabled = true,
+            PartialFileSuffix = ".!mt",
+            SeedingStopMode = SeedingStopMode.Unlimited,
+            SeedingStopRatio = 1,
+            SeedingStopMinutes = 60,
+            CompletedTorrentCleanupMode = CompletedTorrentCleanupMode.Never,
+            CompletedTorrentCleanupMinutes = 60,
+            DeleteLogsForCompletedTorrents = false,
+            EngineConnectionFailureLogBurstLimit = 5,
+            EngineConnectionFailureLogWindowSeconds = 60,
+            EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred,
+            EngineMaximumConnections = 150,
+            EngineMaximumHalfOpenConnections = 8,
+            EngineMaximumDownloadRateBytesPerSecond = 0,
+            EngineMaximumUploadRateBytesPerSecond = 0,
+            MaxActiveMetadataResolutions = 4,
+            MaxActiveDownloads = 4,
+            MetadataRefreshStaleSeconds = 90,
+            MetadataRefreshRestartDelaySeconds = 30,
+            CompletionCallbackEnabled = true,
+            CompletionCallbackCommandPath = completionCallbackCommandPath,
+            CompletionCallbackArguments = completionCallbackArguments,
+            CompletionCallbackWorkingDirectory = null,
+            CompletionCallbackTimeoutSeconds = 30,
+            CompletionCallbackFinalizationTimeoutSeconds = completionCallbackFinalizationTimeoutSeconds,
+            CompletionCallbackApiBaseUrlOverride = null,
+            CompletionCallbackApiKeyOverride = null,
+            EngineSettingsRequireRestart = false,
+            UpdatedAtUtc = null,
+        };
+    }
+
+    private static TorrentSnapshot CreateCompletedSnapshot(DateTimeOffset now)
+    {
+        return new TorrentSnapshot
         {
             TorrentId = Guid.NewGuid(),
             Name = "Queued Complete Torrent",
@@ -51,62 +179,6 @@ public sealed class TorrentCompletionCallbackProcessorTests
             SeedingStartedAtUtc = null,
             LastActivityAtUtc = now,
             ErrorMessage = null,
-        };
-
-        var changed = await processor.MarkPendingIfTriggeredAsync(
-            previousCompletedAtUtc: null,
-            snapshot,
-            CreateRuntimeSettings(),
-            now,
-            CancellationToken.None,
-            new TorrentCompletionFinalizationCheckResult
-            {
-                IsReady = true,
-                FinalPayloadPath = snapshot.SavePath,
-            }
-        );
-
-        Assert.True(changed);
-        Assert.Equal(TorrentCompletionCallbackState.PendingFinalization, snapshot.CompletionCallbackState);
-        Assert.Equal(now, snapshot.CompletionCallbackPendingSinceUtc);
-        Assert.Null(snapshot.CompletionCallbackInvokedAtUtc);
-        Assert.Null(snapshot.CompletionCallbackLastError);
-    }
-
-    private static RuntimeSettingsSnapshot CreateRuntimeSettings()
-    {
-        return new RuntimeSettingsSnapshot
-        {
-            UsesPersistedOverrides = false,
-            PartialFilesEnabled = true,
-            PartialFileSuffix = ".!mt",
-            SeedingStopMode = SeedingStopMode.Unlimited,
-            SeedingStopRatio = 1,
-            SeedingStopMinutes = 60,
-            CompletedTorrentCleanupMode = CompletedTorrentCleanupMode.Never,
-            CompletedTorrentCleanupMinutes = 60,
-            DeleteLogsForCompletedTorrents = false,
-            EngineConnectionFailureLogBurstLimit = 5,
-            EngineConnectionFailureLogWindowSeconds = 60,
-            EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred,
-            EngineMaximumConnections = 150,
-            EngineMaximumHalfOpenConnections = 8,
-            EngineMaximumDownloadRateBytesPerSecond = 0,
-            EngineMaximumUploadRateBytesPerSecond = 0,
-            MaxActiveMetadataResolutions = 4,
-            MaxActiveDownloads = 4,
-            MetadataRefreshStaleSeconds = 90,
-            MetadataRefreshRestartDelaySeconds = 30,
-            CompletionCallbackEnabled = true,
-            CompletionCallbackCommandPath = "/bin/sh",
-            CompletionCallbackArguments = null,
-            CompletionCallbackWorkingDirectory = null,
-            CompletionCallbackTimeoutSeconds = 30,
-            CompletionCallbackFinalizationTimeoutSeconds = 120,
-            CompletionCallbackApiBaseUrlOverride = null,
-            CompletionCallbackApiKeyOverride = null,
-            EngineSettingsRequireRestart = false,
-            UpdatedAtUtc = null,
         };
     }
 
@@ -145,6 +217,25 @@ public sealed class TorrentCompletionCallbackProcessorTests
 
         public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(
+            ActivityLogQuery query,
+            CancellationToken cancellationToken)
+            => Task.FromResult<IReadOnlyList<ActivityLogEntry>>([]);
+
+        public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
+            => Task.FromResult(0);
+
+        public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
+            => Task.FromResult(0);
+    }
+
+    private sealed class ThrowingActivityLogService(Exception writeFailure) : IActivityLogService
+    {
+        public Task EnsureInitializedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken)
+            => Task.FromException(writeFailure);
 
         public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(
             ActivityLogQuery query,

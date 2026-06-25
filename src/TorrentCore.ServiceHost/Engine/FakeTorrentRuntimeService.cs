@@ -8,6 +8,7 @@ using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
 using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 
 #endregion
 
@@ -45,7 +46,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             {
                 logger.LogError(exception, "Fake torrent runtime tick failed.");
 
-                await activityLogService.WriteAsync(
+                await activityLogService.TryWriteActivityLogAsync(
                     new ActivityLogWriteRequest
                     {
                         Level             = ActivityLogLevel.Error,
@@ -484,7 +485,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
     private async Task LogTorrentEventAsync(string eventType, string message, TorrentSnapshot torrent, object details,
         CancellationToken                          cancellationToken)
     {
-        await activityLogService.WriteAsync(
+        await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
             {
                 Level             = ActivityLogLevel.Information,
