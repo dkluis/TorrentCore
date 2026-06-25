@@ -1709,9 +1709,10 @@ public sealed class TorrentApiTests
         var addResponse = await AddMagnetAsync(httpClient, "8484848484848484848484848484848484848484", "MonoTorrent Metadata Refresh");
         addResponse.EnsureSuccessStatusCode();
         var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
 
         var resolvingTorrent = await WaitForAsync(
-            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
             torrent => torrent is not null && torrent.State == TorrentState.ResolvingMetadata && torrent.CanRefreshMetadata,
             timeout: TimeSpan.FromSeconds(5));
 
@@ -1719,7 +1720,7 @@ public sealed class TorrentApiTests
         var historyBefore = await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}");
         Assert.NotNull(historyBefore);
 
-        var refreshResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/metadata/refresh", content: null);
+        var refreshResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent.TorrentId}/metadata/refresh", content: null);
         refreshResponse.EnsureSuccessStatusCode();
 
         var refreshResult = await refreshResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
@@ -1764,9 +1765,10 @@ public sealed class TorrentApiTests
         var addResponse = await AddMagnetAsync(httpClient, "9595959595959595959595959595959595959595", "MonoTorrent Metadata Reset");
         addResponse.EnsureSuccessStatusCode();
         var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
 
         var resolvingTorrent = await WaitForAsync(
-            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent!.TorrentId}"),
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
             torrent => torrent is not null && torrent.State == TorrentState.ResolvingMetadata && torrent.CanRefreshMetadata,
             timeout: TimeSpan.FromSeconds(5));
 
@@ -1774,7 +1776,7 @@ public sealed class TorrentApiTests
         var historyBefore = await httpClient.GetFromJsonAsync<TorrentHistoryDetailDto>($"api/history/by-torrent/{addedTorrent.TorrentId}");
         Assert.NotNull(historyBefore);
 
-        var resetResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent!.TorrentId}/metadata/reset", content: null);
+        var resetResponse = await httpClient.PostAsync($"api/torrents/{addedTorrent.TorrentId}/metadata/reset", content: null);
         resetResponse.EnsureSuccessStatusCode();
 
         var resetResult = await resetResponse.Content.ReadFromJsonAsync<TorrentActionResultDto>();
@@ -2233,10 +2235,11 @@ public sealed class TorrentApiTests
 
         var response = await AddMagnetAsync(httpClient, "7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B7B", "Feedback Timeout Movie", "Movie");
         var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
         CreateSingleFilePayload(Path.Combine(downloadPath, "Movie", "Feedback Timeout Movie"));
 
         var waitingState = await WaitForAsync(
-            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId),
+            async () => await ReadPersistedCallbackStateAsync(storagePath, addedTorrent.TorrentId),
             state => state.State == TorrentCompletionCallbackState.WaitingForFeedback.ToString(),
             timeout: TimeSpan.FromSeconds(5));
 
