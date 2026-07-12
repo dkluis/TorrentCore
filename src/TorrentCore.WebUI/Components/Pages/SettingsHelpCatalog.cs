@@ -131,9 +131,9 @@ public static class SettingsHelpCatalog
     );
 
     public static readonly SettingHelpContent CompletionCallbackTimeoutSeconds = new(
-        "Process Timeout Seconds",
-        "Limits how long TorrentCore waits for the callback process itself to finish.",
-        "If the external callback process runs longer than this, TorrentCore marks the callback attempt as timed out. This timeout is about the launched process duration, not the time TorrentCore waits for file finalization before it starts the callback."
+        "Legacy Process Timeout",
+        "Retained for settings compatibility; TorrentCore no longer waits for the callback process to finish.",
+        "TorrentCore now treats a successful process start as dispatch and immediately waits for independent API feedback. This value no longer limits callback execution and can remain at its existing value."
     );
 
     public static readonly SettingHelpContent CompletionCallbackFinalizationTimeoutSeconds = new(

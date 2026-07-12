@@ -80,7 +80,7 @@ public sealed class RuntimeOperationDurationDiagnosticsTests
             "Example",
             new { OpenConnections = 0 }
         );
-        await diagnostics.WriteCallbackExecutionCompletedAsync(
+        await diagnostics.WriteCallbackDispatchCompletedAsync(
             TimeSpan.FromSeconds(9),
             "succeeded",
             torrentId,
@@ -90,7 +90,7 @@ public sealed class RuntimeOperationDurationDiagnosticsTests
 
         Assert.All(activityLogService.Writes, entry => Assert.Null(entry.TorrentId));
         Assert.Contains(activityLogService.Writes, entry => entry.EventType == "runtime.recovery.action_completed");
-        Assert.Contains(activityLogService.Writes, entry => entry.EventType == "runtime.callback.execution_completed");
+        Assert.Contains(activityLogService.Writes, entry => entry.EventType == "runtime.callback.dispatch_completed");
         Assert.All(
             activityLogService.Writes,
             entry =>

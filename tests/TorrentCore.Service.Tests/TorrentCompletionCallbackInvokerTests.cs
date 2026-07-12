@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
@@ -44,6 +45,43 @@ public sealed class TorrentCompletionCallbackInvokerTests
 
         Assert.Equal(TorrentCompletionCallbackInvocationStatus.Invoked, result.Status);
         Assert.Null(result.Error);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ReturnsWithoutWaitingForCallbackProcessExit()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-callback-invoker-nonblocking");
+        var activityLogService = new ThrowingActivityLogService(new IOException("activity log unavailable"));
+        var invoker = new TorrentCompletionCallbackInvoker(
+            new StubRuntimeSettingsService(
+                CreateRuntimeSettings(
+                    completionCallbackCommandPath: "/bin/sh",
+                    completionCallbackArguments: "-c \"sleep 2\"",
+                    completionCallbackWorkingDirectory: rootPath
+                )
+            ),
+            new ResolvedTorrentCoreServicePaths
+            {
+                DownloadRootPath = rootPath,
+                StorageRootPath = rootPath,
+                DatabaseFilePath = Path.Combine(rootPath, "torrentcore.db"),
+            },
+            activityLogService,
+            new ServiceInstanceContext(),
+            new RuntimeOperationDurationDiagnostics(activityLogService, new ServiceInstanceContext()),
+            NullLogger<TorrentCompletionCallbackInvoker>.Instance
+        );
+        var stopwatch = Stopwatch.StartNew();
+
+        var result = await invoker.InvokeAsync(
+            CreateCompletedSnapshot(rootPath),
+            Path.Combine(rootPath, "Final Payload"),
+            CancellationToken.None
+        );
+
+        stopwatch.Stop();
+        Assert.Equal(TorrentCompletionCallbackInvocationStatus.Invoked, result.Status);
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(1), $"Dispatch took {stopwatch.Elapsed}.");
     }
 
     private static RuntimeSettingsSnapshot CreateRuntimeSettings(

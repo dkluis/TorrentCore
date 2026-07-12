@@ -49,7 +49,7 @@ If callback behavior looks wrong, check:
 - category callback enablement
 - callback state on the torrent
 - final payload path visibility
-- callback timeout versus finalization timeout
+- callback dispatch versus finalization timeout
 
 ## Intermittent Slow Or Unresponsive Operations
 
@@ -58,7 +58,7 @@ Inspect persistent activity logs for:
 - `runtime.operation.slow`
 - `runtime.tick.duration_summary`
 - `runtime.recovery.action_completed`
-- `runtime.callback.execution_completed`
+- `runtime.callback.dispatch_completed`
 - `runtime.connection.activity_summary`
 - `runtime.monotorrent.cache_audit`
 - `runtime.tick.failed`

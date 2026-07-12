@@ -91,6 +91,8 @@ Completion callback rules:
 
 - TorrentCore reuses the shared TVMaze-style callback entrypoint instead of inventing a second callback stack.
 - TorrentCore invokes the callback only after the downstream-visible final payload path is ready.
+- A successful process start completes dispatch; TorrentCore does not wait for the callback process to exit.
+- Downstream completion is reported independently through the callback feedback API and may arrive much later.
 - TorrentCore does not treat the engine's first internal completed edge as sufficient by itself.
 - TorrentCore may expose the validated final payload path through `TORRENTCORE_FINAL_PAYLOAD_PATH`.
 - TorrentCore does not delete final payload files during callback finalization.

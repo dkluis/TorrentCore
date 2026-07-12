@@ -5,5 +5,4 @@ public enum TorrentCompletionCallbackInvocationStatus
     Skipped,
     Invoked,
     Failed,
-    TimedOut,
 }

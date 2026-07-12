@@ -94,13 +94,6 @@ public sealed class TorrentCompletionCallbackProcessor(ITorrentCompletionFinaliz
                     resolvedFinalizationResult.FinalPayloadPath
                 );
                 return true;
-            case TorrentCompletionCallbackInvocationStatus.TimedOut:
-                snapshot.CompletionCallbackState     = TorrentCompletionCallbackState.TimedOut;
-                snapshot.CompletionCallbackLastError = BuildPostAttemptError(
-                    invocationResult.Error,
-                    resolvedFinalizationResult.FinalPayloadPath
-                );
-                return true;
             default:
                 return changed;
         }

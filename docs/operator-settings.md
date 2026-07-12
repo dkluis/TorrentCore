@@ -137,8 +137,8 @@ Queue diagnostics currently expose:
 
 ### Process Timeout Seconds
 
-- process runtime timeout after the callback starts
-- applies live
+- retained for settings and API compatibility
+- callback dispatch no longer waits for process exit, so this value does not limit callback execution
 
 ### Finalization Wait Seconds
 

@@ -89,7 +89,7 @@ public sealed class RuntimeOperationDurationDiagnostics(
         );
     }
 
-    public Task WriteCallbackExecutionCompletedAsync(
+    public Task WriteCallbackDispatchCompletedAsync(
         TimeSpan duration,
         string outcome,
         Guid torrentId,
@@ -101,8 +101,8 @@ public sealed class RuntimeOperationDurationDiagnostics(
             {
                 Level = outcome == "succeeded" ? ActivityLogLevel.Information : ActivityLogLevel.Warning,
                 Category = "runtime",
-                EventType = "runtime.callback.execution_completed",
-                Message = $"Completion callback execution for torrent '{torrentName}' {outcome} in {duration.TotalMilliseconds:F0} ms.",
+                EventType = "runtime.callback.dispatch_completed",
+                Message = $"Completion callback dispatch for torrent '{torrentName}' {outcome} in {duration.TotalMilliseconds:F0} ms.",
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(
                     new
