@@ -21,7 +21,8 @@
 - TorrentCore invokes the callback only after downstream-visible finalization is confirmed.
 - Finalization checks do not treat the first internal completed edge as sufficient.
 - Pending finalization, failure, timeout, and retryability are persisted separately from torrent transfer state.
-- TorrentCore does not delete partial files or final payload files as part of callback finalization.
+- MonoTorrent partial-file naming is disabled; incomplete data may already use its final filename.
+- TorrentCore does not delete final payload files as part of callback finalization.
 - The callback is the authoritative downstream-readiness signal.
 - Downstream systems do not infer readiness by independently scanning download paths or filenames.
 

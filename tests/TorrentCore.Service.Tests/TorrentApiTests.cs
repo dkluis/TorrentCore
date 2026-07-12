@@ -58,8 +58,8 @@ public sealed class TorrentApiTests
         Assert.Equal(0, hostStatus.CurrentConnectedPeerCount);
         Assert.Equal(0, hostStatus.CurrentDownloadRateBytesPerSecond);
         Assert.Equal(0, hostStatus.CurrentUploadRateBytesPerSecond);
-        Assert.True(hostStatus.PartialFilesEnabled);
-        Assert.Equal(".!mt", hostStatus.PartialFileSuffix);
+        Assert.False(hostStatus.PartialFilesEnabled);
+        Assert.Empty(hostStatus.PartialFileSuffix);
         Assert.Equal(SeedingStopMode.Unlimited.ToString(), hostStatus.SeedingStopMode);
         Assert.Equal(EngineHostStatus.Ready, hostStatus.Status);
         Assert.True(hostStatus.SupportsMagnetAdds);
@@ -406,8 +406,8 @@ public sealed class TorrentApiTests
         Assert.Equal("Fake", settings.EngineRuntime);
         Assert.True(settings.SupportsLiveUpdates);
         Assert.False(settings.UsesPersistedOverrides);
-        Assert.True(settings.PartialFilesEnabled);
-        Assert.Equal(".!mt", settings.PartialFileSuffix);
+        Assert.False(settings.PartialFilesEnabled);
+        Assert.Empty(settings.PartialFileSuffix);
         Assert.Equal(SeedingStopMode.Unlimited.ToString(), settings.SeedingStopMode);
         Assert.Equal(CompletedTorrentCleanupMode.Never.ToString(), settings.CompletedTorrentCleanupMode);
         Assert.Equal(60, settings.CompletedTorrentCleanupMinutes);
@@ -843,8 +843,8 @@ public sealed class TorrentApiTests
         Assert.Equal("MonoTorrent", hostStatus!.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);
         Assert.Equal(55_124, hostStatus.EngineDhtPort);
-        Assert.True(hostStatus.PartialFilesEnabled);
-        Assert.Equal(".!mt", hostStatus.PartialFileSuffix);
+        Assert.False(hostStatus.PartialFilesEnabled);
+        Assert.Empty(hostStatus.PartialFileSuffix);
         Assert.Equal(SeedingStopMode.Unlimited.ToString(), hostStatus.SeedingStopMode);
         Assert.True(hostStatus.StartupRecoveryCompleted);
         Assert.Equal("9999999999999999999999999999999999999999", torrent.InfoHash);
@@ -1380,7 +1380,6 @@ public sealed class TorrentApiTests
         var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
         var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
         var finalPayloadPath = Path.Combine(downloadPath, "TV", "MonoTorrent Pending Show");
-        var partialPayloadPath = finalPayloadPath + ".!mt";
         Guid torrentId;
 
         await using (var factory = CreateFactory(
@@ -1395,9 +1394,6 @@ public sealed class TorrentApiTests
             var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
             torrentId = addedTorrent!.TorrentId;
         }
-
-        CreateSingleFilePayload(finalPayloadPath);
-        File.WriteAllText(partialPayloadPath, "partial");
 
         var completedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
         await UpdatePersistedCompletionCallbackSnapshotAsync(
@@ -1425,12 +1421,12 @@ public sealed class TorrentApiTests
 
             Assert.NotNull(pendingTorrent);
             Assert.Equal(finalPayloadPath, pendingTorrent.CompletionCallbackFinalPayloadPath);
-            Assert.Equal("The partial-suffix sibling is still visible.", pendingTorrent.CompletionCallbackPendingReason);
+            Assert.Equal("The final payload path is not visible yet.", pendingTorrent.CompletionCallbackPendingReason);
 
             await Task.Delay(300);
             Assert.Empty(ReadCallbackInvocations(callbackOutputPath));
 
-            File.Delete(partialPayloadPath);
+            CreateSingleFilePayload(finalPayloadPath);
 
             await WaitForAsync(
                 () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
@@ -1972,7 +1968,6 @@ public sealed class TorrentApiTests
         var callbackOutputPath = Path.Combine(rootPath, "callback-output.log");
         var callbackScriptPath = CreateCallbackCaptureScript(rootPath, callbackOutputPath);
         var finalPayloadPath = Path.Combine(downloadPath, "Movie", "Finalization Movie");
-        var partialPayloadPath = finalPayloadPath + ".!mt";
 
         await using var factory = CreateFactory(
             downloadPath: downloadPath,
@@ -1983,10 +1978,6 @@ public sealed class TorrentApiTests
         using var httpClient = factory.CreateClient();
 
         await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
-        File.WriteAllText(finalPayloadPath, "final");
-        File.WriteAllText(partialPayloadPath, "partial");
 
         var response = await AddMagnetAsync(httpClient, "7575757575757575757575757575757575757575", "Finalization Movie", "Movie");
         var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
@@ -2007,9 +1998,9 @@ public sealed class TorrentApiTests
         Assert.NotNull(waitingForFilesTorrent);
         Assert.Null(waitingForFilesTorrent.CompletionCallbackState);
         Assert.Equal(finalPayloadPath, waitingForFilesTorrent.CompletionCallbackFinalPayloadPath);
-        Assert.Equal("The partial-suffix sibling is still visible.", waitingForFilesTorrent.CompletionCallbackPendingReason);
+        Assert.Equal("The final payload path is not visible yet.", waitingForFilesTorrent.CompletionCallbackPendingReason);
 
-        File.Delete(partialPayloadPath);
+        CreateSingleFilePayload(finalPayloadPath);
 
         await WaitForAsync(
             () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
@@ -2032,7 +2023,7 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
-    public async Task FakeRuntime_CompletionCallback_WaitsForMultiFileFinalizationTree()
+    public async Task FakeRuntime_CompletionCallback_WaitsForMultiFilePayloadDirectoryVisibility()
     {
         var rootPath = CreateTempRootPath("torrentcore-callback-multi-finalization");
         var downloadPath = Path.Combine(rootPath, "downloads");
@@ -2051,11 +2042,6 @@ public sealed class TorrentApiTests
 
         await UpdateCompletionCallbackSettingsAsync(httpClient, "/bin/sh", callbackScriptPath, rootPath);
 
-        Directory.CreateDirectory(finalPayloadPath);
-        var partialEpisodePath = Path.Combine(finalPayloadPath, "Season 01", "Episode 01.mkv.!mt");
-        Directory.CreateDirectory(Path.GetDirectoryName(partialEpisodePath)!);
-        File.WriteAllText(partialEpisodePath, "partial");
-
         var response = await AddMagnetAsync(httpClient, "7676767676767676767676767676767676767676", "Finalization Show", "TV");
         var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
 
@@ -2072,10 +2058,11 @@ public sealed class TorrentApiTests
         var pendingState = await ReadPersistedCallbackStateAsync(storagePath, addedTorrent!.TorrentId);
         Assert.Null(pendingState.State);
         Assert.NotNull(waitingForFilesTorrent);
-        Assert.Equal("A partial file is still visible in the payload tree: '" + partialEpisodePath + "'.",
-            waitingForFilesTorrent.CompletionCallbackPendingReason);
+        Assert.Equal("The final payload path is not visible yet.", waitingForFilesTorrent.CompletionCallbackPendingReason);
 
-        File.Move(partialEpisodePath, Path.Combine(finalPayloadPath, "Season 01", "Episode 01.mkv"));
+        var episodePath = Path.Combine(finalPayloadPath, "Season 01", "Episode 01.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(episodePath)!);
+        File.WriteAllText(episodePath, "final");
 
         await WaitForAsync(
             () => Task.FromResult(ReadCallbackInvocations(callbackOutputPath)),
@@ -2641,8 +2628,7 @@ public sealed class TorrentApiTests
             storagePath: storagePath,
             runtimeTickIntervalMilliseconds: 50,
             metadataResolutionDelayMilliseconds: 0,
-            downloadProgressPercentPerTick: 50,
-            usePartialFiles: false);
+            downloadProgressPercentPerTick: 50);
         using var httpClient = factory.CreateClient();
 
         Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
@@ -2697,8 +2683,7 @@ public sealed class TorrentApiTests
             storagePath: storagePath,
             runtimeTickIntervalMilliseconds: 50,
             metadataResolutionDelayMilliseconds: 0,
-            downloadProgressPercentPerTick: 50,
-            usePartialFiles: false);
+            downloadProgressPercentPerTick: 50);
         using var httpClient = factory.CreateClient();
 
         Directory.CreateDirectory(Path.GetDirectoryName(finalPayloadPath)!);
@@ -3241,7 +3226,6 @@ public sealed class TorrentApiTests
         int? engineMaximumUploadRateBytesPerSecond = null,
         int? engineConnectionFailureLogBurstLimit = null,
         int? engineConnectionFailureLogWindowSeconds = null,
-        bool? usePartialFiles = null,
         SeedingStopMode? seedingStopMode = null,
         double? seedingStopRatio = null,
         int? seedingStopMinutes = null,
@@ -3323,11 +3307,6 @@ public sealed class TorrentApiTests
                     if (engineConnectionFailureLogWindowSeconds is not null)
                     {
                         settings[$"{TorrentCoreServiceOptions.SectionName}:EngineConnectionFailureLogWindowSeconds"] = engineConnectionFailureLogWindowSeconds.Value.ToString();
-                    }
-
-                    if (usePartialFiles is not null)
-                    {
-                        settings[$"{TorrentCoreServiceOptions.SectionName}:UsePartialFiles"] = usePartialFiles.Value.ToString();
                     }
 
                     if (seedingStopMode is not null)

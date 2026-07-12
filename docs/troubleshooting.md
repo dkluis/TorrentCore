@@ -41,7 +41,7 @@ Remember:
 
 - TorrentCore does not fire the callback on the engine's first internal completed edge alone
 - finalization must be visible at the downstream payload path first
-- partial-suffix files must no longer be the active payload
+- filename visibility alone does not mean an active transfer is ready for downstream processing
 
 If callback behavior looks wrong, check:
 

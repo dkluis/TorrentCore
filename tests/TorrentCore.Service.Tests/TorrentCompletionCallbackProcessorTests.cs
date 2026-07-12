@@ -113,8 +113,8 @@ public sealed class TorrentCompletionCallbackProcessorTests
         return new RuntimeSettingsSnapshot
         {
             UsesPersistedOverrides = false,
-            PartialFilesEnabled = true,
-            PartialFileSuffix = ".!mt",
+            PartialFilesEnabled = false,
+            PartialFileSuffix = string.Empty,
             SeedingStopMode = SeedingStopMode.Unlimited,
             SeedingStopRatio = 1,
             SeedingStopMinutes = 60,

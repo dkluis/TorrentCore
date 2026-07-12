@@ -15,7 +15,6 @@ public sealed class TorrentCoreServiceOptions
     public int EngineMaximumUploadRateBytesPerSecond { get; init; } = 0;
     public int EngineConnectionFailureLogBurstLimit { get; init; } = 5;
     public int EngineConnectionFailureLogWindowSeconds { get; init; } = 60;
-    public bool UsePartialFiles { get; init; } = true;
     public SeedingStopMode SeedingStopMode { get; init; } = SeedingStopMode.Unlimited;
     public double SeedingStopRatio { get; init; } = 1.0;
     public int SeedingStopMinutes { get; init; } = 60;

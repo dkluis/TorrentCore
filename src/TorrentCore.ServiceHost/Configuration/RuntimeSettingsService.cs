@@ -554,8 +554,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
         return new RuntimeSettingsSnapshot
         {
             UsesPersistedOverrides                       = persistedSettings.Values.Count > 0,
-            PartialFilesEnabled                          = baseOptions.UsePartialFiles,
-            PartialFileSuffix                            = baseOptions.UsePartialFiles ? ".!mt" : string.Empty,
+            PartialFilesEnabled                          = false,
+            PartialFileSuffix                            = string.Empty,
             SeedingStopMode                              = seedingStopMode,
             SeedingStopRatio                             = seedingStopRatio,
             SeedingStopMinutes                           = seedingStopMinutes,

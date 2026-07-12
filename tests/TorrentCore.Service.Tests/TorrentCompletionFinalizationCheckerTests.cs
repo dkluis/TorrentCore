@@ -12,87 +12,61 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
     );
 
     [Fact]
-    public void Check_ObservedSingleFilePaths_UsesExactCompletePath_AndBlocksOnActivePartialSibling()
+    public void Check_ObservedSingleFile_UsesExactCompletePath()
     {
         Directory.CreateDirectory(_rootPath);
-        var finalFilePath   = Path.Combine(_rootPath, "Actual Episode.mkv");
-        var partialFilePath = finalFilePath + ".!mt";
+        var finalFilePath = Path.Combine(_rootPath, "Actual Episode.mkv");
         File.WriteAllText(finalFilePath, "final");
-        File.WriteAllText(partialFilePath, "partial");
 
-        var checker = CreateChecker();
-        var result = checker.Check(
+        var result = CreateChecker().Check(
             CreateSnapshot("Different Torrent Name"),
             CreateRuntimeSettings(),
+            [new TorrentCompletionObservedFilePaths { CompletePath = finalFilePath }]
+        );
+
+        Assert.True(result.IsReady);
+        Assert.Equal(finalFilePath, result.FinalPayloadPath);
+        Assert.Null(result.PendingReason);
+    }
+
+    [Fact]
+    public void Check_ObservedFiles_RequiresEveryCompletePath()
+    {
+        Directory.CreateDirectory(_rootPath);
+        var firstFilePath = Path.Combine(_rootPath, "Season 01", "Episode 01.mkv");
+        var secondFilePath = Path.Combine(_rootPath, "Season 01", "Episode 02.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(firstFilePath)!);
+        File.WriteAllText(firstFilePath, "final");
+
+        var result = CreateChecker().Check(
+            CreateSnapshot("Example Show"),
+            CreateRuntimeSettings(),
             [
-                new TorrentCompletionObservedFilePaths
-                {
-                    CompletePath = finalFilePath,
-                    ActivePath = partialFilePath,
-                    IncompletePath = partialFilePath,
-                }
+                new TorrentCompletionObservedFilePaths { CompletePath = firstFilePath },
+                new TorrentCompletionObservedFilePaths { CompletePath = secondFilePath },
             ]
         );
 
         Assert.False(result.IsReady);
-        Assert.Equal(finalFilePath, result.FinalPayloadPath);
-        Assert.Equal("The partial-suffix sibling is still visible.", result.PendingReason);
+        Assert.Equal(Path.Combine(_rootPath, "Example Show"), result.FinalPayloadPath);
+        Assert.Equal($"A final payload file is not visible yet: '{secondFilePath}'.", result.PendingReason);
     }
 
     [Fact]
-    public void Check_ObservedSingleFilePaths_IgnoresStalePartialSibling_WhenMonoTorrentUsesCompletePath()
+    public void Check_DefaultPayloadPath_WaitsForVisibility()
     {
         Directory.CreateDirectory(_rootPath);
-        var finalFilePath   = Path.Combine(_rootPath, "Actual Episode.mkv");
-        var partialFilePath = finalFilePath + ".!mt";
-        File.WriteAllText(finalFilePath, "final");
-        File.WriteAllText(partialFilePath, "stale");
-
+        var snapshot = CreateSnapshot("Example Movie.mkv");
         var checker = CreateChecker();
-        var result = checker.Check(
-            CreateSnapshot("Different Torrent Name"),
-            CreateRuntimeSettings(),
-            [
-                new TorrentCompletionObservedFilePaths
-                {
-                    CompletePath = finalFilePath,
-                    ActivePath = finalFilePath,
-                    IncompletePath = partialFilePath,
-                }
-            ]
-        );
 
-        Assert.True(result.IsReady);
-        Assert.Equal(finalFilePath, result.FinalPayloadPath);
-        Assert.Null(result.PendingReason);
+        var pendingResult = checker.Check(snapshot, CreateRuntimeSettings());
+        File.WriteAllText(Path.Combine(_rootPath, snapshot.Name), "final");
+        var readyResult = checker.Check(snapshot, CreateRuntimeSettings());
+
+        Assert.False(pendingResult.IsReady);
+        Assert.Equal("The final payload path is not visible yet.", pendingResult.PendingReason);
+        Assert.True(readyResult.IsReady);
     }
-
-    [Fact]
-    public void Check_ObservedSingleFilePaths_AllowsSingleFileNameDifferentFromSnapshotName()
-    {
-        Directory.CreateDirectory(_rootPath);
-        var finalFilePath = Path.Combine(_rootPath, "Actual Movie.mkv");
-        File.WriteAllText(finalFilePath, "final");
-
-        var checker = CreateChecker();
-        var result = checker.Check(
-            CreateSnapshot("Different Torrent Name"),
-            CreateRuntimeSettings(),
-            [
-                new TorrentCompletionObservedFilePaths
-                {
-                    CompletePath = finalFilePath,
-                    ActivePath = finalFilePath,
-                    IncompletePath = finalFilePath + ".!mt",
-                }
-            ]
-        );
-
-        Assert.True(result.IsReady);
-        Assert.Equal(finalFilePath, result.FinalPayloadPath);
-        Assert.Null(result.PendingReason);
-    }
-
 
     public void Dispose()
     {
@@ -154,8 +128,8 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
         return new RuntimeSettingsSnapshot
         {
             UsesPersistedOverrides = false,
-            PartialFilesEnabled = true,
-            PartialFileSuffix = ".!mt",
+            PartialFilesEnabled = false,
+            PartialFileSuffix = string.Empty,
             SeedingStopMode = SeedingStopMode.Unlimited,
             SeedingStopRatio = 1.0,
             SeedingStopMinutes = 60,
@@ -166,7 +140,7 @@ public sealed class TorrentCompletionFinalizationCheckerTests : IDisposable
             EngineConnectionFailureLogWindowSeconds = 60,
             EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred,
             EngineMaximumConnections = 200,
-            EngineMaximumHalfOpenConnections = 8,
+            EngineMaximumHalfOpenConnections = 25,
             EngineMaximumDownloadRateBytesPerSecond = 0,
             EngineMaximumUploadRateBytesPerSecond = 0,
             MaxActiveMetadataResolutions = 4,

@@ -92,9 +92,8 @@ Completion callback rules:
 - TorrentCore reuses the shared TVMaze-style callback entrypoint instead of inventing a second callback stack.
 - TorrentCore invokes the callback only after the downstream-visible final payload path is ready.
 - TorrentCore does not treat the engine's first internal completed edge as sufficient by itself.
-- When partial files are enabled, callback invocation waits until the final payload is visible and partial-suffix files are no longer the active payload.
 - TorrentCore may expose the validated final payload path through `TORRENTCORE_FINAL_PAYLOAD_PATH`.
-- TorrentCore does not delete partial files or final payload files during callback finalization.
+- TorrentCore does not delete final payload files during callback finalization.
 - Downstream systems must not infer payload readiness by independently scanning download paths or filenames.
 
 See [docs/decisions/current-decisions.md](decisions/current-decisions.md) for the extracted appendix with the current durable routing, callback, and history rules.

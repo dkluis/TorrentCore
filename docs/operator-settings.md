@@ -172,13 +172,14 @@ Per-category settings:
 - `Download Root`
 - `Sort Order`
 
-## Partial Files And Restart Semantics
+## Payload Readiness And Restart Semantics
 
-Partial-file rules:
+Payload-readiness rules:
 
-- incomplete files use MonoTorrent's `.!mt` suffix
-- completed files lose that suffix
-- finalization waits observe these paths but do not delete payload-side files
+- MonoTorrent partial-file naming is disabled
+- incomplete data may be visible at its final filename while a transfer is active
+- downstream systems must use TorrentCore's completion callback rather than filename visibility as the readiness signal
+- finalization verifies the engine-reported complete paths or final payload path before callback invocation
 
 Restart-required settings currently include:
 

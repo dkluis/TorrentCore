@@ -908,7 +908,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 CacheDirectory                 = cacheDirectory,
                 AutoSaveLoadFastResume         = true,
                 AutoSaveLoadMagnetLinkMetadata = true,
-                UsePartialFiles                = _serviceOptions.UsePartialFiles,
+                UsePartialFiles                = false,
                 MaximumConnections             = runtimeSettings.EngineMaximumConnections,
                 MaximumHalfOpenConnections     = runtimeSettings.EngineMaximumHalfOpenConnections,
                 MaximumDownloadRate            = runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
@@ -955,8 +955,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                             runtimeSettings.EngineMaximumUploadRateBytesPerSecond,
                             runtimeSettings.EngineConnectionFailureLogBurstLimit,
                             runtimeSettings.EngineConnectionFailureLogWindowSeconds,
-                            _serviceOptions.UsePartialFiles,
-                            PartialFileSuffix = _serviceOptions.UsePartialFiles ? ".!mt" : string.Empty,
+                            UsePartialFiles = false,
+                            PartialFileSuffix = string.Empty,
                             runtimeSettings.SeedingStopMode, runtimeSettings.SeedingStopRatio,
                             runtimeSettings.SeedingStopMinutes,
                         }
@@ -2878,10 +2878,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                               file => new TorrentCompletionObservedFilePaths
                               {
                                   CompletePath = Path.GetFullPath(file.DownloadCompleteFullPath),
-                                  ActivePath = Path.GetFullPath(file.FullPath),
-                                  IncompletePath = string.IsNullOrWhiteSpace(file.DownloadIncompleteFullPath)
-                                          ? null
-                                          : Path.GetFullPath(file.DownloadIncompleteFullPath),
                               }
                           )
                          .ToArray();
