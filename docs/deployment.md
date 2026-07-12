@@ -148,6 +148,17 @@ Rules:
 Use the WebUI restart action for normal remote restarts.
 Use the local runtime scripts when you need explicit host-side control.
 
+## MonoTorrent Refactor Cutover
+
+Before deploying the refactored MonoTorrent integration:
+
+- confirm TorrentCore reports zero active torrents
+- confirm no downloads are active on the host
+- inventory any remaining `.!mt` artifacts for manual disposition
+- back up the TorrentCore database and MonoTorrent cache
+
+The cutover does not migrate active torrents or partially downloaded payloads. Existing history may remain.
+
 ## Logs And Status
 
 Runtime logs:

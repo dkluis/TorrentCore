@@ -5,6 +5,7 @@ using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Infrastructure;
 
 namespace TorrentCore.Service.Tests;
 
@@ -14,6 +15,7 @@ public sealed class TorrentCompletionCallbackInvokerTests
     public async Task InvokeAsync_ReturnsInvoked_WhenActivityLogWriteFails()
     {
         var rootPath = CreateTempRootPath("torrentcore-callback-invoker-log-failure");
+        var activityLogService = new ThrowingActivityLogService(new IOException("activity log unavailable"));
         var invoker = new TorrentCompletionCallbackInvoker(
             new StubRuntimeSettingsService(
                 CreateRuntimeSettings(
@@ -28,8 +30,9 @@ public sealed class TorrentCompletionCallbackInvokerTests
                 StorageRootPath = rootPath,
                 DatabaseFilePath = Path.Combine(rootPath, "torrentcore.db"),
             },
-            new ThrowingActivityLogService(new IOException("activity log unavailable")),
+            activityLogService,
             new ServiceInstanceContext(),
+            new RuntimeOperationDurationDiagnostics(activityLogService, new ServiceInstanceContext()),
             NullLogger<TorrentCompletionCallbackInvoker>.Instance
         );
 

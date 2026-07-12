@@ -46,7 +46,7 @@ TVMaze may:
 - submit a magnet with a stable category key
 - show lightweight torrent state
 - pause, resume, or remove through the public boundary
-- treat files without the configured incomplete suffix as ready for downstream work
+- treat TorrentCore's completion callback as the authoritative downstream-readiness signal
 - deep-link into the dedicated TorrentCore UI
 
 TVMaze must not own:
@@ -95,5 +95,6 @@ Completion callback rules:
 - When partial files are enabled, callback invocation waits until the final payload is visible and partial-suffix files are no longer the active payload.
 - TorrentCore may expose the validated final payload path through `TORRENTCORE_FINAL_PAYLOAD_PATH`.
 - TorrentCore does not delete partial files or final payload files during callback finalization.
+- Downstream systems must not infer payload readiness by independently scanning download paths or filenames.
 
 See [docs/decisions/current-decisions.md](decisions/current-decisions.md) for the extracted appendix with the current durable routing, callback, and history rules.

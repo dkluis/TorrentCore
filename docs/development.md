@@ -69,6 +69,12 @@ Rules:
 - connection-failure warnings are throttled to avoid log floods
 - completed-torrent log pruning, when enabled, applies only to torrent-scoped activity-log rows and never to payload data
 
+Duration diagnostics:
+
+- `runtime.operation.slow` identifies slow synchronization, gate-wait, MonoTorrent, callback, and storage phases
+- `runtime.tick.duration_summary` records minute-scale synchronization timing baselines without logging every tick
+- slow-operation details include subsystem, operation, duration, threshold, outcome, and torrent context when available
+
 ## WebUI Service Connection State
 
 `TorrentCore.WebUI` uses a fallback service base URL from configuration and can persist a tested override at runtime.

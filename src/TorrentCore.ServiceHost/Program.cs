@@ -50,6 +50,7 @@ builder.Services.AddSingleton(serviceProvider =>
     }
 );
 builder.Services.AddSingleton<ServiceInstanceContext>();
+builder.Services.AddSingleton<RuntimeOperationDurationDiagnostics>();
 builder.Services.AddSingleton<StartupRecoveryState>();
 builder.Services.AddSingleton(serviceProvider =>
     {

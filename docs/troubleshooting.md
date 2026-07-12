@@ -51,6 +51,17 @@ If callback behavior looks wrong, check:
 - final payload path visibility
 - callback timeout versus finalization timeout
 
+## Intermittent Slow Or Unresponsive Operations
+
+Inspect persistent activity logs for:
+
+- `runtime.operation.slow`
+- `runtime.tick.duration_summary`
+- `runtime.tick.failed`
+
+Use the logged subsystem and operation fields to distinguish synchronization-gate waits, MonoTorrent lifecycle work,
+callback execution, and storage phases before restarting the service.
+
 ## Deployment And Runtime Checks
 
 Useful runtime checks on the host:

@@ -4,6 +4,7 @@ using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
+using TorrentCore.Service.Infrastructure;
 
 namespace TorrentCore.Service.Tests;
 
@@ -23,7 +24,8 @@ public sealed class TorrentEngineSynchronizationServiceTests
                 }
             ),
             activityLogService,
-            new ServiceInstanceContext()
+            new ServiceInstanceContext(),
+            new RuntimeOperationDurationDiagnostics(activityLogService, new ServiceInstanceContext())
         );
 
         await service.StartAsync(CancellationToken.None);

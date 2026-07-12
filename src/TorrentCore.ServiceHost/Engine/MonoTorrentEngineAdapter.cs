@@ -26,6 +26,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     IOptions<TorrentCoreServiceOptions> serviceOptions, IRuntimeSettingsService runtimeSettingsService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
     ITorrentRemovalCleanupScheduler torrentRemovalCleanupScheduler,
+    RuntimeOperationDurationDiagnostics durationDiagnostics,
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
     private readonly ConnectionFailureLogThrottle                             _connectionFailureLogThrottle = new();
@@ -264,15 +265,40 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         List<TorrentSnapshot> pendingCallbackSnapshots;
         List<KeyValuePair<Guid, TorrentManager>> managers;
 
+        var gateWaitStopwatch = System.Diagnostics.Stopwatch.StartNew();
         await _synchronizationGate.WaitAsync(cancellationToken);
+        gateWaitStopwatch.Stop();
+        await durationDiagnostics.RecordIfSlowAsync(
+            "engine",
+            "synchronization_gate_wait",
+            gateWaitStopwatch.Elapsed,
+            RuntimeOperationDurationDiagnostics.GateWaitSlowThreshold,
+            "acquired"
+        );
+
+        var synchronizationStopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var synchronizationOutcome = "succeeded";
         try
         {
             (pendingCallbackSnapshots, managers) =
                     await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery);
         }
+        catch
+        {
+            synchronizationOutcome = "failed";
+            throw;
+        }
         finally
         {
             _synchronizationGate.Release();
+            synchronizationStopwatch.Stop();
+            await durationDiagnostics.RecordIfSlowAsync(
+                "engine",
+                "serialized_synchronization",
+                synchronizationStopwatch.Elapsed,
+                RuntimeOperationDurationDiagnostics.SynchronizationSlowThreshold,
+                synchronizationOutcome
+            );
         }
 
         await ProcessPendingCallbacksAsync(
@@ -413,7 +439,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         var now       = DateTimeOffset.UtcNow;
-        var manager   = await _engine!.AddAsync(magnet, categorySelection.DownloadRootPath);
+        var manager = await MeasureMonoTorrentOperationAsync(
+            "engine_add_magnet",
+            null,
+            string.IsNullOrWhiteSpace(magnet.Name) ? null : magnet.Name,
+            async () => await _engine!.AddAsync(magnet, categorySelection.DownloadRootPath)
+        );
         var torrentId = Guid.NewGuid();
         RegisterManager(torrentId, manager);
         var persistedSavePath = MonoTorrentSavePathNormalizer.Normalize(
@@ -808,8 +839,13 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             await EnsureManagerStoppedAsync(manager, cancellationToken);
 
-            await _engine!.RemoveAsync(
-                manager, deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly
+            await MeasureMonoTorrentOperationAsync(
+                "engine_remove_manager",
+                torrentId,
+                manager.Name,
+                async () => await _engine!.RemoveAsync(
+                    manager, deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly
+                )
             );
 
             _managers.Remove(torrentId);
@@ -932,7 +968,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var magnet = MagnetLink.Parse(snapshot.MagnetUri);
         var recoveryDownloadRootPath =
                 MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
-        var manager = await _engine!.AddAsync(magnet, recoveryDownloadRootPath);
+        var manager = await MeasureMonoTorrentOperationAsync(
+            "engine_add_recovered_magnet",
+            snapshot.TorrentId,
+            snapshot.Name,
+            async () => await _engine!.AddAsync(magnet, recoveryDownloadRootPath)
+        );
         RegisterManager(snapshot.TorrentId, manager);
         _managers[snapshot.TorrentId] = manager;
         return manager;
@@ -1087,6 +1128,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var now                      = DateTimeOffset.UtcNow;
         var runtimeSettings          = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         var pendingCallbackSnapshots = new List<TorrentSnapshot>();
+        var snapshotPersistenceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         foreach (var entry in managers)
         {
@@ -1147,11 +1189,41 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
         }
 
+        snapshotPersistenceStopwatch.Stop();
+        await durationDiagnostics.RecordIfSlowAsync(
+            "storage",
+            "torrent_snapshot_persistence_phase",
+            snapshotPersistenceStopwatch.Elapsed,
+            RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
+            "succeeded",
+            details: new { ManagerCount = managers.Count }
+        );
+
+        var queueReconciliationStopwatch = System.Diagnostics.Stopwatch.StartNew();
         await ReconcileRuntimeQueueAsync(cancellationToken);
+        queueReconciliationStopwatch.Stop();
+        await durationDiagnostics.RecordIfSlowAsync(
+            "engine",
+            "queue_reconciliation_phase",
+            queueReconciliationStopwatch.Elapsed,
+            RuntimeOperationDurationDiagnostics.SynchronizationSlowThreshold,
+            "succeeded",
+            details: new { ManagerCount = managers.Count }
+        );
         if (includeAutomaticRecovery)
         {
+            var recoveryStopwatch = System.Diagnostics.Stopwatch.StartNew();
             await ProcessMetadataRecoveryAsync(runtimeSettings, now, cancellationToken);
             await ProcessDownloadRecoveryAsync(runtimeSettings, now, cancellationToken);
+            recoveryStopwatch.Stop();
+            await durationDiagnostics.RecordIfSlowAsync(
+                "monotorrent",
+                "automatic_recovery_phase",
+                recoveryStopwatch.Elapsed,
+                RuntimeOperationDurationDiagnostics.MonoTorrentSlowThreshold,
+                "succeeded",
+                details: new { ManagerCount = managers.Count }
+            );
         }
 
         return (pendingCallbackSnapshots, managers);
@@ -2050,7 +2122,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         try
         {
             await EnsureManagerStoppedAsync(manager, cancellationToken);
-            await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly);
+            await MeasureMonoTorrentOperationAsync(
+                "engine_remove_metadata_session",
+                snapshot.TorrentId,
+                snapshot.Name,
+                async () => await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly)
+            );
 
             _managers.Remove(snapshot.TorrentId);
             _observedTorrentIds.Remove(snapshot.TorrentId);
@@ -2059,7 +2136,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var magnet = MagnetLink.Parse(snapshot.MagnetUri);
             var downloadRootPath =
                     MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
-            var recreatedManager = await _engine.AddAsync(magnet, downloadRootPath);
+            var recreatedManager = await MeasureMonoTorrentOperationAsync(
+                "engine_recreate_metadata_session",
+                snapshot.TorrentId,
+                snapshot.Name,
+                async () => await _engine!.AddAsync(magnet, downloadRootPath)
+            );
             RegisterManager(snapshot.TorrentId, recreatedManager);
             _managers[snapshot.TorrentId] = recreatedManager;
             return recreatedManager;
@@ -2714,5 +2796,55 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             _gate.Release();
         }
+    }
+
+    private async Task<T> MeasureMonoTorrentOperationAsync<T>(
+        string operation,
+        Guid? torrentId,
+        string? torrentName,
+        Func<Task<T>> action)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var outcome = "succeeded";
+        try
+        {
+            return await action();
+        }
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            await durationDiagnostics.RecordIfSlowAsync(
+                "monotorrent",
+                operation,
+                stopwatch.Elapsed,
+                RuntimeOperationDurationDiagnostics.MonoTorrentSlowThreshold,
+                outcome,
+                torrentId,
+                new { TorrentName = torrentName }
+            );
+        }
+    }
+
+    private async Task MeasureMonoTorrentOperationAsync(
+        string operation,
+        Guid? torrentId,
+        string? torrentName,
+        Func<Task> action)
+    {
+        await MeasureMonoTorrentOperationAsync(
+            operation,
+            torrentId,
+            torrentName,
+            async () =>
+            {
+                await action();
+                return true;
+            }
+        );
     }
 }

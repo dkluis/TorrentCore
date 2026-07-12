@@ -22,6 +22,15 @@
 - Finalization checks do not treat the first internal completed edge as sufficient.
 - Pending finalization, failure, timeout, and retryability are persisted separately from torrent transfer state.
 - TorrentCore does not delete partial files or final payload files as part of callback finalization.
+- The callback is the authoritative downstream-readiness signal.
+- Downstream systems do not infer readiness by independently scanning download paths or filenames.
+
+## MonoTorrent Refactor Cutover
+
+- Deploy the refactored MonoTorrent integration only after TorrentCore has zero active torrents and no active downloads.
+- Do not migrate active MonoTorrent managers or partially downloaded payloads during cutover.
+- Existing history may remain because it is separate from active torrent state.
+- Inventory any existing `.!mt` artifacts before cutover; TorrentCore does not perform an automated migration.
 
 ## History Appendix
 

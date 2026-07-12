@@ -13,7 +13,8 @@ namespace TorrentCore.Service.Callbacks;
 
 public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService runtimeSettingsService,
     ResolvedTorrentCoreServicePaths servicePaths, IActivityLogService activityLogService,
-    ServiceInstanceContext serviceInstanceContext, ILogger<TorrentCompletionCallbackInvoker> logger)
+    ServiceInstanceContext serviceInstanceContext, RuntimeOperationDurationDiagnostics durationDiagnostics,
+    ILogger<TorrentCompletionCallbackInvoker> logger)
         : ITorrentCompletionCallbackInvoker
 {
     private const string TvmazeApiCompleteApiKeyEnvironmentVariable      = "TVMAZE_API_COMPLETE_API_KEY";
@@ -32,6 +33,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
         CancellationToken cancellationToken
     )
     {
+        var callbackStopwatch = Stopwatch.StartNew();
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         if (!runtimeSettings.CompletionCallbackEnabled ||
             string.IsNullOrWhiteSpace(runtimeSettings.CompletionCallbackCommandPath))
@@ -72,6 +74,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
                 runtimeSettings, finalPayloadPath, null, null, workingDirectory, exception.Message,
                 cancellationToken
             );
+            await RecordCallbackDurationAsync(currentSnapshot, callbackStopwatch, "launch_failed");
             return new TorrentCompletionCallbackInvocationResult
             {
                 Status = TorrentCompletionCallbackInvocationStatus.Failed,
@@ -116,6 +119,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
                 $"The callback exceeded the {runtimeSettings.CompletionCallbackTimeoutSeconds}-second timeout.",
                 cancellationToken
             );
+            await RecordCallbackDurationAsync(currentSnapshot, callbackStopwatch, "timed_out");
             return new TorrentCompletionCallbackInvocationResult
             {
                 Status = TorrentCompletionCallbackInvocationStatus.TimedOut,
@@ -137,6 +141,7 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
                 $"The callback exited with code {process.ExitCode}.",
                 cancellationToken
             );
+            await RecordCallbackDurationAsync(currentSnapshot, callbackStopwatch, "failed");
             return new TorrentCompletionCallbackInvocationResult
             {
                 Status = TorrentCompletionCallbackInvocationStatus.Failed,
@@ -149,11 +154,30 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
             $"Submitted completion callback for torrent '{currentSnapshot.Name}' and waiting for TVMaze feedback.", currentSnapshot, runtimeSettings,
             finalPayloadPath, processId, process.ExitCode, workingDirectory, null, cancellationToken
         );
+        await RecordCallbackDurationAsync(currentSnapshot, callbackStopwatch, "succeeded");
 
         return new TorrentCompletionCallbackInvocationResult
         {
             Status = TorrentCompletionCallbackInvocationStatus.Invoked,
         };
+    }
+
+    private Task RecordCallbackDurationAsync(TorrentSnapshot snapshot, Stopwatch stopwatch, string outcome)
+    {
+        stopwatch.Stop();
+        return durationDiagnostics.RecordIfSlowAsync(
+            "callback",
+            "completion_callback_process",
+            stopwatch.Elapsed,
+            RuntimeOperationDurationDiagnostics.CallbackSlowThreshold,
+            outcome,
+            snapshot.TorrentId,
+            new
+            {
+                snapshot.Name,
+                snapshot.CategoryKey,
+            }
+        );
     }
 
     private ProcessStartInfo BuildProcessStartInfo(RuntimeSettingsSnapshot runtimeSettings, TorrentSnapshot snapshot,
