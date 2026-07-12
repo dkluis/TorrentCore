@@ -35,7 +35,6 @@ public sealed class RuntimeOperationDurationDiagnostics(
                 Category = "runtime",
                 EventType = "runtime.operation.slow",
                 Message = $"Runtime operation '{operation}' in subsystem '{subsystem}' took {duration.TotalMilliseconds:F0} ms.",
-                TorrentId = torrentId,
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(
                     new
@@ -45,7 +44,74 @@ public sealed class RuntimeOperationDurationDiagnostics(
                         DurationMilliseconds = duration.TotalMilliseconds,
                         ThresholdMilliseconds = threshold.TotalMilliseconds,
                         Outcome = outcome,
+                        TorrentId = torrentId,
                         Details = details,
+                    }
+                ),
+            },
+            CancellationToken.None
+        );
+    }
+
+    public Task WriteRecoveryActionCompletedAsync(
+        string recoveryKind,
+        string action,
+        int attemptNumber,
+        TimeSpan duration,
+        string outcome,
+        Guid torrentId,
+        string torrentName,
+        object? details = null)
+    {
+        return activityLogService.TryWriteActivityLogAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = outcome == "succeeded" ? ActivityLogLevel.Information : ActivityLogLevel.Warning,
+                Category = "runtime",
+                EventType = "runtime.recovery.action_completed",
+                Message = $"Recovery action '{action}' for torrent '{torrentName}' {outcome} in {duration.TotalMilliseconds:F0} ms.",
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        RecoveryKind = recoveryKind,
+                        Action = action,
+                        AttemptNumber = attemptNumber,
+                        DurationMilliseconds = duration.TotalMilliseconds,
+                        Outcome = outcome,
+                        TorrentId = torrentId,
+                        TorrentName = torrentName,
+                        Details = details,
+                    }
+                ),
+            },
+            CancellationToken.None
+        );
+    }
+
+    public Task WriteCallbackExecutionCompletedAsync(
+        TimeSpan duration,
+        string outcome,
+        Guid torrentId,
+        string torrentName,
+        string? categoryKey)
+    {
+        return activityLogService.TryWriteActivityLogAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = outcome == "succeeded" ? ActivityLogLevel.Information : ActivityLogLevel.Warning,
+                Category = "runtime",
+                EventType = "runtime.callback.execution_completed",
+                Message = $"Completion callback execution for torrent '{torrentName}' {outcome} in {duration.TotalMilliseconds:F0} ms.",
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(
+                    new
+                    {
+                        DurationMilliseconds = duration.TotalMilliseconds,
+                        Outcome = outcome,
+                        TorrentId = torrentId,
+                        TorrentName = torrentName,
+                        CategoryKey = categoryKey,
                     }
                 ),
             },

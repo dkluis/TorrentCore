@@ -57,10 +57,14 @@ Inspect persistent activity logs for:
 
 - `runtime.operation.slow`
 - `runtime.tick.duration_summary`
+- `runtime.recovery.action_completed`
+- `runtime.callback.execution_completed`
+- `runtime.connection.activity_summary`
 - `runtime.tick.failed`
 
 Use the logged subsystem and operation fields to distinguish synchronization-gate waits, MonoTorrent lifecycle work,
-callback execution, and storage phases before restarting the service.
+callback execution, and storage phases before restarting the service. Recovery and connection summaries retain torrent
+context after torrent-scoped activity logs are pruned.
 
 ## Deployment And Runtime Checks
 

@@ -162,10 +162,17 @@ public sealed class TorrentCompletionCallbackInvoker(IRuntimeSettingsService run
         };
     }
 
-    private Task RecordCallbackDurationAsync(TorrentSnapshot snapshot, Stopwatch stopwatch, string outcome)
+    private async Task RecordCallbackDurationAsync(TorrentSnapshot snapshot, Stopwatch stopwatch, string outcome)
     {
         stopwatch.Stop();
-        return durationDiagnostics.RecordIfSlowAsync(
+        await durationDiagnostics.WriteCallbackExecutionCompletedAsync(
+            stopwatch.Elapsed,
+            outcome,
+            snapshot.TorrentId,
+            snapshot.Name,
+            snapshot.CategoryKey
+        );
+        await durationDiagnostics.RecordIfSlowAsync(
             "callback",
             "completion_callback_process",
             stopwatch.Elapsed,

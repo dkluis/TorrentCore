@@ -73,7 +73,11 @@ Duration diagnostics:
 
 - `runtime.operation.slow` identifies slow synchronization, gate-wait, MonoTorrent, callback, and storage phases
 - `runtime.tick.duration_summary` records minute-scale synchronization timing baselines without logging every tick
+- `runtime.recovery.action_completed` records each automatic recovery action, attempt number, duration, and outcome
+- `runtime.callback.execution_completed` records callback-process duration independently from callback feedback state
+- `runtime.connection.activity_summary` aggregates per-torrent peer and connection churn over one-minute windows
 - slow-operation details include subsystem, operation, duration, threshold, outcome, and torrent context when available
+- runtime diagnostics store torrent context in event details rather than the torrent-scoped log column so completed-torrent log pruning preserves them
 
 ## WebUI Service Connection State
 

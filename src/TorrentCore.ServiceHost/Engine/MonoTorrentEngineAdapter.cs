@@ -29,13 +29,18 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     RuntimeOperationDurationDiagnostics durationDiagnostics,
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
+    private static readonly TimeSpan ConnectionActivitySummaryInterval = TimeSpan.FromMinutes(1);
+    private readonly ConnectionActivitySummaryTracker                          _connectionActivitySummaries = new();
     private readonly ConnectionFailureLogThrottle                             _connectionFailureLogThrottle = new();
+    private readonly ConcurrentDictionary<Guid, int>                          _downloadRecoveryAttemptCounts = new();
     private readonly ConcurrentDictionary<Guid, TorrentDownloadRecoveryState> _downloadRecoveryStates = new();
     private readonly SemaphoreSlim                                            _gate = new(1, 1);
     private readonly Dictionary<Guid, TorrentManager>                         _managers = new();
+    private readonly ConcurrentDictionary<Guid, int>                          _metadataRecoveryAttemptCounts = new();
     private readonly ConcurrentDictionary<Guid, TorrentMetadataRecoveryState> _metadataRecoveryStates = new();
     private readonly HashSet<Guid>                                            _observedTorrentIds = [];
     private readonly ConcurrentDictionary<Guid, long>                         _observedUploadedSessionBytes = new();
+    private readonly ConcurrentDictionary<TorrentManager, Guid>               _torrentIdsByManager = new();
     private readonly TorrentCoreServiceOptions                                _serviceOptions = serviceOptions.Value;
     private readonly SemaphoreSlim                                            _synchronizationGate = new(1, 1);
     private          int                                                      _disposeState;
@@ -102,7 +107,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     if (manager.State is not MonoTorrent.Client.TorrentState.Stopped and
                         not MonoTorrent.Client.TorrentState.Paused)
                     {
-                        await manager.StopAsync(TimeSpan.FromSeconds(2));
+                        await EnsureManagerStoppedAsync(manager, cancellationToken);
                     }
                 }
                 catch (Exception exception)
@@ -115,9 +120,13 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             _managers.Clear();
             _observedTorrentIds.Clear();
             _observedUploadedSessionBytes.Clear();
+            _torrentIdsByManager.Clear();
             _downloadRecoveryStates.Clear();
+            _downloadRecoveryAttemptCounts.Clear();
             _metadataRecoveryStates.Clear();
+            _metadataRecoveryAttemptCounts.Clear();
             _connectionFailureLogThrottle.Clear();
+            _connectionActivitySummaries.Clear();
             _recovered          = false;
             _lastRecoveryResult = null;
         }
@@ -849,10 +858,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             );
 
             _managers.Remove(torrentId);
+            _torrentIdsByManager.TryRemove(manager, out _);
             _observedTorrentIds.Remove(torrentId);
             _observedUploadedSessionBytes.TryRemove(torrentId, out _);
             _downloadRecoveryStates.TryRemove(torrentId, out _);
+            _downloadRecoveryAttemptCounts.TryRemove(torrentId, out _);
             _metadataRecoveryStates.TryRemove(torrentId, out _);
+            _metadataRecoveryAttemptCounts.TryRemove(torrentId, out _);
+            _connectionActivitySummaries.Remove(torrentId);
         }
         finally
         {
@@ -1226,6 +1239,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             );
         }
 
+        await WriteConnectionActivitySummariesAsync(now, managers, cancellationToken);
+
         return (pendingCallbackSnapshots, managers);
     }
 
@@ -1565,6 +1580,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     private void RegisterManager(Guid torrentId, TorrentManager manager)
     {
+        _torrentIdsByManager[manager] = torrentId;
         if (!_observedTorrentIds.Add(torrentId))
         {
             return;
@@ -1622,9 +1638,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
+            var now = DateTimeOffset.UtcNow;
+            _connectionActivitySummaries.RegisterPeersFound(torrentId, now, eventArgs.NewPeers);
             if (eventArgs.NewPeers > 0)
             {
-                NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
+                NoteMetadataDiscoveryActivity(torrentId, now);
             }
 
             await activityLogService.TryWriteActivityLogAsync(
@@ -1658,7 +1676,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
-            NoteMetadataDiscoveryActivity(torrentId, DateTimeOffset.UtcNow);
+            var now = DateTimeOffset.UtcNow;
+            _connectionActivitySummaries.RegisterPeerConnected(torrentId, now);
+            NoteMetadataDiscoveryActivity(torrentId, now);
 
             await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
@@ -1695,6 +1715,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
+            _connectionActivitySummaries.RegisterPeerDisconnected(torrentId, DateTimeOffset.UtcNow);
             await activityLogService.TryWriteActivityLogAsync(
                 new ActivityLogWriteRequest
                 {
@@ -1742,6 +1763,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             if (currentSnapshot.DesiredState != TorrentDesiredState.Runnable)
             {
                 ResetMetadataRecoveryState(currentSnapshot.TorrentId);
+                _metadataRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
                 continue;
             }
 
@@ -1755,6 +1777,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             if (!isResolvingMetadata)
             {
                 ResetMetadataRecoveryState(currentSnapshot.TorrentId);
+                _metadataRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
                 continue;
             }
 
@@ -1765,20 +1788,32 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             switch (decision.Action)
             {
                 case MetadataRecoveryAction.Refresh:
-                    await RequestMetadataDiscoveryRefreshAsync(
-                        currentSnapshot, manager, now, "automatic_stale_metadata", cancellationToken,
+                    await ExecuteRecoveryActionAsync(
+                        "metadata", decision.Action.ToString(), currentSnapshot, _metadataRecoveryAttemptCounts,
+                        async () => await RequestMetadataDiscoveryRefreshAsync(
+                            currentSnapshot, manager, now, "automatic_stale_metadata", cancellationToken,
+                            decision
+                        ),
                         decision
                     );
                 break;
                 case MetadataRecoveryAction.Restart:
-                    await RestartMetadataResolutionAsync(
-                        currentSnapshot, manager, now, runtimeSettings, cancellationToken,
+                    await ExecuteRecoveryActionAsync(
+                        "metadata", decision.Action.ToString(), currentSnapshot, _metadataRecoveryAttemptCounts,
+                        async () => await RestartMetadataResolutionAsync(
+                            currentSnapshot, manager, now, runtimeSettings, cancellationToken,
+                            decision
+                        ),
                         decision
                     );
                 break;
                 case MetadataRecoveryAction.Reset:
-                    await ResetMetadataResolutionAsync(
-                        currentSnapshot, manager, now, runtimeSettings, cancellationToken,
+                    await ExecuteRecoveryActionAsync(
+                        "metadata", decision.Action.ToString(), currentSnapshot, _metadataRecoveryAttemptCounts,
+                        async () => await ResetMetadataResolutionAsync(
+                            currentSnapshot, manager, now, runtimeSettings, cancellationToken,
+                            decision
+                        ),
                         decision
                     );
                 break;
@@ -1802,6 +1837,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             if (currentSnapshot.DesiredState != TorrentDesiredState.Runnable)
             {
                 ResetDownloadRecoveryState(currentSnapshot.TorrentId);
+                _downloadRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
                 continue;
             }
 
@@ -1818,6 +1854,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             if (!isTrackedDownload)
             {
                 ResetDownloadRecoveryState(currentSnapshot.TorrentId);
+                _downloadRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
                 continue;
             }
 
@@ -1828,14 +1865,22 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             switch (decision.Action)
             {
                 case DownloadRecoveryAction.Refresh:
-                    await RequestDownloadPeerRefreshAsync(
-                        currentSnapshot, manager, now, "automatic_stale_download", cancellationToken,
+                    await ExecuteRecoveryActionAsync(
+                        "download", decision.Action.ToString(), currentSnapshot, _downloadRecoveryAttemptCounts,
+                        async () => await RequestDownloadPeerRefreshAsync(
+                            currentSnapshot, manager, now, "automatic_stale_download", cancellationToken,
+                            decision
+                        ),
                         decision
                     );
                 break;
                 case DownloadRecoveryAction.Restart:
-                    await RestartDownloadPeerRecoveryAsync(
-                        currentSnapshot, manager, now, runtimeSettings, cancellationToken,
+                    await ExecuteRecoveryActionAsync(
+                        "download", decision.Action.ToString(), currentSnapshot, _downloadRecoveryAttemptCounts,
+                        async () => await RestartDownloadPeerRecoveryAsync(
+                            currentSnapshot, manager, now, runtimeSettings, cancellationToken,
+                            decision
+                        ),
                         decision
                     );
                 break;
@@ -1846,12 +1891,22 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     private async Task<bool> RunPeerDiscoveryAnnounceAsync(TorrentManager manager, CancellationToken cancellationToken)
     {
         await EnsureManagerStartedAsync(manager, cancellationToken);
-        await manager.DhtAnnounceAsync();
+        await MeasureMonoTorrentOperationAsync(
+            "manager_dht_announce",
+            GetTorrentId(manager),
+            manager.Name,
+            async () => await manager.DhtAnnounceAsync()
+        );
 
         var usedTrackerAnnounce = manager.TrackerManager is not null && CountTrackers(manager) > 0;
         if (usedTrackerAnnounce)
         {
-            await manager.TrackerManager!.AnnounceAsync(TorrentEvent.Started, cancellationToken);
+            await MeasureMonoTorrentOperationAsync(
+                "manager_tracker_announce",
+                GetTorrentId(manager),
+                manager.Name,
+                async () => await manager.TrackerManager!.AnnounceAsync(TorrentEvent.Started, cancellationToken)
+            );
         }
 
         return usedTrackerAnnounce;
@@ -2130,6 +2185,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             );
 
             _managers.Remove(snapshot.TorrentId);
+            _torrentIdsByManager.TryRemove(manager, out _);
             _observedTorrentIds.Remove(snapshot.TorrentId);
             _observedUploadedSessionBytes.TryRemove(snapshot.TorrentId, out _);
 
@@ -2178,6 +2234,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         try
         {
+            _connectionActivitySummaries.RegisterConnectionFailure(
+                torrentId,
+                DateTimeOffset.UtcNow,
+                eventArgs.Reason.ToString()
+            );
             var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(CancellationToken.None);
             var decision = _connectionFailureLogThrottle.RegisterAttempt(
                 $"{torrentId:N}:{eventArgs.Reason}", DateTimeOffset.UtcNow,
@@ -2218,6 +2279,44 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             logger.LogDebug(
                 exception, "Failed handling MonoTorrent connection-failed event for torrent {TorrentId}", torrentId
+            );
+        }
+    }
+
+    private async Task WriteConnectionActivitySummariesAsync(
+        DateTimeOffset now,
+        IReadOnlyList<KeyValuePair<Guid, TorrentManager>> managers,
+        CancellationToken cancellationToken)
+    {
+        foreach (var summary in _connectionActivitySummaries.DrainReady(now, ConnectionActivitySummaryInterval))
+        {
+            var manager = managers.FirstOrDefault(entry => entry.Key == summary.TorrentId).Value;
+            await activityLogService.TryWriteActivityLogAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level = ActivityLogLevel.Information,
+                    Category = "runtime",
+                    EventType = "runtime.connection.activity_summary",
+                    Message = $"Connection activity summary for torrent '{manager?.Name ?? summary.TorrentId.ToString()}'.",
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            summary.TorrentId,
+                            TorrentName = manager?.Name,
+                            summary.WindowStartedAtUtc,
+                            summary.WindowEndedAtUtc,
+                            WindowSeconds = (summary.WindowEndedAtUtc - summary.WindowStartedAtUtc).TotalSeconds,
+                            summary.PeersFoundEvents,
+                            summary.NewPeersFound,
+                            summary.PeerConnectedEvents,
+                            summary.PeerDisconnectedEvents,
+                            summary.ConnectionFailureEvents,
+                            summary.ConnectionFailuresByReason,
+                        }
+                    ),
+                },
+                cancellationToken
             );
         }
     }
@@ -2306,7 +2405,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             try
             {
-                await manager.StopAsync(TimeSpan.FromSeconds(2));
+                await EnsureManagerStoppedAsync(manager, cancellationToken);
             }
             catch (ObjectDisposedException exception)
             {
@@ -2528,7 +2627,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 not MonoTorrent.Client.TorrentState.Paused and not MonoTorrent.Client.TorrentState.Error;
     }
 
-    private static async Task EnsureManagerStoppedAsync(TorrentManager manager, CancellationToken cancellationToken)
+    private async Task EnsureManagerStoppedAsync(TorrentManager manager, CancellationToken cancellationToken)
     {
         if (manager.State is MonoTorrent.Client.TorrentState.Stopped or MonoTorrent.Client.TorrentState.Stopping)
         {
@@ -2536,10 +2635,15 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await manager.StopAsync(TimeSpan.FromSeconds(2));
+        await MeasureMonoTorrentOperationAsync(
+            "manager_stop",
+            GetTorrentId(manager),
+            manager.Name,
+            async () => await manager.StopAsync(TimeSpan.FromSeconds(2))
+        );
     }
 
-    private static async Task EnsureManagerPausedAsync(TorrentManager manager, CancellationToken cancellationToken)
+    private async Task EnsureManagerPausedAsync(TorrentManager manager, CancellationToken cancellationToken)
     {
         await WaitForManagerToBecomeRestartableAsync(manager, cancellationToken);
 
@@ -2549,16 +2653,26 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        await manager.PauseAsync();
+        await MeasureMonoTorrentOperationAsync(
+            "manager_pause",
+            GetTorrentId(manager),
+            manager.Name,
+            async () => await manager.PauseAsync()
+        );
     }
 
-    private static async Task EnsureManagerStartedAsync(TorrentManager manager, CancellationToken cancellationToken)
+    private async Task EnsureManagerStartedAsync(TorrentManager manager, CancellationToken cancellationToken)
     {
         await WaitForManagerToBecomeRestartableAsync(manager, cancellationToken);
 
         if (!IsManagerRunning(manager))
         {
-            await manager.StartAsync();
+            await MeasureMonoTorrentOperationAsync(
+                "manager_start",
+                GetTorrentId(manager),
+                manager.Name,
+                async () => await manager.StartAsync()
+            );
         }
     }
 
@@ -2828,6 +2942,47 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 new { TorrentName = torrentName }
             );
         }
+    }
+
+    private async Task ExecuteRecoveryActionAsync<TDecision>(
+        string recoveryKind,
+        string action,
+        TorrentSnapshot snapshot,
+        ConcurrentDictionary<Guid, int> attemptCounts,
+        Func<Task> operation,
+        TDecision decision)
+    {
+        var attemptNumber = attemptCounts.AddOrUpdate(snapshot.TorrentId, 1, (_, count) => count + 1);
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var outcome = "succeeded";
+        try
+        {
+            await operation();
+        }
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            await durationDiagnostics.WriteRecoveryActionCompletedAsync(
+                recoveryKind,
+                action,
+                attemptNumber,
+                stopwatch.Elapsed,
+                outcome,
+                snapshot.TorrentId,
+                snapshot.Name,
+                decision
+            );
+        }
+    }
+
+    private Guid? GetTorrentId(TorrentManager manager)
+    {
+        return _torrentIdsByManager.TryGetValue(manager, out var torrentId) ? torrentId : null;
     }
 
     private async Task MeasureMonoTorrentOperationAsync(
