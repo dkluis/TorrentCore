@@ -1664,6 +1664,7 @@ public sealed class TorrentApiTests
                 timeout: TimeSpan.FromSeconds(5));
 
             Assert.NotNull(invokedTorrent);
+            var finalizedLastActivityAtUtc = invokedTorrent.LastActivityAtUtc;
 
             await Task.Delay(TimeSpan.FromSeconds(2));
 
@@ -1674,6 +1675,7 @@ public sealed class TorrentApiTests
             Assert.Equal(TorrentCompletionCallbackState.Invoked.ToString(), stableTorrent.CompletionCallbackState);
             Assert.NotNull(stableTorrent.CompletionCallbackFeedback);
             Assert.Equal(reportRequest.CorrelationId, stableTorrent.CompletionCallbackFeedback.CorrelationId);
+            Assert.Equal(finalizedLastActivityAtUtc, stableTorrent.LastActivityAtUtc);
             Assert.DoesNotContain("Timed out waiting for TVMaze callback feedback", stableTorrent.CompletionCallbackLastError ?? string.Empty, StringComparison.Ordinal);
             Assert.NotNull(summaries);
             Assert.Contains(

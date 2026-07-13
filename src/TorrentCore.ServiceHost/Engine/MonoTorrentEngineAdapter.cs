@@ -1152,13 +1152,23 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         foreach (var entry in managers)
         {
-            var snapshot = await torrentStateStore.GetAsync(entry.Key, cancellationToken);
+            var snapshot = await MeasureStorageOperationAsync(
+                "torrent_snapshot_read",
+                entry.Key,
+                async () => await torrentStateStore.GetAsync(entry.Key, cancellationToken)
+            );
             if (snapshot is null)
             {
                 continue;
             }
 
+            if (CanSkipCompletedSynchronization(snapshot, entry.Value))
+            {
+                continue;
+            }
+
             TorrentSnapshot updatedSnapshot;
+            var projectionStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             if (snapshot.DesiredState == TorrentDesiredState.Paused)
             {
@@ -1182,12 +1192,47 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     );
                 }
             }
+            projectionStopwatch.Stop();
+            await durationDiagnostics.RecordIfSlowAsync(
+                "engine",
+                "torrent_snapshot_projection",
+                projectionStopwatch.Elapsed,
+                RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
+                "succeeded",
+                entry.Key,
+                new { TorrentName = snapshot.Name, snapshot.State }
+            );
 
             var previousCompletedAtUtc = snapshot.CompletedAtUtc;
-            var observedFiles = GetObservedFilePaths(entry.Value);
-            var finalizationResult = CreateFinalizationCheckResult(updatedSnapshot, runtimeSettings, observedFiles);
+            TorrentCompletionFinalizationCheckResult? finalizationResult = null;
+            if (ShouldEvaluateCompletionFinalization(previousCompletedAtUtc, updatedSnapshot) ||
+                ShouldEvaluateTimedOutFinalization(updatedSnapshot))
+            {
+                var finalizationStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                finalizationResult = CreateFinalizationCheckResult(
+                    updatedSnapshot,
+                    runtimeSettings,
+                    GetObservedFilePaths(entry.Value)
+                );
+                finalizationStopwatch.Stop();
+                await durationDiagnostics.RecordIfSlowAsync(
+                    "storage",
+                    "torrent_finalization_visibility_check",
+                    finalizationStopwatch.Elapsed,
+                    RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
+                    "succeeded",
+                    entry.Key,
+                    new { TorrentName = snapshot.Name }
+                );
+            }
+
             await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
-                previousCompletedAtUtc, updatedSnapshot, runtimeSettings, now, cancellationToken, finalizationResult
+                previousCompletedAtUtc,
+                updatedSnapshot,
+                runtimeSettings,
+                now,
+                cancellationToken,
+                finalizationResult
             );
 
             if (ShouldAutoRequeueFinalizationTimeout(updatedSnapshot, finalizationResult))
@@ -1198,9 +1243,21 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 updatedSnapshot.CompletionCallbackLastError       = null;
             }
 
-            updatedSnapshot = await PreserveLatestPersistedCallbackProgressAsync(updatedSnapshot, cancellationToken);
-            await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
-            await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
+            updatedSnapshot = await MeasureStorageOperationAsync(
+                "torrent_callback_progress_read",
+                entry.Key,
+                async () => await PreserveLatestPersistedCallbackProgressAsync(updatedSnapshot, cancellationToken)
+            );
+            await MeasureStorageOperationAsync(
+                "torrent_snapshot_write",
+                entry.Key,
+                async () => await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken)
+            );
+            await MeasureStorageOperationAsync(
+                "torrent_history_write",
+                entry.Key,
+                async () => await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken)
+            );
 
             if (updatedSnapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
                 TorrentCompletionCallbackState.WaitingForFeedback)
@@ -1267,10 +1324,28 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var currentSnapshot =
                     await PreserveLatestPersistedCallbackProgressAsync(callbackSnapshot, cancellationToken);
             var manager = managers.FirstOrDefault(entry => entry.Key == currentSnapshot.TorrentId).Value;
-            var observedFiles = GetObservedFilePaths(manager);
+            TorrentCompletionFinalizationCheckResult? finalizationResult = null;
+            if (currentSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
+            {
+                var finalizationStopwatch = System.Diagnostics.Stopwatch.StartNew();
+                finalizationResult = CreateFinalizationCheckResult(
+                    currentSnapshot,
+                    runtimeSettings,
+                    GetObservedFilePaths(manager)
+                );
+                finalizationStopwatch.Stop();
+                await durationDiagnostics.RecordIfSlowAsync(
+                    "storage",
+                    "torrent_finalization_visibility_check",
+                    finalizationStopwatch.Elapsed,
+                    RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
+                    "succeeded",
+                    currentSnapshot.TorrentId,
+                    new { TorrentName = currentSnapshot.Name }
+                );
+            }
             if (!await completionCallbackProcessor.ProcessPendingAsync(
-                        currentSnapshot, runtimeSettings, now, cancellationToken,
-                        CreateFinalizationCheckResult(currentSnapshot, runtimeSettings, observedFiles)
+                        currentSnapshot, runtimeSettings, now, cancellationToken, finalizationResult
                     ))
             {
                 continue;
@@ -1358,8 +1433,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             await EnsureManagerStartedAsync(manager, cancellationToken);
 
             var previousCompletedAtUtc = currentSnapshot.CompletedAtUtc;
-            var observedFiles = GetObservedFilePaths(manager);
-
             var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
             updatedSnapshot.State = ContractTorrentState.Seeding;
             updatedSnapshot = ApplyFileCompletionVisibilityIfNeeded(updatedSnapshot, manager, runtimeSettings);
@@ -1370,9 +1443,19 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 );
             }
 
-            var finalizationResult = CreateFinalizationCheckResult(updatedSnapshot, runtimeSettings, observedFiles);
+            var finalizationResult = ShouldEvaluateCompletionFinalization(
+                previousCompletedAtUtc,
+                updatedSnapshot
+            )
+                ? CreateFinalizationCheckResult(updatedSnapshot, runtimeSettings, GetObservedFilePaths(manager))
+                : null;
             await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
-                previousCompletedAtUtc, updatedSnapshot, runtimeSettings, now, cancellationToken, finalizationResult
+                previousCompletedAtUtc,
+                updatedSnapshot,
+                runtimeSettings,
+                now,
+                cancellationToken,
+                finalizationResult
             );
 
             updatedSnapshot = await PreserveLatestPersistedCallbackProgressAsync(updatedSnapshot, cancellationToken);
@@ -2906,13 +2989,61 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     }
 
     private static bool ShouldAutoRequeueFinalizationTimeout(TorrentSnapshot snapshot,
-        TorrentCompletionFinalizationCheckResult finalizationResult)
+        TorrentCompletionFinalizationCheckResult? finalizationResult)
     {
         return snapshot.CompletionCallbackState == TorrentCompletionCallbackState.TimedOut &&
                snapshot.CompletionCallbackInvokedAtUtc is null &&
                !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLastError) &&
                TorrentCompletionCallbackDiagnostics.IsFinalizationVisibilityTimeout(snapshot.CompletionCallbackLastError) &&
-               finalizationResult.IsReady;
+               finalizationResult?.IsReady == true;
+    }
+
+    private static bool ShouldEvaluateTimedOutFinalization(TorrentSnapshot snapshot)
+    {
+        return snapshot.CompletionCallbackState == TorrentCompletionCallbackState.TimedOut &&
+               snapshot.CompletionCallbackInvokedAtUtc is null &&
+               TorrentCompletionCallbackDiagnostics.IsFinalizationVisibilityTimeout(
+                   snapshot.CompletionCallbackLastError
+               );
+    }
+
+    private static bool ShouldEvaluateCompletionFinalization(
+        DateTimeOffset? previousCompletedAtUtc,
+        TorrentSnapshot snapshot)
+    {
+        return previousCompletedAtUtc is null &&
+               snapshot.CompletedAtUtc is not null &&
+               (snapshot.State is ContractTorrentState.Completed or ContractTorrentState.Seeding or
+                       ContractTorrentState.Queued) &&
+               snapshot.InvokeCompletionCallback &&
+               !string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLabel) &&
+               snapshot.CompletionCallbackState is null;
+    }
+
+    private static bool CanSkipCompletedSynchronization(TorrentSnapshot snapshot, TorrentManager manager)
+    {
+        if (snapshot.State != ContractTorrentState.Completed || IsManagerRunning(manager))
+        {
+            return false;
+        }
+
+        if (!snapshot.InvokeCompletionCallback || string.IsNullOrWhiteSpace(snapshot.CompletionCallbackLabel))
+        {
+            return true;
+        }
+
+        return snapshot.CompletionCallbackState switch
+        {
+            TorrentCompletionCallbackState.WaitingForFeedback =>
+                    snapshot.CompletionCallbackInvokedAtUtc is not null,
+            TorrentCompletionCallbackState.Invoked or
+            TorrentCompletionCallbackState.Failed => true,
+            TorrentCompletionCallbackState.TimedOut =>
+                    !TorrentCompletionCallbackDiagnostics.IsFinalizationVisibilityTimeout(
+                        snapshot.CompletionCallbackLastError
+                    ),
+            _ => false,
+        };
     }
 
     private async Task<TorrentManager?> TryGetManagerAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -2925,6 +3056,52 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         finally
         {
             _gate.Release();
+        }
+    }
+
+    private async Task MeasureStorageOperationAsync(
+        string operation,
+        Guid torrentId,
+        Func<Task> action)
+    {
+        await MeasureStorageOperationAsync(
+            operation,
+            torrentId,
+            async () =>
+            {
+                await action();
+                return true;
+            }
+        );
+    }
+
+    private async Task<T> MeasureStorageOperationAsync<T>(
+        string operation,
+        Guid torrentId,
+        Func<Task<T>> action)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        var outcome = "succeeded";
+        try
+        {
+            return await action();
+        }
+        catch
+        {
+            outcome = "failed";
+            throw;
+        }
+        finally
+        {
+            stopwatch.Stop();
+            await durationDiagnostics.RecordIfSlowAsync(
+                "storage",
+                operation,
+                stopwatch.Elapsed,
+                RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
+                outcome,
+                torrentId
+            );
         }
     }
 

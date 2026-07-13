@@ -11,4 +11,5 @@ public sealed class TorrentsPageState
     public int PageSize { get; set; } = 25;
     public Guid? SelectedTorrentId { get; set; }
     public bool AutoRefreshEnabled { get; set; } = true;
+    public int AutoRefreshSeconds { get; set; } = 15;
 }

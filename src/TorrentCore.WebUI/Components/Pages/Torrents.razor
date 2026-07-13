@@ -12,7 +12,7 @@
               Title="Torrents"
               Summary="Single-grid torrent workflow with selected detail/actions below the grid, TVMaze-style panel composition, and periodic refresh."
               Class="torrents-page"
-              StatusLine="Auto refresh runs every 5 seconds. Select a row to manage one torrent from the detail panel. Sort from grid headers.">
+              StatusLine="@BuildStatusLine()">
     <HeaderActions>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
@@ -115,6 +115,21 @@
                                              Color="Color.Primary"
                                              Value="_autoRefreshEnabled"
                                              ValueChanged="OnAutoRefreshChanged" />
+                            </div>
+
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.AutoRefreshInterval" />
+                                <MudSelect T="int"
+                                           Value="_autoRefreshSeconds"
+                                           ValueChanged="OnAutoRefreshIntervalChanged"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Dense="true">
+                                    @foreach (var interval in AutoRefreshIntervalOptions)
+                                    {
+                                        <MudSelectItem T="int" Value="@interval">@interval seconds</MudSelectItem>
+                                    }
+                                </MudSelect>
                             </div>
                         </div>
                     </OperatorCard>
@@ -555,7 +570,7 @@
 
 @code {
     private const string StateKey = "torrents:list";
-    private const int AutoRefreshSeconds = 5;
+    private const int DefaultAutoRefreshSeconds = 15;
     private const string UncategorizedFilterValue = "__uncategorized";
     private const string SortName = "name";
     private const string SortCategory = "category";
@@ -568,6 +583,7 @@
     private const string SortCallback = "callback";
 
     private readonly List<TorrentSummaryDto> _allTorrents = [];
+    private static readonly int[] AutoRefreshIntervalOptions = [5, 10, 15];
 
     private TorrentsPageState _state = new()
     {
@@ -578,6 +594,7 @@
     private CancellationTokenSource? _refreshLoopCts;
     private Task? _refreshLoopTask;
     private bool _autoRefreshEnabled = true;
+    private int _autoRefreshSeconds = DefaultAutoRefreshSeconds;
     private bool _isActingOnSelected;
     private bool _isDisposed;
     private bool _isLoadingSelectedDetail;
@@ -661,6 +678,10 @@
         }
 
         _autoRefreshEnabled = _state.AutoRefreshEnabled;
+        _autoRefreshSeconds = AutoRefreshIntervalOptions.Contains(_state.AutoRefreshSeconds)
+            ? _state.AutoRefreshSeconds
+            : DefaultAutoRefreshSeconds;
+        _state.AutoRefreshSeconds = _autoRefreshSeconds;
         _selectedTorrentId = _state.SelectedTorrentId;
 
         await LoadAsync(showSuccessToast: false, showLoadingState: true, fromAutoRefresh: false);
@@ -808,6 +829,18 @@
         _state.AutoRefreshEnabled = value;
         PersistState();
         _actionMessage = value ? "Auto refresh enabled." : "Auto refresh paused.";
+        _actionIsError = false;
+        return Task.CompletedTask;
+    }
+
+    private Task OnAutoRefreshIntervalChanged(int value)
+    {
+        _autoRefreshSeconds = AutoRefreshIntervalOptions.Contains(value)
+            ? value
+            : DefaultAutoRefreshSeconds;
+        _state.AutoRefreshSeconds = _autoRefreshSeconds;
+        PersistState();
+        _actionMessage = $"Auto refresh interval set to {_autoRefreshSeconds} seconds.";
         _actionIsError = false;
         return Task.CompletedTask;
     }
@@ -1045,10 +1078,9 @@
 
     private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(AutoRefreshSeconds));
-
-        while (await timer.WaitForNextTickAsync(cancellationToken))
+        while (!cancellationToken.IsCancellationRequested)
         {
+            await Task.Delay(TimeSpan.FromSeconds(_autoRefreshSeconds), cancellationToken);
             if (_isDisposed || !_autoRefreshEnabled || _isRefreshing || _isActingOnSelected || _isLoadingSelectedDetail)
             {
                 continue;
@@ -1067,6 +1099,11 @@
                 }
             );
         }
+    }
+
+    private string BuildStatusLine()
+    {
+        return $"Auto refresh runs every {_autoRefreshSeconds} seconds. Select a row to manage one torrent from the detail panel. Sort from grid headers.";
     }
 
     private void PersistState()

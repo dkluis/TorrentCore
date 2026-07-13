@@ -49,9 +49,15 @@ public static class TorrentsHelpCatalog
     );
 
     public static readonly SettingHelpContent AutoRefresh = new(
-        "Auto Refresh (5s)",
-        "Turns the 5-second automatic torrent-list refresh loop on or off.",
-        "When enabled, the Torrents page reloads the current list every 5 seconds as long as the page is idle enough to do so safely. While actions or detail loads are in progress, TorrentCore.WebUI intentionally avoids stepping on the active operator workflow."
+        "Auto Refresh",
+        "Turns the automatic torrent-list refresh loop on or off.",
+        "When enabled, the Torrents page reloads at the selected browser-local interval as long as the page is idle enough to do so safely. While actions or detail loads are in progress, TorrentCore.WebUI intentionally avoids stepping on the active operator workflow."
+    );
+
+    public static readonly SettingHelpContent AutoRefreshInterval = new(
+        "Refresh Interval",
+        "Selects a 5, 10, or 15-second torrent-list refresh interval.",
+        "The default is 15 seconds. This preference is stored locally for this WebUI browser and does not change TorrentCore.Service synchronization or another operator's browser."
     );
 
     public static readonly SettingHelpContent CurrentTorrents = new(

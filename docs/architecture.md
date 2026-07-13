@@ -98,5 +98,8 @@ Completion callback rules:
 - TorrentCore may expose the validated final payload path through `TORRENTCORE_FINAL_PAYLOAD_PATH`.
 - TorrentCore does not delete final payload files during callback finalization.
 - Downstream systems must not infer payload readiness by independently scanning download paths or filenames.
+- Completed, stopped torrents leave the per-tick synchronization path after callback dispatch or terminal callback state.
+- Waiting-for-feedback torrents are updated by the feedback API rather than periodic filesystem polling.
+- Finalization visibility checks run only at the completion edge, while pending finalization, or during an explicit retry.
 
 See [docs/decisions/current-decisions.md](decisions/current-decisions.md) for the extracted appendix with the current durable routing, callback, and history rules.
