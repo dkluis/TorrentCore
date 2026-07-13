@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using TorrentCore.Core.Diagnostics;
+using TorrentCore.Persistence.Sqlite.Configuration;
 using TorrentCore.Persistence.Sqlite.Logging;
 using TorrentCore.Persistence.Sqlite.Schema;
 
@@ -13,15 +14,16 @@ public sealed class SqliteWriteCoordinationTests : IDisposable
     );
 
     [Fact]
-    public async Task SeparateLogServices_CoordinateConcurrentWrites_InWalMode()
+    public async Task DiagnosticAndOperationalStores_WriteConcurrently_InWalMode()
     {
         Directory.CreateDirectory(_rootPath);
         var databaseFilePath = Path.Combine(_rootPath, "torrentcore.db");
         await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
         var firstService = new SqliteActivityLogService(databaseFilePath, 1000);
         var secondService = new SqliteActivityLogService(databaseFilePath, 1000);
+        var settingsStore = new SqliteRuntimeSettingsStore(databaseFilePath);
 
-        var writes = Enumerable.Range(0, 100).Select(
+        var logWrites = Enumerable.Range(0, 100).Select(
             index => (index % 2 == 0 ? firstService : secondService).WriteAsync(
                 new ActivityLogWriteRequest
                 {
@@ -33,7 +35,17 @@ public sealed class SqliteWriteCoordinationTests : IDisposable
                 CancellationToken.None
             )
         );
-        await Task.WhenAll(writes);
+        var settingsWrite = settingsStore.UpsertAsync(
+            new Dictionary<string, string>
+            {
+                ["test_setting"] = "operational-write-completed",
+            },
+            CancellationToken.None
+        );
+        await Task.WhenAll(logWrites.Append(settingsWrite));
+
+        var settings = await settingsStore.GetAsync(CancellationToken.None);
+        Assert.Equal("operational-write-completed", settings.Values["test_setting"]);
 
         await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
         await connection.OpenAsync();

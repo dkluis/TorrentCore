@@ -50,8 +50,6 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
-
         await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
@@ -95,7 +93,6 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
         command.Parameters.AddWithValue("$details_json", request.DetailsJson ?? (object) DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
-        await EnforceRetentionAsync(connection, cancellationToken);
     }
 
     public async Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(ActivityLogQuery query,
@@ -106,6 +103,7 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
         var boundedTake = Math.Max(1, query.Take);
 
         await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+        await EnforceRetentionAsync(connection, cancellationToken);
 
         var command = connection.CreateCommand();
         var sql = new StringBuilder(
@@ -215,8 +213,6 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
-
         await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
@@ -232,8 +228,6 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     public async Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
     {
         await EnsureInitializedAsync(cancellationToken);
-
-        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
 
         await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
@@ -254,6 +248,16 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     private async Task EnforceRetentionAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var boundedMaxEntryCount = Math.Max(100, maxEntryCount);
+        var countCommand = connection.CreateCommand();
+        countCommand.CommandText = "SELECT COUNT(*) FROM activity_logs;";
+        var currentEntryCount = Convert.ToInt64(
+            await countCommand.ExecuteScalarAsync(cancellationToken),
+            CultureInfo.InvariantCulture
+        );
+        if (currentEntryCount <= boundedMaxEntryCount)
+        {
+            return;
+        }
 
         var command = connection.CreateCommand();
         command.CommandText = """

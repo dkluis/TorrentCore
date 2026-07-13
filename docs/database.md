@@ -6,9 +6,10 @@ TorrentCore uses a host-local SQLite database managed by `TorrentCore.Persistenc
 
 Schema changes are applied through tracked migrations in `SqliteSchemaMigrator`.
 
-Runtime database connections use WAL journal mode, `synchronous=NORMAL`, a bounded busy timeout, and one coordinated
-writer gate per database file. Reads remain independent so activity-log queries do not compete as writers with torrent
-state, history, category, settings, or diagnostic persistence.
+Runtime database connections use WAL journal mode, `synchronous=NORMAL`, and a bounded busy timeout. Torrent state,
+history, category, and settings stores share one coordinated writer gate per database file. Activity logs deliberately
+write outside that gate so diagnostic traffic cannot queue ahead of lifecycle persistence. Log retention runs at startup
+and before log reads rather than after every insert.
 
 Current core tables:
 
