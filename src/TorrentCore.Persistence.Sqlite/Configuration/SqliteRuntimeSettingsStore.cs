@@ -34,8 +34,7 @@ public sealed class SqliteRuntimeSettingsStore(string databaseFilePath)
                 Directory.CreateDirectory(directoryPath);
             }
 
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken);
+            await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
             _isInitialized = true;
         }
         finally
@@ -48,8 +47,7 @@ public sealed class SqliteRuntimeSettingsStore(string databaseFilePath)
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -85,8 +83,8 @@ public sealed class SqliteRuntimeSettingsStore(string databaseFilePath)
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         var updatedAtUtc = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
@@ -111,14 +109,4 @@ public sealed class SqliteRuntimeSettingsStore(string databaseFilePath)
         await transaction.CommitAsync(cancellationToken);
     }
 
-    private SqliteConnection CreateConnection()
-    {
-        var connectionStringBuilder = new SqliteConnectionStringBuilder
-        {
-            DataSource = databaseFilePath,
-            Mode       = SqliteOpenMode.ReadWriteCreate,
-        };
-
-        return new SqliteConnection(connectionStringBuilder.ToString());
-    }
 }

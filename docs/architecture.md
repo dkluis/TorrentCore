@@ -78,6 +78,7 @@ The WebUI stays a thin client over service contracts. It must not:
 - Queued torrents wait inside TorrentCore until slots open.
 - Queue order is oldest added first, with torrent id as a stable tie-breaker.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
+- Forced recovery announces run outside serialized synchronization, are deduplicated per torrent, and use a bounded tracker-announce window.
 
 ## Category Routing And Callback Rules
 

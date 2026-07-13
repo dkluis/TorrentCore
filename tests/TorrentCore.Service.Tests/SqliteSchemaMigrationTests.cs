@@ -41,6 +41,10 @@ public sealed class SqliteSchemaMigrationTests
         await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
         await connection.OpenAsync();
 
+        var journalModeCommand = connection.CreateCommand();
+        journalModeCommand.CommandText = "PRAGMA journal_mode;";
+        Assert.Equal("wal", Assert.IsType<string>(await journalModeCommand.ExecuteScalarAsync()));
+
         var command = connection.CreateCommand();
         command.CommandText = "SELECT version FROM schema_migrations ORDER BY version;";
 

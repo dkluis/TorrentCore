@@ -34,8 +34,12 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                 Directory.CreateDirectory(directoryPath);
             }
 
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken);
+            await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+            await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+
+            var journalModeCommand = connection.CreateCommand();
+            journalModeCommand.CommandText = "PRAGMA journal_mode=WAL;";
+            await journalModeCommand.ExecuteNonQueryAsync(cancellationToken);
 
             await EnsureSchemaMigrationsTableAsync(connection, cancellationToken);
 
@@ -645,17 +649,6 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
         }
 
         return false;
-    }
-
-    private SqliteConnection CreateConnection()
-    {
-        var connectionStringBuilder = new SqliteConnectionStringBuilder
-        {
-            DataSource = databaseFilePath,
-            Mode       = SqliteOpenMode.ReadWriteCreate,
-        };
-
-        return new SqliteConnection(connectionStringBuilder.ToString());
     }
 
     private sealed record SqliteMigrationDefinition(int Version, string Name,

@@ -36,8 +36,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                 Directory.CreateDirectory(directoryPath);
             }
 
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken);
+            await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
             _isInitialized = true;
         }
         finally
@@ -50,8 +49,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = "SELECT COUNT(*) FROM torrents;";
@@ -63,8 +61,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = "SELECT EXISTS(SELECT 1 FROM torrents WHERE info_hash = $info_hash);";
@@ -77,8 +74,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -124,8 +120,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -174,8 +169,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = CreateInsertCommand(connection, torrent);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -185,8 +180,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
         var command = CreateUpdateCommand(connection, torrent);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -195,8 +190,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = "DELETE FROM torrents WHERE torrent_id = $torrent_id;";
@@ -496,14 +491,4 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue("$error_message", torrent.ErrorMessage ?? (object) DBNull.Value);
     }
 
-    private SqliteConnection CreateConnection()
-    {
-        var connectionStringBuilder = new SqliteConnectionStringBuilder
-        {
-            DataSource = databaseFilePath,
-            Mode       = SqliteOpenMode.ReadWriteCreate,
-        };
-
-        return new SqliteConnection(connectionStringBuilder.ToString());
-    }
 }

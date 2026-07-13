@@ -65,15 +65,15 @@ public static class SettingsHelpCatalog
     );
 
     public static readonly SettingHelpContent EngineConnectionFailureLogBurstLimit = new(
-        "Connection Failure Burst Limit",
-        "Caps how many repeated connection-failure events TorrentCore logs before it starts suppressing duplicates.",
-        "This keeps the activity log from filling with hundreds of near-identical warnings when many peers are unreachable. Raise it if you want more repeated failure visibility; lower it if the log is too noisy. It applies live."
+        "Legacy Failure Burst Limit",
+        "Retained for settings compatibility; TorrentCore no longer persists individual peer connection failures.",
+        "Connection failures are aggregated by torrent and reason in the minute activity summary, so this value no longer controls persistent logging."
     );
 
     public static readonly SettingHelpContent EngineConnectionFailureLogWindowSeconds = new(
-        "Connection Failure Window Seconds",
-        "Sets the time window used with the burst limit for connection-failure log suppression.",
-        "TorrentCore groups repeated identical connection failures inside this window before allowing them to appear again. A longer window suppresses noise more aggressively, while a shorter window lets repeated failures show up again sooner. It applies live."
+        "Legacy Failure Window",
+        "Retained for settings compatibility with the former individual-failure throttle.",
+        "Connection failures now appear only in aggregate minute summaries, so this value no longer affects persistent logging."
     );
 
     public static readonly SettingHelpContent EngineMaximumConnections = new(

@@ -77,8 +77,7 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                 Directory.CreateDirectory(directoryPath);
             }
 
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken);
+            await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
             _isInitialized = true;
         }
         finally
@@ -91,8 +90,7 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = $"{SelectColumns}\nWHERE torrent_id = $torrent_id\nLIMIT 1;";
@@ -105,8 +103,7 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = $"{SelectColumns}\nORDER BY submitted_at_utc DESC, torrent_id DESC;";
@@ -125,8 +122,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -220,8 +217,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -315,8 +312,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -483,14 +480,4 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         return DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
     }
 
-    private SqliteConnection CreateConnection()
-    {
-        var connectionStringBuilder = new SqliteConnectionStringBuilder
-        {
-            DataSource = databaseFilePath,
-            Mode = SqliteOpenMode.ReadWriteCreate,
-        };
-
-        return new SqliteConnection(connectionStringBuilder.ToString());
-    }
 }

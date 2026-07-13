@@ -6,6 +6,10 @@ TorrentCore uses a host-local SQLite database managed by `TorrentCore.Persistenc
 
 Schema changes are applied through tracked migrations in `SqliteSchemaMigrator`.
 
+Runtime database connections use WAL journal mode, `synchronous=NORMAL`, a bounded busy timeout, and one coordinated
+writer gate per database file. Reads remain independent so activity-log queries do not compete as writers with torrent
+state, history, category, settings, or diagnostic persistence.
+
 Current core tables:
 
 - `schema_migrations`

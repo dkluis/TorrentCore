@@ -69,13 +69,13 @@ Queue diagnostics currently expose:
 
 ### Connection Failure Burst Limit
 
-- number of repeated connection-failure warnings allowed before suppression starts
-- applies live
+- retained for settings and API compatibility
+- individual failures are no longer persisted; failure counts and reasons appear in minute activity summaries
 
 ### Connection Failure Window Seconds
 
-- suppression window paired with the burst limit
-- applies live
+- retained for settings and API compatibility
+- individual failure suppression is no longer needed because persistence is summary-only
 
 ## Lifecycle And Cleanup
 

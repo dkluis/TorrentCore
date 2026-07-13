@@ -30,14 +30,16 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
     private static readonly TimeSpan ConnectionActivitySummaryInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan RecoveryTrackerAnnounceTimeout = TimeSpan.FromSeconds(10);
+    private readonly CancellationTokenSource                                  _backgroundOperationCts = new();
     private readonly ConnectionActivitySummaryTracker                          _connectionActivitySummaries = new();
-    private readonly ConnectionFailureLogThrottle                             _connectionFailureLogThrottle = new();
     private readonly ConcurrentDictionary<Guid, int>                          _downloadRecoveryAttemptCounts = new();
     private readonly ConcurrentDictionary<Guid, TorrentDownloadRecoveryState> _downloadRecoveryStates = new();
     private readonly SemaphoreSlim                                            _gate = new(1, 1);
     private readonly Dictionary<Guid, TorrentManager>                         _managers = new();
     private readonly ConcurrentDictionary<Guid, int>                          _metadataRecoveryAttemptCounts = new();
     private readonly ConcurrentDictionary<Guid, TorrentMetadataRecoveryState> _metadataRecoveryStates = new();
+    private readonly ConcurrentDictionary<Guid, Task>                         _peerDiscoveryAnnounceTasks = new();
     private readonly HashSet<Guid>                                            _observedTorrentIds = [];
     private readonly ConcurrentDictionary<Guid, long>                         _observedUploadedSessionBytes = new();
     private readonly ConcurrentDictionary<TorrentManager, Guid>               _torrentIdsByManager = new();
@@ -63,6 +65,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         _gate.Dispose();
         _synchronizationGate.Dispose();
+        _backgroundOperationCts.Dispose();
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -98,6 +101,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 return;
             }
 
+            await StopBackgroundOperationsAsync();
+
             await FlushManagedSnapshotsForShutdownAsync(cancellationToken);
 
             foreach (var manager in _managers.Values)
@@ -125,8 +130,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             _downloadRecoveryAttemptCounts.Clear();
             _metadataRecoveryStates.Clear();
             _metadataRecoveryAttemptCounts.Clear();
-            _connectionFailureLogThrottle.Clear();
             _connectionActivitySummaries.Clear();
+            _peerDiscoveryAnnounceTasks.Clear();
             _recovered          = false;
             _lastRecoveryResult = null;
         }
@@ -1826,28 +1831,148 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
     }
 
-    private async Task<bool> RunPeerDiscoveryAnnounceAsync(TorrentManager manager, CancellationToken cancellationToken)
+    private async Task<bool> QueuePeerDiscoveryAnnounceAsync(
+        TorrentManager manager,
+        CancellationToken cancellationToken)
     {
         await EnsureManagerStartedAsync(manager, cancellationToken);
-        await MeasureMonoTorrentOperationAsync(
-            "manager_dht_announce",
-            GetTorrentId(manager),
-            manager.Name,
-            async () => await manager.DhtAnnounceAsync()
+        var torrentId = GetTorrentId(manager) ?? throw new InvalidOperationException(
+            $"MonoTorrent manager '{manager.Name}' is not registered."
         );
-
         var usedTrackerAnnounce = manager.TrackerManager is not null && CountTrackers(manager) > 0;
-        if (usedTrackerAnnounce)
+        var completionSource = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!_peerDiscoveryAnnounceTasks.TryAdd(torrentId, completionSource.Task))
         {
-            await MeasureMonoTorrentOperationAsync(
-                "manager_tracker_announce",
-                GetTorrentId(manager),
-                manager.Name,
-                async () => await manager.TrackerManager!.AnnounceAsync(TorrentEvent.Started, cancellationToken)
-            );
+            return usedTrackerAnnounce;
         }
 
+        _ = Task.Run(
+            async () =>
+            {
+                try
+                {
+                    await RunPeerDiscoveryAnnounceInBackgroundAsync(
+                        torrentId,
+                        manager,
+                        usedTrackerAnnounce,
+                        _backgroundOperationCts.Token
+                    );
+                }
+                finally
+                {
+                    completionSource.TrySetResult();
+                    _peerDiscoveryAnnounceTasks.TryRemove(torrentId, out _);
+                }
+            },
+            CancellationToken.None
+        );
+
         return usedTrackerAnnounce;
+    }
+
+    private async Task RunPeerDiscoveryAnnounceInBackgroundAsync(
+        Guid torrentId,
+        TorrentManager manager,
+        bool usedTrackerAnnounce,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await MeasureMonoTorrentOperationAsync(
+                "manager_dht_announce",
+                torrentId,
+                manager.Name,
+                async () => await manager.DhtAnnounceAsync()
+            );
+
+            if (!usedTrackerAnnounce)
+            {
+                return;
+            }
+
+            using var timeoutCts = new CancellationTokenSource(RecoveryTrackerAnnounceTimeout);
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                timeoutCts.Token
+            );
+            try
+            {
+                await MeasureMonoTorrentOperationAsync(
+                    "manager_tracker_announce",
+                    torrentId,
+                    manager.Name,
+                    async () => await manager.TrackerManager!.AnnounceAsync(TorrentEvent.Started, linkedCts.Token)
+                );
+            }
+            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested &&
+                                                      !cancellationToken.IsCancellationRequested)
+            {
+                await activityLogService.TryWriteActivityLogAsync(
+                    new ActivityLogWriteRequest
+                    {
+                        Level = ActivityLogLevel.Warning,
+                        Category = "runtime",
+                        EventType = "runtime.recovery.announce_timed_out",
+                        Message = $"Recovery tracker announce for torrent '{manager.Name}' exceeded the time limit.",
+                        TorrentId = torrentId,
+                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                        DetailsJson = JsonSerializer.Serialize(
+                            new
+                            {
+                                TimeoutMilliseconds = RecoveryTrackerAnnounceTimeout.TotalMilliseconds,
+                                TorrentId = torrentId,
+                                TorrentName = manager.Name,
+                            }
+                        ),
+                    }, CancellationToken.None
+                );
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Background peer discovery announce failed for torrent {TorrentId}", torrentId);
+            await activityLogService.TryWriteActivityLogAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level = ActivityLogLevel.Warning,
+                    Category = "runtime",
+                    EventType = "runtime.recovery.announce_failed",
+                    Message = $"Background recovery announce failed for torrent '{manager.Name}'.",
+                    TorrentId = torrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            TorrentId = torrentId,
+                            TorrentName = manager.Name,
+                            Error = exception.Message,
+                        }
+                    ),
+                }, CancellationToken.None
+            );
+        }
+    }
+
+    private async Task StopBackgroundOperationsAsync()
+    {
+        _backgroundOperationCts.Cancel();
+        var backgroundTasks = _peerDiscoveryAnnounceTasks.Values.ToArray();
+        if (backgroundTasks.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.WhenAll(backgroundTasks).WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or TimeoutException)
+        {
+            logger.LogDebug(exception, "Background recovery announces did not all stop before shutdown continued");
+        }
     }
 
     private async Task RequestMetadataDiscoveryRefreshAsync(TorrentSnapshot snapshot, TorrentManager manager,
@@ -1858,7 +1983,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             snapshot.TorrentId, _ => new TorrentMetadataRecoveryState()
         );
         var trackerCount        = CountTrackers(manager);
-        var usedTrackerAnnounce = await RunPeerDiscoveryAnnounceAsync(manager, cancellationToken);
+        var usedTrackerAnnounce = await QueuePeerDiscoveryAnnounceAsync(manager, cancellationToken);
 
         recoveryState.MarkRefresh(now);
 
@@ -1947,7 +2072,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             snapshot.TorrentId, _ => new TorrentDownloadRecoveryState()
         );
         var trackerCount        = CountTrackers(manager);
-        var usedTrackerAnnounce = await RunPeerDiscoveryAnnounceAsync(manager, cancellationToken);
+        var usedTrackerAnnounce = await QueuePeerDiscoveryAnnounceAsync(manager, cancellationToken);
 
         recoveryState.MarkRefresh(now);
 
@@ -1998,7 +2123,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await EnsureManagerStartedAsync(manager, cancellationToken);
 
         var trackerCount        = CountTrackers(manager);
-        var usedTrackerAnnounce = await RunPeerDiscoveryAnnounceAsync(manager, cancellationToken);
+        var usedTrackerAnnounce = await QueuePeerDiscoveryAnnounceAsync(manager, cancellationToken);
 
         await activityLogService.TryWriteActivityLogAsync(
             new ActivityLogWriteRequest
@@ -2168,57 +2293,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
     }
 
-    private async Task HandleConnectionAttemptFailedAsync(Guid torrentId, ConnectionAttemptFailedEventArgs eventArgs)
+    private Task HandleConnectionAttemptFailedAsync(Guid torrentId, ConnectionAttemptFailedEventArgs eventArgs)
     {
-        try
-        {
-            _connectionActivitySummaries.RegisterConnectionFailure(
-                torrentId,
-                DateTimeOffset.UtcNow,
-                eventArgs.Reason.ToString()
-            );
-            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(CancellationToken.None);
-            var decision = _connectionFailureLogThrottle.RegisterAttempt(
-                $"{torrentId:N}:{eventArgs.Reason}", DateTimeOffset.UtcNow,
-                runtimeSettings.EngineConnectionFailureLogBurstLimit,
-                runtimeSettings.EngineConnectionFailureLogWindowSeconds
-            );
-            if (decision == ConnectionFailureLogDecision.Suppress)
-            {
-                return;
-            }
-
-            await activityLogService.TryWriteActivityLogAsync(
-                new ActivityLogWriteRequest
-                {
-                    Level = decision == ConnectionFailureLogDecision.ThrottleNotice ? ActivityLogLevel.Information :
-                            ActivityLogLevel.Warning,
-                    Category = "engine",
-                    EventType = decision == ConnectionFailureLogDecision.ThrottleNotice ?
-                            "torrent.engine.connection_failed.throttled" : "torrent.engine.connection_failed",
-                    Message = decision == ConnectionFailureLogDecision.ThrottleNotice ?
-                            $"Repeated MonoTorrent connection failures are being throttled for reason '{eventArgs.Reason}'." :
-                            $"MonoTorrent connection attempt failed with reason '{eventArgs.Reason}'.",
-                    TorrentId         = torrentId,
-                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                    DetailsJson = JsonSerializer.Serialize(
-                        new
-                        {
-                            Reason        = eventArgs.Reason.ToString(),
-                            PeerUri       = eventArgs.Peer.ConnectionUri?.ToString(),
-                            WindowSeconds = runtimeSettings.EngineConnectionFailureLogWindowSeconds,
-                            BurstLimit    = runtimeSettings.EngineConnectionFailureLogBurstLimit,
-                        }
-                    ),
-                }, CancellationToken.None
-            );
-        }
-        catch (Exception exception)
-        {
-            logger.LogDebug(
-                exception, "Failed handling MonoTorrent connection-failed event for torrent {TorrentId}", torrentId
-            );
-        }
+        _connectionActivitySummaries.RegisterConnectionFailure(
+            torrentId,
+            DateTimeOffset.UtcNow,
+            eventArgs.Reason.ToString()
+        );
+        return Task.CompletedTask;
     }
 
     private async Task WriteConnectionActivitySummariesAsync(

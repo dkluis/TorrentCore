@@ -36,8 +36,7 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
                 Directory.CreateDirectory(directoryPath);
             }
 
-            await using var connection = CreateConnection();
-            await connection.OpenAsync(cancellationToken);
+            await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
             await EnforceRetentionAsync(connection, cancellationToken);
             _isInitialized = true;
         }
@@ -51,8 +50,9 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -105,8 +105,7 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
 
         var boundedTake = Math.Max(1, query.Take);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         var sql = new StringBuilder(
@@ -216,8 +215,9 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -233,8 +233,9 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
     {
         await EnsureInitializedAsync(cancellationToken);
 
-        await using var connection = CreateConnection();
-        await connection.OpenAsync(cancellationToken);
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
 
         var command = connection.CreateCommand();
         command.CommandText = """
@@ -268,14 +269,4 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private SqliteConnection CreateConnection()
-    {
-        var connectionStringBuilder = new SqliteConnectionStringBuilder
-        {
-            DataSource = databaseFilePath,
-            Mode       = SqliteOpenMode.ReadWriteCreate,
-        };
-
-        return new SqliteConnection(connectionStringBuilder.ToString());
-    }
 }
