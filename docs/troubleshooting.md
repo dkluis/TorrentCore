@@ -66,8 +66,11 @@ Use the logged subsystem and operation fields to distinguish synchronization-gat
 callback execution, and storage phases before restarting the service. Recovery and connection summaries retain torrent
 context after torrent-scoped activity logs are pruned.
 For broad snapshot-phase delays, compare `torrent_snapshot_read`, `torrent_snapshot_projection`,
-`torrent_finalization_visibility_check`, `torrent_snapshot_write`, and `torrent_history_write` before attributing the
+`torrent_finalization_visibility_probe`, `torrent_snapshot_write`, and `torrent_history_write` before attributing the
 whole phase to SQLite.
+Final-payload visibility checks use deduplicated per-torrent background probes. A slow
+`torrent_finalization_visibility_probe` can delay one torrent's callback readiness, but it must not extend serialized
+engine synchronization or pause state updates for other torrents.
 Forced recovery announces do not hold serialized synchronization. Tracker announces are limited to ten seconds and
 duplicate recovery announces for the same torrent are suppressed while one remains active.
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete

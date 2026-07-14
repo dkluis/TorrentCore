@@ -78,7 +78,8 @@ Duration diagnostics:
 - `runtime.connection.activity_summary` aggregates per-torrent peer and connection churn over one-minute windows
 - individual peer discovery, connection, and disconnection events are aggregated instead of persisted separately
 - `runtime.monotorrent.cache_audit` inventories metadata, fast-resume, unmatched, and aged cache files at startup without deleting them
-- slow storage diagnostics distinguish snapshot reads, projection, finalization visibility, state writes, and history writes
+- slow storage diagnostics distinguish snapshot reads, projection, state writes, and history writes
+- `torrent_finalization_visibility_probe` measures slow background filesystem visibility checks independently from engine synchronization
 - slow-operation details include subsystem, operation, duration, threshold, outcome, and torrent context when available
 - runtime diagnostics store torrent context in event details rather than the torrent-scoped log column so completed-torrent log pruning preserves them
 

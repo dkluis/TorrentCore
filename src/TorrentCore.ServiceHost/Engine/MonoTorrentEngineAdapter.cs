@@ -23,6 +23,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     IActivityLogService activityLogService, ITorrentCompletionCallbackProcessor completionCallbackProcessor,
     ITorrentHistoryService torrentHistoryService,
     ITorrentCompletionFinalizationChecker finalizationChecker, ResolvedTorrentCoreServicePaths servicePaths,
+    TorrentCompletionFinalizationProbeCoordinator finalizationProbeCoordinator,
     IOptions<TorrentCoreServiceOptions> serviceOptions, IRuntimeSettingsService runtimeSettingsService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
     ITorrentRemovalCleanupScheduler torrentRemovalCleanupScheduler,
@@ -122,6 +123,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             await _engine.StopAllAsync(TimeSpan.FromSeconds(2));
+            foreach (var torrentId in _managers.Keys)
+            {
+                finalizationProbeCoordinator.Remove(torrentId);
+            }
             _managers.Clear();
             _observedTorrentIds.Clear();
             _observedUploadedSessionBytes.Clear();
@@ -174,6 +179,17 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     var manager         = await AddOrGetManagerAsync(snapshot, cancellationToken);
                     var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
                     var previousState   = snapshot.State;
+                    TorrentCompletionFinalizationCheckResult? finalizationResult = null;
+                    var observedFiles = GetObservedFilePaths(manager);
+                    if (manager.HasMetadata && LooksTransferComplete(updatedSnapshot))
+                    {
+                        finalizationProbeCoordinator.TryTakeCompletedOrSchedule(
+                            updatedSnapshot,
+                            runtimeSettings,
+                            observedFiles,
+                            out finalizationResult
+                        );
+                    }
 
                     if (ShouldPreservePersistedCompletion(snapshot, manager))
                     {
@@ -182,7 +198,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     else
                     {
                         updatedSnapshot = NormalizeCompletedErrorIfPayloadVisible(
-                            updatedSnapshot, manager, runtimeSettings, now
+                            updatedSnapshot,
+                            finalizationResult,
+                            now
                         );
                     }
 
@@ -199,7 +217,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     if (updatedSnapshot.State == ContractTorrentState.Seeding)
                     {
                         updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(
-                            updatedSnapshot, manager, now, cancellationToken
+                            updatedSnapshot,
+                            manager,
+                            now,
+                            cancellationToken,
+                            finalizationResult
                         );
                     }
 
@@ -276,8 +298,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     private async Task SynchronizeInternalAsync(CancellationToken cancellationToken, bool includeAutomaticRecovery)
     {
-        List<TorrentSnapshot> pendingCallbackSnapshots;
-        List<KeyValuePair<Guid, TorrentManager>> managers;
+        List<PendingCallbackWork> pendingCallbackWork;
 
         var gateWaitStopwatch = System.Diagnostics.Stopwatch.StartNew();
         await _synchronizationGate.WaitAsync(cancellationToken);
@@ -294,7 +315,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var synchronizationOutcome = "succeeded";
         try
         {
-            (pendingCallbackSnapshots, managers) =
+            pendingCallbackWork =
                     await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery);
         }
         catch
@@ -315,9 +336,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             );
         }
 
-        await ProcessPendingCallbacksAsync(
-            pendingCallbackSnapshots, managers, cancellationToken
-        );
+        await ProcessPendingCallbacksAsync(pendingCallbackWork, cancellationToken);
     }
 
     public async Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken)
@@ -556,6 +575,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            finalizationProbeCoordinator.Remove(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             var updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
@@ -717,6 +737,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            finalizationProbeCoordinator.Remove(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
@@ -812,11 +833,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             return persistedSnapshots;
         }
 
-        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
-
         return persistedSnapshots.Select(snapshot
                                           => managers.TryGetValue(snapshot.TorrentId, out var manager) ?
-                                                  CreateReadProjectedSnapshot(snapshot, manager, runtimeSettings, this) : snapshot
+                                                  CreateReadProjectedSnapshot(snapshot, manager) : snapshot
                                   )
                                  .ToArray();
     }
@@ -871,6 +890,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             _metadataRecoveryStates.TryRemove(torrentId, out _);
             _metadataRecoveryAttemptCounts.TryRemove(torrentId, out _);
             _connectionActivitySummaries.Remove(torrentId);
+            finalizationProbeCoordinator.Remove(torrentId);
         }
         finally
         {
@@ -1072,7 +1092,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 } else
                 {
                     updatedSnapshot = NormalizeCompletedErrorIfPayloadVisible(
-                        updatedSnapshot, manager, runtimeSettings, now
+                        updatedSnapshot,
+                        finalizationResult: null,
+                        now
                     );
                 }
 
@@ -1123,7 +1145,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return managedTorrents;
     }
 
-    private async Task<(List<TorrentSnapshot> PendingCallbackSnapshots, List<KeyValuePair<Guid, TorrentManager>> Managers)>
+    private async Task<List<PendingCallbackWork>>
             SynchronizeCoreAsync(CancellationToken cancellationToken, bool includeAutomaticRecovery = true)
     {
         await EnsureInitializedAsync(cancellationToken);
@@ -1135,7 +1157,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             if (!_recovered)
             {
-                return (new List<TorrentSnapshot>(), new List<KeyValuePair<Guid, TorrentManager>>());
+                return [];
             }
 
             managers = _managers.ToList();
@@ -1147,7 +1169,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         var now                      = DateTimeOffset.UtcNow;
         var runtimeSettings          = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
-        var pendingCallbackSnapshots = new List<TorrentSnapshot>();
+        var pendingCallbackWork = new List<PendingCallbackWork>();
         var snapshotPersistenceStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         foreach (var entry in managers)
@@ -1162,12 +1184,21 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 continue;
             }
 
+            var observedFiles = GetObservedFilePaths(entry.Value);
+            if (snapshot.State == ContractTorrentState.Completed && !IsManagerRunning(entry.Value) &&
+                snapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
+            {
+                pendingCallbackWork.Add(new PendingCallbackWork(snapshot, observedFiles, FinalizationResult: null));
+                continue;
+            }
+
             if (CanSkipCompletedSynchronization(snapshot, entry.Value))
             {
                 continue;
             }
 
             TorrentSnapshot updatedSnapshot;
+            TorrentCompletionFinalizationCheckResult? finalizationResult = null;
             var projectionStopwatch = System.Diagnostics.Stopwatch.StartNew();
 
             if (snapshot.DesiredState == TorrentDesiredState.Paused)
@@ -1181,14 +1212,34 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             } else
             {
                 updatedSnapshot = CreateUpdatedSnapshot(snapshot, entry.Value, now);
-                updatedSnapshot = ApplyFileCompletionVisibilityIfNeeded(updatedSnapshot, entry.Value, runtimeSettings);
+                if (entry.Value.HasMetadata && LooksTransferComplete(updatedSnapshot))
+                {
+                    finalizationProbeCoordinator.TryTakeCompletedOrSchedule(
+                        updatedSnapshot,
+                        runtimeSettings,
+                        observedFiles,
+                        out finalizationResult
+                    );
+                }
+
+                updatedSnapshot = ApplyFileCompletionVisibilityIfNeeded(
+                    updatedSnapshot,
+                    entry.Value,
+                    finalizationResult
+                );
                 updatedSnapshot = NormalizeCompletedErrorIfPayloadVisible(
-                    updatedSnapshot, entry.Value, runtimeSettings, now
+                    updatedSnapshot,
+                    finalizationResult,
+                    now
                 );
                 if (updatedSnapshot.State == ContractTorrentState.Seeding)
                 {
                     updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(
-                        updatedSnapshot, entry.Value, now, cancellationToken
+                        updatedSnapshot,
+                        entry.Value,
+                        now,
+                        cancellationToken,
+                        finalizationResult
                     );
                 }
             }
@@ -1204,25 +1255,13 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             );
 
             var previousCompletedAtUtc = snapshot.CompletedAtUtc;
-            TorrentCompletionFinalizationCheckResult? finalizationResult = null;
             if (ShouldEvaluateCompletionFinalization(previousCompletedAtUtc, updatedSnapshot) ||
                 ShouldEvaluateTimedOutFinalization(updatedSnapshot))
             {
-                var finalizationStopwatch = System.Diagnostics.Stopwatch.StartNew();
-                finalizationResult = CreateFinalizationCheckResult(
+                finalizationResult ??= TorrentCompletionFinalizationProbeCoordinator.CreateDeferredResult(
                     updatedSnapshot,
-                    runtimeSettings,
-                    GetObservedFilePaths(entry.Value)
-                );
-                finalizationStopwatch.Stop();
-                await durationDiagnostics.RecordIfSlowAsync(
-                    "storage",
-                    "torrent_finalization_visibility_check",
-                    finalizationStopwatch.Elapsed,
-                    RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
-                    "succeeded",
-                    entry.Key,
-                    new { TorrentName = snapshot.Name }
+                    observedFiles,
+                    defaultDownloadRootPath: servicePaths.DownloadRootPath
                 );
             }
 
@@ -1262,7 +1301,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             if (updatedSnapshot.CompletionCallbackState is TorrentCompletionCallbackState.PendingFinalization or
                 TorrentCompletionCallbackState.WaitingForFeedback)
             {
-                pendingCallbackSnapshots.Add(updatedSnapshot);
+                pendingCallbackWork.Add(new PendingCallbackWork(updatedSnapshot, observedFiles, finalizationResult));
             }
         }
 
@@ -1305,13 +1344,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
         await WriteConnectionActivitySummariesAsync(now, managers, cancellationToken);
 
-        return (pendingCallbackSnapshots, managers);
+        return pendingCallbackWork;
     }
 
-    private async Task ProcessPendingCallbacksAsync(IReadOnlyList<TorrentSnapshot> pendingCallbackSnapshots,
-        IReadOnlyList<KeyValuePair<Guid, TorrentManager>> managers, CancellationToken cancellationToken)
+    private async Task ProcessPendingCallbacksAsync(
+        IReadOnlyList<PendingCallbackWork> pendingCallbackWork,
+        CancellationToken cancellationToken)
     {
-        if (pendingCallbackSnapshots.Count == 0)
+        if (pendingCallbackWork.Count == 0)
         {
             return;
         }
@@ -1319,29 +1359,30 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var now             = DateTimeOffset.UtcNow;
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
 
-        foreach (var callbackSnapshot in pendingCallbackSnapshots)
+        foreach (var work in pendingCallbackWork)
         {
             var currentSnapshot =
-                    await PreserveLatestPersistedCallbackProgressAsync(callbackSnapshot, cancellationToken);
-            var manager = managers.FirstOrDefault(entry => entry.Key == currentSnapshot.TorrentId).Value;
+                    await PreserveLatestPersistedCallbackProgressAsync(work.Snapshot, cancellationToken);
             TorrentCompletionFinalizationCheckResult? finalizationResult = null;
             if (currentSnapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
             {
-                var finalizationStopwatch = System.Diagnostics.Stopwatch.StartNew();
-                finalizationResult = CreateFinalizationCheckResult(
+                finalizationResult = work.FinalizationResult;
+                var probeCompleted = finalizationResult is not null ||
+                                     finalizationProbeCoordinator.TryTakeCompletedOrSchedule(
+                                         currentSnapshot,
+                                         runtimeSettings,
+                                         work.ObservedFiles,
+                                         out finalizationResult
+                                     );
+                if (!probeCompleted)
+                {
+                    continue;
+                }
+
+                finalizationResult ??= TorrentCompletionFinalizationProbeCoordinator.CreateDeferredResult(
                     currentSnapshot,
-                    runtimeSettings,
-                    GetObservedFilePaths(manager)
-                );
-                finalizationStopwatch.Stop();
-                await durationDiagnostics.RecordIfSlowAsync(
-                    "storage",
-                    "torrent_finalization_visibility_check",
-                    finalizationStopwatch.Elapsed,
-                    RuntimeOperationDurationDiagnostics.StorageSlowThreshold,
-                    "succeeded",
-                    currentSnapshot.TorrentId,
-                    new { TorrentName = currentSnapshot.Name }
+                    work.ObservedFiles,
+                    defaultDownloadRootPath: servicePaths.DownloadRootPath
                 );
             }
             if (!await completionCallbackProcessor.ProcessPendingAsync(
@@ -1354,6 +1395,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             currentSnapshot = await PreserveLatestPersistedCallbackProgressAsync(currentSnapshot, cancellationToken);
             await torrentStateStore.UpdateAsync(currentSnapshot, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(currentSnapshot, cancellationToken);
+            if (currentSnapshot.CompletionCallbackState != TorrentCompletionCallbackState.PendingFinalization)
+            {
+                finalizationProbeCoordinator.Remove(currentSnapshot.TorrentId);
+            }
         }
     }
 
@@ -1415,6 +1460,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                                         .Where(entry => entry.Snapshot.State is not ContractTorrentState.Completed and
                                                  not ContractTorrentState.Error and not ContractTorrentState.Removed
                                          )
+                                        .Where(entry => entry.Snapshot.CompletionCallbackState is not
+                                             TorrentCompletionCallbackState.PendingFinalization and not
+                                             TorrentCompletionCallbackState.WaitingForFeedback)
                                         .Where(entry => entry.Manager.HasMetadata && entry.Manager.Complete)
                                         .OrderBy(entry => entry.Snapshot.AddedAtUtc)
                                         .ThenBy(entry => entry.Snapshot.TorrentId)
@@ -1435,19 +1483,34 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             var previousCompletedAtUtc = currentSnapshot.CompletedAtUtc;
             var updatedSnapshot = CreateUpdatedSnapshot(currentSnapshot, manager, now);
             updatedSnapshot.State = ContractTorrentState.Seeding;
-            updatedSnapshot = ApplyFileCompletionVisibilityIfNeeded(updatedSnapshot, manager, runtimeSettings);
+            var observedFiles = GetObservedFilePaths(manager);
+            finalizationProbeCoordinator.TryTakeCompletedOrSchedule(
+                updatedSnapshot,
+                runtimeSettings,
+                observedFiles,
+                out var finalizationResult
+            );
+            updatedSnapshot = ApplyFileCompletionVisibilityIfNeeded(updatedSnapshot, manager, finalizationResult);
             if (updatedSnapshot.State == ContractTorrentState.Seeding)
             {
                 updatedSnapshot = await ApplySeedingPolicyIfNeededAsync(
-                    updatedSnapshot, manager, now, cancellationToken
+                    updatedSnapshot,
+                    manager,
+                    now,
+                    cancellationToken,
+                    finalizationResult
                 );
             }
 
-            var finalizationResult = ShouldEvaluateCompletionFinalization(
+            var callbackFinalizationResult = ShouldEvaluateCompletionFinalization(
                 previousCompletedAtUtc,
                 updatedSnapshot
             )
-                ? CreateFinalizationCheckResult(updatedSnapshot, runtimeSettings, GetObservedFilePaths(manager))
+                ? finalizationResult ?? TorrentCompletionFinalizationProbeCoordinator.CreateDeferredResult(
+                    updatedSnapshot,
+                    observedFiles,
+                    defaultDownloadRootPath: servicePaths.DownloadRootPath
+                )
                 : null;
             await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
                 previousCompletedAtUtc,
@@ -1455,7 +1518,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 runtimeSettings,
                 now,
                 cancellationToken,
-                finalizationResult
+                callbackFinalizationResult
             );
 
             updatedSnapshot = await PreserveLatestPersistedCallbackProgressAsync(updatedSnapshot, cancellationToken);
@@ -1584,8 +1647,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return updated;
     }
 
-    private static TorrentSnapshot CreateReadProjectedSnapshot(TorrentSnapshot existing, TorrentManager manager,
-        RuntimeSettingsSnapshot runtimeSettings, MonoTorrentEngineAdapter adapter)
+    private static TorrentSnapshot CreateReadProjectedSnapshot(TorrentSnapshot existing, TorrentManager manager)
     {
         var state = MapState(manager, existing.State, existing.DesiredState);
         var totalBytes = manager.HasMetadata ? manager.Torrent?.Size ?? existing.TotalBytes :
@@ -1638,14 +1700,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 existing.LastActivityAtUtc ?? existing.CompletedAtUtc ?? DateTimeOffset.UtcNow
             );
         }
-        else
-        {
-            projectedSnapshot = adapter.NormalizeCompletedErrorIfPayloadVisible(
-                projectedSnapshot, manager, runtimeSettings,
-                existing.LastActivityAtUtc ?? existing.CompletedAtUtc ?? DateTimeOffset.UtcNow
-            );
-        }
-
         if (state is ContractTorrentState.Paused or ContractTorrentState.Queued or ContractTorrentState.Completed or
             ContractTorrentState.Error)
         {
@@ -1654,7 +1708,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             projectedSnapshot.UploadRateBytesPerSecond   = 0;
         }
 
-        return adapter.ApplyFileCompletionVisibilityIfNeeded(projectedSnapshot, manager, runtimeSettings);
+        return existing.State == ContractTorrentState.WaitingForFileCompletion
+            ? ApplyFileCompletionVisibilityIfNeeded(projectedSnapshot, manager, finalizationResult: null)
+            : projectedSnapshot;
     }
 
     private static TorrentSnapshot CreateQueuedSnapshot(TorrentSnapshot snapshot, DateTimeOffset now)
@@ -2481,13 +2537,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         );
     }
 
-    private async Task<TorrentSnapshot> ApplySeedingPolicyIfNeededAsync(TorrentSnapshot snapshot,
-        TorrentManager manager, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task<TorrentSnapshot> ApplySeedingPolicyIfNeededAsync(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        DateTimeOffset now,
+        CancellationToken cancellationToken,
+        TorrentCompletionFinalizationCheckResult? finalizationResult)
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
-        var finalizationResult = CreateFinalizationCheckResult(
-            snapshot, runtimeSettings, GetObservedFilePaths(manager)
-        );
         var seedingDecision = SeedingPolicyEvaluator.Evaluate(
             runtimeSettings.SeedingStopMode, runtimeSettings.SeedingStopRatio, runtimeSettings.SeedingStopMinutes,
             snapshot.UploadedBytes, snapshot.TotalBytes, snapshot.SeedingStartedAtUtc, now
@@ -2497,7 +2554,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             return snapshot;
         }
 
-        if (!finalizationResult.IsReady)
+        if (finalizationResult?.IsReady != true)
         {
             return snapshot;
         }
@@ -2579,8 +2636,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return completedSnapshot;
     }
 
-    private TorrentSnapshot ApplyFileCompletionVisibilityIfNeeded(TorrentSnapshot snapshot,
-        TorrentManager manager, RuntimeSettingsSnapshot runtimeSettings)
+    private static TorrentSnapshot ApplyFileCompletionVisibilityIfNeeded(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        TorrentCompletionFinalizationCheckResult? finalizationResult)
     {
         if (snapshot.State is ContractTorrentState.Completed or ContractTorrentState.Paused or ContractTorrentState.Error or
             ContractTorrentState.Removed or ContractTorrentState.ResolvingMetadata)
@@ -2601,8 +2660,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             return snapshot;
         }
 
-        var finalizationResult = CreateFinalizationCheckResult(snapshot, runtimeSettings, manager);
-        if (finalizationResult.IsReady)
+        if (finalizationResult?.IsReady == true)
         {
             return snapshot;
         }
@@ -2686,16 +2744,17 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return snapshot;
     }
 
-    private TorrentSnapshot NormalizeCompletedErrorIfPayloadVisible(TorrentSnapshot snapshot, TorrentManager manager,
-        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now)
+    private static TorrentSnapshot NormalizeCompletedErrorIfPayloadVisible(
+        TorrentSnapshot snapshot,
+        TorrentCompletionFinalizationCheckResult? finalizationResult,
+        DateTimeOffset now)
     {
         if (snapshot.State != ContractTorrentState.Error)
         {
             return snapshot;
         }
 
-        var finalizationResult = CreateFinalizationCheckResult(snapshot, runtimeSettings, manager);
-        return NormalizeCompletedErrorSnapshot(snapshot, finalizationResult.IsReady, now);
+        return NormalizeCompletedErrorSnapshot(snapshot, finalizationResult?.IsReady == true, now);
     }
 
     private static bool LooksTransferComplete(TorrentSnapshot snapshot)
@@ -3195,4 +3254,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
         );
     }
+
+    private sealed record PendingCallbackWork(
+        TorrentSnapshot Snapshot,
+        IReadOnlyList<TorrentCompletionObservedFilePaths>? ObservedFiles,
+        TorrentCompletionFinalizationCheckResult? FinalizationResult);
 }
