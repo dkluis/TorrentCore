@@ -11,6 +11,78 @@ namespace TorrentCore.Service.Tests;
 public sealed class TorrentHistoryServiceTests
 {
     [Fact]
+    public async Task ObserveSnapshot_IgnoresPreHashCompletion_AndStoresLaterSeedingCompletion()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-prehash-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var store = new SqliteTorrentHistoryStore(databaseFilePath);
+            var service = new TorrentHistoryService(store, new ServiceInstanceContext());
+            var submittedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5);
+            var downloadStartedAtUtc = submittedAtUtc.AddMinutes(1);
+            var completedAtUtc = submittedAtUtc.AddMinutes(3);
+
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(
+                    TorrentState.Queued,
+                    submittedAtUtc,
+                    submittedAtUtc,
+                    1_024,
+                    100,
+                    completedAtUtc: submittedAtUtc
+                ),
+                CancellationToken.None
+            );
+
+            var afterPreHash = await store.GetAsync(TorrentId, CancellationToken.None);
+
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(
+                    TorrentState.Downloading,
+                    submittedAtUtc,
+                    downloadStartedAtUtc,
+                    1_024,
+                    0
+                ),
+                CancellationToken.None
+            );
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(
+                    TorrentState.Seeding,
+                    submittedAtUtc,
+                    completedAtUtc,
+                    1_024,
+                    100,
+                    seedingStartedAtUtc: completedAtUtc,
+                    completedAtUtc: completedAtUtc
+                ),
+                CancellationToken.None
+            );
+
+            var final = await store.GetAsync(TorrentId, CancellationToken.None);
+
+            Assert.NotNull(afterPreHash);
+            Assert.Null(afterPreHash.DownloadCompletedAtUtc);
+            Assert.NotNull(final);
+            Assert.Equal(downloadStartedAtUtc, final.DownloadStartedAtUtc);
+            Assert.Equal(completedAtUtc, final.DownloadCompletedAtUtc);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ObserveSnapshot_DoesNotRewriteMilestoneTimestamps_OnLaterUpdates()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-service-{Guid.NewGuid():N}");

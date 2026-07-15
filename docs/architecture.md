@@ -95,6 +95,7 @@ Completion callback rules:
 - A successful process start completes dispatch; TorrentCore does not wait for the callback process to exit.
 - Downstream completion is reported independently through the callback feedback API and may arrive much later.
 - TorrentCore does not treat the engine's first internal completed edge as sufficient by itself.
+- Transient MonoTorrent progress values during starting, hashing, queued, or downloading states do not establish completion; completion timestamps require a completed or seeding lifecycle state.
 - TorrentCore may expose the validated final payload path through `TORRENTCORE_FINAL_PAYLOAD_PATH`.
 - TorrentCore does not delete final payload files during callback finalization.
 - Downstream systems must not infer payload readiness by independently scanning download paths or filenames.

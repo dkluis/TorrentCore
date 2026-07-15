@@ -7,6 +7,33 @@ namespace TorrentCore.Service.Tests;
 public sealed class MonoTorrentEngineAdapterStateNormalizationTests
 {
     [Fact]
+    public void ResolveCompletedAtUtc_IgnoresTransientPreHashCompletionUntilSeeding()
+    {
+        var submittedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-2);
+        var completedAtUtc = DateTimeOffset.UtcNow;
+
+        var queuedCompletion = MonoTorrentEngineAdapter.ResolveCompletedAtUtc(
+            submittedAtUtc,
+            TorrentState.Queued,
+            completedAtUtc
+        );
+        var downloadingCompletion = MonoTorrentEngineAdapter.ResolveCompletedAtUtc(
+            submittedAtUtc,
+            TorrentState.Downloading,
+            completedAtUtc
+        );
+        var seedingCompletion = MonoTorrentEngineAdapter.ResolveCompletedAtUtc(
+            null,
+            TorrentState.Seeding,
+            completedAtUtc
+        );
+
+        Assert.Null(queuedCompletion);
+        Assert.Null(downloadingCompletion);
+        Assert.Equal(completedAtUtc, seedingCompletion);
+    }
+
+    [Fact]
     public void NormalizeCompletedErrorSnapshot_ConvertsVisibleCompletedErrorToCompleted()
     {
         var now = DateTimeOffset.UtcNow;

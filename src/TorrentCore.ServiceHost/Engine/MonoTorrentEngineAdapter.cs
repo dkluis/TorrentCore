@@ -1622,7 +1622,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             ConnectedPeerCount                = manager.OpenConnections,
             AddedAtUtc                        = existing.AddedAtUtc,
             CompletedAtUtc = ResolveCompletedAtUtc(
-                existing.CompletedAtUtc, state, manager.Progress, manager.Complete, now
+                existing.CompletedAtUtc, state, now
             ),
             SeedingStartedAtUtc = ResolveSeedingStartedAtUtc(existing.SeedingStartedAtUtc, state, now),
             LastActivityAtUtc   = now,
@@ -2511,13 +2511,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return existingUploadedBytes + Math.Max(0L, delta);
     }
 
-    private static DateTimeOffset? ResolveCompletedAtUtc(DateTimeOffset? existingCompletedAtUtc,
-        ContractTorrentState state, double progressPercent, bool isComplete, DateTimeOffset now)
+    internal static DateTimeOffset? ResolveCompletedAtUtc(
+        DateTimeOffset? existingCompletedAtUtc,
+        ContractTorrentState state,
+        DateTimeOffset now)
     {
-        var isCompletedState    = state is ContractTorrentState.Completed or ContractTorrentState.Seeding;
-        var reachedFullProgress = progressPercent >= 100d;
-
-        return isComplete || isCompletedState || reachedFullProgress ? existingCompletedAtUtc ?? now : null;
+        return state is ContractTorrentState.Completed or ContractTorrentState.Seeding
+            ? existingCompletedAtUtc ?? now
+            : null;
     }
 
     private static DateTimeOffset? ResolveSeedingStartedAtUtc(DateTimeOffset? existingSeedingStartedAtUtc,

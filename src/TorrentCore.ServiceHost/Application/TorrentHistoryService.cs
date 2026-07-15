@@ -160,7 +160,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             SubmittedAtUtc = snapshot.AddedAtUtc,
             MetadataResolvedAtUtc = metadataResolvedAtUtc,
             DownloadStartedAtUtc = downloadStartedAtUtc,
-            DownloadCompletedAtUtc = snapshot.CompletedAtUtc,
+            DownloadCompletedAtUtc = ResolveCredibleCompletionAtUtc(snapshot),
             SeedingStartedAtUtc = snapshot.SeedingStartedAtUtc,
             LastActivityAtUtc = snapshot.LastActivityAtUtc,
             LastUpdatedAtUtc = now,
@@ -206,7 +206,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             SubmittedAtUtc = submittedAtUtc,
             MetadataResolvedAtUtc = torrent.InfoHash is not null && torrent.TotalBytes is not null ? submittedAtUtc : null,
             DownloadStartedAtUtc = null,
-            DownloadCompletedAtUtc = torrent.CompletedAtUtc,
+            DownloadCompletedAtUtc = ResolveCredibleCompletionAtUtc(torrent),
             SeedingStartedAtUtc = null,
             LastActivityAtUtc = torrent.LastActivityAtUtc,
             LastUpdatedAtUtc = submittedAtUtc,
@@ -275,7 +275,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         updated.MetadataResolvedAtUtc ??= torrent.InfoHash is not null && torrent.TotalBytes is not null
             ? torrent.AddedAtUtc
             : null;
-        updated.DownloadCompletedAtUtc ??= torrent.CompletedAtUtc;
+        updated.DownloadCompletedAtUtc ??= ResolveCredibleCompletionAtUtc(torrent);
         updated.ServiceInstanceIdLastSeen = serviceInstanceContext.ServiceInstanceId;
         return updated;
     }
@@ -358,7 +358,18 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             updated.DownloadStartedAtUtc = snapshot.LastActivityAtUtc ?? now;
         }
 
-        updated.DownloadCompletedAtUtc ??= snapshot.CompletedAtUtc;
+        if (updated.DownloadStartedAtUtc is not null && updated.DownloadCompletedAtUtc is not null &&
+            updated.DownloadCompletedAtUtc < updated.DownloadStartedAtUtc)
+        {
+            updated.DownloadCompletedAtUtc = null;
+        }
+
+        var credibleCompletionAtUtc = ResolveCredibleCompletionAtUtc(snapshot);
+        if (credibleCompletionAtUtc is not null &&
+            (updated.DownloadStartedAtUtc is null || credibleCompletionAtUtc >= updated.DownloadStartedAtUtc))
+        {
+            updated.DownloadCompletedAtUtc ??= credibleCompletionAtUtc;
+        }
         updated.SeedingStartedAtUtc ??= snapshot.SeedingStartedAtUtc;
 
         return updated;
@@ -378,6 +389,25 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
 
         return string.Equals(existing.LatestTorrentState, Contracts.Torrents.TorrentState.ResolvingMetadata.ToString(), StringComparison.Ordinal) &&
                snapshot.State != Contracts.Torrents.TorrentState.ResolvingMetadata;
+    }
+
+    private static DateTimeOffset? ResolveCredibleCompletionAtUtc(TorrentSnapshot snapshot)
+    {
+        return snapshot.State is Contracts.Torrents.TorrentState.Completed or
+                Contracts.Torrents.TorrentState.Seeding or
+                Contracts.Torrents.TorrentState.Removed
+            ? snapshot.CompletedAtUtc
+            : null;
+    }
+
+    private static DateTimeOffset? ResolveCredibleCompletionAtUtc(
+        TorrentCore.Contracts.Torrents.TorrentDetailDto torrent)
+    {
+        return torrent.State is Contracts.Torrents.TorrentState.Completed or
+                Contracts.Torrents.TorrentState.Seeding or
+                Contracts.Torrents.TorrentState.Removed
+            ? torrent.CompletedAtUtc
+            : null;
     }
 
     private static bool HasMeaningfulChanges(TorrentHistoryRecord existing, TorrentHistoryRecord updated)

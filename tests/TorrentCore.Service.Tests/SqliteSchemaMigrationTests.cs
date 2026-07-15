@@ -1,12 +1,99 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using TorrentCore.Persistence.Sqlite.Schema;
 using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Tests;
 
 public sealed class SqliteSchemaMigrationTests
 {
+    [Fact]
+    public async Task Migration14_RepairsCompletionTimestampThatPredatesDownloadStart()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-completion-repair");
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+        var submittedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+        var downloadStartedAtUtc = submittedAtUtc.AddMinutes(1);
+        var seedingStartedAtUtc = submittedAtUtc.AddMinutes(5);
+
+        var initialMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await initialMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+            var insertCommand = connection.CreateCommand();
+            insertCommand.CommandText = """
+                                        INSERT INTO torrent_history (
+                                            torrent_id,
+                                            name,
+                                            magnet_uri,
+                                            latest_torrent_state,
+                                            latest_progress_percent,
+                                            latest_downloaded_bytes,
+                                            latest_uploaded_bytes,
+                                            latest_download_rate_bytes_per_second,
+                                            latest_upload_rate_bytes_per_second,
+                                            latest_tracker_count,
+                                            latest_connected_peer_count,
+                                            submitted_at_utc,
+                                            download_started_at_utc,
+                                            download_completed_at_utc,
+                                            seeding_started_at_utc,
+                                            last_updated_at_utc,
+                                            invoke_completion_callback,
+                                            data_deleted,
+                                            removed_by_cleanup_policy
+                                        )
+                                        VALUES (
+                                            '11111111-1111-1111-1111-111111111111',
+                                            'Premature Completion',
+                                            'magnet:?xt=urn:btih:1111111111111111111111111111111111111111',
+                                            'Completed',
+                                            100,
+                                            100,
+                                            0,
+                                            0,
+                                            0,
+                                            1,
+                                            0,
+                                            $submitted_at_utc,
+                                            $download_started_at_utc,
+                                            $download_completed_at_utc,
+                                            $seeding_started_at_utc,
+                                            $last_updated_at_utc,
+                                            1,
+                                            0,
+                                            0
+                                        );
+
+                                        DELETE FROM schema_migrations WHERE version = 14;
+                                        """;
+            insertCommand.Parameters.AddWithValue("$submitted_at_utc", submittedAtUtc.ToString("O"));
+            insertCommand.Parameters.AddWithValue("$download_started_at_utc", downloadStartedAtUtc.ToString("O"));
+            insertCommand.Parameters.AddWithValue("$download_completed_at_utc", submittedAtUtc.ToString("O"));
+            insertCommand.Parameters.AddWithValue("$seeding_started_at_utc", seedingStartedAtUtc.ToString("O"));
+            insertCommand.Parameters.AddWithValue("$last_updated_at_utc", seedingStartedAtUtc.ToString("O"));
+            await insertCommand.ExecuteNonQueryAsync();
+        }
+
+        var repairMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await repairMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+        var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = """
+                                    SELECT download_completed_at_utc
+                                    FROM torrent_history
+                                    WHERE torrent_id = '11111111-1111-1111-1111-111111111111';
+                                    """;
+        var repairedValue = (string?) await verifyCommand.ExecuteScalarAsync();
+
+        Assert.Equal(seedingStartedAtUtc, DateTimeOffset.Parse(repairedValue!));
+    }
+
     [Fact]
     public async Task SqliteNativeLibraryVersion_IsNotVulnerableToCve20256965()
     {
@@ -55,7 +142,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], versions);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";

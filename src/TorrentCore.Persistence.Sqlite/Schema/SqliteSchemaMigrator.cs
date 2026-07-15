@@ -614,6 +614,27 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     }
                 }
             ),
+            new SqliteMigrationDefinition(
+                14, "repair_premature_history_completion_timestamps", async (connection, cancellationToken) =>
+                {
+                    if (!await TableExistsAsync(connection, "torrent_history", cancellationToken))
+                    {
+                        return;
+                    }
+
+                    var command = connection.CreateCommand();
+                    command.CommandText = """
+                                          UPDATE torrent_history
+                                          SET download_completed_at_utc = seeding_started_at_utc
+                                          WHERE download_started_at_utc IS NOT NULL
+                                            AND download_completed_at_utc IS NOT NULL
+                                            AND seeding_started_at_utc IS NOT NULL
+                                            AND download_completed_at_utc < download_started_at_utc
+                                            AND seeding_started_at_utc >= download_started_at_utc;
+                                          """;
+                    await command.ExecuteNonQueryAsync(cancellationToken);
+                }
+            ),
         ];
     }
 
