@@ -77,6 +77,10 @@ The WebUI stays a thin client over service contracts. It must not:
 - Active metadata-resolution and active-download limits control execution, not admission.
 - Queued torrents wait inside TorrentCore until slots open.
 - Queue order is oldest added first, with torrent id as a stable tie-breaker.
+- Automatic recovery applies only to torrents occupying active metadata-resolution or download slots; queued and
+  terminal torrents do not run recovery actions.
+- Repeated cold recovery cycles use bounded progressive backoff (`1x`, `2x`, `4x`, then `8x`) from the configured
+  stale and restart-delay windows. Useful peer or transfer activity immediately restores the normal cadence.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
 - Forced recovery announces run outside serialized synchronization, are deduplicated per torrent, and use a bounded tracker-announce window.
 

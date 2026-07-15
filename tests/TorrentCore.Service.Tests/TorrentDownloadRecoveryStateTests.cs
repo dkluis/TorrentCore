@@ -58,7 +58,7 @@ public sealed class TorrentDownloadRecoveryStateTests
     }
 
     [Fact]
-    public void Evaluate_StartsANewRefreshCycleAfterRestartStaysCold()
+    public void Evaluate_BacksOffTheNextRefreshCycleAfterRestartStaysCold()
     {
         var state = new TorrentDownloadRecoveryState();
         var start = new DateTimeOffset(2026, 4, 3, 18, 49, 38, TimeSpan.Zero);
@@ -68,10 +68,58 @@ public sealed class TorrentDownloadRecoveryStateTests
         state.MarkRefresh(start.AddSeconds(61));
         state.MarkRestart(start.AddSeconds(77));
 
-        var decision = state.Evaluate(start.AddSeconds(138), staleSeconds: 60, restartDelaySeconds: 15);
+        var beforeBackoffExpires = state.Evaluate(start.AddSeconds(138), staleSeconds: 60,
+            restartDelaySeconds: 15);
+        Assert.Equal(DownloadRecoveryAction.None, beforeBackoffExpires.Action);
+        Assert.Equal(2, beforeBackoffExpires.BackoffMultiplier);
+
+        var decision = state.Evaluate(start.AddSeconds(198), staleSeconds: 60, restartDelaySeconds: 15);
 
         Assert.Equal(DownloadRecoveryAction.Refresh, decision.Action);
         Assert.Equal(DownloadRecoveryAction.Restart, decision.LastRecoveryAction);
         Assert.Equal(start.AddSeconds(77), decision.LastActionAtUtc);
+    }
+
+    [Fact]
+    public void Observe_UsefulActivityClearsRecoveryBackoff()
+    {
+        var state = new TorrentDownloadRecoveryState();
+        var start = new DateTimeOffset(2026, 4, 3, 18, 49, 38, TimeSpan.Zero);
+
+        state.Observe(start, isTrackedDownload: true, downloadedBytes: 1_024, downloadRateBytesPerSecond: 0,
+            openConnections: 0);
+        state.MarkRefresh(start.AddSeconds(61));
+        state.MarkRestart(start.AddSeconds(77));
+        state.Observe(start.AddSeconds(80), isTrackedDownload: true, downloadedBytes: 2_048,
+            downloadRateBytesPerSecond: 512, openConnections: 1);
+        state.Observe(start.AddSeconds(81), isTrackedDownload: true, downloadedBytes: 2_048,
+            downloadRateBytesPerSecond: 0, openConnections: 0);
+
+        var decision = state.Evaluate(start.AddSeconds(141), staleSeconds: 60, restartDelaySeconds: 15);
+
+        Assert.Equal(DownloadRecoveryAction.Refresh, decision.Action);
+        Assert.Equal(1, decision.BackoffMultiplier);
+        Assert.Equal(0, decision.RecoveryCycle);
+    }
+
+    [Fact]
+    public void MarkRestart_CapsRecoveryBackoffAtEightTimesTheConfiguredWindows()
+    {
+        var state = new TorrentDownloadRecoveryState();
+        var start = new DateTimeOffset(2026, 4, 3, 18, 49, 38, TimeSpan.Zero);
+
+        state.Observe(start, isTrackedDownload: true, downloadedBytes: 1_024, downloadRateBytesPerSecond: 0,
+            openConnections: 0);
+        for (var cycle = 1; cycle <= 5; cycle++)
+        {
+            state.MarkRestart(start.AddMinutes(cycle));
+        }
+
+        var decision = state.Evaluate(start.AddMinutes(5).AddSeconds(1), staleSeconds: 60,
+            restartDelaySeconds: 15);
+
+        Assert.Equal(8, decision.BackoffMultiplier);
+        Assert.Equal(480, decision.EffectiveStaleSeconds);
+        Assert.Equal(120, decision.EffectiveRestartDelaySeconds);
     }
 }

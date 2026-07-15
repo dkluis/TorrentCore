@@ -8,6 +8,10 @@ Automatic recovery path:
 2. after `Metadata Refresh Restart Delay Seconds`, TorrentCore escalates to stop/start
 3. if the session still stays cold, TorrentCore can recreate the metadata session
 
+Only torrents in active metadata-resolution slots are eligible. After an unsuccessful reset cycle, TorrentCore backs
+off subsequent stale and escalation windows to `2x`, `4x`, and at most `8x`; useful discovery activity clears that
+backoff.
+
 Useful events to inspect:
 
 - `torrent.metadata.refresh_requested`
@@ -26,6 +30,8 @@ Operator guidance:
 ## Downloading But No Peers
 
 TorrentCore also treats zero-peer download stalls as a stale-recovery case.
+Only active downloads are eligible. Each restart that remains cold applies the same bounded progressive backoff, and
+any connected peer, positive rate, or downloaded-byte progress clears it.
 
 Useful checks:
 
@@ -73,6 +79,8 @@ Final-payload visibility checks use deduplicated per-torrent background probes. 
 engine synchronization or pause state updates for other torrents.
 Forced recovery announces do not hold serialized synchronization. Tracker announces are limited to ten seconds and
 duplicate recovery announces for the same torrent are suppressed while one remains active.
+Recovery action details include the recovery cycle, backoff multiplier, and effective timing windows. A high attempt
+count with an `8x` multiplier indicates a persistently cold torrent rather than an engine-wide synchronization stall.
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete
 them because cached metadata can accelerate a later re-add of the same torrent.
 
