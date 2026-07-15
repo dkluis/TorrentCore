@@ -45,7 +45,8 @@ internal sealed class TorrentDownloadRecoveryState
         }
     }
 
-    public TorrentDownloadRecoveryDecision Evaluate(DateTimeOffset now, int staleSeconds, int restartDelaySeconds)
+    public TorrentDownloadRecoveryDecision Evaluate(DateTimeOffset now, int staleSeconds, int restartDelaySeconds,
+        int coldRecoveryThresholdMinutes = 240, int coldRecoveryIntervalMinutes = 60)
     {
         lock (_gate)
         {
@@ -56,6 +57,20 @@ internal sealed class TorrentDownloadRecoveryState
 
             var staleSinceUtc = _lastUsefulActivityAtUtc ?? _downloadingSinceUtc.Value;
             var backoffMultiplier = GetBackoffMultiplier(_recoveryCycle);
+            if (now - staleSinceUtc >= TimeSpan.FromMinutes(coldRecoveryThresholdMinutes))
+            {
+                var interval = TimeSpan.FromMinutes(coldRecoveryIntervalMinutes);
+                var action = _lastActionAtUtc is null || now - _lastActionAtUtc.Value >= interval ?
+                        _lastRecoveryAction == DownloadRecoveryAction.Refresh ? DownloadRecoveryAction.Restart :
+                        DownloadRecoveryAction.Refresh :
+                        DownloadRecoveryAction.None;
+                return new TorrentDownloadRecoveryDecision(
+                    action, _downloadingSinceUtc, _lastUsefulActivityAtUtc, _lastActionAtUtc, _lastRecoveryAction,
+                    staleSinceUtc, _recoveryCycle, backoffMultiplier, staleSeconds * backoffMultiplier,
+                    restartDelaySeconds * backoffMultiplier, true, staleSinceUtc, coldRecoveryIntervalMinutes
+                );
+            }
+
             var effectiveStaleSeconds = staleSeconds * backoffMultiplier;
             var effectiveRestartDelaySeconds = restartDelaySeconds * backoffMultiplier;
             if (now - staleSinceUtc < TimeSpan.FromSeconds(effectiveStaleSeconds))
@@ -63,7 +78,7 @@ internal sealed class TorrentDownloadRecoveryState
                 return new TorrentDownloadRecoveryDecision(
                     DownloadRecoveryAction.None, _downloadingSinceUtc, _lastUsefulActivityAtUtc, _lastActionAtUtc,
                     _lastRecoveryAction, staleSinceUtc, _recoveryCycle, backoffMultiplier, effectiveStaleSeconds,
-                    effectiveRestartDelaySeconds
+                    effectiveRestartDelaySeconds, false, null, null
                 );
             }
 
@@ -72,7 +87,7 @@ internal sealed class TorrentDownloadRecoveryState
                 return new TorrentDownloadRecoveryDecision(
                     DownloadRecoveryAction.Refresh, _downloadingSinceUtc, _lastUsefulActivityAtUtc, _lastActionAtUtc,
                     _lastRecoveryAction, staleSinceUtc, _recoveryCycle, backoffMultiplier, effectiveStaleSeconds,
-                    effectiveRestartDelaySeconds
+                    effectiveRestartDelaySeconds, false, null, null
                 );
             }
 
@@ -82,7 +97,7 @@ internal sealed class TorrentDownloadRecoveryState
                 return new TorrentDownloadRecoveryDecision(
                     DownloadRecoveryAction.Restart, _downloadingSinceUtc, _lastUsefulActivityAtUtc, _lastActionAtUtc,
                     _lastRecoveryAction, staleSinceUtc, _recoveryCycle, backoffMultiplier, effectiveStaleSeconds,
-                    effectiveRestartDelaySeconds
+                    effectiveRestartDelaySeconds, false, null, null
                 );
             }
 
@@ -92,14 +107,14 @@ internal sealed class TorrentDownloadRecoveryState
                 return new TorrentDownloadRecoveryDecision(
                     DownloadRecoveryAction.Refresh, _downloadingSinceUtc, _lastUsefulActivityAtUtc, _lastActionAtUtc,
                     _lastRecoveryAction, staleSinceUtc, _recoveryCycle, backoffMultiplier, effectiveStaleSeconds,
-                    effectiveRestartDelaySeconds
+                    effectiveRestartDelaySeconds, false, null, null
                 );
             }
 
             return new TorrentDownloadRecoveryDecision(
                 DownloadRecoveryAction.None, _downloadingSinceUtc, _lastUsefulActivityAtUtc, _lastActionAtUtc,
                 _lastRecoveryAction, staleSinceUtc, _recoveryCycle, backoffMultiplier, effectiveStaleSeconds,
-                effectiveRestartDelaySeconds
+                effectiveRestartDelaySeconds, false, null, null
             );
         }
     }
@@ -157,11 +172,12 @@ internal enum DownloadRecoveryAction
 internal readonly record struct TorrentDownloadRecoveryDecision(DownloadRecoveryAction Action,
     DateTimeOffset? DownloadingSinceUtc, DateTimeOffset? LastUsefulActivityAtUtc, DateTimeOffset? LastActionAtUtc,
     DownloadRecoveryAction LastRecoveryAction, DateTimeOffset StaleSinceUtc, int RecoveryCycle, int BackoffMultiplier,
-    int EffectiveStaleSeconds, int EffectiveRestartDelaySeconds)
+    int EffectiveStaleSeconds, int EffectiveRestartDelaySeconds, bool LongColdMode,
+    DateTimeOffset? LongColdSinceUtc, int? EffectiveRecoveryIntervalMinutes)
 {
     public static TorrentDownloadRecoveryDecision None
         => new(
             DownloadRecoveryAction.None, null, null, null, DownloadRecoveryAction.None,
-            DateTimeOffset.MinValue, 0, 1, 0, 0
+            DateTimeOffset.MinValue, 0, 1, 0, 0, false, null, null
         );
 }

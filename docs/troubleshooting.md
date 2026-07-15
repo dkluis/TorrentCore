@@ -32,6 +32,8 @@ Operator guidance:
 TorrentCore also treats zero-peer download stalls as a stale-recovery case.
 Only active downloads are eligible. Each restart that remains cold applies the same bounded progressive backoff, and
 any connected peer, positive rate, or downloaded-byte progress clears it.
+After `Long-Cold Threshold Minutes`, recovery switches to one action per `Long-Cold Recovery Interval Minutes` and
+alternates refresh and restart. The defaults are four hours and one hour, respectively.
 
 Useful checks:
 
@@ -80,7 +82,8 @@ engine synchronization or pause state updates for other torrents.
 Forced recovery announces do not hold serialized synchronization. Tracker announces are limited to ten seconds and
 duplicate recovery announces for the same torrent are suppressed while one remains active.
 Recovery action details include the recovery cycle, backoff multiplier, and effective timing windows. A high attempt
-count with an `8x` multiplier indicates a persistently cold torrent rather than an engine-wide synchronization stall.
+count with `LongColdMode=true` indicates a persistently cold torrent on the slower configured cadence rather than an
+engine-wide synchronization stall.
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete
 them because cached metadata can accelerate a later re-add of the same torrent.
 

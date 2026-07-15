@@ -22,6 +22,8 @@ public sealed class RuntimeSettingsSnapshot
     public required int                         MaxActiveDownloads                           { get; init; }
     public required int                         MetadataRefreshStaleSeconds                  { get; init; }
     public required int                         MetadataRefreshRestartDelaySeconds           { get; init; }
+    public int                                  ColdDownloadRecoveryThresholdMinutes         { get; init; } = 240;
+    public int                                  ColdDownloadRecoveryIntervalMinutes          { get; init; } = 60;
     public required bool                        CompletionCallbackEnabled                    { get; init; }
     public          string?                     CompletionCallbackCommandPath                { get; init; }
     public          string?                     CompletionCallbackArguments                  { get; init; }

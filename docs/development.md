@@ -74,7 +74,7 @@ Duration diagnostics:
 - `runtime.operation.slow` identifies slow synchronization, gate-wait, MonoTorrent, callback, and storage phases
 - `runtime.tick.duration_summary` records minute-scale synchronization timing baselines without logging every tick
 - `runtime.recovery.action_completed` records each automatic recovery action, attempt number, duration, outcome,
-  recovery cycle, and bounded backoff timing
+  recovery cycle, bounded backoff timing, and long-cold cadence state
 - `runtime.callback.dispatch_completed` records callback process-launch duration independently from callback feedback state
 - `runtime.connection.activity_summary` aggregates per-torrent peer and connection churn over one-minute windows
 - individual peer discovery, connection, and disconnection events are aggregated instead of persisted separately

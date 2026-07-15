@@ -423,6 +423,8 @@ public sealed class TorrentApiTests
         Assert.Equal(4, settings.MaxActiveDownloads);
         Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
         Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+        Assert.Equal(240, settings.ColdDownloadRecoveryThresholdMinutes);
+        Assert.Equal(60, settings.ColdDownloadRecoveryIntervalMinutes);
         Assert.False(settings.CompletionCallbackEnabled);
         Assert.Null(settings.CompletionCallbackCommandPath);
         Assert.Null(settings.CompletionCallbackArguments);
@@ -469,6 +471,8 @@ public sealed class TorrentApiTests
                 MaxActiveDownloads = 2,
                 MetadataRefreshStaleSeconds = 90,
                 MetadataRefreshRestartDelaySeconds = 30,
+                ColdDownloadRecoveryThresholdMinutes = 180,
+                ColdDownloadRecoveryIntervalMinutes = 45,
                 CompletionCallbackEnabled = true,
                 CompletionCallbackCommandPath = "/usr/local/bin/torrentcore-callback",
                 CompletionCallbackArguments = "--run",
@@ -502,6 +506,8 @@ public sealed class TorrentApiTests
             Assert.Equal(2, settings.MaxActiveDownloads);
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+            Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
+            Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
             Assert.True(settings.CompletionCallbackEnabled);
             Assert.Equal("/usr/local/bin/torrentcore-callback", settings.CompletionCallbackCommandPath);
             Assert.Equal("--run", settings.CompletionCallbackArguments);
@@ -557,6 +563,8 @@ public sealed class TorrentApiTests
             Assert.Equal(2, settings.MaxActiveDownloads);
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+            Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
+            Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
             Assert.True(settings.CompletionCallbackEnabled);
             Assert.Equal("/usr/local/bin/torrentcore-callback", settings.CompletionCallbackCommandPath);
             Assert.Equal("--run", settings.CompletionCallbackArguments);
@@ -590,6 +598,23 @@ public sealed class TorrentApiTests
             Assert.NotNull(logs);
             Assert.Contains(logs, log => log.EventType == "service.runtime_settings.updated");
         }
+    }
+
+    [Theory]
+    [InlineData(0, 60)]
+    [InlineData(240, 0)]
+    public async Task UpdateRuntimeSettings_RejectsInvalidLongColdRecoveryWindows(int thresholdMinutes,
+        int intervalMinutes)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(thresholdMinutes, intervalMinutes)
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -2649,6 +2674,8 @@ public sealed class TorrentApiTests
             MaxActiveDownloads = 4,
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
+            ColdDownloadRecoveryThresholdMinutes = 240,
+            ColdDownloadRecoveryIntervalMinutes = 60,
         });
         updateResponse.EnsureSuccessStatusCode();
 
@@ -2704,6 +2731,8 @@ public sealed class TorrentApiTests
             MaxActiveDownloads = 4,
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
+            ColdDownloadRecoveryThresholdMinutes = 240,
+            ColdDownloadRecoveryIntervalMinutes = 60,
         });
         updateResponse.EnsureSuccessStatusCode();
 
@@ -3366,7 +3395,9 @@ public sealed class TorrentApiTests
             });
     }
 
-    private static UpdateRuntimeSettingsRequest CreateDefaultRuntimeSettingsUpdateRequest()
+    private static UpdateRuntimeSettingsRequest CreateDefaultRuntimeSettingsUpdateRequest(
+        int coldDownloadRecoveryThresholdMinutes = 240,
+        int coldDownloadRecoveryIntervalMinutes = 60)
     {
         return new UpdateRuntimeSettingsRequest
         {
@@ -3387,6 +3418,8 @@ public sealed class TorrentApiTests
             MaxActiveDownloads = 4,
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
+            ColdDownloadRecoveryThresholdMinutes = coldDownloadRecoveryThresholdMinutes,
+            ColdDownloadRecoveryIntervalMinutes = coldDownloadRecoveryIntervalMinutes,
             CompletionCallbackEnabled = false,
             CompletionCallbackCommandPath = null,
             CompletionCallbackArguments = null,
@@ -3803,6 +3836,8 @@ public sealed class TorrentApiTests
             MaxActiveDownloads = 4,
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
+            ColdDownloadRecoveryThresholdMinutes = 240,
+            ColdDownloadRecoveryIntervalMinutes = 60,
             CompletionCallbackEnabled = true,
             CompletionCallbackCommandPath = commandPath,
             CompletionCallbackArguments = arguments,
@@ -3835,6 +3870,8 @@ public sealed class TorrentApiTests
             MaxActiveDownloads = 4,
             MetadataRefreshStaleSeconds = staleSeconds,
             MetadataRefreshRestartDelaySeconds = restartDelaySeconds,
+            ColdDownloadRecoveryThresholdMinutes = 240,
+            ColdDownloadRecoveryIntervalMinutes = 60,
             CompletionCallbackEnabled = false,
             CompletionCallbackCommandPath = null,
             CompletionCallbackArguments = null,

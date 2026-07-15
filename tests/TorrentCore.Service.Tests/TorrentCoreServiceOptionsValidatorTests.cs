@@ -89,6 +89,8 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             CompletedTorrentCleanupMinutes = -1,
             MaxActiveMetadataResolutions = 0,
             MaxActiveDownloads = 0,
+            ColdDownloadRecoveryThresholdMinutes = 0,
+            ColdDownloadRecoveryIntervalMinutes = 0,
             CompletionCallbackEnabled = true,
             CompletionCallbackCommandPath = "",
             CompletionCallbackTimeoutSeconds = 0,
@@ -116,6 +118,10 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
         Assert.Contains(result.Failures, failure => failure.Contains("CompletedTorrentCleanupMinutes", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MaxActiveMetadataResolutions", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("MaxActiveDownloads", StringComparison.Ordinal));
+        Assert.Contains(result.Failures,
+            failure => failure.Contains("ColdDownloadRecoveryThresholdMinutes", StringComparison.Ordinal));
+        Assert.Contains(result.Failures,
+            failure => failure.Contains("ColdDownloadRecoveryIntervalMinutes", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackCommandPath", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackTimeoutSeconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackFinalizationTimeoutSeconds", StringComparison.Ordinal));

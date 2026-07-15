@@ -81,6 +81,8 @@ The WebUI stays a thin client over service contracts. It must not:
   terminal torrents do not run recovery actions.
 - Repeated cold recovery cycles use bounded progressive backoff (`1x`, `2x`, `4x`, then `8x`) from the configured
   stale and restart-delay windows. Useful peer or transfer activity immediately restores the normal cadence.
+- Downloads that remain continuously cold beyond the configured long-cold threshold switch to one recovery action per
+  configured interval, alternating peer refresh and restart. Useful activity exits long-cold mode immediately.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
 - Forced recovery announces run outside serialized synchronization, are deduplicated per torrent, and use a bounded tracker-announce window.
 

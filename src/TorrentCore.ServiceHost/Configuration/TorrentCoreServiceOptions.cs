@@ -28,6 +28,8 @@ public sealed class TorrentCoreServiceOptions
     public int MaxActiveDownloads { get; init; } = 4;
     public int MetadataRefreshStaleSeconds { get; init; } = 90;
     public int MetadataRefreshRestartDelaySeconds { get; init; } = 30;
+    public int ColdDownloadRecoveryThresholdMinutes { get; init; } = 240;
+    public int ColdDownloadRecoveryIntervalMinutes { get; init; } = 60;
     public bool CompletionCallbackEnabled { get; init; }
     public string CompletionCallbackCommandPath { get; init; } = string.Empty;
     public string? CompletionCallbackArguments { get; init; }

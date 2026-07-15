@@ -122,4 +122,73 @@ public sealed class TorrentDownloadRecoveryStateTests
         Assert.Equal(480, decision.EffectiveStaleSeconds);
         Assert.Equal(120, decision.EffectiveRestartDelaySeconds);
     }
+
+    [Fact]
+    public void Evaluate_LongColdModeLimitsRecoveryToOneAlternatingActionPerInterval()
+    {
+        var state = new TorrentDownloadRecoveryState();
+        var start = new DateTimeOffset(2026, 7, 15, 9, 0, 0, TimeSpan.Zero);
+
+        state.Observe(start, isTrackedDownload: true, downloadedBytes: 0, downloadRateBytesPerSecond: 0,
+            openConnections: 0);
+        state.MarkRestart(start.AddHours(3).AddMinutes(30));
+
+        var thresholdDecision = state.Evaluate(
+            start.AddHours(4), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 240, coldRecoveryIntervalMinutes: 60
+        );
+        Assert.Equal(DownloadRecoveryAction.None, thresholdDecision.Action);
+        Assert.True(thresholdDecision.LongColdMode);
+        Assert.Equal(start, thresholdDecision.LongColdSinceUtc);
+        Assert.Equal(60, thresholdDecision.EffectiveRecoveryIntervalMinutes);
+
+        var refreshDecision = state.Evaluate(
+            start.AddHours(4).AddMinutes(31), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 240, coldRecoveryIntervalMinutes: 60
+        );
+        Assert.Equal(DownloadRecoveryAction.Refresh, refreshDecision.Action);
+        state.MarkRefresh(start.AddHours(4).AddMinutes(31));
+
+        var beforeNextInterval = state.Evaluate(
+            start.AddHours(5).AddMinutes(30), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 240, coldRecoveryIntervalMinutes: 60
+        );
+        Assert.Equal(DownloadRecoveryAction.None, beforeNextInterval.Action);
+
+        var restartDecision = state.Evaluate(
+            start.AddHours(5).AddMinutes(31), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 240, coldRecoveryIntervalMinutes: 60
+        );
+        Assert.Equal(DownloadRecoveryAction.Restart, restartDecision.Action);
+    }
+
+    [Fact]
+    public void Observe_UsefulActivityLeavesLongColdModeAndRestoresNormalCadence()
+    {
+        var state = new TorrentDownloadRecoveryState();
+        var start = new DateTimeOffset(2026, 7, 15, 9, 0, 0, TimeSpan.Zero);
+
+        state.Observe(start, isTrackedDownload: true, downloadedBytes: 0, downloadRateBytesPerSecond: 0,
+            openConnections: 0);
+        var longColdDecision = state.Evaluate(
+            start.AddHours(4), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 240, coldRecoveryIntervalMinutes: 60
+        );
+        Assert.True(longColdDecision.LongColdMode);
+        state.MarkRefresh(start.AddHours(4));
+
+        state.Observe(start.AddHours(4).AddMinutes(1), isTrackedDownload: true, downloadedBytes: 1_024,
+            downloadRateBytesPerSecond: 512, openConnections: 1);
+        state.Observe(start.AddHours(4).AddMinutes(2), isTrackedDownload: true, downloadedBytes: 1_024,
+            downloadRateBytesPerSecond: 0, openConnections: 0);
+
+        var normalDecision = state.Evaluate(
+            start.AddHours(4).AddMinutes(3).AddSeconds(1), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 240, coldRecoveryIntervalMinutes: 60
+        );
+
+        Assert.Equal(DownloadRecoveryAction.Refresh, normalDecision.Action);
+        Assert.False(normalDecision.LongColdMode);
+        Assert.Equal(1, normalDecision.BackoffMultiplier);
+    }
 }

@@ -19,6 +19,8 @@ public sealed class UpdateRuntimeSettingsRequest
     public required int     MaxActiveDownloads                           { get; init; }
     public required int     MetadataRefreshStaleSeconds                  { get; init; }
     public required int     MetadataRefreshRestartDelaySeconds           { get; init; }
+    public required int     ColdDownloadRecoveryThresholdMinutes         { get; init; }
+    public required int     ColdDownloadRecoveryIntervalMinutes          { get; init; }
     public          bool?   CompletionCallbackEnabled                    { get; init; }
     public          string? CompletionCallbackCommandPath                { get; init; }
     public          string? CompletionCallbackArguments                  { get; init; }

@@ -137,6 +137,20 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (options.ColdDownloadRecoveryThresholdMinutes < 1)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:ColdDownloadRecoveryThresholdMinutes must be 1 or greater."
+            );
+        }
+
+        if (options.ColdDownloadRecoveryIntervalMinutes < 1)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:ColdDownloadRecoveryIntervalMinutes must be 1 or greater."
+            );
+        }
+
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
             failures.Add(

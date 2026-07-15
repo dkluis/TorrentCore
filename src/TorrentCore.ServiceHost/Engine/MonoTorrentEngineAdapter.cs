@@ -1941,7 +1941,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             var decision = recoveryState.Evaluate(
-                now, runtimeSettings.MetadataRefreshStaleSeconds, runtimeSettings.MetadataRefreshRestartDelaySeconds
+                now, runtimeSettings.MetadataRefreshStaleSeconds, runtimeSettings.MetadataRefreshRestartDelaySeconds,
+                runtimeSettings.ColdDownloadRecoveryThresholdMinutes,
+                runtimeSettings.ColdDownloadRecoveryIntervalMinutes
             );
 
             switch (decision.Action)
@@ -2254,6 +2256,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                             decision.Value.BackoffMultiplier,
                             decision.Value.EffectiveStaleSeconds,
                             decision.Value.EffectiveRestartDelaySeconds,
+                            decision.Value.LongColdMode,
+                            decision.Value.LongColdSinceUtc,
+                            decision.Value.EffectiveRecoveryIntervalMinutes,
                         },
                     }
                 ),
@@ -2304,6 +2309,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                         decision.BackoffMultiplier,
                         decision.EffectiveStaleSeconds,
                         decision.EffectiveRestartDelaySeconds,
+                        decision.LongColdMode,
+                        decision.LongColdSinceUtc,
+                        decision.EffectiveRecoveryIntervalMinutes,
                         runtimeSettings.MetadataRefreshStaleSeconds,
                         runtimeSettings.MetadataRefreshRestartDelaySeconds,
                     }

@@ -174,6 +174,22 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             );
         }
 
+        if (request.ColdDownloadRecoveryThresholdMinutes < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", "ColdDownloadRecoveryThresholdMinutes must be 1 or greater.",
+                StatusCodes.Status400BadRequest, nameof(request.ColdDownloadRecoveryThresholdMinutes)
+            );
+        }
+
+        if (request.ColdDownloadRecoveryIntervalMinutes < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", "ColdDownloadRecoveryIntervalMinutes must be 1 or greater.",
+                StatusCodes.Status400BadRequest, nameof(request.ColdDownloadRecoveryIntervalMinutes)
+            );
+        }
+
         var currentSettings           = await GetEffectiveSettingsAsync(cancellationToken);
         var completionCallbackEnabled = request.CompletionCallbackEnabled ?? currentSettings.CompletionCallbackEnabled;
         var completionCallbackCommandPath = request.CompletionCallbackCommandPath is null ?
@@ -257,6 +273,10 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             request.MetadataRefreshStaleSeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.MetadataRefreshRestartDelaySeconds] =
                             request.MetadataRefreshRestartDelaySeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.ColdDownloadRecoveryThresholdMinutes] =
+                            request.ColdDownloadRecoveryThresholdMinutes.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.ColdDownloadRecoveryIntervalMinutes] =
+                            request.ColdDownloadRecoveryIntervalMinutes.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.CompletionCallbackEnabled]     = completionCallbackEnabled.ToString(),
                     [RuntimeSettingsKeys.CompletionCallbackCommandPath] = completionCallbackCommandPath ?? string.Empty,
                     [RuntimeSettingsKeys.CompletionCallbackArguments]   = completionCallbackArguments   ?? string.Empty,
@@ -311,6 +331,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             request.MaxActiveDownloads,
                             request.MetadataRefreshStaleSeconds,
                             request.MetadataRefreshRestartDelaySeconds,
+                            request.ColdDownloadRecoveryThresholdMinutes,
+                            request.ColdDownloadRecoveryIntervalMinutes,
                             completionCallbackEnabled,
                             completionCallbackCommandPath,
                             completionCallbackWorkingDirectory,
@@ -494,6 +516,30 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             metadataRefreshRestartDelaySeconds = parsedMetadataRefreshRestartDelaySeconds;
         }
 
+        var coldDownloadRecoveryThresholdMinutes = baseOptions.ColdDownloadRecoveryThresholdMinutes;
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.ColdDownloadRecoveryThresholdMinutes,
+                out var coldDownloadRecoveryThresholdMinutesValue
+            ) && int.TryParse(
+                coldDownloadRecoveryThresholdMinutesValue, CultureInfo.InvariantCulture,
+                out var parsedColdDownloadRecoveryThresholdMinutes
+            ) && parsedColdDownloadRecoveryThresholdMinutes > 0)
+        {
+            coldDownloadRecoveryThresholdMinutes = parsedColdDownloadRecoveryThresholdMinutes;
+        }
+
+        var coldDownloadRecoveryIntervalMinutes = baseOptions.ColdDownloadRecoveryIntervalMinutes;
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.ColdDownloadRecoveryIntervalMinutes,
+                out var coldDownloadRecoveryIntervalMinutesValue
+            ) && int.TryParse(
+                coldDownloadRecoveryIntervalMinutesValue, CultureInfo.InvariantCulture,
+                out var parsedColdDownloadRecoveryIntervalMinutes
+            ) && parsedColdDownloadRecoveryIntervalMinutes > 0)
+        {
+            coldDownloadRecoveryIntervalMinutes = parsedColdDownloadRecoveryIntervalMinutes;
+        }
+
         var completionCallbackEnabled = baseOptions.CompletionCallbackEnabled;
         if (values.TryGetValue(RuntimeSettingsKeys.CompletionCallbackEnabled, out var completionCallbackEnabledValue) &&
             bool.TryParse(completionCallbackEnabledValue, out var parsedCompletionCallbackEnabled))
@@ -573,6 +619,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             MaxActiveDownloads                           = maxActiveDownloads,
             MetadataRefreshStaleSeconds                  = metadataRefreshStaleSeconds,
             MetadataRefreshRestartDelaySeconds           = metadataRefreshRestartDelaySeconds,
+            ColdDownloadRecoveryThresholdMinutes         = coldDownloadRecoveryThresholdMinutes,
+            ColdDownloadRecoveryIntervalMinutes          = coldDownloadRecoveryIntervalMinutes,
             CompletionCallbackEnabled                    = completionCallbackEnabled,
             CompletionCallbackCommandPath                = completionCallbackCommandPath,
             CompletionCallbackArguments                  = completionCallbackArguments,
@@ -619,6 +667,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             MaxActiveDownloads                           = settings.MaxActiveDownloads,
             MetadataRefreshStaleSeconds                  = settings.MetadataRefreshStaleSeconds,
             MetadataRefreshRestartDelaySeconds           = settings.MetadataRefreshRestartDelaySeconds,
+            ColdDownloadRecoveryThresholdMinutes         = settings.ColdDownloadRecoveryThresholdMinutes,
+            ColdDownloadRecoveryIntervalMinutes          = settings.ColdDownloadRecoveryIntervalMinutes,
             CompletionCallbackEnabled                    = settings.CompletionCallbackEnabled,
             CompletionCallbackCommandPath                = settings.CompletionCallbackCommandPath,
             CompletionCallbackArguments                  = settings.CompletionCallbackArguments,

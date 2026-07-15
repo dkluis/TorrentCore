@@ -34,6 +34,20 @@ Queue diagnostics currently expose:
 - used for both metadata stalls and zero-peer download stalls
 - applies live
 
+### Long-Cold Threshold Minutes
+
+- continuous zero-peer and zero-progress duration before an active download enters long-cold recovery
+- defaults to `240`
+- useful peer or transfer activity restarts this timer
+- applies live
+
+### Long-Cold Recovery Interval Minutes
+
+- minimum delay between automatic actions after a download enters long-cold recovery
+- defaults to `60`
+- actions alternate between peer refresh and restart, so restart normally occurs every two intervals
+- applies live
+
 ## Engine Settings
 
 ### Engine Encryption Mode
@@ -192,7 +206,7 @@ Restart-required settings currently include:
 Live settings currently include:
 
 - queue concurrency
-- metadata recovery windows
+- metadata and long-cold download recovery windows
 - logging throttle settings
 - seeding policy
 - completed-torrent cleanup policy

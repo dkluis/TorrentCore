@@ -267,6 +267,30 @@
                                     </div>
 
                                     <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.ColdDownloadRecoveryThresholdMinutes" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.ColdDownloadRecoveryThresholdMinutes"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.ColdDownloadRecoveryThresholdMinutes = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.ColdDownloadRecoveryIntervalMinutes" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.ColdDownloadRecoveryIntervalMinutes"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.ColdDownloadRecoveryIntervalMinutes = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
                                         <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineConnectionFailureLogBurstLimit" />
                                         <MudNumericField T="int"
                                                          Value="_queue.EngineConnectionFailureLogBurstLimit"
@@ -1005,6 +1029,8 @@
         _queue.MaxActiveDownloads = _runtimeSnapshot.MaxActiveDownloads;
         _queue.MetadataRefreshStaleSeconds = _runtimeSnapshot.MetadataRefreshStaleSeconds;
         _queue.MetadataRefreshRestartDelaySeconds = _runtimeSnapshot.MetadataRefreshRestartDelaySeconds;
+        _queue.ColdDownloadRecoveryThresholdMinutes = _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes;
+        _queue.ColdDownloadRecoveryIntervalMinutes = _runtimeSnapshot.ColdDownloadRecoveryIntervalMinutes;
         _queue.EngineConnectionFailureLogBurstLimit = _runtimeSnapshot.EngineConnectionFailureLogBurstLimit;
         _queue.EngineConnectionFailureLogWindowSeconds = _runtimeSnapshot.EngineConnectionFailureLogWindowSeconds;
     }
@@ -1061,6 +1087,8 @@
             MaxActiveDownloads = _queue.MaxActiveDownloads,
             MetadataRefreshStaleSeconds = _queue.MetadataRefreshStaleSeconds,
             MetadataRefreshRestartDelaySeconds = _queue.MetadataRefreshRestartDelaySeconds,
+            ColdDownloadRecoveryThresholdMinutes = _queue.ColdDownloadRecoveryThresholdMinutes,
+            ColdDownloadRecoveryIntervalMinutes = _queue.ColdDownloadRecoveryIntervalMinutes,
             CompletionCallbackEnabled = _callback.CompletionCallbackEnabled,
             CompletionCallbackCommandPath = _callback.CompletionCallbackCommandPath,
             CompletionCallbackArguments = _callback.CompletionCallbackArguments,
@@ -1157,6 +1185,8 @@
                 _queue.MaxActiveDownloads != _runtimeSnapshot.MaxActiveDownloads ||
                 _queue.MetadataRefreshStaleSeconds != _runtimeSnapshot.MetadataRefreshStaleSeconds ||
                 _queue.MetadataRefreshRestartDelaySeconds != _runtimeSnapshot.MetadataRefreshRestartDelaySeconds ||
+                _queue.ColdDownloadRecoveryThresholdMinutes != _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes ||
+                _queue.ColdDownloadRecoveryIntervalMinutes != _runtimeSnapshot.ColdDownloadRecoveryIntervalMinutes ||
                 _queue.EngineConnectionFailureLogBurstLimit != _runtimeSnapshot.EngineConnectionFailureLogBurstLimit ||
                 _queue.EngineConnectionFailureLogWindowSeconds != _runtimeSnapshot.EngineConnectionFailureLogWindowSeconds);
     }
@@ -1281,6 +1311,8 @@
         public int MaxActiveDownloads { get; set; } = 4;
         public int MetadataRefreshStaleSeconds { get; set; } = 90;
         public int MetadataRefreshRestartDelaySeconds { get; set; } = 30;
+        public int ColdDownloadRecoveryThresholdMinutes { get; set; } = 240;
+        public int ColdDownloadRecoveryIntervalMinutes { get; set; } = 60;
         public int EngineConnectionFailureLogBurstLimit { get; set; } = 5;
         public int EngineConnectionFailureLogWindowSeconds { get; set; } = 60;
     }
