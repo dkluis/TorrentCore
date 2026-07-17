@@ -79,6 +79,10 @@ whole phase to SQLite.
 Final-payload visibility checks use deduplicated per-torrent background probes. A slow
 `torrent_finalization_visibility_probe` can delay one torrent's callback readiness, but it must not extend serialized
 engine synchronization or pause state updates for other torrents.
+Completion-time manager stops are also deduplicated background work. A slow `completion_manager_stop` delays only that
+torrent's callback handoff; callback dispatch remains blocked until MonoTorrent has stopped accessing the payload.
+Inspect `runtime.completion.manager_stop_completed` for duration and outcome. Failures also appear as
+`runtime.completion.manager_stop_failed` and retry after a short cooldown.
 Forced recovery announces do not hold serialized synchronization. Tracker announces are limited to ten seconds and
 duplicate recovery announces for the same torrent are suppressed while one remains active.
 Recovery action details include the recovery cycle, backoff multiplier, and effective timing windows. A high attempt

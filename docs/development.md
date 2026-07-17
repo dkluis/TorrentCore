@@ -81,6 +81,9 @@ Duration diagnostics:
 - `runtime.monotorrent.cache_audit` inventories metadata, fast-resume, unmatched, and aged cache files at startup without deleting them
 - slow storage diagnostics distinguish snapshot reads, projection, state writes, and history writes
 - `torrent_finalization_visibility_probe` measures slow background filesystem visibility checks independently from engine synchronization
+- `completion_manager_stop` measures slow background MonoTorrent completion stops independently from serialized synchronization
+- `runtime.completion.manager_stop_completed` records every background completion stop duration and outcome
+- `runtime.completion.manager_stop_failed` records callback-gating stop failures and retry context
 - slow-operation details include subsystem, operation, duration, threshold, outcome, and torrent context when available
 - runtime diagnostics store torrent context in event details rather than the torrent-scoped log column so completed-torrent log pruning preserves them
 

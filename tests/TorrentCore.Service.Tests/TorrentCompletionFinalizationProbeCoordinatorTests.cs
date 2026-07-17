@@ -46,6 +46,12 @@ public sealed class TorrentCompletionFinalizationProbeCoordinatorTests
         Assert.True(completedResult.IsReady);
         Assert.Equal(snapshot.SavePath, completedResult.FinalPayloadPath);
         Assert.Equal(1, checker.CallCount);
+
+        Assert.True(
+            coordinator.TryTakeCompletedOrSchedule(snapshot, runtimeSettings, observedFiles: null, out var retainedResult)
+        );
+        Assert.True(retainedResult!.IsReady);
+        Assert.Equal(1, checker.CallCount);
     }
 
     [Fact]

@@ -106,7 +106,10 @@ Completion callback rules:
 - TorrentCore does not delete final payload files during callback finalization.
 - Downstream systems must not infer payload readiness by independently scanning download paths or filenames.
 - Final-payload filesystem visibility probes run as deduplicated per-torrent background work and never hold serialized engine synchronization.
-- Serialized synchronization consumes completed probe results and remains the sole owner of MonoTorrent lifecycle and persisted callback-state mutations.
+- Completion-time MonoTorrent stops run as deduplicated per-torrent background work when the seeding policy has been
+  reached. Callback dispatch remains gated until both payload visibility and the manager stop succeed.
+- Serialized synchronization consumes completed probe and stop results and remains the sole owner of persisted
+  callback-state mutations.
 - Completed, stopped torrents leave the per-tick synchronization path after callback dispatch or terminal callback state.
 - Waiting-for-feedback torrents are updated by the feedback API rather than periodic filesystem polling.
 - Finalization visibility checks run only at the completion edge, while pending finalization, or during an explicit retry.

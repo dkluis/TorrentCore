@@ -40,8 +40,11 @@ public sealed class TorrentCompletionFinalizationProbeCoordinator(
             return false;
         }
 
-        _probes.TryRemove(snapshot.TorrentId, out _);
         result = task.GetAwaiter().GetResult();
+        if (!result.IsReady)
+        {
+            _probes.TryRemove(snapshot.TorrentId, out _);
+        }
         return true;
     }
 
