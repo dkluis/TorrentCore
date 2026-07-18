@@ -9,6 +9,73 @@ namespace TorrentCore.Service.Tests;
 public sealed class SqliteSchemaMigrationTests
 {
     [Fact]
+    public async Task Migration15_ClearsMetadataTimestampForStillUnresolvedLiveMagnet()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-metadata-repair");
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+        var submittedAtUtc = DateTimeOffset.UtcNow.AddHours(-12);
+
+        var initialMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await initialMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+            var insertCommand = connection.CreateCommand();
+            insertCommand.CommandText = """
+                                        INSERT INTO torrents (
+                                            torrent_id, name, state, magnet_uri, info_hash, save_path,
+                                            progress_percent, downloaded_bytes, uploaded_bytes, total_bytes,
+                                            download_rate_bytes_per_second, upload_rate_bytes_per_second,
+                                            tracker_count, connected_peer_count, added_at_utc
+                                        )
+                                        VALUES (
+                                            '15151515-1515-1515-1515-151515151515', 'Unresolved Magnet',
+                                            'ResolvingMetadata',
+                                            'magnet:?xt=urn:btih:1515151515151515151515151515151515151515',
+                                            '1515151515151515151515151515151515151515', '/tmp/unresolved',
+                                            0, 0, 0, NULL, 0, 0, 1, 0, $submitted_at_utc
+                                        );
+
+                                        INSERT INTO torrent_history (
+                                            torrent_id, name, magnet_uri, latest_torrent_state,
+                                            latest_progress_percent, latest_downloaded_bytes, latest_uploaded_bytes,
+                                            latest_download_rate_bytes_per_second, latest_upload_rate_bytes_per_second,
+                                            latest_tracker_count, latest_connected_peer_count, submitted_at_utc,
+                                            metadata_resolved_at_utc, last_updated_at_utc, invoke_completion_callback,
+                                            data_deleted, removed_by_cleanup_policy
+                                        )
+                                        VALUES (
+                                            '15151515-1515-1515-1515-151515151515', 'Unresolved Magnet',
+                                            'magnet:?xt=urn:btih:1515151515151515151515151515151515151515',
+                                            'Queued', 0, 0, 0, 0, 0, 1, 0, $submitted_at_utc,
+                                            $metadata_resolved_at_utc, $metadata_resolved_at_utc, 0, 0, 0
+                                        );
+
+                                        DELETE FROM schema_migrations WHERE version = 15;
+                                        """;
+            insertCommand.Parameters.AddWithValue("$submitted_at_utc", submittedAtUtc.ToString("O"));
+            insertCommand.Parameters.AddWithValue(
+                "$metadata_resolved_at_utc", submittedAtUtc.AddMinutes(1).ToString("O"));
+            await insertCommand.ExecuteNonQueryAsync();
+        }
+
+        var repairMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await repairMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+        var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = """
+                                    SELECT metadata_resolved_at_utc
+                                    FROM torrent_history
+                                    WHERE torrent_id = '15151515-1515-1515-1515-151515151515';
+                                    """;
+
+        Assert.Equal(DBNull.Value, await verifyCommand.ExecuteScalarAsync());
+    }
+
+    [Fact]
     public async Task Migration14_RepairsCompletionTimestampThatPredatesDownloadStart()
     {
         var rootPath = CreateTempRootPath("torrentcore-history-completion-repair");
@@ -142,7 +209,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], versions);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";

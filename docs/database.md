@@ -57,8 +57,10 @@ Current core tables:
 - history rows are inserted once and updated in place
 - history rows are not deleted by the current implementation
 - future retention policy is separate from the current design
+- metadata resolution is recorded only after payload size becomes available; an info hash or a temporary queued state is not sufficient evidence
 - download completion is recorded only from a completed or seeding lifecycle state, not from a transient 100-percent progress value
 - migration 14 repairs an impossible stored completion that predates download start when a later valid seeding timestamp is available
+- migration 15 clears premature metadata-resolution timestamps for live magnets that are still unresolved and have no download milestones
 
 Important history fields include:
 

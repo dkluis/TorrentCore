@@ -11,6 +11,43 @@ namespace TorrentCore.Service.Tests;
 public sealed class TorrentHistoryServiceTests
 {
     [Fact]
+    public async Task ObserveSnapshot_DoesNotStampMetadataResolved_WhenRecoveryTemporarilyQueuesUnresolvedMagnet()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-unresolved-metadata-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var store = new SqliteTorrentHistoryStore(databaseFilePath);
+            var service = new TorrentHistoryService(store, new ServiceInstanceContext());
+            var addedAt = DateTimeOffset.UtcNow.AddHours(-1);
+
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(TorrentState.ResolvingMetadata, addedAt, addedAt, null, 0),
+                CancellationToken.None);
+            await service.ObserveSnapshotAsync(
+                CreateSnapshot(TorrentState.Queued, addedAt, addedAt.AddMinutes(1), null, 0),
+                CancellationToken.None);
+
+            var history = await store.GetAsync(TorrentId, CancellationToken.None);
+
+            Assert.NotNull(history);
+            Assert.Null(history.MetadataResolvedAtUtc);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ObserveSnapshot_IgnoresPreHashCompletion_AndStoresLaterSeedingCompletion()
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-prehash-{Guid.NewGuid():N}");

@@ -1806,11 +1806,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         var now = DateTimeOffset.UtcNow;
         _connectionActivitySummaries.RegisterPeersFound(torrentId, now, eventArgs.NewPeers);
-        if (eventArgs.NewPeers > 0)
-        {
-            NoteMetadataDiscoveryActivity(torrentId, now);
-        }
-
         return Task.CompletedTask;
     }
 

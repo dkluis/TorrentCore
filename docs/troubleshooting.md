@@ -9,8 +9,9 @@ Automatic recovery path:
 3. if the session still stays cold, TorrentCore can recreate the metadata session
 
 Only torrents in active metadata-resolution slots are eligible. After an unsuccessful reset cycle, TorrentCore backs
-off subsequent stale and escalation windows to `2x`, `4x`, and at most `8x`; useful discovery activity clears that
-backoff.
+off subsequent stale and escalation windows to `2x`, `4x`, and at most `8x`. Finding peer candidates does not clear
+that backoff because repeated recovery announces can rediscover peers that never connect; an actual peer connection
+does clear it.
 
 Useful events to inspect:
 

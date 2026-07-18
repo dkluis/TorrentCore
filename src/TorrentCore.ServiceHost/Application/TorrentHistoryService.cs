@@ -134,7 +134,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
     {
         var latestState = snapshot.State.ToString();
         DateTimeOffset? metadataResolvedAtUtc =
-                ShouldStampMetadataResolved(null, snapshot) ? snapshot.LastActivityAtUtc ?? now : null;
+                ShouldStampMetadataResolved(snapshot) ? snapshot.LastActivityAtUtc ?? now : null;
         DateTimeOffset? downloadStartedAtUtc =
                 snapshot.State == Contracts.Torrents.TorrentState.Downloading ? snapshot.LastActivityAtUtc ?? now : null;
 
@@ -348,7 +348,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             updated.LatestCompletionCallbackFeedbackJson = existing.LatestCompletionCallbackFeedbackJson;
         }
 
-        if (updated.MetadataResolvedAtUtc is null && ShouldStampMetadataResolved(existing, snapshot))
+        if (updated.MetadataResolvedAtUtc is null && ShouldStampMetadataResolved(snapshot))
         {
             updated.MetadataResolvedAtUtc = snapshot.LastActivityAtUtc ?? now;
         }
@@ -375,20 +375,9 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         return updated;
     }
 
-    private static bool ShouldStampMetadataResolved(TorrentHistoryRecord? existing, TorrentSnapshot snapshot)
+    private static bool ShouldStampMetadataResolved(TorrentSnapshot snapshot)
     {
-        if (snapshot.State == Contracts.Torrents.TorrentState.ResolvingMetadata)
-        {
-            return false;
-        }
-
-        if (existing is null)
-        {
-            return snapshot.TotalBytes is not null || !string.IsNullOrWhiteSpace(snapshot.InfoHash);
-        }
-
-        return string.Equals(existing.LatestTorrentState, Contracts.Torrents.TorrentState.ResolvingMetadata.ToString(), StringComparison.Ordinal) &&
-               snapshot.State != Contracts.Torrents.TorrentState.ResolvingMetadata;
+        return snapshot.TotalBytes is not null;
     }
 
     private static DateTimeOffset? ResolveCredibleCompletionAtUtc(TorrentSnapshot snapshot)

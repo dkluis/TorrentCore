@@ -635,6 +635,34 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     await command.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
+            new SqliteMigrationDefinition(
+                15, "repair_premature_history_metadata_timestamps", async (connection, cancellationToken) =>
+                {
+                    if (!await TableExistsAsync(connection, "torrents", cancellationToken) ||
+                        !await TableExistsAsync(connection, "torrent_history", cancellationToken))
+                    {
+                        return;
+                    }
+
+                    var command = connection.CreateCommand();
+                    command.CommandText = """
+                                          UPDATE torrent_history
+                                          SET metadata_resolved_at_utc = NULL
+                                          WHERE metadata_resolved_at_utc IS NOT NULL
+                                            AND download_started_at_utc IS NULL
+                                            AND download_completed_at_utc IS NULL
+                                            AND seeding_started_at_utc IS NULL
+                                            AND EXISTS (
+                                                SELECT 1
+                                                FROM torrents
+                                                WHERE torrents.torrent_id = torrent_history.torrent_id
+                                                  AND torrents.state = 'ResolvingMetadata'
+                                                  AND torrents.total_bytes IS NULL
+                                            );
+                                          """;
+                    await command.ExecuteNonQueryAsync(cancellationToken);
+                }
+            ),
         ];
     }
 
