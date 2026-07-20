@@ -67,13 +67,19 @@ public static class SettingsHelpCatalog
     public static readonly SettingHelpContent ColdDownloadRecoveryThresholdMinutes = new(
         "Long-Cold Threshold Minutes",
         "Defines when a continuously inactive download switches from progressive recovery to long-cold recovery.",
-        "The default is 240 minutes. The timer resets when TorrentCore observes a connected peer, positive download rate, or downloaded-byte progress. It applies live."
+        "The default is 120 minutes. The timer resets when TorrentCore observes a connected peer, positive download rate, or downloaded-byte progress. It applies live."
     );
 
     public static readonly SettingHelpContent ColdDownloadRecoveryIntervalMinutes = new(
         "Long-Cold Recovery Interval Minutes",
         "Limits long-cold downloads to one automatic recovery action per interval.",
         "The default is 60 minutes. TorrentCore alternates a peer refresh and a restart, so the more expensive restart normally occurs every two intervals. Useful download activity immediately returns the torrent to normal recovery cadence. It applies live."
+    );
+
+    public static readonly SettingHelpContent ColdDownloadAbandonAfterHours = new(
+        "Abandon Cold Download After Hours",
+        "Removes a download and deletes its partial payload after continuous inactivity.",
+        "The default is 72 hours. TorrentCore retains a history record, deletes torrent-scoped logs, and does not invoke the completion callback. Set this to 0 to disable automatic abandonment. It applies live."
     );
 
     public static readonly SettingHelpContent EngineConnectionFailureLogBurstLimit = new(

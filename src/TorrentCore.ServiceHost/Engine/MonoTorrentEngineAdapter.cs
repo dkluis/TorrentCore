@@ -1647,6 +1647,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 existing.CompletedAtUtc, state, now
             ),
             SeedingStartedAtUtc = ResolveSeedingStartedAtUtc(existing.SeedingStartedAtUtc, state, now),
+            DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
             LastActivityAtUtc   = now,
             ErrorMessage        = manager.Error?.Reason.ToString() ?? existing.ErrorMessage,
         };
@@ -1710,6 +1711,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             AddedAtUtc = existing.AddedAtUtc,
             CompletedAtUtc = existing.CompletedAtUtc,
             SeedingStartedAtUtc = existing.SeedingStartedAtUtc,
+            DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
             LastActivityAtUtc = existing.LastActivityAtUtc,
             ErrorMessage = state == ContractTorrentState.Error ?
                     manager.Error?.Reason.ToString() ?? existing.ErrorMessage : null,
@@ -1937,24 +1939,54 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             {
                 ResetDownloadRecoveryState(currentSnapshot.TorrentId);
                 _downloadRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
+                if (currentSnapshot.DownloadColdSinceUtc is not null)
+                {
+                    currentSnapshot.DownloadColdSinceUtc = null;
+                    await torrentStateStore.UpdateAsync(currentSnapshot, cancellationToken);
+                }
                 continue;
             }
 
             var isTrackedDownload = currentSnapshot.State == ContractTorrentState.Downloading &&
                     manager.HasMetadata && !manager.Complete;
             var recoveryState = _downloadRecoveryStates.GetOrAdd(
-                currentSnapshot.TorrentId, _ => new TorrentDownloadRecoveryState()
-            );
-            recoveryState.Observe(
-                now, isTrackedDownload, currentSnapshot.DownloadedBytes, currentSnapshot.DownloadRateBytesPerSecond,
-                manager.OpenConnections
+                currentSnapshot.TorrentId,
+                _ => new TorrentDownloadRecoveryState(
+                    currentSnapshot.DownloadColdSinceUtc,
+                    currentSnapshot.DownloadedBytes
+                )
             );
 
             if (!isTrackedDownload)
             {
-                ResetDownloadRecoveryState(currentSnapshot.TorrentId);
-                _downloadRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
+                if (currentSnapshot.State == ContractTorrentState.Queued && manager.HasMetadata && !manager.Complete)
+                {
+                    recoveryState.Suspend(now);
+                }
+                else
+                {
+                    ResetDownloadRecoveryState(currentSnapshot.TorrentId);
+                    _downloadRecoveryAttemptCounts.TryRemove(currentSnapshot.TorrentId, out _);
+                    if (currentSnapshot.DownloadColdSinceUtc is not null)
+                    {
+                        currentSnapshot.DownloadColdSinceUtc = null;
+                        await torrentStateStore.UpdateAsync(currentSnapshot, cancellationToken);
+                    }
+                }
+
                 continue;
+            }
+
+            recoveryState.Observe(
+                now, true, currentSnapshot.DownloadedBytes,
+                currentSnapshot.DownloadRateBytesPerSecond, manager.OpenConnections
+            );
+
+            var coldSinceUtc = recoveryState.GetColdSinceUtc();
+            if (currentSnapshot.DownloadColdSinceUtc != coldSinceUtc)
+            {
+                currentSnapshot.DownloadColdSinceUtc = coldSinceUtc;
+                await torrentStateStore.UpdateAsync(currentSnapshot, cancellationToken);
             }
 
             var decision = recoveryState.Evaluate(

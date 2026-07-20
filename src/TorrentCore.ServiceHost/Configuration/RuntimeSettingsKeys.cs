@@ -21,6 +21,7 @@ public static class RuntimeSettingsKeys
     public const string MetadataRefreshRestartDelaySeconds      = "metadata_refresh_restart_delay_seconds";
     public const string ColdDownloadRecoveryThresholdMinutes    = "cold_download_recovery_threshold_minutes";
     public const string ColdDownloadRecoveryIntervalMinutes     = "cold_download_recovery_interval_minutes";
+    public const string ColdDownloadAbandonAfterHours           = "cold_download_abandon_after_hours";
     public const string CompletionCallbackEnabled               = "completion_callback_enabled";
     public const string CompletionCallbackCommandPath           = "completion_callback_command_path";
     public const string CompletionCallbackArguments             = "completion_callback_arguments";

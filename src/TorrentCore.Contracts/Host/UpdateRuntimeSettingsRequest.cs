@@ -21,6 +21,7 @@ public sealed class UpdateRuntimeSettingsRequest
     public required int     MetadataRefreshRestartDelaySeconds           { get; init; }
     public required int     ColdDownloadRecoveryThresholdMinutes         { get; init; }
     public required int     ColdDownloadRecoveryIntervalMinutes          { get; init; }
+    public int              ColdDownloadAbandonAfterHours                { get; init; } = 72;
     public          bool?   CompletionCallbackEnabled                    { get; init; }
     public          string? CompletionCallbackCommandPath                { get; init; }
     public          string? CompletionCallbackArguments                  { get; init; }

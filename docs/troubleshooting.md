@@ -34,7 +34,10 @@ TorrentCore also treats zero-peer download stalls as a stale-recovery case.
 Only active downloads are eligible. Each restart that remains cold applies the same bounded progressive backoff, and
 any connected peer, positive rate, or downloaded-byte progress clears it.
 After `Long-Cold Threshold Minutes`, recovery switches to one action per `Long-Cold Recovery Interval Minutes` and
-alternates refresh and restart. The defaults are four hours and one hour, respectively.
+alternates refresh and restart. The defaults are two hours and one hour, respectively.
+After `Abandon Cold Download After Hours` of continuous inactivity, TorrentCore removes the torrent, deletes its
+partial payload and torrent-scoped logs, skips the completion callback, and retains the removal reason in history.
+The default is 72 hours; `0` disables abandonment.
 
 Useful checks:
 
@@ -89,6 +92,8 @@ duplicate recovery announces for the same torrent are suppressed while one remai
 Recovery action details include the recovery cycle, backoff multiplier, and effective timing windows. A high attempt
 count with `LongColdMode=true` indicates a persistently cold torrent on the slower configured cadence rather than an
 engine-wide synchronization stall.
+Runnable downloads retain their accumulated cold duration across automatic stop/start transitions. Time spent queued
+for an active-download slot is suspended and does not advance the long-cold threshold.
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete
 them because cached metadata can accelerate a later re-add of the same torrent.
 

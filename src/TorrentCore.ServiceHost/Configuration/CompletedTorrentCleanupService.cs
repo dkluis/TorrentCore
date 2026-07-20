@@ -54,7 +54,8 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         if (runtimeSettings.CompletedTorrentCleanupMode != CompletedTorrentCleanupMode.AfterCompletedMinutes &&
-            !runtimeSettings.DeleteLogsForCompletedTorrents)
+            !runtimeSettings.DeleteLogsForCompletedTorrents &&
+            runtimeSettings.ColdDownloadAbandonAfterHours == 0)
         {
             return;
         }
@@ -65,6 +66,8 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
         {
             var now      = DateTimeOffset.UtcNow;
             var torrents = await torrentStateStore.ListAsync(cancellationToken);
+            await ProcessAbandonedDownloadsAsync(torrents, runtimeSettings, now, cancellationToken);
+
             var completedCandidates = torrents
                                      .Where(IsSuccessfulCompletedTorrent)
                                      .Where(torrent
@@ -176,6 +179,118 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
         finally
         {
             _gate.Release();
+        }
+    }
+
+    private async Task ProcessAbandonedDownloadsAsync(IReadOnlyList<TorrentSnapshot> torrents,
+        RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (runtimeSettings.ColdDownloadAbandonAfterHours == 0)
+        {
+            return;
+        }
+
+        var candidates = torrents
+                        .Where(torrent => torrent.State == TorrentState.Downloading)
+                        .Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable)
+                        .Where(torrent => torrent.DownloadColdSinceUtc is not null)
+                        .Where(torrent => now - torrent.DownloadColdSinceUtc!.Value >=
+                                          TimeSpan.FromHours(runtimeSettings.ColdDownloadAbandonAfterHours))
+                        .OrderBy(torrent => torrent.DownloadColdSinceUtc)
+                        .ThenBy(torrent => torrent.TorrentId)
+                        .ToList();
+
+        foreach (var torrent in candidates)
+        {
+            var hourLabel = runtimeSettings.ColdDownloadAbandonAfterHours == 1 ? "hour" : "hours";
+            var removalReason =
+                    $"Download abandoned after {runtimeSettings.ColdDownloadAbandonAfterHours} {hourLabel} without peer or transfer activity.";
+            try
+            {
+                torrent.ErrorMessage = removalReason;
+                await torrentEngineAdapter.RemoveAsync(
+                    torrent.TorrentId,
+                    new RemoveTorrentRequest
+                    {
+                        DeleteData = true,
+                    },
+                    cancellationToken
+                );
+                await torrentHistoryService.MarkRemovedAsync(
+                    torrent,
+                    dataDeleted: true,
+                    removalReason,
+                    removedByCleanupPolicy: true,
+                    removedAtUtc: DateTimeOffset.UtcNow,
+                    cancellationToken
+                );
+
+                var deletedLogCount = await activityLogService.DeleteByTorrentIdAsync(
+                    torrent.TorrentId,
+                    cancellationToken
+                );
+                await activityLogService.TryWriteActivityLogAsync(
+                    new ActivityLogWriteRequest
+                    {
+                        Level = ActivityLogLevel.Warning,
+                        Category = "torrent",
+                        EventType = "torrent.download.abandoned",
+                        Message = $"Automatically abandoned cold download '{torrent.Name}'.",
+                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                        DetailsJson = JsonSerializer.Serialize(
+                            new
+                            {
+                                torrent.TorrentId,
+                                torrent.Name,
+                                torrent.ProgressPercent,
+                                torrent.DownloadedBytes,
+                                torrent.TotalBytes,
+                                torrent.DownloadColdSinceUtc,
+                                runtimeSettings.ColdDownloadAbandonAfterHours,
+                                DeletedTorrentLogCount = deletedLogCount,
+                                PartialDataDeleted = true,
+                                CompletionCallbackInvoked = false,
+                            }
+                        ),
+                    },
+                    cancellationToken
+                );
+            }
+            catch (Application.ServiceOperationException exception) when (exception.Code == "torrent_not_found")
+            {
+                logger.LogDebug(
+                    "Cold download {TorrentId} was already removed before abandonment cleanup executed.",
+                    torrent.TorrentId
+                );
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Automatic abandonment failed for cold download {TorrentId}",
+                    torrent.TorrentId
+                );
+                await activityLogService.TryWriteActivityLogAsync(
+                    new ActivityLogWriteRequest
+                    {
+                        Level = ActivityLogLevel.Warning,
+                        Category = "torrent",
+                        EventType = "torrent.download.abandon_failed",
+                        Message = exception.Message,
+                        TorrentId = torrent.TorrentId,
+                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                        DetailsJson = JsonSerializer.Serialize(
+                            new
+                            {
+                                torrent.DownloadColdSinceUtc,
+                                runtimeSettings.ColdDownloadAbandonAfterHours,
+                                ExceptionType = exception.GetType().FullName,
+                            }
+                        ),
+                    },
+                    cancellationToken
+                );
+            }
         }
     }
 

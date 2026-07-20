@@ -83,6 +83,11 @@ The WebUI stays a thin client over service contracts. It must not:
   stale and restart-delay windows. Useful peer or transfer activity immediately restores the normal cadence.
 - Downloads that remain continuously cold beyond the configured long-cold threshold switch to one recovery action per
   configured interval, alternating peer refresh and restart. Useful activity exits long-cold mode immediately.
+- Automatic restart transitions preserve accumulated cold-recovery state; time spent waiting in a runnable queue is
+  excluded from the cold duration.
+- The continuous cold timestamp is persisted across service restarts. When the configured abandonment window expires,
+  TorrentCore removes the torrent and partial payload without invoking completion processing, prunes torrent-scoped
+  logs, and retains the cleanup reason in torrent history.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
 - Forced recovery announces run outside serialized synchronization, are deduplicated per torrent, and use a bounded tracker-announce window.
 

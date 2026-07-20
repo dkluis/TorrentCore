@@ -163,6 +163,58 @@ public sealed class TorrentDownloadRecoveryStateTests
     }
 
     [Fact]
+    public void Suspend_PreservesRecoveryCycleAcrossTransientRunnableQueue()
+    {
+        var state = new TorrentDownloadRecoveryState();
+        var start = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero);
+
+        state.Observe(start, isTrackedDownload: true, downloadedBytes: 1_024, downloadRateBytesPerSecond: 0,
+            openConnections: 0);
+        state.MarkRefresh(start.AddSeconds(61));
+        state.MarkRestart(start.AddSeconds(77));
+        state.Suspend(start.AddSeconds(78));
+        state.Observe(start.AddSeconds(88), isTrackedDownload: true, downloadedBytes: 1_024,
+            downloadRateBytesPerSecond: 0, openConnections: 0);
+
+        var beforeBackoffExpires = state.Evaluate(start.AddSeconds(206), staleSeconds: 60,
+            restartDelaySeconds: 15);
+        var afterBackoffExpires = state.Evaluate(start.AddSeconds(207), staleSeconds: 60,
+            restartDelaySeconds: 15);
+
+        Assert.Equal(DownloadRecoveryAction.None, beforeBackoffExpires.Action);
+        Assert.Equal(DownloadRecoveryAction.Refresh, afterBackoffExpires.Action);
+        Assert.Equal(1, afterBackoffExpires.RecoveryCycle);
+        Assert.Equal(2, afterBackoffExpires.BackoffMultiplier);
+        Assert.Equal(start.AddSeconds(10), afterBackoffExpires.DownloadingSinceUtc);
+    }
+
+    [Fact]
+    public void Suspend_ExcludesRunnableQueueTimeFromLongColdThreshold()
+    {
+        var state = new TorrentDownloadRecoveryState();
+        var start = new DateTimeOffset(2026, 7, 20, 9, 0, 0, TimeSpan.Zero);
+
+        state.Observe(start, isTrackedDownload: true, downloadedBytes: 1_024, downloadRateBytesPerSecond: 0,
+            openConnections: 0);
+        state.Suspend(start.AddHours(1));
+        state.Observe(start.AddHours(3), isTrackedDownload: true, downloadedBytes: 1_024,
+            downloadRateBytesPerSecond: 0, openConnections: 0);
+
+        var beforeThreshold = state.Evaluate(
+            start.AddHours(3).AddMinutes(59), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 120, coldRecoveryIntervalMinutes: 60
+        );
+        var atThreshold = state.Evaluate(
+            start.AddHours(4), staleSeconds: 60, restartDelaySeconds: 90,
+            coldRecoveryThresholdMinutes: 120, coldRecoveryIntervalMinutes: 60
+        );
+
+        Assert.False(beforeThreshold.LongColdMode);
+        Assert.True(atThreshold.LongColdMode);
+        Assert.Equal(start.AddHours(2), atThreshold.LongColdSinceUtc);
+    }
+
+    [Fact]
     public void Observe_UsefulActivityLeavesLongColdModeAndRestoresNormalCadence()
     {
         var state = new TorrentDownloadRecoveryState();

@@ -663,6 +663,17 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     await command.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
+            new SqliteMigrationDefinition(
+                16, "persist_download_cold_since_timestamp", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrents", "download_cold_since_utc", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText = "ALTER TABLE torrents ADD COLUMN download_cold_since_utc TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
         ];
     }
 

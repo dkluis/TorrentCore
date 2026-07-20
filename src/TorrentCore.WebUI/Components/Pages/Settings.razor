@@ -291,6 +291,18 @@
                                     </div>
 
                                     <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.ColdDownloadAbandonAfterHours" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.ColdDownloadAbandonAfterHours"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.ColdDownloadAbandonAfterHours = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="0"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
                                         <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineConnectionFailureLogBurstLimit" />
                                         <MudNumericField T="int"
                                                          Value="_queue.EngineConnectionFailureLogBurstLimit"
@@ -1031,6 +1043,7 @@
         _queue.MetadataRefreshRestartDelaySeconds = _runtimeSnapshot.MetadataRefreshRestartDelaySeconds;
         _queue.ColdDownloadRecoveryThresholdMinutes = _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes;
         _queue.ColdDownloadRecoveryIntervalMinutes = _runtimeSnapshot.ColdDownloadRecoveryIntervalMinutes;
+        _queue.ColdDownloadAbandonAfterHours = _runtimeSnapshot.ColdDownloadAbandonAfterHours;
         _queue.EngineConnectionFailureLogBurstLimit = _runtimeSnapshot.EngineConnectionFailureLogBurstLimit;
         _queue.EngineConnectionFailureLogWindowSeconds = _runtimeSnapshot.EngineConnectionFailureLogWindowSeconds;
     }
@@ -1089,6 +1102,7 @@
             MetadataRefreshRestartDelaySeconds = _queue.MetadataRefreshRestartDelaySeconds,
             ColdDownloadRecoveryThresholdMinutes = _queue.ColdDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = _queue.ColdDownloadRecoveryIntervalMinutes,
+            ColdDownloadAbandonAfterHours = _queue.ColdDownloadAbandonAfterHours,
             CompletionCallbackEnabled = _callback.CompletionCallbackEnabled,
             CompletionCallbackCommandPath = _callback.CompletionCallbackCommandPath,
             CompletionCallbackArguments = _callback.CompletionCallbackArguments,
@@ -1187,6 +1201,7 @@
                 _queue.MetadataRefreshRestartDelaySeconds != _runtimeSnapshot.MetadataRefreshRestartDelaySeconds ||
                 _queue.ColdDownloadRecoveryThresholdMinutes != _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes ||
                 _queue.ColdDownloadRecoveryIntervalMinutes != _runtimeSnapshot.ColdDownloadRecoveryIntervalMinutes ||
+                _queue.ColdDownloadAbandonAfterHours != _runtimeSnapshot.ColdDownloadAbandonAfterHours ||
                 _queue.EngineConnectionFailureLogBurstLimit != _runtimeSnapshot.EngineConnectionFailureLogBurstLimit ||
                 _queue.EngineConnectionFailureLogWindowSeconds != _runtimeSnapshot.EngineConnectionFailureLogWindowSeconds);
     }
@@ -1311,8 +1326,9 @@
         public int MaxActiveDownloads { get; set; } = 4;
         public int MetadataRefreshStaleSeconds { get; set; } = 90;
         public int MetadataRefreshRestartDelaySeconds { get; set; } = 30;
-        public int ColdDownloadRecoveryThresholdMinutes { get; set; } = 240;
+        public int ColdDownloadRecoveryThresholdMinutes { get; set; } = 120;
         public int ColdDownloadRecoveryIntervalMinutes { get; set; } = 60;
+        public int ColdDownloadAbandonAfterHours { get; set; } = 72;
         public int EngineConnectionFailureLogBurstLimit { get; set; } = 5;
         public int EngineConnectionFailureLogWindowSeconds { get; set; } = 60;
     }

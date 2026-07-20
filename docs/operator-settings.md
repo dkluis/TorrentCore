@@ -37,8 +37,9 @@ Queue diagnostics currently expose:
 ### Long-Cold Threshold Minutes
 
 - continuous zero-peer and zero-progress duration before an active download enters long-cold recovery
-- defaults to `240`
+- defaults to `120`
 - useful peer or transfer activity restarts this timer
+- transient runnable queue states suspend the timer without discarding accumulated cold time
 - applies live
 
 ### Long-Cold Recovery Interval Minutes
@@ -46,6 +47,16 @@ Queue diagnostics currently expose:
 - minimum delay between automatic actions after a download enters long-cold recovery
 - defaults to `60`
 - actions alternate between peer refresh and restart, so restart normally occurs every two intervals
+- applies live
+
+### Abandon Cold Download After Hours
+
+- continuous cold duration before TorrentCore stops tracking the download and deletes its partial payload
+- defaults to `72`; set to `0` to disable automatic abandonment
+- the completion callback is not invoked
+- the durable history row is retained with the cleanup reason and deleted-data outcome
+- torrent-scoped activity logs are deleted after successful removal; a service-scoped abandonment summary remains
+- the cold timestamp is persisted across service restarts and excludes time waiting in the runnable queue
 - applies live
 
 ## Engine Settings

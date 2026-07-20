@@ -423,8 +423,9 @@ public sealed class TorrentApiTests
         Assert.Equal(4, settings.MaxActiveDownloads);
         Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
         Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
-        Assert.Equal(240, settings.ColdDownloadRecoveryThresholdMinutes);
+        Assert.Equal(120, settings.ColdDownloadRecoveryThresholdMinutes);
         Assert.Equal(60, settings.ColdDownloadRecoveryIntervalMinutes);
+        Assert.Equal(72, settings.ColdDownloadAbandonAfterHours);
         Assert.False(settings.CompletionCallbackEnabled);
         Assert.Null(settings.CompletionCallbackCommandPath);
         Assert.Null(settings.CompletionCallbackArguments);
@@ -473,6 +474,7 @@ public sealed class TorrentApiTests
                 MetadataRefreshRestartDelaySeconds = 30,
                 ColdDownloadRecoveryThresholdMinutes = 180,
                 ColdDownloadRecoveryIntervalMinutes = 45,
+                ColdDownloadAbandonAfterHours = 48,
                 CompletionCallbackEnabled = true,
                 CompletionCallbackCommandPath = "/usr/local/bin/torrentcore-callback",
                 CompletionCallbackArguments = "--run",
@@ -508,6 +510,7 @@ public sealed class TorrentApiTests
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
+            Assert.Equal(48, settings.ColdDownloadAbandonAfterHours);
             Assert.True(settings.CompletionCallbackEnabled);
             Assert.Equal("/usr/local/bin/torrentcore-callback", settings.CompletionCallbackCommandPath);
             Assert.Equal("--run", settings.CompletionCallbackArguments);
@@ -565,6 +568,7 @@ public sealed class TorrentApiTests
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
+            Assert.Equal(48, settings.ColdDownloadAbandonAfterHours);
             Assert.True(settings.CompletionCallbackEnabled);
             Assert.Equal("/usr/local/bin/torrentcore-callback", settings.CompletionCallbackCommandPath);
             Assert.Equal("--run", settings.CompletionCallbackArguments);
@@ -612,6 +616,20 @@ public sealed class TorrentApiTests
         var response = await httpClient.PutAsJsonAsync(
             "api/host/runtime-settings",
             CreateDefaultRuntimeSettingsUpdateRequest(thresholdMinutes, intervalMinutes)
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeSettings_RejectsNegativeColdDownloadAbandonmentWindow()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(coldDownloadAbandonAfterHours: -1)
         );
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -2695,6 +2713,71 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_AbandonsPersistedColdDownload_DeletesDataAndTorrentLogs_AndRetainsHistory()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-cold-abandonment");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 0.01);
+        using var httpClient = factory.CreateClient();
+
+        var settingsRequest = CreateDefaultRuntimeSettingsUpdateRequest(coldDownloadAbandonAfterHours: 1);
+        var updateResponse = await httpClient.PutAsJsonAsync("api/host/runtime-settings", settingsRequest);
+        updateResponse.EnsureSuccessStatusCode();
+
+        var response = await AddMagnetAsync(
+            httpClient,
+            "ABABABABABABABABABABABABABABABABABABABAB",
+            "Cold Abandonment Torrent");
+        var addedTorrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(addedTorrent.SavePath)!);
+        await File.WriteAllTextAsync(addedTorrent.SavePath, "partial payload");
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{addedTorrent.TorrentId}"),
+            torrent => torrent is not null && torrent.State == TorrentState.Downloading,
+            timeout: TimeSpan.FromSeconds(5));
+
+        await ForceDownloadColdSinceAsync(
+            databaseFilePath,
+            addedTorrent.TorrentId,
+            DateTimeOffset.UtcNow.AddHours(-2));
+
+        var remainingTorrents = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            torrents => torrents is not null && torrents.All(torrent => torrent.TorrentId != addedTorrent.TorrentId),
+            timeout: TimeSpan.FromSeconds(5));
+        await WaitForAsync(
+            () => Task.FromResult(File.Exists(addedTorrent.SavePath)),
+            exists => !exists,
+            timeout: TimeSpan.FromSeconds(5));
+        var history = await GetRemovalHistoryRowAsync(databaseFilePath, addedTorrent.TorrentId);
+        var torrentLogs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+            $"api/logs?take=100&torrentId={addedTorrent.TorrentId}");
+        var allLogs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=100");
+
+        Assert.NotNull(remainingTorrents);
+        Assert.False(File.Exists(addedTorrent.SavePath));
+        Assert.NotNull(history);
+        Assert.True(history.DataDeleted);
+        Assert.True(history.RemovedByCleanupPolicy);
+        Assert.Contains("abandoned after 1 hour", history.RemovalReason, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(torrentLogs);
+        Assert.Empty(torrentLogs);
+        Assert.NotNull(allLogs);
+        Assert.Contains(allLogs, log => log.EventType == "torrent.download.abandoned" && log.TorrentId is null);
+    }
+
+    [Fact]
     public async Task FakeRuntime_DeleteLogsForCompletedTorrents_PrunesTorrentScopedLogs_WithoutRemovingTorrent()
     {
         var rootPath = CreateTempRootPath("torrentcore-auto-log-cleanup");
@@ -3397,7 +3480,8 @@ public sealed class TorrentApiTests
 
     private static UpdateRuntimeSettingsRequest CreateDefaultRuntimeSettingsUpdateRequest(
         int coldDownloadRecoveryThresholdMinutes = 240,
-        int coldDownloadRecoveryIntervalMinutes = 60)
+        int coldDownloadRecoveryIntervalMinutes = 60,
+        int coldDownloadAbandonAfterHours = 72)
     {
         return new UpdateRuntimeSettingsRequest
         {
@@ -3420,6 +3504,7 @@ public sealed class TorrentApiTests
             MetadataRefreshRestartDelaySeconds = 30,
             ColdDownloadRecoveryThresholdMinutes = coldDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = coldDownloadRecoveryIntervalMinutes,
+            ColdDownloadAbandonAfterHours = coldDownloadAbandonAfterHours,
             CompletionCallbackEnabled = false,
             CompletionCallbackCommandPath = null,
             CompletionCallbackArguments = null,
@@ -3685,6 +3770,25 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue("$state", state.ToString());
         command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
         command.Parameters.AddWithValue("$error_message", (object?)errorMessage ?? DBNull.Value);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ForceDownloadColdSinceAsync(
+        string databaseFilePath,
+        Guid torrentId,
+        DateTimeOffset coldSinceUtc)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              UPDATE torrents
+                              SET download_cold_since_utc = $download_cold_since_utc
+                              WHERE torrent_id = $torrent_id;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$download_cold_since_utc", coldSinceUtc.ToString("O"));
         await command.ExecuteNonQueryAsync();
     }
 

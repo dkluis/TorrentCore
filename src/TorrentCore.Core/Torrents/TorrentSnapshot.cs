@@ -36,6 +36,7 @@ public sealed class TorrentSnapshot
     public required DateTimeOffset                  AddedAtUtc                        { get; init; }
     public          DateTimeOffset?                 CompletedAtUtc                    { get; set; }
     public          DateTimeOffset?                 SeedingStartedAtUtc               { get; set; }
+    public          DateTimeOffset?                 DownloadColdSinceUtc              { get; set; }
     public          DateTimeOffset?                 LastActivityAtUtc                 { get; set; }
     public          string?                         ErrorMessage                      { get; set; }
 }

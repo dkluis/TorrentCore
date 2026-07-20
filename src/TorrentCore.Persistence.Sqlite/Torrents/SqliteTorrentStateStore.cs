@@ -107,6 +107,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   added_at_utc,
                                   completed_at_utc,
                                   seeding_started_at_utc,
+                                  download_cold_since_utc,
                                   last_activity_at_utc,
                                   error_message
                               FROM torrents
@@ -153,6 +154,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   added_at_utc,
                                   completed_at_utc,
                                   seeding_started_at_utc,
+                                  download_cold_since_utc,
                                   last_activity_at_utc,
                                   error_message
                               FROM torrents
@@ -251,10 +253,13 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                     SeedingStartedAtUtc = reader.IsDBNull(27) ? null : DateTimeOffset.Parse(
                         reader.GetString(27), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
                     ),
-                    LastActivityAtUtc = reader.IsDBNull(28) ? null : DateTimeOffset.Parse(
+                    DownloadColdSinceUtc = reader.IsDBNull(28) ? null : DateTimeOffset.Parse(
                         reader.GetString(28), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
                     ),
-                    ErrorMessage = reader.IsDBNull(29) ? null : reader.GetString(29),
+                    LastActivityAtUtc = reader.IsDBNull(29) ? null : DateTimeOffset.Parse(
+                        reader.GetString(29), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    ErrorMessage = reader.IsDBNull(30) ? null : reader.GetString(30),
                 }
             );
         }
@@ -295,6 +300,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   added_at_utc,
                                   completed_at_utc,
                                   seeding_started_at_utc,
+                                  download_cold_since_utc,
                                   last_activity_at_utc,
                                   error_message
                               )
@@ -327,6 +333,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   $added_at_utc,
                                   $completed_at_utc,
                                   $seeding_started_at_utc,
+                                  $download_cold_since_utc,
                                   $last_activity_at_utc,
                                   $error_message
                               );
@@ -417,6 +424,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   added_at_utc = $added_at_utc,
                                   completed_at_utc = $completed_at_utc,
                                   seeding_started_at_utc = $seeding_started_at_utc,
+                                  download_cold_since_utc = $download_cold_since_utc,
                                   last_activity_at_utc = $last_activity_at_utc,
                                   error_message = $error_message
                               WHERE torrent_id = $torrent_id;
@@ -483,6 +491,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         command.Parameters.AddWithValue(
             "$seeding_started_at_utc",
             torrent.SeedingStartedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$download_cold_since_utc",
+            torrent.DownloadColdSinceUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object) DBNull.Value
         );
         command.Parameters.AddWithValue(
             "$last_activity_at_utc",

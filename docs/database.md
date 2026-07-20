@@ -32,6 +32,7 @@ Current core tables:
 
 - live runtime state
 - restart and recovery persistence
+- persisted continuous-cold timestamp used by long-running download abandonment
 - current category routing and callback state for active torrents
 
 ### `runtime_settings`
@@ -61,6 +62,7 @@ Current core tables:
 - download completion is recorded only from a completed or seeding lifecycle state, not from a transient 100-percent progress value
 - migration 14 repairs an impossible stored completion that predates download start when a later valid seeding timestamp is available
 - migration 15 clears premature metadata-resolution timestamps for live magnets that are still unresolved and have no download milestones
+- migration 16 adds the live download cold timestamp used to preserve recovery and abandonment timing across service restarts
 
 Important history fields include:
 

@@ -11,6 +11,15 @@ internal sealed class TorrentDownloadRecoveryState
     private          long?           _lastObservedDownloadedBytes;
     private          DateTimeOffset? _lastUsefulActivityAtUtc;
     private          int             _recoveryCycle;
+    private          DateTimeOffset? _suspendedAtUtc;
+    private          bool            _isCold;
+
+    public TorrentDownloadRecoveryState(DateTimeOffset? coldSinceUtc = null, long? downloadedBytes = null)
+    {
+        _downloadingSinceUtc = coldSinceUtc;
+        _lastObservedDownloadedBytes = downloadedBytes;
+        _isCold = coldSinceUtc is not null;
+    }
 
     public void Observe(DateTimeOffset now, bool isTrackedDownload, long downloadedBytes,
         long downloadRateBytesPerSecond, int openConnections)
@@ -23,6 +32,7 @@ internal sealed class TorrentDownloadRecoveryState
                 return;
             }
 
+            ResumeUnsafe(now);
             _downloadingSinceUtc ??= now;
 
             var sawUsefulActivity = openConnections > 0 || downloadRateBytesPerSecond > 0;
@@ -35,6 +45,7 @@ internal sealed class TorrentDownloadRecoveryState
 
             if (!sawUsefulActivity)
             {
+                _isCold = true;
                 return;
             }
 
@@ -42,11 +53,31 @@ internal sealed class TorrentDownloadRecoveryState
             _lastActionAtUtc         = null;
             _lastRecoveryAction      = DownloadRecoveryAction.None;
             _recoveryCycle           = 0;
+            _isCold                  = false;
+        }
+    }
+
+    public DateTimeOffset? GetColdSinceUtc()
+    {
+        lock (_gate)
+        {
+            return _isCold ? _lastUsefulActivityAtUtc ?? _downloadingSinceUtc : null;
+        }
+    }
+
+    public void Suspend(DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (_downloadingSinceUtc is not null)
+            {
+                _suspendedAtUtc ??= now;
+            }
         }
     }
 
     public TorrentDownloadRecoveryDecision Evaluate(DateTimeOffset now, int staleSeconds, int restartDelaySeconds,
-        int coldRecoveryThresholdMinutes = 240, int coldRecoveryIntervalMinutes = 60)
+        int coldRecoveryThresholdMinutes = 120, int coldRecoveryIntervalMinutes = 60)
     {
         lock (_gate)
         {
@@ -156,6 +187,26 @@ internal sealed class TorrentDownloadRecoveryState
         _lastObservedDownloadedBytes = null;
         _lastUsefulActivityAtUtc    = null;
         _recoveryCycle              = 0;
+        _suspendedAtUtc             = null;
+        _isCold                     = false;
+    }
+
+    private void ResumeUnsafe(DateTimeOffset now)
+    {
+        if (_suspendedAtUtc is null)
+        {
+            return;
+        }
+
+        var suspendedDuration = now - _suspendedAtUtc.Value;
+        if (suspendedDuration > TimeSpan.Zero)
+        {
+            _downloadingSinceUtc = _downloadingSinceUtc?.Add(suspendedDuration);
+            _lastUsefulActivityAtUtc = _lastUsefulActivityAtUtc?.Add(suspendedDuration);
+            _lastActionAtUtc = _lastActionAtUtc?.Add(suspendedDuration);
+        }
+
+        _suspendedAtUtc = null;
     }
 
     private static int GetBackoffMultiplier(int recoveryCycle)

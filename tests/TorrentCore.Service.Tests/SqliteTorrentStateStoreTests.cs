@@ -31,6 +31,7 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.Equal(torrent.CompletionCallbackPendingSinceUtc, reloaded.CompletionCallbackPendingSinceUtc);
             Assert.Equal(torrent.CompletionCallbackInvokedAtUtc, reloaded.CompletionCallbackInvokedAtUtc);
             Assert.Equal("The callback exited with code 1.", reloaded.CompletionCallbackLastError);
+            Assert.Equal(torrent.DownloadColdSinceUtc, reloaded.DownloadColdSinceUtc);
         }
         finally
         {
@@ -164,6 +165,7 @@ public sealed class SqliteTorrentStateStoreTests
             TrackerCount = 0,
             ConnectedPeerCount = 0,
             AddedAtUtc = now,
+            DownloadColdSinceUtc = now.AddHours(-2),
             LastActivityAtUtc = now,
         };
     }

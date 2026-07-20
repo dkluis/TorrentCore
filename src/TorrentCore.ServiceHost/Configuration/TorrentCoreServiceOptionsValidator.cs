@@ -151,6 +151,13 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (options.ColdDownloadAbandonAfterHours < 0)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:ColdDownloadAbandonAfterHours must be 0 or greater."
+            );
+        }
+
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
             failures.Add(
