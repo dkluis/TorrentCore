@@ -31,6 +31,45 @@ func profileAddressesAndDevicePreferencesAreNormalizedAndPersisted() async throw
 
     #expect(reloaded == preferences)
     #expect(reloaded.activeProfile == profile)
+    #expect(reloaded.autoRefreshEnabled)
+}
+
+@Test
+func versionOnePreferencesMigrateWithoutLosingConnections() async throws {
+    let suiteName = "TorrentCoreFeatureSessionMigrationTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer {
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Existing",
+        address: "http://existing.test:7033"
+    )
+    let current = TorrentCoreClientPreferences(
+        profiles: [profile],
+        activeProfileID: profile.id,
+        refreshInterval: .fiveSeconds
+    )
+    let encoded = try JSONEncoder().encode(current)
+    var object = try #require(
+        JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    object["schemaVersion"] = 1
+    object.removeValue(forKey: "autoRefreshEnabled")
+    defaults.set(
+        try JSONSerialization.data(withJSONObject: object),
+        forKey: UserDefaultsTorrentCoreProfileStore.legacyStorageKey
+    )
+
+    let store = UserDefaultsTorrentCoreProfileStore(suiteName: suiteName)
+    let migrated = try await store.load()
+
+    #expect(migrated.schemaVersion == 2)
+    #expect(migrated.activeProfile == profile)
+    #expect(migrated.refreshInterval == .fiveSeconds)
+    #expect(migrated.autoRefreshEnabled)
+    #expect(defaults.data(forKey: UserDefaultsTorrentCoreProfileStore.storageKey) != nil)
 }
 
 @Test
@@ -184,6 +223,30 @@ func refreshOnlyLoadsTheOpenFeatureContext() async throws {
 
 @Test
 @MainActor
+func torrentInspectorContextRefreshesListAndSelectedDetail() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Inspector",
+        address: "http://inspector.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [.initPreview])
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(profiles: [profile], activeProfileID: profile.id)),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client])
+    )
+    try await session.load()
+
+    session.setContext(.torrentListAndDetail(TorrentCorePreviewFixtures.torrentID))
+    await session.refresh()
+
+    let calls = await client.calls
+    #expect(calls.torrents == 1)
+    #expect(calls.torrentDetail == 1)
+    #expect(session.torrents.value?.count == 1)
+    #expect(session.torrentDetail.value?.torrentID == TorrentCorePreviewFixtures.torrentID)
+}
+
+@Test
+@MainActor
 func foregroundStartsOneLoopAndBackgroundStopsIt() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Foreground",
@@ -217,6 +280,65 @@ func foregroundStartsOneLoopAndBackgroundStopsIt() async throws {
 
     session.setApplicationActive(false)
     #expect(!session.isApplicationActive)
+}
+
+@Test
+@MainActor
+func disabledAutoRefreshLoadsTheContextOnceWithoutPolling() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Manual",
+        address: "http://manual.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [.initPreview])
+    let sleeper = RecordingSleeper()
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id,
+            autoRefreshEnabled: false
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client]),
+        sleeper: sleeper
+    )
+    try await session.load()
+    session.setContext(.torrents)
+    session.setApplicationActive(true)
+
+    await waitUntil {
+        await client.calls.torrents == 1
+    }
+    for _ in 0..<20 {
+        await Task.yield()
+    }
+
+    #expect(await client.calls.torrents == 1)
+    #expect(await sleeper.intervals.isEmpty)
+}
+
+@Test
+func torrentFilteringAndPaginationMatchTheOperatorGridSemantics() {
+    var uncategorized = TorrentCorePreviewFixtures.pausedTorrent
+    uncategorized.categoryKey = nil
+    let values = [TorrentCorePreviewFixtures.downloadingTorrent, uncategorized]
+    let filter = TorrentCoreTorrentFilter(
+        searchText: "paused",
+        state: TorrentCoreTorrentState.paused.rawValue,
+        category: .uncategorized
+    )
+
+    let filtered = filter.apply(to: values)
+    #expect(filtered.map(\.torrentID) == [uncategorized.torrentID])
+
+    let manyValues = Array(0..<60)
+    let page = TorrentCorePagination.page(
+        manyValues,
+        index: 2,
+        size: .twentyFive
+    )
+    #expect(page.values == Array(50..<60))
+    #expect(page.pageIndex == 2)
+    #expect(page.pageCount == 3)
+    #expect(page.totalCount == 60)
 }
 
 @Test
@@ -387,13 +509,19 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
     func torrent(id: UUID) async throws -> TorrentCoreTorrentDetail {
         calls.torrentDetail += 1
         try checkConnection()
-        throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        guard torrentValues.contains(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        var detail = TorrentCorePreviewFixtures.torrentDetail
+        detail.torrentID = id
+        detail.name = torrentValues.first(where: { $0.torrentID == id })?.name
+        return detail
     }
 
     func categories() async throws -> [TorrentCoreCategory] {
         calls.categories += 1
         try checkConnection()
-        return []
+        return TorrentCorePreviewFixtures.categories
     }
 
     func addMagnet(

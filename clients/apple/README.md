@@ -2,9 +2,8 @@
 
 ## Status
 
-Milestones 0 through 2 are complete. The targets, shared package, build configurations, network boundary, automatic
-signing, generated service contract, HTTP client, connection profiles, and shared feature-state foundation are
-established.
+Milestones 0 through 3 are complete. The macOS Connection, Dashboard, and Torrents operator screens are implemented.
+The fixture-only signed UI tests and the operator-approved disposable live mutation sequence passed on July 23, 2026.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -36,6 +35,20 @@ swift test \
 The probe reads health, host status, dashboard lifecycle, torrents, optional torrent detail, and categories. It never
 performs a mutation. Without the variable, the live test returns immediately and routine tests remain fixture-only.
 
+`liveDisposableMutationSequence` is a separate, explicitly gated test. It runs only when all of these values are
+supplied for an operator-approved disposable target:
+
+- `TORRENTCORE_ALLOW_DISPOSABLE_MUTATION=1`
+- `TORRENTCORE_INTEGRATION_BASE_URL`
+- `TORRENTCORE_DISPOSABLE_MAGNET_URI`
+- `TORRENTCORE_DISPOSABLE_INFO_HASH`
+- `TORRENTCORE_DISPOSABLE_CATEGORY`, using the live enabled category display name
+
+The test validates host capabilities and the magnet hash, resolves exactly one enabled category, and refuses to add
+the torrent if that hash already exists. It then adds, observes, pauses, resumes, and removes only the returned torrent
+ID with data deletion enabled. Failures after creation trigger best-effort cleanup of that same verified target. Do not
+save a disposable magnet or a live endpoint in the repository.
+
 ## Contract And Client
 
 `TorrentCoreAPI` uses pinned Swift OpenAPI Generator, runtime, and URLSession packages. The committed normalized
@@ -51,24 +64,52 @@ automation may use `-skipPackagePluginValidation` with the pinned package versio
 ## Connection Profiles And Refresh
 
 Connection profiles are nonsecret, device-local client settings. `UserDefaultsTorrentCoreProfileStore` stores one
-versioned JSON document under `TorrentCore.ClientPreferences.v1`; it is not written to iCloud. The document contains:
+versioned JSON document under `TorrentCore.ClientPreferences.v2`; it is not written to iCloud. The document contains:
 
 - named profiles with stable UUIDs, normalized base URLs, and created/updated timestamps
 - the selected profile UUID
 - one client-wide refresh interval
+- one client-wide Auto Refresh on/off preference
+
+On first load, a version 1 document is decoded with Auto Refresh enabled, validated, and copied to the version 2 key.
+The legacy value is left in place as a recovery copy. Saved connections, active selection, and refresh interval are
+preserved.
 
 There is no compiled or automatically created server profile. Operators create profiles at runtime. Addresses accept
 HTTP or HTTPS hostnames and IP addresses with optional ports; missing schemes become HTTP. Credentials, query strings,
 fragments, and non-root paths are rejected. Duplicate normalized service addresses are not allowed.
 
-The selectable refresh intervals are 5, 10, and 15 seconds, with 15 seconds as the default. Refresh runs only while the
-application is active and only for the open feature context. Returning to the foreground triggers an immediate refresh;
-backgrounded and suspended applications do not poll. Offline state retains last-known values in memory and marks them
-stale. Service actions are disabled until refresh reconnects, and mutations are never retried automatically.
+The selectable refresh intervals are 5, 10, and 15 seconds, with 15 seconds as the default. Auto Refresh defaults on
+and can be disabled without disabling manual Refresh. Initial screen loads and foreground reconnection remain one-shot
+loads; periodic refresh runs only while the application is active and only for the open feature context. Backgrounded
+and suspended applications do not poll. When a torrent inspector is visible, the open context refreshes the list and
+selected detail together. Offline state retains last-known values in memory and marks them stale. Service actions are
+disabled until refresh reconnects, and mutations are never retried automatically.
 
 `TorrentCoreCredentialStoring` reserves a credential boundary and the Keychain service name
 `com.conadv.TorrentCore.credentials`. The initial trusted-LAN/VPN model uses
 `UnconfiguredTorrentCoreCredentialStore`, so it creates no Keychain items or permission prompts.
+
+## macOS Core Operator MVP
+
+The macOS app uses a native sidebar for Connection, Dashboard, and Torrents. It remembers the last destination, but
+opens Connection when there is no active saved connection.
+
+- Connection manages named installations and keeps Test Connection separate from Save & Connect. Unreachable
+  installations can still be saved for later LAN or VPN use.
+- Dashboard shows service and engine identity, transfer totals, torrent states, queue capacity, startup recovery, and
+  recent lifecycle events.
+- Torrents uses a native sortable table with name, state, and category filters; local pagination matches the WebUI
+  choices of 25, 50, 100, and 250 rows.
+- Single selection drives a resizable trailing inspector. The inspector exposes pause, resume, remove, and
+  remove-with-data according to service capabilities.
+- Add Magnet uses enabled service categories in service sort order and permits Uncategorized.
+- Both remove paths require native destructive confirmation. A mutation timeout is shown as uncertain and is followed
+  by authoritative refresh rather than automatic retry.
+- Standard macOS Settings and the main toolbar share the same global Auto Refresh and interval preferences.
+
+The app has no compiled live endpoint. `--torrentcore-ui-fixtures` is reserved for the Xcode UI-test target and starts
+an in-memory fixture service; it never contacts or mutates a deployed TorrentCore installation.
 
 ## Build And Test
 
@@ -87,6 +128,8 @@ xcodebuild \
   -configuration Debug \
   -destination 'platform=macOS,arch=arm64' \
   -skipPackagePluginValidation \
+  SYMROOT=/private/tmp/torrentcore-apple-mac-products \
+  OBJROOT=/private/tmp/torrentcore-apple-mac-intermediates \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
@@ -100,9 +143,30 @@ xcodebuild \
   -configuration Debug \
   -destination 'generic/platform=iOS Simulator' \
   -skipPackagePluginValidation \
+  SYMROOT=/private/tmp/torrentcore-apple-mobile-products \
+  OBJROOT=/private/tmp/torrentcore-apple-mobile-intermediates \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
+
+Compile the macOS app and both test targets without launching an app:
+
+```bash
+xcodebuild \
+  -project clients/apple/TorrentCoreApple.xcodeproj \
+  -scheme TorrentCoreMac \
+  -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' \
+  -skipPackagePluginValidation \
+  SYMROOT=/private/tmp/torrentcore-apple-test-products \
+  OBJROOT=/private/tmp/torrentcore-apple-test-intermediates \
+  CODE_SIGNING_ALLOWED=NO \
+  build-for-testing
+```
+
+Running `TorrentCoreMacUITests` launches an app and therefore requires a normal development-signed build. Do not run
+UI tests against an unsigned app product. The explicit temporary build roots above also prevent compile-only
+verification from replacing the normal signed Xcode product. The UI tests use only the in-memory fixture environment.
 
 ## Signing And Distribution
 

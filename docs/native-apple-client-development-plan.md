@@ -7,7 +7,7 @@ This document is an implementation plan, not a statement of current product supp
 `TorrentCore.WebUI` remains the supported operator UI until the native macOS client reaches its release milestone and
 the active architecture documentation is deliberately updated.
 
-Milestones 0 through 2 were completed on July 23, 2026.
+Milestones 0 through 3 were completed on July 23, 2026.
 
 ## Outcome
 
@@ -39,8 +39,11 @@ native interaction models rather than sharing complete screens.
 - Use manual connection profiles first; defer Bonjour discovery unless it proves necessary.
 - Persist profiles and the selected profile device-locally rather than through iCloud.
 - Use one client-wide selectable refresh interval of 5, 10, or 15 seconds, defaulting to 15 seconds.
+- Allow client-wide Auto Refresh to be turned off while preserving manual Refresh.
 - Refresh only the open feature context while the application is active; do not poll in the background.
 - Keep torrent actions single-item. Defer native multi-selection unless later operator experience establishes a need.
+- Paginate the native torrent table locally with 25, 50, 100, or 250 rows after local filtering and sorting.
+- Present selected torrent details in the standard resizable trailing macOS inspector.
 
 ## Development And Runtime Model
 
@@ -276,6 +279,10 @@ Exit criteria:
 - offline and reconnect flows preserve a clear last-known-state boundary
 
 ### Milestone 3: macOS Core Operator MVP
+
+Status: complete (July 23, 2026). Shared/unit and compile-only macOS/iOS verification pass. The development-signed
+fixture UI tests pass, and an operator-approved disposable target completed add, observation, pause, resume, and
+remove-with-data verification against the local CA-Desktop installation.
 
 Deliver the first usable native product slice.
 

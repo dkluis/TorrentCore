@@ -1,0 +1,205 @@
+import Foundation
+import TorrentCoreAPI
+
+public enum TorrentCoreFixtureEnvironment {
+    @MainActor
+    public static func makeSession() throws -> TorrentCoreFeatureSession {
+        let profile = try TorrentCoreConnectionProfile(
+            name: "Fixture Service",
+            address: "http://fixture.torrentcore.test:7033"
+        )
+        let client = TorrentCoreFixtureServiceClient()
+        return TorrentCoreFeatureSession(
+            profileStore: TorrentCoreFixtureProfileStore(.init(
+                profiles: [profile],
+                activeProfileID: profile.id
+            )),
+            clientFactory: TorrentCoreFixtureClientFactory(
+                baseURL: profile.baseURL,
+                client: client
+            )
+        )
+    }
+}
+
+private actor TorrentCoreFixtureProfileStore: TorrentCoreProfilePersisting {
+    private var preferences: TorrentCoreClientPreferences
+
+    init(_ preferences: TorrentCoreClientPreferences) {
+        self.preferences = preferences
+    }
+
+    func load() async throws -> TorrentCoreClientPreferences {
+        preferences
+    }
+
+    func save(_ preferences: TorrentCoreClientPreferences) async throws {
+        self.preferences = preferences
+    }
+}
+
+private struct TorrentCoreFixtureClientFactory: TorrentCoreServiceClientBuilding {
+    let baseURL: URL
+    let client: TorrentCoreFixtureServiceClient
+
+    func makeClient(baseURL: URL) throws -> any TorrentCoreServiceClientProtocol {
+        guard baseURL == self.baseURL else {
+            throw TorrentCoreClientError.invalidBaseURL
+        }
+        return client
+    }
+}
+
+private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol {
+    private var torrentValues = [
+        TorrentCorePreviewFixtures.downloadingTorrent,
+        TorrentCorePreviewFixtures.pausedTorrent,
+    ]
+
+    func probe() async throws -> TorrentCoreServiceHealth {
+        TorrentCorePreviewFixtures.connectedHealth
+    }
+
+    func hostStatus() async throws -> TorrentCoreHostStatus {
+        var status = TorrentCorePreviewFixtures.hostStatus
+        status.torrentCount = torrentValues.count
+        status.downloadingCount = torrentValues.filter { $0.state == .downloading }.count
+        status.pausedCount = torrentValues.filter { $0.state == .paused }.count
+        return status
+    }
+
+    func dashboardLifecycle() async throws -> TorrentCoreDashboardLifecycle {
+        var lifecycle = TorrentCorePreviewFixtures.dashboardLifecycle
+        lifecycle.recentEvents = [
+            TorrentCoreLifecycleEvent(
+                category: "Host",
+                eventType: "StartupReady",
+                level: "Information",
+                message: "Fixture TorrentCore service is ready.",
+                occurredAt: TorrentCorePreviewFixtures.checkedAt,
+                torrentID: nil
+            ),
+            TorrentCoreLifecycleEvent(
+                category: "Torrent",
+                eventType: "TorrentAdded",
+                level: "Information",
+                message: "Preview Torrent was added.",
+                occurredAt: TorrentCorePreviewFixtures.checkedAt.addingTimeInterval(-300),
+                torrentID: TorrentCorePreviewFixtures.torrentID
+            ),
+        ]
+        return lifecycle
+    }
+
+    func torrents() async throws -> [TorrentCoreTorrentSummary] {
+        torrentValues
+    }
+
+    func torrent(id: UUID) async throws -> TorrentCoreTorrentDetail {
+        guard let summary = torrentValues.first(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        var detail = TorrentCorePreviewFixtures.torrentDetail
+        detail.torrentID = id
+        detail.name = summary.name
+        detail.categoryKey = summary.categoryKey
+        detail.state = summary.state
+        detail.canPause = summary.canPause
+        detail.canResume = summary.canResume
+        detail.canRemove = summary.canRemove
+        detail.progressPercent = summary.progressPercent
+        detail.downloadRateBytesPerSecond = summary.downloadRateBytesPerSecond
+        detail.uploadRateBytesPerSecond = summary.uploadRateBytesPerSecond
+        detail.connectedPeerCount = summary.connectedPeerCount
+        detail.waitReason = summary.waitReason
+        return detail
+    }
+
+    func categories() async throws -> [TorrentCoreCategory] {
+        TorrentCorePreviewFixtures.categories
+    }
+
+    func addMagnet(
+        _ magnetURI: String,
+        categoryKey: String?
+    ) async throws -> TorrentCoreTorrentDetail {
+        let newID = UUID()
+        var summary = TorrentCorePreviewFixtures.downloadingTorrent
+        summary.torrentID = newID
+        summary.name = "New Fixture Magnet"
+        summary.categoryKey = categoryKey
+        summary.progressPercent = 0
+        summary.downloadedBytes = 0
+        summary.addedAt = Date()
+        torrentValues.insert(summary, at: 0)
+
+        var detail = TorrentCorePreviewFixtures.torrentDetail
+        detail.torrentID = newID
+        detail.name = summary.name
+        detail.categoryKey = categoryKey
+        detail.magnetURI = magnetURI
+        detail.progressPercent = 0
+        detail.downloadedBytes = 0
+        detail.addedAt = summary.addedAt
+        return detail
+    }
+
+    func pause(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.state = .paused
+            torrent.canPause = false
+            torrent.canResume = true
+            torrent.downloadRateBytesPerSecond = 0
+            torrent.uploadRateBytesPerSecond = 0
+            torrent.waitReason = .pausedByOperator
+        }
+        return TorrentCoreActionResult(
+            action: "pause",
+            dataDeleted: nil,
+            processedAt: Date(),
+            state: .paused,
+            torrentID: id
+        )
+    }
+
+    func resume(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.state = .downloading
+            torrent.canPause = true
+            torrent.canResume = false
+            torrent.downloadRateBytesPerSecond = 4_096_000
+            torrent.waitReason = nil
+        }
+        return TorrentCoreActionResult(
+            action: "resume",
+            dataDeleted: nil,
+            processedAt: Date(),
+            state: .downloading,
+            torrentID: id
+        )
+    }
+
+    func remove(id: UUID, deleteData: Bool) async throws -> TorrentCoreActionResult {
+        guard torrentValues.contains(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        torrentValues.removeAll { $0.torrentID == id }
+        return TorrentCoreActionResult(
+            action: "remove",
+            dataDeleted: deleteData,
+            processedAt: Date(),
+            state: .removed,
+            torrentID: id
+        )
+    }
+
+    private func update(
+        id: UUID,
+        _ mutation: (inout TorrentCoreTorrentSummary) -> Void
+    ) throws {
+        guard let index = torrentValues.firstIndex(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        mutation(&torrentValues[index])
+    }
+}

@@ -31,25 +31,44 @@ extension TorrentCoreProfileStoreError: LocalizedError {
 }
 
 public actor UserDefaultsTorrentCoreProfileStore: TorrentCoreProfilePersisting {
-    public static let storageKey = "TorrentCore.ClientPreferences.v1"
+    public static let storageKey = "TorrentCore.ClientPreferences.v2"
+    public static let legacyStorageKey = "TorrentCore.ClientPreferences.v1"
 
     private let defaults: UserDefaults
     private let storageKey: String
+    private let legacyStorageKey: String?
 
-    public init(suiteName: String? = nil, storageKey: String = storageKey) {
+    public init(
+        suiteName: String? = nil,
+        storageKey: String = storageKey,
+        legacyStorageKey: String? = legacyStorageKey
+    ) {
         if let suiteName, let suiteDefaults = UserDefaults(suiteName: suiteName) {
             defaults = suiteDefaults
         } else {
             defaults = .standard
         }
         self.storageKey = storageKey
+        self.legacyStorageKey = storageKey == Self.storageKey ? legacyStorageKey : nil
     }
 
     public func load() async throws -> TorrentCoreClientPreferences {
-        guard let data = defaults.data(forKey: storageKey) else {
+        if let data = defaults.data(forKey: storageKey) {
+            return try decode(data)
+        }
+
+        guard let legacyStorageKey,
+              let legacyData = defaults.data(forKey: legacyStorageKey)
+        else {
             return TorrentCoreClientPreferences()
         }
 
+        let migratedPreferences = try decode(legacyData)
+        try await save(migratedPreferences)
+        return migratedPreferences
+    }
+
+    private func decode(_ data: Data) throws -> TorrentCoreClientPreferences {
         do {
             let preferences = try JSONDecoder().decode(TorrentCoreClientPreferences.self, from: data)
             try Self.validate(preferences)

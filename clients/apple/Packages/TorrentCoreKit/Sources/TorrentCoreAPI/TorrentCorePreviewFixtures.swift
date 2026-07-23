@@ -120,6 +120,76 @@ public enum TorrentCorePreviewFixtures {
         waitReason: nil
     )
 
+    public static let pausedTorrent: TorrentCoreTorrentSummary = {
+        var torrent = downloadingTorrent
+        torrent.name = "Paused Preview Torrent"
+        torrent.state = .paused
+        torrent.canPause = false
+        torrent.canResume = true
+        torrent.downloadRateBytesPerSecond = 0
+        torrent.uploadRateBytesPerSecond = 0
+        torrent.connectedPeerCount = 0
+        torrent.waitReason = .pausedByOperator
+        torrent.torrentID = UUID(uuidString: "66666666-7777-8888-9999-aaaaaaaaaaaa")
+        return torrent
+    }()
+
+    public static let torrentDetail = TorrentCoreTorrentDetail(
+        addedAt: downloadingTorrent.addedAt,
+        canPause: true,
+        canRefreshMetadata: false,
+        canRemove: true,
+        canResume: false,
+        canRetryCompletionCallback: false,
+        categoryKey: "tv",
+        completedAt: nil,
+        completionCallbackFeedback: nil,
+        completionCallbackFinalPayloadPath: nil,
+        completionCallbackInvokedAt: nil,
+        completionCallbackLastError: nil,
+        completionCallbackPendingReason: nil,
+        completionCallbackPendingSince: nil,
+        completionCallbackState: nil,
+        connectedPeerCount: 5,
+        downloadRateBytesPerSecond: 4_096_000,
+        downloadedBytes: 524_288_000,
+        errorMessage: nil,
+        infoHash: "0123456789abcdef0123456789abcdef01234567",
+        lastActivityAt: checkedAt,
+        magnetURI: "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567",
+        name: "Preview Torrent",
+        progressPercent: 50,
+        queuePosition: nil,
+        savePath: "/preview/downloads/Preview Torrent",
+        state: .downloading,
+        torrentID: torrentID,
+        totalBytes: 1_048_576_000,
+        trackerCount: 2,
+        uploadRateBytesPerSecond: 512_000,
+        waitReason: nil
+    )
+
+    public static let categories = [
+        TorrentCoreCategory(
+            callbackLabel: "TV Show",
+            displayName: "TV (Show)",
+            downloadRootPath: "/preview/downloads/tv",
+            enabled: true,
+            invokeCompletionCallback: true,
+            key: "tv",
+            sortOrder: 10
+        ),
+        TorrentCoreCategory(
+            callbackLabel: "Movie",
+            displayName: "Movie",
+            downloadRootPath: "/preview/downloads/movies",
+            enabled: true,
+            invokeCompletionCallback: true,
+            key: "movie",
+            sortOrder: 20
+        ),
+    ]
+
     public static let serviceProblem = TorrentCoreServiceProblem(
         type: "https://torrentcore.local/problems/unavailable",
         title: "Service unavailable",

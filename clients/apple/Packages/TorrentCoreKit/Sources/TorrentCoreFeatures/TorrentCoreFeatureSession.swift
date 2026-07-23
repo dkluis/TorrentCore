@@ -8,11 +8,12 @@ public enum TorrentCoreFeatureContext: Equatable, Sendable {
     case dashboard
     case torrents
     case torrentDetail(UUID)
+    case torrentListAndDetail(UUID)
     case addMagnet
 
     var refreshesPeriodically: Bool {
         switch self {
-        case .connection, .dashboard, .torrents, .torrentDetail:
+        case .connection, .dashboard, .torrents, .torrentDetail, .torrentListAndDetail:
             true
         case .none, .addMagnet:
             false
@@ -257,7 +258,32 @@ public final class TorrentCoreFeatureSession {
         updatedPreferences.refreshInterval = interval
         try await profileStore.save(updatedPreferences)
         preferences = updatedPreferences
-        restartRefreshLoop()
+        if preferences.autoRefreshEnabled {
+            restartRefreshLoop()
+        }
+    }
+
+    public func setAutoRefreshEnabled(_ isEnabled: Bool) async throws {
+        guard preferences.autoRefreshEnabled != isEnabled else {
+            return
+        }
+
+        var updatedPreferences = preferences
+        updatedPreferences.autoRefreshEnabled = isEnabled
+        try await profileStore.save(updatedPreferences)
+        preferences = updatedPreferences
+        if isEnabled {
+            restartRefreshLoop()
+        } else {
+            refreshLoopTask?.cancel()
+            refreshLoopTask = nil
+        }
+    }
+
+    public func testConnection(address: String) async throws -> TorrentCoreServiceHealth {
+        let profile = try TorrentCoreConnectionProfile(name: "Connection Test", address: address)
+        let testClient = try clientFactory.makeClient(baseURL: profile.baseURL)
+        return try await testClient.probe()
     }
 
     public func setContext(_ context: TorrentCoreFeatureContext) {
@@ -456,7 +482,7 @@ public final class TorrentCoreFeatureSession {
         }
 
         let interval = preferences.refreshInterval.seconds
-        let repeats = context.refreshesPeriodically
+        let repeats = preferences.autoRefreshEnabled && context.refreshesPeriodically
         refreshLoopTask = Task { [weak self, sleeper] in
             guard let self else {
                 return
@@ -580,6 +606,40 @@ public final class TorrentCoreFeatureSession {
                     return
                 }
                 torrentDetail.succeed(detail, at: now())
+            case let .torrentListAndDetail(torrentID):
+                let summaries = try await serviceClient.torrents()
+                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    return
+                }
+                torrents.succeed(summaries, at: now())
+
+                guard summaries.contains(where: { $0.torrentID == torrentID }) else {
+                    torrentDetail.reset()
+                    return
+                }
+
+                do {
+                    let detail = try await serviceClient.torrent(id: torrentID)
+                    guard isCurrent(profile: profile, context: context, generation: generation) else {
+                        return
+                    }
+                    torrentDetail.succeed(detail, at: now())
+                } catch {
+                    guard isCurrent(profile: profile, context: context, generation: generation),
+                          !(error is CancellationError)
+                    else {
+                        return
+                    }
+                    let message = errorMessage(error)
+                    torrentDetail.fail(message: message)
+                    if isConnectivityFailure(error) {
+                        connectionState = .offline(
+                            profileID: profile.id,
+                            attemptedAt: now(),
+                            message: message
+                        )
+                    }
+                }
             case .addMagnet:
                 let availableCategories = try await serviceClient.categories()
                 guard isCurrent(profile: profile, context: context, generation: generation) else {
@@ -645,6 +705,9 @@ public final class TorrentCoreFeatureSession {
             torrents.beginLoading()
         case .torrentDetail:
             torrentDetail.beginLoading()
+        case .torrentListAndDetail:
+            torrents.beginLoading()
+            torrentDetail.beginLoading()
         case .addMagnet:
             categories.beginLoading()
         case .none, .connection:
@@ -660,6 +723,9 @@ public final class TorrentCoreFeatureSession {
         case .torrents:
             torrents.fail(message: message)
         case .torrentDetail:
+            torrentDetail.fail(message: message)
+        case .torrentListAndDetail:
+            torrents.fail(message: message)
             torrentDetail.fail(message: message)
         case .addMagnet:
             categories.fail(message: message)

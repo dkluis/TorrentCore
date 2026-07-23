@@ -70,23 +70,26 @@ public enum TorrentCoreRefreshInterval: Int, CaseIterable, Codable, Hashable, Se
 }
 
 public struct TorrentCoreClientPreferences: Codable, Equatable, Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public var schemaVersion: Int
     public var profiles: [TorrentCoreConnectionProfile]
     public var activeProfileID: UUID?
     public var refreshInterval: TorrentCoreRefreshInterval
+    public var autoRefreshEnabled: Bool
 
     public init(
         schemaVersion: Int = currentSchemaVersion,
         profiles: [TorrentCoreConnectionProfile] = [],
         activeProfileID: UUID? = nil,
-        refreshInterval: TorrentCoreRefreshInterval = .defaultValue
+        refreshInterval: TorrentCoreRefreshInterval = .defaultValue,
+        autoRefreshEnabled: Bool = true
     ) {
         self.schemaVersion = schemaVersion
         self.profiles = profiles
         self.activeProfileID = activeProfileID
         self.refreshInterval = refreshInterval
+        self.autoRefreshEnabled = autoRefreshEnabled
     }
 
     public var activeProfile: TorrentCoreConnectionProfile? {
@@ -94,5 +97,36 @@ public struct TorrentCoreClientPreferences: Codable, Equatable, Sendable {
             return nil
         }
         return profiles.first { $0.id == activeProfileID }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case profiles
+        case activeProfileID
+        case refreshInterval
+        case autoRefreshEnabled
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let storedVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        guard storedVersion == 1 || storedVersion == Self.currentSchemaVersion else {
+            throw TorrentCoreProfileStoreError.unsupportedSchemaVersion(storedVersion)
+        }
+
+        schemaVersion = Self.currentSchemaVersion
+        profiles = try container.decodeIfPresent(
+            [TorrentCoreConnectionProfile].self,
+            forKey: .profiles
+        ) ?? []
+        activeProfileID = try container.decodeIfPresent(UUID.self, forKey: .activeProfileID)
+        refreshInterval = try container.decodeIfPresent(
+            TorrentCoreRefreshInterval.self,
+            forKey: .refreshInterval
+        ) ?? .defaultValue
+        autoRefreshEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .autoRefreshEnabled
+        ) ?? true
     }
 }

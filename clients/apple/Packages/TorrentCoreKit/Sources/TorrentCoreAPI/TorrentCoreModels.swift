@@ -134,6 +134,22 @@ public struct TorrentCoreLifecycleEvent: Codable, Hashable, Sendable {
     public var message: String?
     public var occurredAt: Date
     public var torrentID: UUID?
+
+    public init(
+        category: String?,
+        eventType: String?,
+        level: String?,
+        message: String?,
+        occurredAt: Date,
+        torrentID: UUID?
+    ) {
+        self.category = category
+        self.eventType = eventType
+        self.level = level
+        self.message = message
+        self.occurredAt = occurredAt
+        self.torrentID = torrentID
+    }
 }
 
 public struct TorrentCoreDashboardLifecycle: Codable, Hashable, Sendable {
@@ -263,6 +279,20 @@ public struct TorrentCoreActionResult: Codable, Hashable, Sendable {
     public var processedAt: Date
     public var state: TorrentCoreTorrentState
     public var torrentID: UUID?
+
+    public init(
+        action: String?,
+        dataDeleted: Bool?,
+        processedAt: Date,
+        state: TorrentCoreTorrentState,
+        torrentID: UUID?
+    ) {
+        self.action = action
+        self.dataDeleted = dataDeleted
+        self.processedAt = processedAt
+        self.state = state
+        self.torrentID = torrentID
+    }
 }
 
 public struct TorrentCoreServiceProblem: Codable, Hashable, Sendable {

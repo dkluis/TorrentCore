@@ -42,9 +42,36 @@ TORRENTCORE_UPDATE_OPENAPI=1 dotnet test \
 Then run the normal .NET suite and the Swift package tests. Live Apple integration remains opt-in through
 `TORRENTCORE_INTEGRATION_BASE_URL` and is read-only unless the operator explicitly approves a mutation.
 
+The separately gated `liveDisposableMutationSequence` also requires
+`TORRENTCORE_ALLOW_DISPOSABLE_MUTATION=1`, the disposable magnet URI and expected info hash, and the exact live enabled
+category display name. It refuses an existing hash, scopes every action to the ID returned by add, removes with data
+deletion enabled, and attempts cleanup after a partial failure. Never commit those live values.
+
 Milestone 2 shared-state tests cover device-local profile persistence, URL normalization, active profile isolation,
 client-wide refresh preferences, open-context request routing, foreground/background behavior, last-known stale state,
 single-item mutation refresh, and rejection of late responses from a previous profile.
+
+Milestone 3 adds shared tests for version 1-to-2 client-preference migration, Auto Refresh disablement, combined
+torrent-list and selected-detail refresh, WebUI-equivalent torrent filtering, and 25/50/100/250-row local pagination.
+The `TorrentCoreMac` scheme includes a unit target and a fixture-only UI target. Compile both without launching an app:
+
+```bash
+xcodebuild \
+  -project clients/apple/TorrentCoreApple.xcodeproj \
+  -scheme TorrentCoreMac \
+  -configuration Debug \
+  -destination 'platform=macOS,arch=arm64' \
+  -skipPackagePluginValidation \
+  SYMROOT=/private/tmp/torrentcore-apple-test-products \
+  OBJROOT=/private/tmp/torrentcore-apple-test-intermediates \
+  CODE_SIGNING_ALLOWED=NO \
+  build-for-testing
+```
+
+Run `TorrentCoreMacUITests` only from a normal development-signed test build. The target supplies
+`--torrentcore-ui-fixtures`, which uses an in-memory service and never reads a saved endpoint or contacts a live
+TorrentCore installation. Do not execute an unsigned UI-test product because macOS rejects it before test bootstrap.
+The Milestone 3 signed fixture run passed both inspector-accessibility and destructive-confirmation cancellation tests.
 
 Production Swagger availability is verified by `OpenApiContractTests` alongside normalized contract comparison.
 

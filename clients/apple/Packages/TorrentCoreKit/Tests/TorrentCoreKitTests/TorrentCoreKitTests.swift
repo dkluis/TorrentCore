@@ -166,12 +166,208 @@ func liveReadOnlyIntegrationProbe() async throws {
     }
 }
 
+@Test
+func liveDisposableMutationSequence() async throws {
+    let environment = ProcessInfo.processInfo.environment
+    guard environment["TORRENTCORE_ALLOW_DISPOSABLE_MUTATION"] == "1" else {
+        return
+    }
+    guard let baseURLValue = environment["TORRENTCORE_INTEGRATION_BASE_URL"],
+          let baseURL = URL(string: baseURLValue),
+          let magnetURI = environment["TORRENTCORE_DISPOSABLE_MAGNET_URI"],
+          let expectedInfoHashValue = environment["TORRENTCORE_DISPOSABLE_INFO_HASH"],
+          let categoryDisplayName = environment["TORRENTCORE_DISPOSABLE_CATEGORY"]
+    else {
+        throw LiveMutationSafetyError(
+            "The live disposable mutation gate requires the base URL, magnet URI, expected info hash, and category."
+        )
+    }
+
+    let expectedInfoHash = expectedInfoHashValue.lowercased()
+    guard expectedInfoHash.count == 40,
+          expectedInfoHash.unicodeScalars.allSatisfy({
+              CharacterSet(charactersIn: "0123456789abcdef").contains($0)
+          }),
+          magnetURI.lowercased().contains("xt=urn:btih:\(expectedInfoHash)")
+    else {
+        throw LiveMutationSafetyError(
+            "The expected 40-character info hash does not match the disposable magnet URI."
+        )
+    }
+
+    let client = try TorrentCoreClient(baseURL: baseURL)
+    _ = try await liveStep("mutation preflight health") { try await client.probe() }
+    let host = try await liveStep("mutation preflight host status") {
+        try await client.hostStatus()
+    }
+    guard host.supportsMagnetAdds,
+          host.supportsPause,
+          host.supportsResume,
+          host.supportsRemove
+    else {
+        throw LiveMutationSafetyError(
+            "The live host does not report all capabilities required by the disposable sequence."
+        )
+    }
+
+    let categories = try await liveStep("mutation preflight categories") {
+        try await client.categories()
+    }
+    let matchingCategories = categories.filter {
+        $0.enabled && $0.displayName == categoryDisplayName
+    }
+    guard matchingCategories.count == 1,
+          let categoryKey = matchingCategories[0].key,
+          !categoryKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    else {
+        throw LiveMutationSafetyError(
+            "The requested enabled category did not resolve to exactly one non-empty category key."
+        )
+    }
+
+    let existingMatches = try await liveTorrents(
+        matchingInfoHash: expectedInfoHash,
+        client: client
+    )
+    guard existingMatches.isEmpty else {
+        throw LiveMutationSafetyError(
+            "The disposable info hash already exists on the host; no mutation was attempted."
+        )
+    }
+
+    var createdTorrentID: UUID?
+    do {
+        let added = try await liveStep("add disposable magnet") {
+            try await client.addMagnet(magnetURI, categoryKey: categoryKey)
+        }
+        let torrentID = try requireLiveTorrentID(added.torrentID, step: "add")
+        guard added.infoHash?.lowercased() == expectedInfoHash,
+              added.categoryKey == categoryKey
+        else {
+            createdTorrentID = torrentID
+            throw LiveMutationSafetyError(
+                "The add response did not match the approved info hash and resolved category."
+            )
+        }
+        createdTorrentID = torrentID
+
+        for observation in 1 ... 3 {
+            let detail = try await liveStep("monitor disposable torrent \(observation)") {
+                try await client.torrent(id: torrentID)
+            }
+            guard detail.infoHash?.lowercased() == expectedInfoHash else {
+                throw LiveMutationSafetyError(
+                    "The monitored torrent identity changed after add."
+                )
+            }
+            print(
+                "Disposable observation \(observation): "
+                    + "state=\(detail.state.rawValue), "
+                    + "progress=\(detail.progressPercent)"
+            )
+            if observation < 3 {
+                try await Task.sleep(for: .seconds(2))
+            }
+        }
+
+        _ = try await waitForLiveTorrent(
+            client: client,
+            id: torrentID,
+            step: "wait for pause capability",
+            accepting: \.canPause
+        )
+        let paused = try await liveStep("pause disposable torrent") {
+            try await client.pause(id: torrentID)
+        }
+        guard paused.torrentID == torrentID else {
+            throw LiveMutationSafetyError("The pause response returned a different torrent ID.")
+        }
+        _ = try await waitForLiveTorrent(
+            client: client,
+            id: torrentID,
+            step: "confirm paused state"
+        ) {
+            $0.state == .paused && $0.canResume
+        }
+
+        let resumed = try await liveStep("resume disposable torrent") {
+            try await client.resume(id: torrentID)
+        }
+        guard resumed.torrentID == torrentID else {
+            throw LiveMutationSafetyError("The resume response returned a different torrent ID.")
+        }
+        _ = try await waitForLiveTorrent(
+            client: client,
+            id: torrentID,
+            step: "confirm resumed state"
+        ) {
+            $0.state != .paused && $0.canPause
+        }
+
+        let removed = try await liveStep("remove disposable torrent and data") {
+            try await client.remove(id: torrentID, deleteData: true)
+        }
+        guard removed.torrentID == torrentID,
+              removed.dataDeleted == true
+        else {
+            throw LiveMutationSafetyError(
+                "The remove response did not confirm the approved torrent ID and data deletion."
+            )
+        }
+        let remaining = try await liveStep("confirm disposable torrent removal") {
+            try await client.torrents()
+        }
+        guard !remaining.contains(where: { $0.torrentID == torrentID }) else {
+            throw LiveMutationSafetyError(
+                "The disposable torrent still appears in the authoritative list after removal."
+            )
+        }
+        createdTorrentID = nil
+    } catch {
+        let primaryError = error
+        let cleanupID: UUID?
+        if let createdTorrentID {
+            cleanupID = createdTorrentID
+        } else {
+            cleanupID = try await liveTorrents(
+                matchingInfoHash: expectedInfoHash,
+                client: client
+            ).only
+        }
+
+        if let cleanupID {
+            do {
+                _ = try await client.remove(id: cleanupID, deleteData: true)
+                let remaining = try await client.torrents()
+                guard !remaining.contains(where: { $0.torrentID == cleanupID }) else {
+                    throw LiveMutationSafetyError(
+                        "The cleanup target remains in the authoritative torrent list."
+                    )
+                }
+            } catch {
+                throw LiveMutationSafetyError(
+                    "The disposable sequence failed (\(primaryError)); cleanup also failed (\(error))."
+                )
+            }
+        }
+        throw primaryError
+    }
+}
+
 private struct LiveProbeStepError: Error, CustomStringConvertible {
     let step: String
     let underlying: any Error
 
     var description: String {
         "\(step): \(underlying)"
+    }
+}
+
+private struct LiveMutationSafetyError: Error, CustomStringConvertible {
+    let description: String
+
+    init(_ description: String) {
+        self.description = description
     }
 }
 
@@ -183,6 +379,62 @@ private func liveStep<Value>(
         return try await operation()
     } catch {
         throw LiveProbeStepError(step: step, underlying: error)
+    }
+}
+
+private func requireLiveTorrentID(_ id: UUID?, step: String) throws -> UUID {
+    guard let id else {
+        throw LiveMutationSafetyError(
+            "The \(step) response did not include a torrent ID."
+        )
+    }
+    return id
+}
+
+private func liveTorrents(
+    matchingInfoHash expectedInfoHash: String,
+    client: TorrentCoreClient
+) async throws -> [UUID] {
+    let summaries = try await liveStep("disposable target preflight list") {
+        try await client.torrents()
+    }
+    var matches: [UUID] = []
+    for torrentID in summaries.compactMap(\.torrentID) {
+        let detail = try await liveStep("disposable target preflight detail") {
+            try await client.torrent(id: torrentID)
+        }
+        if detail.infoHash?.lowercased() == expectedInfoHash {
+            matches.append(torrentID)
+        }
+    }
+    return matches
+}
+
+private func waitForLiveTorrent(
+    client: TorrentCoreClient,
+    id: UUID,
+    step: String,
+    accepting: (TorrentCoreTorrentDetail) -> Bool
+) async throws -> TorrentCoreTorrentDetail {
+    for attempt in 1 ... 15 {
+        let detail = try await liveStep(step) {
+            try await client.torrent(id: id)
+        }
+        if accepting(detail) {
+            return detail
+        }
+        if attempt < 15 {
+            try await Task.sleep(for: .seconds(2))
+        }
+    }
+    throw LiveMutationSafetyError(
+        "\(step) did not become true within 30 seconds."
+    )
+}
+
+private extension Array {
+    var only: Element? {
+        count == 1 ? self[0] : nil
     }
 }
 

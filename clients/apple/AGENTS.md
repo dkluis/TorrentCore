@@ -52,6 +52,8 @@ xcodebuild \
   -configuration Debug \
   -destination 'platform=macOS,arch=arm64' \
   -skipPackagePluginValidation \
+  SYMROOT=/private/tmp/torrentcore-apple-mac-products \
+  OBJROOT=/private/tmp/torrentcore-apple-mac-intermediates \
   CODE_SIGNING_ALLOWED=NO \
   build
 
@@ -61,9 +63,15 @@ xcodebuild \
   -configuration Debug \
   -destination 'generic/platform=iOS Simulator' \
   -skipPackagePluginValidation \
+  SYMROOT=/private/tmp/torrentcore-apple-mobile-products \
+  OBJROOT=/private/tmp/torrentcore-apple-mobile-intermediates \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
 
 Run the relevant Swift tests and target builds before finishing Apple-client changes. If a service contract changes,
 also update .NET callers and tests and run the relevant .NET verification.
+
+Keep unsigned command-line products under an explicit temporary `SYMROOT` and `OBJROOT`. Never place an unsigned app
+in the operator's normal Xcode build location because macOS may reject that product when Xcode or UI automation
+launches it.

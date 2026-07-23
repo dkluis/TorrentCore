@@ -13,7 +13,32 @@
 		100000000000000000000004 /* TorrentCoreMobileContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000004 /* TorrentCoreMobileContentView.swift */; };
 		100000000000000000000005 /* TorrentCoreFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = D00000000000000000000001 /* TorrentCoreFeatures */; };
 		100000000000000000000006 /* TorrentCoreFeatures in Frameworks */ = {isa = PBXBuildFile; productRef = D00000000000000000000002 /* TorrentCoreFeatures */; };
+		100000000000000000000007 /* TorrentCoreMacComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000010 /* TorrentCoreMacComponents.swift */; };
+		100000000000000000000008 /* TorrentCoreMacConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000011 /* TorrentCoreMacConnectionView.swift */; };
+		100000000000000000000009 /* TorrentCoreMacDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000012 /* TorrentCoreMacDashboardView.swift */; };
+		100000000000000000000010 /* TorrentCoreMacTorrentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000013 /* TorrentCoreMacTorrentsView.swift */; };
+		100000000000000000000011 /* TorrentCoreMacSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000014 /* TorrentCoreMacSettingsView.swift */; };
+		100000000000000000000012 /* TorrentCoreAPI in Frameworks */ = {isa = PBXBuildFile; productRef = D00000000000000000000003 /* TorrentCoreAPI */; };
+		100000000000000000000013 /* TorrentCoreMacTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000015 /* TorrentCoreMacTests.swift */; };
+		100000000000000000000014 /* TorrentCoreMacUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000016 /* TorrentCoreMacUITests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		E00000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 800000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 500000000000000000000001;
+			remoteInfo = TorrentCoreMac;
+		};
+		E00000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 800000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 500000000000000000000001;
+			remoteInfo = TorrentCoreMac;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		200000000000000000000001 /* TorrentCoreMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacApp.swift; sourceTree = "<group>"; };
@@ -25,6 +50,15 @@
 		200000000000000000000007 /* TorrentCore.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TorrentCore.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		200000000000000000000008 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		200000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		200000000000000000000010 /* TorrentCoreMacComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacComponents.swift; sourceTree = "<group>"; };
+		200000000000000000000011 /* TorrentCoreMacConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacConnectionView.swift; sourceTree = "<group>"; };
+		200000000000000000000012 /* TorrentCoreMacDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacDashboardView.swift; sourceTree = "<group>"; };
+		200000000000000000000013 /* TorrentCoreMacTorrentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacTorrentsView.swift; sourceTree = "<group>"; };
+		200000000000000000000014 /* TorrentCoreMacSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacSettingsView.swift; sourceTree = "<group>"; };
+		200000000000000000000015 /* TorrentCoreMacTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacTests.swift; sourceTree = "<group>"; };
+		200000000000000000000016 /* TorrentCoreMacUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacUITests.swift; sourceTree = "<group>"; };
+		200000000000000000000017 /* TorrentCoreMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TorrentCoreMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		200000000000000000000018 /* TorrentCoreMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TorrentCoreMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				100000000000000000000012 /* TorrentCoreAPI in Frameworks */,
 				100000000000000000000005 /* TorrentCoreFeatures in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -44,6 +79,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		300000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		300000000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,6 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				400000000000000000000002 /* Apps */,
+				400000000000000000000006 /* Tests */,
 				400000000000000000000005 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -69,6 +119,11 @@
 			children = (
 				200000000000000000000001 /* TorrentCoreMacApp.swift */,
 				200000000000000000000002 /* TorrentCoreMacContentView.swift */,
+				200000000000000000000010 /* TorrentCoreMacComponents.swift */,
+				200000000000000000000011 /* TorrentCoreMacConnectionView.swift */,
+				200000000000000000000012 /* TorrentCoreMacDashboardView.swift */,
+				200000000000000000000013 /* TorrentCoreMacTorrentsView.swift */,
+				200000000000000000000014 /* TorrentCoreMacSettingsView.swift */,
 				200000000000000000000005 /* TorrentCoreMac.entitlements */,
 				200000000000000000000008 /* Info.plist */,
 			);
@@ -90,8 +145,35 @@
 			children = (
 				200000000000000000000006 /* TorrentCore.app */,
 				200000000000000000000007 /* TorrentCore.app */,
+				200000000000000000000017 /* TorrentCoreMacTests.xctest */,
+				200000000000000000000018 /* TorrentCoreMacUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		400000000000000000000006 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				400000000000000000000007 /* TorrentCoreMacTests */,
+				400000000000000000000008 /* TorrentCoreMacUITests */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		400000000000000000000007 /* TorrentCoreMacTests */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000015 /* TorrentCoreMacTests.swift */,
+			);
+			path = TorrentCoreMacTests;
+			sourceTree = "<group>";
+		};
+		400000000000000000000008 /* TorrentCoreMacUITests */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000016 /* TorrentCoreMacUITests.swift */,
+			);
+			path = TorrentCoreMacUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +194,7 @@
 			name = TorrentCoreMac;
 			packageProductDependencies = (
 				D00000000000000000000001 /* TorrentCoreFeatures */,
+				D00000000000000000000003 /* TorrentCoreAPI */,
 			);
 			productName = TorrentCore;
 			productReference = 200000000000000000000006 /* TorrentCore.app */;
@@ -137,6 +220,42 @@
 			productReference = 200000000000000000000007 /* TorrentCore.app */;
 			productType = "com.apple.product-type.application";
 		};
+		500000000000000000000003 /* TorrentCoreMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B000000000000000000000004 /* Build configuration list for PBXNativeTarget "TorrentCoreMacTests" */;
+			buildPhases = (
+				700000000000000000000003 /* Sources */,
+				300000000000000000000003 /* Frameworks */,
+				600000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F00000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = TorrentCoreMacTests;
+			productName = TorrentCoreMacTests;
+			productReference = 200000000000000000000017 /* TorrentCoreMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		500000000000000000000004 /* TorrentCoreMacUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B000000000000000000000005 /* Build configuration list for PBXNativeTarget "TorrentCoreMacUITests" */;
+			buildPhases = (
+				700000000000000000000004 /* Sources */,
+				300000000000000000000004 /* Frameworks */,
+				600000000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F00000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = TorrentCoreMacUITests;
+			productName = TorrentCoreMacUITests;
+			productReference = 200000000000000000000018 /* TorrentCoreMacUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -154,6 +273,12 @@
 					500000000000000000000002 = {
 						CreatedOnToolsVersion = 26.0;
 						ProvisioningStyle = Automatic;
+					};
+					500000000000000000000003 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					500000000000000000000004 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -177,6 +302,8 @@
 			targets = (
 				500000000000000000000001 /* TorrentCoreMac */,
 				500000000000000000000002 /* TorrentCoreMobile */,
+				500000000000000000000003 /* TorrentCoreMacTests */,
+				500000000000000000000004 /* TorrentCoreMacUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -196,6 +323,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		600000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		600000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -205,6 +346,11 @@
 			files = (
 				100000000000000000000001 /* TorrentCoreMacApp.swift in Sources */,
 				100000000000000000000002 /* TorrentCoreMacContentView.swift in Sources */,
+				100000000000000000000007 /* TorrentCoreMacComponents.swift in Sources */,
+				100000000000000000000008 /* TorrentCoreMacConnectionView.swift in Sources */,
+				100000000000000000000009 /* TorrentCoreMacDashboardView.swift in Sources */,
+				100000000000000000000010 /* TorrentCoreMacTorrentsView.swift in Sources */,
+				100000000000000000000011 /* TorrentCoreMacSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -217,7 +363,36 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		700000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000013 /* TorrentCoreMacTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		700000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000014 /* TorrentCoreMacUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F00000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 500000000000000000000001 /* TorrentCoreMac */;
+			targetProxy = E00000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		F00000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 500000000000000000000001 /* TorrentCoreMac */;
+			targetProxy = E00000000000000000000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		900000000000000000000001 /* Debug */ = {
@@ -490,6 +665,107 @@
 			};
 			name = Release;
 		};
+		900000000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5GRR76N48V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conadv.TorrentCore.mac.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TorrentCore.app/Contents/MacOS/TorrentCore";
+			};
+			name = Debug;
+		};
+		900000000000000000000011 /* Integration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5GRR76N48V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conadv.TorrentCore.mac.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG INTEGRATION $(inherited)";
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TorrentCore.app/Contents/MacOS/TorrentCore";
+			};
+			name = Integration;
+		};
+		900000000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5GRR76N48V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conadv.TorrentCore.mac.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TorrentCore.app/Contents/MacOS/TorrentCore";
+			};
+			name = Release;
+		};
+		900000000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5GRR76N48V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conadv.TorrentCore.mac.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = TorrentCoreMac;
+			};
+			name = Debug;
+		};
+		900000000000000000000014 /* Integration */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5GRR76N48V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conadv.TorrentCore.mac.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG INTEGRATION $(inherited)";
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = TorrentCoreMac;
+			};
+			name = Integration;
+		};
+		900000000000000000000015 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 5GRR76N48V;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.conadv.TorrentCore.mac.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_TARGET_NAME = TorrentCoreMac;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -523,6 +799,26 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		B000000000000000000000004 /* Build configuration list for PBXNativeTarget "TorrentCoreMacTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				900000000000000000000010 /* Debug */,
+				900000000000000000000011 /* Integration */,
+				900000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B000000000000000000000005 /* Build configuration list for PBXNativeTarget "TorrentCoreMacUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				900000000000000000000013 /* Debug */,
+				900000000000000000000014 /* Integration */,
+				900000000000000000000015 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -542,6 +838,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C000000000000000000000001 /* XCLocalSwiftPackageReference "TorrentCoreKit" */;
 			productName = TorrentCoreFeatures;
+		};
+		D00000000000000000000003 /* TorrentCoreAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C000000000000000000000001 /* XCLocalSwiftPackageReference "TorrentCoreKit" */;
+			productName = TorrentCoreAPI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

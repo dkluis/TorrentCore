@@ -1,0 +1,294 @@
+import SwiftUI
+import TorrentCoreAPI
+import TorrentCoreFeatures
+
+struct TorrentCoreMacDashboardView: View {
+    let session: TorrentCoreFeatureSession
+
+    private let metricColumns = [
+        GridItem(.adaptive(minimum: 170, maximum: 260), spacing: 12),
+    ]
+
+    var body: some View {
+        Group {
+            if let status = session.hostStatus.value {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        TorrentCoreMacPhaseBanner(
+                            phase: session.hostStatus.phase,
+                            lastSuccessfulAt: session.hostStatus.lastSuccessfulAt
+                        )
+
+                        serviceHeader(status: status)
+                        transferMetrics(status: status)
+                        torrentMetrics(status: status)
+                        queueAndRecovery(status: status)
+                        lifecycleSection
+                    }
+                    .padding(20)
+                    .frame(maxWidth: 1_200, alignment: .leading)
+                }
+                .accessibilityIdentifier("dashboard.content")
+            } else {
+                emptyState
+            }
+        }
+    }
+
+    private func serviceHeader(status: TorrentCoreHostStatus) -> some View {
+        GroupBox("Service") {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Service",
+                        value: status.serviceName ?? "TorrentCore.Service"
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Version",
+                        value: status.serviceVersion ?? "—"
+                    )
+                }
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Engine",
+                        value: status.engineRuntime ?? "—"
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Environment",
+                        value: status.environmentName ?? "—"
+                    )
+                }
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Status",
+                        value: TorrentCoreDisplayFormatter.splitIdentifier(status.status.rawValue)
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Instance",
+                        value: status.serviceInstanceID?.uuidString ?? "—"
+                    )
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private func transferMetrics(status: TorrentCoreHostStatus) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Current Transfer")
+                .font(.headline)
+            LazyVGrid(columns: metricColumns, alignment: .leading, spacing: 12) {
+                TorrentCoreMacMetric(
+                    title: "Download",
+                    value: TorrentCoreDisplayFormatter.rate(
+                        status.currentDownloadRateBytesPerSecond
+                    ),
+                    systemImage: "arrow.down"
+                )
+                TorrentCoreMacMetric(
+                    title: "Upload",
+                    value: TorrentCoreDisplayFormatter.rate(
+                        status.currentUploadRateBytesPerSecond
+                    ),
+                    systemImage: "arrow.up"
+                )
+                TorrentCoreMacMetric(
+                    title: "Connected Peers",
+                    value: status.currentConnectedPeerCount.formatted(),
+                    systemImage: "person.2"
+                )
+                TorrentCoreMacMetric(
+                    title: "Total Torrents",
+                    value: status.torrentCount.formatted(),
+                    systemImage: "arrow.down.circle"
+                )
+            }
+        }
+    }
+
+    private func torrentMetrics(status: TorrentCoreHostStatus) -> some View {
+        GroupBox("Torrent States") {
+            LazyVGrid(columns: metricColumns, alignment: .leading, spacing: 12) {
+                TorrentCoreMacMetric(
+                    title: "Resolving Metadata",
+                    value: status.resolvingMetadataCount.formatted()
+                )
+                TorrentCoreMacMetric(
+                    title: "Queued",
+                    value: (status.metadataQueueCount + status.downloadQueueCount).formatted()
+                )
+                TorrentCoreMacMetric(
+                    title: "Downloading",
+                    value: status.downloadingCount.formatted()
+                )
+                TorrentCoreMacMetric(
+                    title: "Seeding",
+                    value: status.seedingCount.formatted()
+                )
+                TorrentCoreMacMetric(
+                    title: "Paused",
+                    value: status.pausedCount.formatted()
+                )
+                TorrentCoreMacMetric(
+                    title: "Completed",
+                    value: status.completedCount.formatted()
+                )
+                TorrentCoreMacMetric(
+                    title: "Errors",
+                    value: status.errorCount.formatted()
+                )
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private func queueAndRecovery(status: TorrentCoreHostStatus) -> some View {
+        GroupBox("Capacity & Startup Recovery") {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Download Slots",
+                        value: "\(status.availableDownloadSlots) of \(status.maxActiveDownloads) available"
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Metadata Slots",
+                        value: "\(status.availableMetadataResolutionSlots) of \(status.maxActiveMetadataResolutions) available"
+                    )
+                }
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Recovery",
+                        value: status.startupRecoveryCompleted ? "Completed" : "In progress"
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Recovered",
+                        value: status.startupRecoveredTorrentCount.formatted()
+                    )
+                }
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Normalized",
+                        value: status.startupNormalizedTorrentCount.formatted()
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Completed At",
+                        value: TorrentCoreDisplayFormatter.timestamp(
+                            status.startupRecoveryCompletedAt
+                        )
+                    )
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    @ViewBuilder
+    private var lifecycleSection: some View {
+        if let lifecycle = session.dashboardLifecycle.value {
+            GroupBox("Recent Lifecycle Events") {
+                if lifecycle.recentEvents.isEmpty {
+                    Text("No recent lifecycle events for this service instance.")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(
+                            Array(lifecycle.recentEvents.prefix(12).enumerated()),
+                            id: \.offset
+                        ) { index, event in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text(event.eventType.map(
+                                        TorrentCoreDisplayFormatter.splitIdentifier
+                                    ) ?? "Event")
+                                        .fontWeight(.semibold)
+                                    Spacer()
+                                    Text(TorrentCoreDisplayFormatter.timestamp(event.occurredAt))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                if let message = event.message, !message.isEmpty {
+                                    Text(message)
+                                }
+                                if let category = event.category, !category.isEmpty {
+                                    Text(category)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 9)
+                            if index < min(lifecycle.recentEvents.count, 12) - 1 {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+            TorrentCoreMacPhaseBanner(
+                phase: session.dashboardLifecycle.phase,
+                lastSuccessfulAt: session.dashboardLifecycle.lastSuccessfulAt
+            )
+        }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label(emptyTitle, systemImage: emptySystemImage)
+        } description: {
+            Text(emptyMessage)
+        } actions: {
+            if case .loading = session.hostStatus.phase {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            if session.activeProfile != nil {
+                Button("Refresh") {
+                    Task {
+                        await session.refresh()
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("dashboard.empty")
+    }
+
+    private var emptyTitle: String {
+        switch session.connectionState {
+        case .noProfile:
+            "No TorrentCore Connection"
+        case .offline:
+            "TorrentCore Offline"
+        case .connecting:
+            "Connecting"
+        case .notConnected, .connected:
+            "Dashboard Unavailable"
+        }
+    }
+
+    private var emptySystemImage: String {
+        switch session.connectionState {
+        case .offline:
+            "network.slash"
+        case .connecting:
+            "arrow.trianglehead.2.clockwise"
+        case .noProfile, .notConnected, .connected:
+            "gauge.with.dots.needle.50percent"
+        }
+    }
+
+    private var emptyMessage: String {
+        switch session.connectionState {
+        case .noProfile:
+            "Create or select a connection before opening the dashboard."
+        case let .offline(_, _, message):
+            message
+        case .connecting:
+            "Checking TorrentCore.Service…"
+        case .notConnected:
+            "Refresh to connect to the selected TorrentCore installation."
+        case .connected:
+            "TorrentCore did not return dashboard information."
+        }
+    }
+}
