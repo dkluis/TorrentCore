@@ -1,0 +1,455 @@
+# Native Apple Client Development Plan
+
+## Status
+
+This document is an implementation plan, not a statement of current product support.
+
+`TorrentCore.WebUI` remains the supported operator UI until the native macOS client reaches its release milestone and
+the active architecture documentation is deliberately updated.
+
+## Outcome
+
+Build native macOS and iOS/iPadOS operator clients for TorrentCore without moving engine, persistence, queueing,
+callback, recovery, or filesystem policy out of `TorrentCore.Service`.
+
+The macOS client is the first product deliverable. Shared API, connection, state, formatting, and test layers are
+designed for reuse by the later iPad and iPhone targets. Platform-specific views express the same capabilities through
+native interaction models rather than sharing complete screens.
+
+## Fixed Product Decisions
+
+- Target macOS 26 or later and iOS/iPadOS 26 or later.
+- Support Apple Silicon only.
+- Distribute to a limited group rather than through a broad public release.
+- Treat each TorrentCore installation as a private, effectively single-operator product.
+- Allow a client to save profiles for unrelated installations, with one active installation at a time.
+- Assume one TorrentCore host per LAN.
+- Connect over a trusted LAN or a VPN that routes clients onto that LAN.
+- Do not support direct public-internet exposure in the initial product.
+- Continue using HTTP inside the trusted LAN/VPN boundary initially.
+- Keep `TorrentCore.WebUI` available for Windows systems and as a fallback operator surface.
+- Use manual connection profiles first; defer Bonjour discovery unless it proves necessary.
+
+## Development And Runtime Model
+
+Source development occurs on the development Mac. The live TorrentCore runtime does not.
+
+The current integration host is:
+
+- hostname: `ca-server.local`
+- LAN address: `192.168.68.80`
+
+Normal Apple-client development must use fakes, fixtures, and an injected transport. SwiftUI previews and routine tests
+must not require a locally running .NET service.
+
+Live integration against `ca-server.local` is opt-in. Read-only checks should precede any mutating test. Tests that add,
+pause, resume, remove, change settings, or restart the service must use an explicit test procedure and operator
+confirmation.
+
+The native clients never read or copy the TorrentCore SQLite database. Database snapshots remain a separate diagnostic
+workflow and must be copied consistently before offline analysis.
+
+## Architecture Boundaries
+
+The native clients:
+
+- communicate only through stable TorrentCore HTTP contracts
+- do not call MonoTorrent
+- do not read or mutate TorrentCore persistence
+- do not reproduce queue, recovery, callback, seeding, cleanup, or path policy
+- do not embed, install, start, or supervise `TorrentCore.Service`
+- do not treat filesystem inspection as evidence of torrent or callback completion
+- do not replace the WebUI during the initial rollout
+
+The service remains the authoritative source for capabilities and allowed actions. Clients honor fields such as
+`CanPause`, `CanResume`, `CanRemove`, `CanRefreshMetadata`, and `CanRetryCompletionCallback` rather than independently
+reconstructing service policy.
+
+## Proposed Repository Shape
+
+```text
+clients/apple/
+├── TorrentCoreApple.xcodeproj
+├── Apps/
+│   ├── TorrentCoreMac/
+│   └── TorrentCoreMobile/
+├── Packages/
+│   └── TorrentCoreKit/
+│       ├── Sources/
+│       │   ├── TorrentCoreAPI/
+│       │   ├── TorrentCoreFeatures/
+│       │   └── TorrentCoreSupport/
+│       └── Tests/
+├── Tests/
+│   ├── TorrentCoreMacUITests/
+│   └── TorrentCoreMobileUITests/
+└── README.md
+```
+
+Use one Xcode project with separate macOS and iOS/iPadOS application targets. Keep reusable implementation in the
+local `TorrentCoreKit` Swift package so platform targets cannot accidentally become the source of shared behavior.
+
+A nested `AGENTS.md` should be added when implementation begins to record supported platforms, schemes, build commands,
+signing boundaries, preview rules, and Apple-specific conventions.
+
+## Reuse Boundary
+
+### Shared Across macOS, iPadOS, And iOS
+
+- API DTOs and request DTOs
+- JSON date, enum, nullable-value, and error decoding
+- `URLSession` transport, timeouts, cancellation, and retry classification
+- service-error mapping and trace identifiers
+- connection profiles and active-profile selection
+- health probing and service identity validation
+- foreground refresh coordination
+- observable feature models
+- capability and action-result handling
+- formatting for sizes, rates, durations, timestamps, states, and wait reasons
+- filter and sort definitions where their semantics are platform independent
+- multi-item action coordination and partial-failure reporting
+- test fixtures, fake transports, clocks, and deterministic schedulers
+
+Shared packages should avoid AppKit and UIKit. Navigation, presentation, and platform controls remain outside the shared
+feature layer.
+
+### Platform Specific
+
+- navigation structure
+- macOS tables, inspectors, toolbars, commands, and Settings window
+- iPad sidebar/list/detail composition
+- iPhone tabs, compact rows, drill-down navigation, and swipe actions
+- selection behavior and keyboard shortcuts
+- sheets, popovers, context menus, and confirmation presentation
+- platform-specific accessibility and UI automation
+- share-extension presentation and handoff
+
+## API Client Strategy
+
+Milestone 1 includes a decision gate for Swift client generation.
+
+1. Produce a reproducible OpenAPI document from the service.
+2. Evaluate the document with Swift OpenAPI Generator.
+3. Use generation only if the generated client needs no hand edits and preserves TorrentCore error semantics.
+4. Otherwise implement a small typed `URLSession` client against the same committed contract and fixtures.
+
+Generated code, if selected, must be reproducible and must not be manually patched. Either approach requires decoding
+tests for representative success and failure payloads.
+
+The first client slice must cover:
+
+- health and host status
+- dashboard lifecycle
+- torrent list and detail
+- categories
+- add magnet
+- pause, resume, and remove
+
+Later parity adds history, logs, runtime settings, category updates, peers, trackers, metadata recovery actions, callback
+retry, orphaned-log cleanup, and service restart.
+
+## Milestones
+
+### Milestone 0: Delivery Baseline
+
+Establish the product, repository, signing, and network baseline before feature implementation.
+
+Work:
+
+- confirm application names and bundle identifiers
+- confirm the Apple Developer team and limited-distribution method
+- create macOS and iOS/iPadOS targets with macOS 26 and iOS/iPadOS 26 deployment targets
+- configure Apple Silicon build destinations
+- establish Debug, integration, and Release configurations
+- document that local previews use fakes and that live integration is opt-in
+- record the LAN/VPN-only network model and prohibit direct public port forwarding
+- select an initial integration endpoint without committing host-local configuration
+- decide how the OpenAPI document is produced and validated
+
+Exit criteria:
+
+- both targets build from a clean checkout
+- Swift package tests run from the command line
+- no signing secret or live endpoint is committed
+- no local TorrentCore runtime is required
+
+### Milestone 1: Shared Contract And Transport Foundation
+
+Build the cross-platform API boundary before building operator screens.
+
+Work:
+
+- implement or generate DTOs and request types
+- implement injected HTTP transport
+- map TorrentCore problem details and service errors
+- support cancellation, bounded timeouts, and offline failures
+- handle GUIDs, ISO timestamps, string enums, nullable values, and unknown future enum values safely
+- implement health probing and service identity capture
+- add fixture-based decoding and request-construction tests
+- add fake responses for previews and UI automation
+- configure local-network privacy messaging
+- configure the narrow local-network HTTP transport allowance required by Apple platforms
+
+Exit criteria:
+
+- the same package builds for macOS and iOS
+- all initial-slice endpoints have deterministic tests
+- previews can show connected, loading, empty, offline, and error states without a service
+- an opt-in read-only probe can reach `ca-server.local`
+
+### Milestone 2: Shared Connection And Feature State
+
+Build reusable application behavior without committing to macOS or mobile presentation.
+
+Work:
+
+- save named connection profiles and select one active profile
+- validate and normalize manually entered base URLs
+- persist nonsecret profile settings
+- reserve Keychain-backed credential support without requiring credentials in the initial HTTP/VPN model
+- implement reconnect and explicit refresh behavior
+- pause periodic refresh when the application is not active
+- implement shared dashboard and torrent feature models
+- implement capability-driven action availability
+- refresh authoritative state after successful mutations
+- aggregate multi-item results without hiding partial failures
+- prevent overlapping refreshes and stale response replacement
+
+Exit criteria:
+
+- shared state tests run for macOS and iOS destinations
+- switching profiles cannot leak state between unrelated installations
+- foreground/background transitions do not create duplicate polling loops
+- offline and reconnect flows preserve a clear last-known-state boundary
+
+### Milestone 3: macOS Core Operator MVP
+
+Deliver the first usable native product slice.
+
+Work:
+
+- build a `NavigationSplitView` shell
+- add Connection, Dashboard, and Torrents destinations
+- build a native torrent `Table`
+- add sorting, filtering, single selection, and an inspector-style detail view
+- add magnet submission with category selection
+- add pause, resume, remove, and remove-with-data actions
+- add destructive-action confirmations
+- add foreground auto-refresh and manual refresh
+- add native client settings for connection and refresh preferences
+- add clear offline, loading, empty, stale, and error states
+
+Exit criteria:
+
+- an operator can connect, inspect service health, add a magnet, monitor it, pause or resume it, and remove it
+- destructive operations cannot run without confirmation
+- the MVP passes unit, integration, accessibility-smoke, and basic UI tests
+- the WebUI remains unchanged and operational
+
+### Milestone 4: macOS Functional Parity
+
+Express the supported WebUI capabilities through native macOS workflows.
+
+Work:
+
+- add History with filters and detail
+- add Logs with filters, details, and orphaned-log cleanup
+- add service runtime Settings and category administration
+- distinguish native client settings from service settings
+- add peer and tracker diagnostics
+- add metadata refresh and metadata-session reset
+- add callback retry and callback-state detail
+- add service restart with outage and recovery feedback
+- add multi-selection where it improves torrent operations
+- add context menus, toolbar items, application commands, and keyboard shortcuts
+- add cross-navigation between torrents, history, and filtered logs
+
+Exit criteria:
+
+- every supported WebUI operator capability is either present or has a documented native-platform exception
+- multi-item operations report each failure and never imply atomic behavior
+- long history and log collections remain responsive
+- settings validation and restart-required behavior match the service contract
+
+Potential service changes discovered here, such as server paging or bulk operations, must be evaluated as separate API
+slices. The Mac client must not simulate new service semantics silently.
+
+### Milestone 5: macOS Hardening And Limited Release
+
+Turn feature parity into a supportable application.
+
+Work:
+
+- complete VoiceOver, keyboard navigation, focus, contrast, and Dynamic Type review
+- test slow, interrupted, denied, and changing network conditions
+- test service restart, service-instance changes, and stale responses
+- test large torrent, history, peer, tracker, and log collections
+- verify no sensitive callback or connection data is written to diagnostic logs
+- add release build, signing, notarization, packaging, and installation instructions
+- add a repeatable opt-in live integration checklist
+- document recovery through the WebUI when the native client is unavailable
+
+Exit criteria:
+
+- a signed and notarized release candidate installs cleanly on a separate macOS 26 system
+- automated tests pass from a clean checkout
+- live integration verification passes against a designated installation
+- the release does not require a local .NET runtime
+
+Only after this milestone should the active architecture documentation consider describing the Mac client as a
+supported operator UI.
+
+### Milestone 6: iPad Adaptation
+
+Reuse the stable package while building an iPad-native presentation.
+
+Work:
+
+- add sidebar/list/detail navigation
+- adapt torrent administration to touch and pointer input
+- provide drill-down history, logs, peers, trackers, callback state, and settings
+- reuse connection profiles, feature state, formatting, actions, and test fixtures
+- validate foreground refresh and reconnection across iPad lifecycle transitions
+
+Exit criteria:
+
+- core operator workflows work without macOS-specific UI assumptions
+- shared-package changes are general improvements rather than copied screen behavior
+- iPad tests cover compact and regular horizontal size classes
+
+### Milestone 7: iPhone Adaptation
+
+Build a compact operator experience on the same shared foundation.
+
+Work:
+
+- add `TabView` and `NavigationStack` composition
+- use compact torrent rows and grouped detail sections
+- add appropriate swipe actions, context menus, and sheets
+- move dense diagnostics into focused drill-down screens
+- retain explicit confirmations for destructive actions
+- verify interruption, foreground refresh, and reconnect behavior on real devices
+
+Exit criteria:
+
+- the main monitor, add, pause, resume, remove, history, log, and settings workflows are usable on iPhone
+- no background-continuous-monitoring behavior is implied
+- the app passes accessibility and real-device local-network permission testing
+
+### Milestone 8: Mobile Distribution And Optional Integrations
+
+Complete limited mobile distribution and add convenience integrations after the core product is stable.
+
+Work:
+
+- configure TestFlight distribution
+- add release notes and installation guidance for each private installation
+- evaluate a share extension for magnet submission
+- evaluate magnet URL handling
+- use App Group storage only if an extension requires it
+- evaluate Bonjour discovery only if manual profiles remain an operator problem
+- evaluate notifications only with an explicit service-side delivery design
+
+Exit criteria:
+
+- a TestFlight build can connect over LAN and routed VPN
+- the application fails closed when neither LAN nor VPN can reach the host
+- optional integrations do not bypass connection validation or action confirmation
+
+## Verification Strategy
+
+### Routine Development
+
+- Swift unit tests for DTOs, transport, feature state, formatting, and action coordination
+- fixture-based contract tests for representative service payloads
+- mock-transport integration tests
+- SwiftUI previews backed exclusively by fixtures and fakes
+- UI tests for core platform workflows
+- command-line builds for every supported target and scheme
+
+### Live Integration
+
+Live tests are opt-in and target `ca-server.local` or another explicitly named installation.
+
+Order:
+
+1. health
+2. host identity and status
+3. dashboard and torrent reads
+4. history and log reads
+5. peer and tracker reads
+6. mutation against a designated test torrent
+7. administrative settings or restart only with explicit operator approval
+
+The live integration suite must not assume that a copied database is current, and it must not access SQLite directly.
+
+### Service Or Contract Changes
+
+If native-client work changes a public service contract:
+
+- update `TorrentCore.Contracts`
+- update `TorrentCore.Client`
+- update WebUI callers where affected
+- add or update API tests
+- run the relevant .NET build and test suite
+- regenerate or validate the Swift contract
+- verify compatibility with the deployed service version policy
+
+## WebUI And Deployment Impact
+
+The initial native-client milestones do not replace or redeploy the WebUI.
+
+Expected topology:
+
+```text
+macOS / iOS / iPadOS client
+    -> trusted LAN or routed VPN
+    -> TorrentCore.Service HTTP API
+
+Windows browser
+    -> trusted LAN or routed VPN
+    -> TorrentCore.WebUI
+    -> loopback TorrentCore.Service HTTP API
+```
+
+Deployment rules:
+
+- do not expose Service or WebUI ports directly to the public internet
+- keep the VPN route to the host LAN address
+- use a stable LAN address or local hostname for each installation
+- keep native application distribution separate from service launch-agent deployment
+- do not add the native Mac application to TorrentCore launch-agent management
+- retain WebUI deployment for Windows and recovery access
+
+HTTPS and service authentication are deferred while the trusted LAN/VPN boundary is the accepted security boundary.
+If direct public access becomes a requirement, stop and plan authentication, TLS, secret storage, WebUI protection, and
+deployment changes before enabling it.
+
+## Principal Risks
+
+| Risk | Mitigation |
+|---|---|
+| Development actions affect the live installation | Use fakes by default, opt-in live configuration, read-only smoke tests first, and designated test torrents |
+| Swift DTOs drift from .NET contracts | Reproducible OpenAPI or typed contract fixtures plus compatibility tests |
+| Shared code becomes lowest-common-denominator UI | Share behavior and state, not entire screens |
+| Polling creates duplicate requests or stale state | Central refresh coordination, cancellation, lifecycle awareness, and response ordering |
+| Multi-item actions partially fail | Report per-item results and avoid claiming atomic behavior |
+| HTTP is accidentally exposed publicly | LAN/VPN-only deployment rule and no router port forwarding |
+| iOS background suspension conflicts with expectations | Promise foreground monitoring only unless a notification design is added |
+| Native work breaks WebUI behavior | Keep service semantics authoritative and run .NET/WebUI regression verification for contract changes |
+| Generator output requires manual edits | Reject generation or fix the source contract; never patch generated output |
+
+## Completion Definition
+
+The native Apple client initiative is complete when:
+
+- the macOS, iPadOS, and iOS applications use one tested shared API and feature package
+- each platform provides native interaction rather than a resized desktop screen
+- service-domain behavior remains in `TorrentCore.Service`
+- WebUI remains available for Windows and fallback administration
+- normal development and previews require no local TorrentCore runtime
+- live integration is explicit and safe
+- limited Mac and TestFlight distribution are repeatable
+- LAN and VPN operation are documented
+- no native client depends on direct database or filesystem access
+

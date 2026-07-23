@@ -14,5 +14,6 @@ Start here:
 - [docs/troubleshooting.md](docs/troubleshooting.md)
 - [docs/testing.md](docs/testing.md)
 - [docs/deployment.md](docs/deployment.md)
+- [docs/native-apple-client-development-plan.md](docs/native-apple-client-development-plan.md)
 
 Historical planning and handoff material lives under [docs/archive/](docs/archive/).
