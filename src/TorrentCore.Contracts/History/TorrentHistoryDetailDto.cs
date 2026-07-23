@@ -29,6 +29,8 @@ public sealed class TorrentHistoryDetailDto
     public          DateTimeOffset? LastActivityAt                   { get; init; }
     public required DateTimeOffset  LastUpdatedAt                    { get; init; }
     public          DateTimeOffset? RemovedAt                        { get; init; }
+    public required TorrentHistoryOutcome Outcome                    { get; init; }
+    public          TorrentRemovalKind? RemovalKind                  { get; init; }
     public required bool            InvokeCompletionCallback         { get; init; }
     public          string?         CompletionCallbackLabel          { get; init; }
     public          string?         LatestCallbackStatus             { get; init; }

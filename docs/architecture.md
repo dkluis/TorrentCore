@@ -88,6 +88,8 @@ The WebUI stays a thin client over service contracts. It must not:
 - The continuous cold timestamp is persisted across service restarts. When the configured abandonment window expires,
   TorrentCore removes the torrent and partial payload without invoking completion processing, prunes torrent-scoped
   logs, and retains the cleanup reason in torrent history.
+- History stores a structured cold-abandonment removal kind. The operator UI surfaces retained abandonments through a
+  dedicated outcome filter and summary that do not depend on the original submission date.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
 - Forced recovery announces run outside serialized synchronization, are deduplicated per torrent, and use a bounded tracker-announce window.
 

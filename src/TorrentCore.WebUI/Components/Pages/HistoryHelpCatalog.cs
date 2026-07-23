@@ -5,7 +5,7 @@ public static class HistoryHelpCatalog
     public static readonly SettingHelpContent Filters = new(
         "Filters",
         "Controls which history rows TorrentCore.WebUI requests from the service.",
-        "Search sends the current History filter fields to TorrentCore.Service. Clear resets every filter field, reloads the unfiltered history list, and keeps sorting local to the grid."
+        "Search sends the current History filter fields to TorrentCore.Service. The Abandoned outcome retrieves all abandoned downloads without applying submitted-date fields. Clear resets every filter field and reloads the unfiltered history list."
     );
 
     public static readonly SettingHelpContent Refresh = new(
@@ -17,19 +17,19 @@ public static class HistoryHelpCatalog
     public static readonly SettingHelpContent Clear = new(
         "Clear Filters",
         "Resets every History filter field and reloads the unfiltered list.",
-        "This clears From Date, To Date, Torrent Name, Category, State, and Removed so the page returns to the default full history view."
+        "This clears Submitted From, Submitted To, Torrent Name, Category, State, and Outcome."
     );
 
     public static readonly SettingHelpContent FromDate = new(
-        "From Date",
+        "Submitted From Date",
         "Limits history rows to torrents submitted on or after this local date.",
-        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive start date."
+        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive start date. Abandoned outcome searches ignore this field."
     );
 
     public static readonly SettingHelpContent ToDate = new(
-        "To Date",
+        "Submitted To Date",
         "Limits history rows to torrents submitted on or before this local date.",
-        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive end date."
+        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive end date. Abandoned outcome searches ignore this field."
     );
 
     public static readonly SettingHelpContent TorrentName = new(
@@ -50,10 +50,10 @@ public static class HistoryHelpCatalog
         "Matching is case-insensitive and uses contains semantics, so values like seed, down, or pause are valid."
     );
 
-    public static readonly SettingHelpContent Removed = new(
-        "Removed",
-        "Controls whether the list includes active history rows, removed rows, or both.",
-        "All leaves the removal state unfiltered. Active Only shows rows still tracked as active. Removed Only shows rows with a recorded removal timestamp."
+    public static readonly SettingHelpContent Outcome = new(
+        "Outcome",
+        "Filters history by active, removed, or abandoned lifecycle outcome.",
+        "Abandoned identifies cold downloads removed by the automatic abandonment policy and retrieves them without a submitted-date restriction."
     );
 
     public static readonly SettingHelpContent HistoryResults = new(

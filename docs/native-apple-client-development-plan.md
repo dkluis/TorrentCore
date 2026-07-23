@@ -7,6 +7,8 @@ This document is an implementation plan, not a statement of current product supp
 `TorrentCore.WebUI` remains the supported operator UI until the native macOS client reaches its release milestone and
 the active architecture documentation is deliberately updated.
 
+Milestone 0 was completed on July 23, 2026. Milestone 1 has not started.
+
 ## Outcome
 
 Build native macOS and iOS/iPadOS operator clients for TorrentCore without moving engine, persistence, queueing,
@@ -20,7 +22,13 @@ native interaction models rather than sharing complete screens.
 
 - Target macOS 26 or later and iOS/iPadOS 26 or later.
 - Support Apple Silicon only.
+- Use `TorrentCore` as the product name on macOS and mobile.
+- Use bundle identifiers `com.conadv.TorrentCore.mac` and `com.conadv.TorrentCore.mobile`.
+- Use Apple Developer Team `5GRR76N48V` with automatic signing.
+- Use a normal Xcode-managed project without Tuist, XcodeGen, or another project generator.
 - Distribute to a limited group rather than through a broad public release.
+- Distribute the Mac app through signed and notarized direct download.
+- Distribute the mobile app through TestFlight.
 - Treat each TorrentCore installation as a private, effectively single-operator product.
 - Allow a client to save profiles for unrelated installations, with one active installation at a time.
 - Assume one TorrentCore host per LAN.
@@ -65,7 +73,7 @@ The service remains the authoritative source for capabilities and allowed action
 `CanPause`, `CanResume`, `CanRemove`, `CanRefreshMetadata`, and `CanRetryCompletionCallback` rather than independently
 reconstructing service policy.
 
-## Proposed Repository Shape
+## Repository Shape
 
 ```text
 clients/apple/
@@ -89,8 +97,8 @@ clients/apple/
 Use one Xcode project with separate macOS and iOS/iPadOS application targets. Keep reusable implementation in the
 local `TorrentCoreKit` Swift package so platform targets cannot accidentally become the source of shared behavior.
 
-A nested `AGENTS.md` should be added when implementation begins to record supported platforms, schemes, build commands,
-signing boundaries, preview rules, and Apple-specific conventions.
+The nested `AGENTS.md` records supported platforms, schemes, build commands, signing boundaries, preview rules, and
+Apple-specific conventions.
 
 ## Reuse Boundary
 
@@ -128,10 +136,12 @@ feature layer.
 
 Milestone 1 includes a decision gate for Swift client generation.
 
-1. Produce a reproducible OpenAPI document from the service.
-2. Evaluate the document with Swift OpenAPI Generator.
-3. Use generation only if the generated client needs no hand edits and preserves TorrentCore error semantics.
-4. Otherwise implement a small typed `URLSession` client against the same committed contract and fixtures.
+1. Produce the service's `/swagger/v1/swagger.json` document through an in-process Development test host, so generation
+   requires neither the live installation nor a long-running local service.
+2. Normalize and compare the generated document with a committed contract artifact in automated verification.
+3. Evaluate the document with Swift OpenAPI Generator.
+4. Use generation only if the generated client needs no hand edits and preserves TorrentCore error semantics.
+5. Otherwise implement a small typed `URLSession` client against the same committed contract and fixtures.
 
 Generated code, if selected, must be reproducible and must not be manually patched. Either approach requires decoding
 tests for representative success and failure payloads.
@@ -152,7 +162,17 @@ retry, orphaned-log cleanup, and service restart.
 
 ### Milestone 0: Delivery Baseline
 
+Status: complete (July 23, 2026).
+
 Establish the product, repository, signing, and network baseline before feature implementation.
+
+Completion evidence:
+
+- the macOS and mobile targets build for arm64 from the command line
+- the shared Swift package test passes from the command line
+- Xcode automatic signing produces a valid macOS development signature for Team `5GRR76N48V`
+- Debug, Integration, and Release configurations and shared schemes are present
+- endpoint selection remains runtime configuration and no live endpoint default or signing material is committed
 
 Work:
 
@@ -452,4 +472,3 @@ The native Apple client initiative is complete when:
 - limited Mac and TestFlight distribution are repeatable
 - LAN and VPN operation are documented
 - no native client depends on direct database or filesystem access
-

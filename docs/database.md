@@ -63,6 +63,7 @@ Current core tables:
 - migration 14 repairs an impossible stored completion that predates download start when a later valid seeding timestamp is available
 - migration 15 clears premature metadata-resolution timestamps for live magnets that are still unresolved and have no download milestones
 - migration 16 adds the live download cold timestamp used to preserve recovery and abandonment timing across service restarts
+- migration 17 adds and backfills the structured history `removal_kind` used for reliable outcome filtering
 
 Important history fields include:
 
@@ -70,7 +71,7 @@ Important history fields include:
 - latest operator-visible state and metrics
 - lifecycle timestamps
 - callback state
-- removal outcome
+- removal outcome, including a structured removal kind independent of the operator-facing reason text
 
 Extracted durable rules are summarized in [docs/decisions/current-decisions.md](decisions/current-decisions.md).
 

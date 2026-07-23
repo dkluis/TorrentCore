@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MonoTorrent;
 using MonoTorrent.Client;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
@@ -789,6 +790,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             snapshot,
             dataDeleted: request.DeleteData,
             removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
+            removalKind: request.DeleteData
+                ? TorrentRemovalKind.ManualRemovalWithData
+                : TorrentRemovalKind.ManualRemoval,
             removedByCleanupPolicy: false,
             removedAtUtc,
             cancellationToken);

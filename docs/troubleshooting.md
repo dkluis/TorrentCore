@@ -38,6 +38,10 @@ alternates refresh and restart. The defaults are two hours and one hour, respect
 After `Abandon Cold Download After Hours` of continuous inactivity, TorrentCore removes the torrent, deletes its
 partial payload and torrent-scoped logs, skips the completion callback, and retains the removal reason in history.
 The default is 72 hours; `0` disables abandonment.
+The History page shows a persistent abandonment summary when retained abandoned downloads exist. Use its
+`View abandoned downloads` action or the `Abandoned` outcome filter; this search intentionally ignores submitted-date
+fields because an abandoned torrent may have been submitted days earlier. The grid keeps the last engine state in the
+State column and shows `Abandoned` separately in Outcome.
 
 Useful checks:
 

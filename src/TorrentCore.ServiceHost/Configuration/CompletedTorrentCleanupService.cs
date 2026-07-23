@@ -2,6 +2,7 @@
 
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
@@ -110,6 +111,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                         torrent,
                         dataDeleted: false,
                         removalReason: "automatic_cleanup",
+                        removalKind: TorrentRemovalKind.CompletedTorrentCleanup,
                         removedByCleanupPolicy: true,
                         removedAtUtc: DateTimeOffset.UtcNow,
                         cancellationToken);
@@ -220,6 +222,7 @@ public sealed class CompletedTorrentCleanupService(ITorrentStateStore torrentSta
                     torrent,
                     dataDeleted: true,
                     removalReason,
+                    removalKind: TorrentRemovalKind.ColdDownloadAbandonment,
                     removedByCleanupPolicy: true,
                     removedAtUtc: DateTimeOffset.UtcNow,
                     cancellationToken

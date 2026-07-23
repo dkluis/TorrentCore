@@ -238,6 +238,7 @@ public sealed class TorrentApiTests
         Assert.NotNull(historyRow.RemovedAtUtc);
         Assert.False(historyRow.DataDeleted);
         Assert.Equal("manual_remove", historyRow.RemovalReason);
+        Assert.Equal(TorrentRemovalKind.ManualRemoval, historyRow.RemovalKind);
         Assert.False(historyRow.RemovedByCleanupPolicy);
     }
 
@@ -279,6 +280,7 @@ public sealed class TorrentApiTests
         Assert.NotNull(historyRow.RemovedAtUtc);
         Assert.True(historyRow.DataDeleted);
         Assert.Equal("manual_remove_delete_data", historyRow.RemovalReason);
+        Assert.Equal(TorrentRemovalKind.ManualRemovalWithData, historyRow.RemovalKind);
         Assert.False(historyRow.RemovedByCleanupPolicy);
     }
 
@@ -311,12 +313,21 @@ public sealed class TorrentApiTests
 
         await UpdateHistoryRowAsync(databaseFilePath, firstTorrent.TorrentId, may20, "Completed", removedAtUtc: null);
         await UpdateHistoryRowAsync(databaseFilePath, secondTorrent.TorrentId, may21, "Seeding", removedAtUtc: null);
-        await UpdateHistoryRowAsync(databaseFilePath, thirdTorrent.TorrentId, may22, "Completed", removedAtUtc: may22.AddHours(1), removalReason: "manual_remove");
+        await UpdateHistoryRowAsync(
+            databaseFilePath,
+            thirdTorrent.TorrentId,
+            may22,
+            "Downloading",
+            removedAtUtc: may22.AddHours(1),
+            removalReason: "Download abandoned after 72 hours without peer or transfer activity.",
+            removalKind: TorrentRemovalKind.ColdDownloadAbandonment);
 
         var allHistory = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history");
 
         Assert.NotNull(allHistory);
         Assert.Equal([thirdTorrent.TorrentId, secondTorrent.TorrentId, firstTorrent.TorrentId], allHistory.Select(item => item.TorrentId).ToArray());
+        Assert.Equal(TorrentHistoryOutcome.Abandoned, allHistory[0].Outcome);
+        Assert.Equal(TorrentRemovalKind.ColdDownloadAbandonment, allHistory[0].RemovalKind);
 
         var byName = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?torrentName=alpha");
         Assert.NotNull(byName);
@@ -342,6 +353,13 @@ public sealed class TorrentApiTests
         Assert.NotNull(active);
         Assert.Equal(2, active.Count);
         Assert.DoesNotContain(active, item => item.TorrentId == thirdTorrent.TorrentId);
+
+        var abandoned = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>(
+            "api/history?outcome=Abandoned");
+        Assert.NotNull(abandoned);
+        Assert.Single(abandoned);
+        Assert.Equal(thirdTorrent.TorrentId, abandoned[0].TorrentId);
+        Assert.Equal(TorrentHistoryOutcome.Abandoned, abandoned[0].Outcome);
 
         var byDate = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?fromDate=2026-05-21&toDate=2026-05-22");
         Assert.NotNull(byDate);
@@ -2770,6 +2788,7 @@ public sealed class TorrentApiTests
         Assert.NotNull(history);
         Assert.True(history.DataDeleted);
         Assert.True(history.RemovedByCleanupPolicy);
+        Assert.Equal(TorrentRemovalKind.ColdDownloadAbandonment, history.RemovalKind);
         Assert.Contains("abandoned after 1 hour", history.RemovalReason, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(torrentLogs);
         Assert.Empty(torrentLogs);
@@ -3659,6 +3678,7 @@ public sealed class TorrentApiTests
         public DateTimeOffset? RemovedAtUtc { get; init; }
         public bool DataDeleted { get; init; }
         public string? RemovalReason { get; init; }
+        public TorrentRemovalKind? RemovalKind { get; init; }
         public bool RemovedByCleanupPolicy { get; init; }
     }
 
@@ -3712,6 +3732,7 @@ public sealed class TorrentApiTests
                                   removed_at_utc,
                                   data_deleted,
                                   removal_reason,
+                                  removal_kind,
                                   removed_by_cleanup_policy,
                                   last_updated_at_utc,
                                   latest_torrent_state,
@@ -3733,10 +3754,13 @@ public sealed class TorrentApiTests
             RemovedAtUtc = reader.IsDBNull(0) ? null : DateTimeOffset.Parse(reader.GetString(0)),
             DataDeleted = reader.GetInt64(1) != 0,
             RemovalReason = reader.IsDBNull(2) ? null : reader.GetString(2),
-            RemovedByCleanupPolicy = reader.GetInt64(3) != 0,
-            LastUpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(4)),
-            LatestTorrentState = reader.GetString(5),
-            LatestProgressPercent = reader.GetDouble(6),
+            RemovalKind = reader.IsDBNull(3)
+                ? null
+                : Enum.Parse<TorrentRemovalKind>(reader.GetString(3)),
+            RemovedByCleanupPolicy = reader.GetInt64(4) != 0,
+            LastUpdatedAtUtc = DateTimeOffset.Parse(reader.GetString(5)),
+            LatestTorrentState = reader.GetString(6),
+            LatestProgressPercent = reader.GetDouble(7),
         };
     }
 
@@ -3798,7 +3822,8 @@ public sealed class TorrentApiTests
         DateTimeOffset submittedAtUtc,
         string latestTorrentState,
         DateTimeOffset? removedAtUtc,
-        string? removalReason = null)
+        string? removalReason = null,
+        TorrentRemovalKind? removalKind = null)
     {
         await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
         await connection.OpenAsync();
@@ -3813,6 +3838,7 @@ public sealed class TorrentApiTests
                 latest_torrent_state = $latest_torrent_state,
                 removed_at_utc = $removed_at_utc,
                 removal_reason = $removal_reason,
+                removal_kind = $removal_kind,
                 removed_by_cleanup_policy = $removed_by_cleanup_policy
             WHERE torrent_id = $torrent_id;
             """;
@@ -3822,7 +3848,10 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue("$latest_torrent_state", latestTorrentState);
         command.Parameters.AddWithValue("$removed_at_utc", removedAtUtc?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$removal_reason", (object?)removalReason ?? DBNull.Value);
-        command.Parameters.AddWithValue("$removed_by_cleanup_policy", 0);
+        command.Parameters.AddWithValue("$removal_kind", removalKind?.ToString() ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$removed_by_cleanup_policy",
+            removalKind is TorrentRemovalKind.CompletedTorrentCleanup or TorrentRemovalKind.ColdDownloadAbandonment ? 1 : 0);
         await command.ExecuteNonQueryAsync();
     }
 

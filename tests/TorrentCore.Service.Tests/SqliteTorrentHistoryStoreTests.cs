@@ -1,3 +1,4 @@
+using TorrentCore.Contracts.History;
 using TorrentCore.Core.History;
 using TorrentCore.Persistence.Sqlite.History;
 using TorrentCore.Persistence.Sqlite.Schema;
@@ -39,6 +40,7 @@ public sealed class SqliteTorrentHistoryStoreTests
             Assert.Equal(record.LastUpdatedAtUtc, reloaded.LastUpdatedAtUtc);
             Assert.Equal(record.InvokeCompletionCallback, reloaded.InvokeCompletionCallback);
             Assert.Equal(record.CompletionCallbackLabel, reloaded.CompletionCallbackLabel);
+            Assert.Equal(record.RemovalKind, reloaded.RemovalKind);
             Assert.Equal(record.ServiceInstanceIdLastSeen, reloaded.ServiceInstanceIdLastSeen);
         }
         finally
@@ -89,6 +91,7 @@ public sealed class SqliteTorrentHistoryStoreTests
             CallbackLastError = null,
             DataDeleted = false,
             RemovalReason = null,
+            RemovalKind = TorrentRemovalKind.ColdDownloadAbandonment,
             RemovedByCleanupPolicy = false,
             FinalPayloadPath = null,
             ServiceInstanceIdLastSeen = Guid.NewGuid(),

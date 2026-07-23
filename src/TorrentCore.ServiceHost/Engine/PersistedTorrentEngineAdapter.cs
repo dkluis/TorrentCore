@@ -2,6 +2,7 @@
 
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Primitives;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Application;
@@ -346,6 +347,9 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             torrent,
             dataDeleted: request.DeleteData,
             removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
+            removalKind: request.DeleteData
+                ? TorrentRemovalKind.ManualRemovalWithData
+                : TorrentRemovalKind.ManualRemoval,
             removedByCleanupPolicy: false,
             removedAtUtc,
             cancellationToken);

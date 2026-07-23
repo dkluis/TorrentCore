@@ -108,6 +108,11 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
             query.Add($"state={Uri.EscapeDataString(request.State)}");
         }
 
+        if (request.Outcome is not null)
+        {
+            query.Add($"outcome={Uri.EscapeDataString(request.Outcome.Value.ToString())}");
+        }
+
         if (request.Removed is not null)
         {
             query.Add($"removed={request.Removed.Value.ToString().ToLowerInvariant()}");

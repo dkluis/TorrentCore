@@ -2,6 +2,7 @@
 
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using TorrentCore.Contracts.History;
 using TorrentCore.Core.History;
 
 #endregion
@@ -49,7 +50,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                              removal_reason,
                                              removed_by_cleanup_policy,
                                              final_payload_path,
-                                             service_instance_id_last_seen
+                                             service_instance_id_last_seen,
+                                             removal_kind
                                          FROM torrent_history
                                          """;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
@@ -165,7 +167,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   removal_reason,
                                   removed_by_cleanup_policy,
                                   final_payload_path,
-                                  service_instance_id_last_seen
+                                  service_instance_id_last_seen,
+                                  removal_kind
                               )
                               VALUES (
                                   $torrent_id,
@@ -205,7 +208,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   $removal_reason,
                                   $removed_by_cleanup_policy,
                                   $final_payload_path,
-                                  $service_instance_id_last_seen
+                                  $service_instance_id_last_seen,
+                                  $removal_kind
                               );
                               """;
 
@@ -260,7 +264,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   removal_reason,
                                   removed_by_cleanup_policy,
                                   final_payload_path,
-                                  service_instance_id_last_seen
+                                  service_instance_id_last_seen,
+                                  removal_kind
                               )
                               VALUES (
                                   $torrent_id,
@@ -300,7 +305,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   $removal_reason,
                                   $removed_by_cleanup_policy,
                                   $final_payload_path,
-                                  $service_instance_id_last_seen
+                                  $service_instance_id_last_seen,
+                                  $removal_kind
                               );
                               """;
 
@@ -355,7 +361,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                   removal_reason = $removal_reason,
                                   removed_by_cleanup_policy = $removed_by_cleanup_policy,
                                   final_payload_path = $final_payload_path,
-                                  service_instance_id_last_seen = $service_instance_id_last_seen
+                                  service_instance_id_last_seen = $service_instance_id_last_seen,
+                                  removal_kind = $removal_kind
                               WHERE torrent_id = $torrent_id;
                               """;
 
@@ -417,6 +424,7 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
             RemovedByCleanupPolicy = reader.GetInt64(35) != 0,
             FinalPayloadPath = reader.IsDBNull(36) ? null : reader.GetString(36),
             ServiceInstanceIdLastSeen = reader.IsDBNull(37) ? null : Guid.Parse(reader.GetString(37)),
+            RemovalKind = reader.IsDBNull(38) ? null : ParseRemovalKind(reader.GetString(38)),
         };
     }
 
@@ -468,6 +476,9 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         command.Parameters.AddWithValue(
             "$service_instance_id_last_seen",
             record.ServiceInstanceIdLastSeen?.ToString() ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$removal_kind",
+            record.RemovalKind?.ToString() ?? (object)DBNull.Value);
     }
 
     private static object ToDbValue(DateTimeOffset? value)
@@ -478,6 +489,13 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
     private static DateTimeOffset ParseDateTime(string value)
     {
         return DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+    }
+
+    private static TorrentRemovalKind? ParseRemovalKind(string value)
+    {
+        return Enum.TryParse<TorrentRemovalKind>(value, ignoreCase: false, out var removalKind)
+            ? removalKind
+            : null;
     }
 
 }

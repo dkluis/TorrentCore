@@ -43,6 +43,8 @@ Durable history rules preserved from the completed history workstream:
 - the row is inserted when the torrent is added and then updated in place
 - history is not derived from activity logs
 - history rows are retained after active torrent removal
+- removal classification is stored as a structured kind rather than inferred from operator-facing reason text
+- abandoned-download history can be retrieved independently of the torrent submission date
 
 Important history fields:
 

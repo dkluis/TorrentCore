@@ -55,6 +55,8 @@ Queue diagnostics currently expose:
 - defaults to `72`; set to `0` to disable automatic abandonment
 - the completion callback is not invoked
 - the durable history row is retained with the cleanup reason and deleted-data outcome
+- history records the structured `ColdDownloadAbandonment` removal kind
+- the History page displays an abandonment alert and provides an Abandoned outcome filter that is not constrained by submitted date
 - torrent-scoped activity logs are deleted after successful removal; a service-scoped abandonment summary remains
 - the cold timestamp is persisted across service restarts and excludes time waiting in the runnable queue
 - applies live

@@ -2046,6 +2046,10 @@ h1:focus {
     overflow: visible;
 }
 
+.history-abandonment-alert {
+    margin-bottom: 0.75rem;
+}
+
 .history-grid {
     display: grid;
     gap: 0.75rem;

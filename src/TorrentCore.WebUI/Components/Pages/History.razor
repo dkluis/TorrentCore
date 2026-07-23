@@ -26,6 +26,34 @@
                    Message="@_errorMessage"
                    ActionText="Retry"
                    OnAction="RefreshAsync">
+            @if (_abandonedHistoryCount > 0)
+            {
+                <MudAlert Severity="Severity.Warning"
+                          Variant="Variant.Outlined"
+                          Dense="true"
+                          Class="history-abandonment-alert">
+                    <div class="dashboard-panel-header">
+                        <div>
+                            <strong>@BuildAbandonmentAlertTitle()</strong>
+                            <p class="dashboard-panel-copy">@BuildAbandonmentAlertSummary()</p>
+                        </div>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Warning"
+                                   Size="Size.Small"
+                                   Disabled="@(_isRefreshing || _isLoadingSelectedDetail)"
+                                   OnClick="ViewAbandonedDownloadsAsync">
+                            View abandoned downloads
+                        </MudButton>
+                    </div>
+                </MudAlert>
+            }
+            else if (!string.IsNullOrWhiteSpace(_abandonedSummaryErrorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Dense="true">
+                    @_abandonedSummaryErrorMessage
+                </MudAlert>
+            }
+
             <div class="dashboard-tab-content history-tab-content">
                 <div class="history-grid">
                     <OperatorCard Class="section-card history-panel history-panel--filters">
@@ -70,6 +98,7 @@
                                               Variant="Variant.Outlined"
                                               Margin="Margin.Dense"
                                               Placeholder="yyyy-MM-dd"
+                                              Disabled="@IsAbandonedOutcomeSelected"
                                               Immediate="true" />
                             </div>
 
@@ -81,6 +110,7 @@
                                               Variant="Variant.Outlined"
                                               Margin="Margin.Dense"
                                               Placeholder="yyyy-MM-dd"
+                                              Disabled="@IsAbandonedOutcomeSelected"
                                               Immediate="true" />
                             </div>
 
@@ -115,16 +145,17 @@
                             </div>
 
                             <div class="settings-field-block">
-                                <SettingHelpTrigger Content="@HistoryHelpCatalog.Removed" />
+                                <SettingHelpTrigger Content="@HistoryHelpCatalog.Outcome" />
                                 <MudSelect T="string"
-                                           Value="_state.RemovedFilter"
-                                           ValueChanged="OnRemovedFilterChanged"
+                                           Value="_state.OutcomeFilter"
+                                           ValueChanged="OnOutcomeFilterChanged"
                                            Variant="Variant.Outlined"
                                            Margin="Margin.Dense"
                                            Dense="true">
-                                    <MudSelectItem T="string" Value="@RemovedAllValue">All</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@RemovedActiveOnlyValue">Active Only</MudSelectItem>
-                                    <MudSelectItem T="string" Value="@RemovedRemovedOnlyValue">Removed Only</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@OutcomeAllValue">All</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@OutcomeActiveValue">Active</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@OutcomeRemovedValue">Removed</MudSelectItem>
+                                    <MudSelectItem T="string" Value="@OutcomeAbandonedValue">Abandoned</MudSelectItem>
                                 </MudSelect>
                             </div>
                         </div>
@@ -201,6 +232,13 @@
                                     </MudTh>
                                     <MudTh>
                                         <MudTableSortLabel T="TorrentHistorySummaryDto"
+                                                           SortLabel="@SortOutcome"
+                                                           SortBy="@(row => row.Outcome)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortOutcome))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortOutcome, direction))">Outcome</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentHistorySummaryDto"
                                                            SortLabel="@SortProgress"
                                                            SortBy="@(row => row.LatestProgressPercent)"
                                                            InitialDirection="@(GetInitialSortDirection(SortProgress))"
@@ -247,6 +285,7 @@
                                     <MudTd DataLabel="Name" Class="operations-table-wrap">@context.Name</MudTd>
                                     <MudTd DataLabel="Category">@FormatCategory(context.CategoryKey)</MudTd>
                                     <MudTd DataLabel="State">@context.LatestTorrentState</MudTd>
+                                    <MudTd DataLabel="Outcome">@FormatOutcome(context.Outcome)</MudTd>
                                     <MudTd DataLabel="Progress">@context.LatestProgressPercent.ToString("0.0")%</MudTd>
                                     <MudTd DataLabel="Downloaded">@FormatBytes(context.LatestDownloadedBytes)</MudTd>
                                     <MudTd DataLabel="Total">@FormatNullableBytes(context.LatestTotalBytes)</MudTd>
@@ -311,6 +350,10 @@
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">State</p>
                                     <p class="dashboard-detail-value">@_selectedHistoryDetail.LatestTorrentState</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Outcome</p>
+                                    <p class="dashboard-detail-value">@FormatOutcome(_selectedHistoryDetail.Outcome)</p>
                                 </div>
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Wait</p>
@@ -512,13 +555,15 @@
 
 @code {
     private const string StateKey = "history:list";
-    private const string RemovedAllValue = "";
-    private const string RemovedActiveOnlyValue = "active";
-    private const string RemovedRemovedOnlyValue = "removed";
+    private const string OutcomeAllValue = "";
+    private const string OutcomeActiveValue = "active";
+    private const string OutcomeRemovedValue = "removed";
+    private const string OutcomeAbandonedValue = "abandoned";
     private const string SortSubmitted = "submitted";
     private const string SortName = "name";
     private const string SortCategory = "category";
     private const string SortState = "state";
+    private const string SortOutcome = "outcome";
     private const string SortProgress = "progress";
     private const string SortDownloaded = "downloaded";
     private const string SortTotal = "total";
@@ -535,6 +580,9 @@
     private string? _actionMessage;
     private bool _actionIsError;
     private string? _filterValidationMessage;
+    private int _abandonedHistoryCount;
+    private TorrentHistorySummaryDto? _mostRecentAbandonedHistory;
+    private string? _abandonedSummaryErrorMessage;
     private TorrentHistoryDetailDto? _selectedHistoryDetail;
     private string? _selectedDetailErrorMessage;
 
@@ -552,12 +600,6 @@
         if (_state.PageSize <= 0)
         {
             _state.PageSize = 25;
-        }
-
-        if (string.IsNullOrWhiteSpace(_state.FromDate))
-        {
-            _state.FromDate = BuildTodayDateFilter();
-            PersistState();
         }
 
         await LoadAsync(showSuccessToast: false, showLoadingState: true);
@@ -587,9 +629,15 @@
         return Task.CompletedTask;
     }
 
-    private Task OnRemovedFilterChanged(string value)
+    private Task OnOutcomeFilterChanged(string value)
     {
-        _state.RemovedFilter = value;
+        _state.OutcomeFilter = value;
+        if (string.Equals(value, OutcomeAbandonedValue, StringComparison.Ordinal))
+        {
+            _state.FromDate = string.Empty;
+            _state.ToDate = string.Empty;
+        }
+
         _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
@@ -635,8 +683,8 @@
         _state.TorrentName = string.Empty;
         _state.CategoryKey = string.Empty;
         _state.State = string.Empty;
-        _state.RemovedFilter = RemovedAllValue;
-        _state.FromDate = BuildTodayDateFilter();
+        _state.OutcomeFilter = OutcomeAllValue;
+        _state.FromDate = string.Empty;
         _state.ToDate = string.Empty;
         _state.PageIndex = 0;
         ClearSelectedHistoryEntry();
@@ -644,6 +692,23 @@
         await LoadAsync(showSuccessToast: false, showLoadingState: false);
         Feedback.Info("History filters cleared.");
         _actionMessage = "History filters cleared.";
+        _actionIsError = false;
+    }
+
+    private async Task ViewAbandonedDownloadsAsync()
+    {
+        _state.TorrentName = string.Empty;
+        _state.CategoryKey = string.Empty;
+        _state.State = string.Empty;
+        _state.OutcomeFilter = OutcomeAbandonedValue;
+        _state.FromDate = string.Empty;
+        _state.ToDate = string.Empty;
+        _state.PageIndex = 0;
+        ClearSelectedHistoryEntry();
+        PersistState();
+        await LoadAsync(showSuccessToast: false, showLoadingState: false);
+        Feedback.Info("Showing all abandoned downloads.");
+        _actionMessage = "Showing all abandoned downloads.";
         _actionIsError = false;
     }
 
@@ -670,7 +735,34 @@
 
         _errorMessage = null;
 
-        var historyResult = await Api.GetHistoryAsync(request);
+        var historyTask = Api.GetHistoryAsync(request);
+        var abandonedHistoryTask = Api.GetHistoryAsync(
+            new TorrentHistoryQueryRequest
+            {
+                Outcome = TorrentHistoryOutcome.Abandoned,
+                Take = 500,
+            });
+
+        var historyResult = await historyTask;
+        var abandonedHistoryResult = await abandonedHistoryTask;
+        if (abandonedHistoryResult.IsSuccess)
+        {
+            var abandonedRows = abandonedHistoryResult.Value ?? [];
+            _abandonedHistoryCount = abandonedRows.Count;
+            _mostRecentAbandonedHistory = abandonedRows
+                .Where(row => row.RemovedAt is not null)
+                .OrderByDescending(row => row.RemovedAt)
+                .FirstOrDefault();
+            _abandonedSummaryErrorMessage = null;
+        }
+        else
+        {
+            _abandonedHistoryCount = 0;
+            _mostRecentAbandonedHistory = null;
+            _abandonedSummaryErrorMessage =
+                abandonedHistoryResult.ErrorMessage ?? "Abandoned-download history summary is unavailable.";
+        }
+
         if (!historyResult.IsSuccess)
         {
             var errorMessage = historyResult.ErrorMessage ?? "History request failed.";
@@ -813,14 +905,15 @@
             TorrentName = string.IsNullOrWhiteSpace(_state.TorrentName) ? null : _state.TorrentName,
             CategoryKey = string.IsNullOrWhiteSpace(_state.CategoryKey) ? null : _state.CategoryKey,
             State = string.IsNullOrWhiteSpace(_state.State) ? null : _state.State,
-            Removed = _state.RemovedFilter switch
+            Outcome = _state.OutcomeFilter switch
             {
-                RemovedActiveOnlyValue => false,
-                RemovedRemovedOnlyValue => true,
+                OutcomeActiveValue => TorrentHistoryOutcome.Active,
+                OutcomeRemovedValue => TorrentHistoryOutcome.Removed,
+                OutcomeAbandonedValue => TorrentHistoryOutcome.Abandoned,
                 _ => null,
             },
-            FromDate = fromDate,
-            ToDate = toDate,
+            FromDate = IsAbandonedOutcomeSelected ? null : fromDate,
+            ToDate = IsAbandonedOutcomeSelected ? null : toDate,
             Take = 500,
         };
     }
@@ -837,6 +930,9 @@
         PageStateStore.Save(StateKey, _state);
     }
 
+    private bool IsAbandonedOutcomeSelected =>
+        string.Equals(_state.OutcomeFilter, OutcomeAbandonedValue, StringComparison.Ordinal);
+
     private static string BuildTodayDateFilter()
     {
         return DateTimeOffset.Now.LocalDateTime.ToString("yyyy-MM-dd");
@@ -850,6 +946,20 @@
     private string BuildHistorySummary()
     {
         return $"{_historyRows.Count:n0} result(s) loaded. Click a column header to sort or a row to inspect full details.";
+    }
+
+    private string BuildAbandonmentAlertTitle()
+    {
+        return _abandonedHistoryCount == 1
+            ? "1 abandoned download is recorded in history."
+            : $"{_abandonedHistoryCount:n0} abandoned downloads are recorded in history.";
+    }
+
+    private string BuildAbandonmentAlertSummary()
+    {
+        return _mostRecentAbandonedHistory?.RemovedAt is null
+            ? "Use the action to view abandoned downloads without a submitted-date restriction."
+            : $"Most recent: {_mostRecentAbandonedHistory.Name}, removed {FormatDateTime(_mostRecentAbandonedHistory.RemovedAt)}.";
     }
 
     private string BuildSelectionSummary()
@@ -900,6 +1010,17 @@
     private static string FormatRemovalReason(string? value)
     {
         return ValueOrDash(value);
+    }
+
+    private static string FormatOutcome(TorrentHistoryOutcome outcome)
+    {
+        return outcome switch
+        {
+            TorrentHistoryOutcome.Active => "Active",
+            TorrentHistoryOutcome.Removed => "Removed",
+            TorrentHistoryOutcome.Abandoned => "Abandoned",
+            _ => outcome.ToString(),
+        };
     }
 
     private static string FormatBoolean(bool value)

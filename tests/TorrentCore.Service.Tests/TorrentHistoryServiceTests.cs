@@ -1,3 +1,4 @@
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.History;
 using TorrentCore.Core.Torrents;
@@ -398,6 +399,7 @@ public sealed class TorrentHistoryServiceTests
                     completedAtUtc: completedAt),
                 dataDeleted: false,
                 removalReason: "automatic_cleanup",
+                removalKind: TorrentRemovalKind.CompletedTorrentCleanup,
                 removedByCleanupPolicy: true,
                 removedAt,
                 CancellationToken.None);
@@ -409,6 +411,7 @@ public sealed class TorrentHistoryServiceTests
             Assert.Equal(removedAt, history.RemovedAtUtc);
             Assert.False(history.DataDeleted);
             Assert.Equal("automatic_cleanup", history.RemovalReason);
+            Assert.Equal(TorrentRemovalKind.CompletedTorrentCleanup, history.RemovalKind);
             Assert.True(history.RemovedByCleanupPolicy);
             Assert.Equal(removedAt, history.LastUpdatedAtUtc);
         }

@@ -9,6 +9,61 @@ namespace TorrentCore.Service.Tests;
 public sealed class SqliteSchemaMigrationTests
 {
     [Fact]
+    public async Task Migration17_BackfillsColdDownloadAbandonmentKind()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-history-removal-kind");
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+        var submittedAtUtc = DateTimeOffset.UtcNow.AddDays(-4);
+        var removedAtUtc = DateTimeOffset.UtcNow;
+
+        var initialMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await initialMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+            var insertCommand = connection.CreateCommand();
+            insertCommand.CommandText = """
+                                        INSERT INTO torrent_history (
+                                            torrent_id, name, magnet_uri, latest_torrent_state,
+                                            latest_progress_percent, latest_downloaded_bytes, latest_uploaded_bytes,
+                                            latest_download_rate_bytes_per_second, latest_upload_rate_bytes_per_second,
+                                            latest_tracker_count, latest_connected_peer_count, submitted_at_utc,
+                                            last_updated_at_utc, removed_at_utc, invoke_completion_callback,
+                                            data_deleted, removal_reason, removed_by_cleanup_policy, removal_kind
+                                        )
+                                        VALUES (
+                                            '17171717-1717-1717-1717-171717171717', 'Abandoned Download',
+                                            'magnet:?xt=urn:btih:1717171717171717171717171717171717171717',
+                                            'Downloading', 91, 910, 0, 0, 0, 1, 0, $submitted_at_utc,
+                                            $removed_at_utc, $removed_at_utc, 0, 1,
+                                            'Download abandoned after 72 hours without peer or transfer activity.',
+                                            1, NULL
+                                        );
+
+                                        DELETE FROM schema_migrations WHERE version = 17;
+                                        """;
+            insertCommand.Parameters.AddWithValue("$submitted_at_utc", submittedAtUtc.ToString("O"));
+            insertCommand.Parameters.AddWithValue("$removed_at_utc", removedAtUtc.ToString("O"));
+            await insertCommand.ExecuteNonQueryAsync();
+        }
+
+        var backfillMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await backfillMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+        var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = """
+                                    SELECT removal_kind
+                                    FROM torrent_history
+                                    WHERE torrent_id = '17171717-1717-1717-1717-171717171717';
+                                    """;
+
+        Assert.Equal("ColdDownloadAbandonment", await verifyCommand.ExecuteScalarAsync());
+    }
+
+    [Fact]
     public async Task Migration15_ClearsMetadataTimestampForStillUnresolvedLiveMagnet()
     {
         var rootPath = CreateTempRootPath("torrentcore-history-metadata-repair");
@@ -209,7 +264,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], versions);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";
@@ -224,6 +279,7 @@ public sealed class SqliteSchemaMigrationTests
         Assert.Contains("download_root_path", historyColumns);
         Assert.Contains("latest_completion_callback_feedback_received_at_utc", historyColumns);
         Assert.Contains("latest_completion_callback_feedback_json", historyColumns);
+        Assert.Contains("removal_kind", historyColumns);
         Assert.DoesNotContain("save_path", historyColumns);
     }
 

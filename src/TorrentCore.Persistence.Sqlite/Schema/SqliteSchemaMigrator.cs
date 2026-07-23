@@ -674,6 +674,39 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     }
                 }
             ),
+            new SqliteMigrationDefinition(
+                17, "add_structured_history_removal_kind", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrent_history", "removal_kind", cancellationToken))
+                    {
+                        var alterCommand = connection.CreateCommand();
+                        alterCommand.CommandText =
+                                "ALTER TABLE torrent_history ADD COLUMN removal_kind TEXT NULL;";
+                        await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    var backfillCommand = connection.CreateCommand();
+                    backfillCommand.CommandText = """
+                                                  UPDATE torrent_history
+                                                  SET removal_kind = CASE
+                                                      WHEN removal_reason = 'manual_remove'
+                                                          THEN 'ManualRemoval'
+                                                      WHEN removal_reason = 'manual_remove_delete_data'
+                                                          THEN 'ManualRemovalWithData'
+                                                      WHEN removal_reason = 'automatic_cleanup'
+                                                          THEN 'CompletedTorrentCleanup'
+                                                      WHEN removed_by_cleanup_policy = 1
+                                                           AND data_deleted = 1
+                                                           AND removal_reason LIKE 'Download abandoned after %'
+                                                          THEN 'ColdDownloadAbandonment'
+                                                      ELSE removal_kind
+                                                  END
+                                                  WHERE removal_kind IS NULL
+                                                    AND removed_at_utc IS NOT NULL;
+                                                  """;
+                    await backfillCommand.ExecuteNonQueryAsync(cancellationToken);
+                }
+            ),
         ];
     }
 

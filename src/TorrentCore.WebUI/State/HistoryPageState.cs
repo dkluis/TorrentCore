@@ -5,7 +5,7 @@ public sealed class HistoryPageState
     public string TorrentName { get; set; } = string.Empty;
     public string CategoryKey { get; set; } = string.Empty;
     public string State { get; set; } = string.Empty;
-    public string RemovedFilter { get; set; } = string.Empty;
+    public string OutcomeFilter { get; set; } = string.Empty;
     public string FromDate { get; set; } = string.Empty;
     public string ToDate { get; set; } = string.Empty;
     public string SortBy { get; set; } = string.Empty;

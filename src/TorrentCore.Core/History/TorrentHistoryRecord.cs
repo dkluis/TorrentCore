@@ -1,3 +1,5 @@
+using TorrentCore.Contracts.History;
+
 namespace TorrentCore.Core.History;
 
 public sealed class TorrentHistoryRecord
@@ -37,6 +39,7 @@ public sealed class TorrentHistoryRecord
     public          string?         LatestCompletionCallbackFeedbackJson { get; set; }
     public required bool            DataDeleted                        { get; set; }
     public          string?         RemovalReason                      { get; set; }
+    public          TorrentRemovalKind? RemovalKind                    { get; set; }
     public required bool            RemovedByCleanupPolicy             { get; set; }
     public          string?         FinalPayloadPath                   { get; set; }
     public          Guid?           ServiceInstanceIdLastSeen          { get; set; }
