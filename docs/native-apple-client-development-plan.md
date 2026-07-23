@@ -7,7 +7,7 @@ This document is an implementation plan, not a statement of current product supp
 `TorrentCore.WebUI` remains the supported operator UI until the native macOS client reaches its release milestone and
 the active architecture documentation is deliberately updated.
 
-Milestone 0 was completed on July 23, 2026. Milestone 1 has not started.
+Milestones 0 and 1 were completed on July 23, 2026.
 
 ## Outcome
 
@@ -195,7 +195,20 @@ Exit criteria:
 
 ### Milestone 1: Shared Contract And Transport Foundation
 
+Status: complete (July 23, 2026).
+
 Build the cross-platform API boundary before building operator screens.
+
+Completion evidence:
+
+- an in-process .NET test produces and compares the committed OpenAPI v1 artifact
+- the pinned Swift OpenAPI Generator produces internal types and a client with no hand edits
+- the public Swift facade covers every initial-slice endpoint and preserves TorrentCore problem details
+- deterministic tests cover request paths, methods, bodies, decoding, future enum values, cancellation, offline
+  failures, and timeouts
+- macOS and iOS Simulator targets build with the same shared package
+- preview fixtures cover connected, loading, empty, offline, and error states without a service
+- read-only probes pass through both `ca-server.local` and `192.168.68.80`
 
 Work:
 

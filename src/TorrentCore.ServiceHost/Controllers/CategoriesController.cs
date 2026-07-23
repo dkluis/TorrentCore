@@ -1,6 +1,7 @@
 #region
 
 using Microsoft.AspNetCore.Mvc;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Service.Application;
 
@@ -23,9 +24,9 @@ public sealed class CategoriesController(ITorrentApplicationService torrentAppli
 
     [HttpPut("{key}")]
     [ProducesResponseType(StatusCodes.Status200OK,         Type = typeof(TorrentCategoryDto))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentCategoryDto>> Update(string key,
         [FromBody] UpdateTorrentCategoryRequest                       request, CancellationToken cancellationToken)
     {

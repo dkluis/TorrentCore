@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "500000000000000000000002"
-               BuildableName = "TorrentCore Mobile.app"
+               BuildableName = "TorrentCore.app"
                BlueprintName = "TorrentCoreMobile"
                ReferencedContainer = "container:TorrentCoreApple.xcodeproj">
             </BuildableReference>
@@ -46,7 +46,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "500000000000000000000002"
-            BuildableName = "TorrentCore Mobile.app"
+            BuildableName = "TorrentCore.app"
             BlueprintName = "TorrentCoreMobile"
             ReferencedContainer = "container:TorrentCoreApple.xcodeproj">
          </BuildableReference>
@@ -63,7 +63,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "500000000000000000000002"
-            BuildableName = "TorrentCore Mobile.app"
+            BuildableName = "TorrentCore.app"
             BlueprintName = "TorrentCoreMobile"
             ReferencedContainer = "container:TorrentCoreApple.xcodeproj">
          </BuildableReference>

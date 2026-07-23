@@ -2,6 +2,7 @@ namespace TorrentCore.Contracts.Host;
 
 public sealed class EngineHostStatusDto
 {
+    public int                       ApiVersion                              { get; init; }
     public required string           ServiceName                             { get; init; }
     public required string           ServiceVersion                          { get; init; }
     public required Guid             ServiceInstanceId                       { get; init; }

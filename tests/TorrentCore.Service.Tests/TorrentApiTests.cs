@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.History;
@@ -34,6 +35,7 @@ public sealed class TorrentApiTests
         var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
 
         Assert.NotNull(hostStatus);
+        Assert.Equal(ServiceApiContract.CurrentVersion, hostStatus.ApiVersion);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);

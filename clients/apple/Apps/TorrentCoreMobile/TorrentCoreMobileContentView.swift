@@ -2,16 +2,37 @@ import SwiftUI
 import TorrentCoreFeatures
 
 struct TorrentCoreMobileContentView: View {
+    var state: TorrentCorePreviewState = .empty
+
     var body: some View {
         ContentUnavailableView {
-            Label(TorrentCoreFeatureFoundation.productName, systemImage: "arrow.down.circle")
+            Label(state.title, systemImage: state.systemImage)
         } description: {
-            Text("Shared iOS and iPadOS client foundation")
+            Text(state.message)
+        } actions: {
+            if state.isLoading {
+                ProgressView()
+            }
         }
     }
 }
 
-#Preview {
-    TorrentCoreMobileContentView()
+#Preview("Connected") {
+    TorrentCoreMobileContentView(state: .connected)
 }
 
+#Preview("Loading") {
+    TorrentCoreMobileContentView(state: .loading)
+}
+
+#Preview("Empty") {
+    TorrentCoreMobileContentView(state: .empty)
+}
+
+#Preview("Offline") {
+    TorrentCoreMobileContentView(state: .offline)
+}
+
+#Preview("Error") {
+    TorrentCoreMobileContentView(state: .error)
+}

@@ -2,6 +2,7 @@
 
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Application;
@@ -19,7 +20,7 @@ public sealed class LogsController(IActivityLogService activityLogService, Servi
 {
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IReadOnlyList<ActivityLogEntryDto>))]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<IReadOnlyList<ActivityLogEntryDto>>> GetRecent([FromQuery] int take = 100,
         [FromQuery] ActivityLogLevel? level = null, [FromQuery] string? category = null,
         [FromQuery] string? eventType = null, [FromQuery] Guid? torrentId = null,
@@ -69,7 +70,7 @@ public sealed class LogsController(IActivityLogService activityLogService, Servi
 
     [HttpPost("delete-orphaned-torrent-logs")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeleteOrphanedTorrentLogsResultDto))]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<DeleteOrphanedTorrentLogsResultDto>> DeleteOrphanedTorrentLogs(
         CancellationToken cancellationToken = default)
     {

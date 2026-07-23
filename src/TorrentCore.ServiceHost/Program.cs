@@ -36,6 +36,16 @@ builder.Services.AddSwaggerGen(options =>
                 Description = "Management API for the TorrentCore service host.",
             }
         );
+        options.CustomOperationIds(apiDescription =>
+            {
+                var controller = apiDescription.ActionDescriptor.RouteValues["controller"];
+                var action     = apiDescription.ActionDescriptor.RouteValues["action"];
+
+                return string.IsNullOrWhiteSpace(controller) || string.IsNullOrWhiteSpace(action)
+                    ? null
+                    : $"{controller}_{action}";
+            }
+        );
     }
 );
 builder.Services.AddSingleton<IValidateOptions<TorrentCoreServiceOptions>, TorrentCoreServiceOptionsValidator>();

@@ -1,6 +1,7 @@
 #region
 
 using Microsoft.AspNetCore.Mvc;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.Diagnostics;
 
 #endregion
@@ -19,6 +20,7 @@ public sealed class HealthController : ControllerBase
         return Ok(
             new ServiceHealthDto
             {
+                ApiVersion      = ServiceApiContract.CurrentVersion,
                 ServiceName     = "TorrentCore.Service",
                 Status          = "ok",
                 EnvironmentName = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().EnvironmentName,

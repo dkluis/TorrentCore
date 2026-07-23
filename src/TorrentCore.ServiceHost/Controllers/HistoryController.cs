@@ -1,6 +1,7 @@
 #region
 
 using Microsoft.AspNetCore.Mvc;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.History;
 using TorrentCore.Service.Application;
 
@@ -25,7 +26,7 @@ public sealed class HistoryController(ITorrentApplicationService torrentApplicat
 
     [HttpGet("by-torrent/{torrentId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentHistoryDetailDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentHistoryDetailDto>> GetByTorrentId(Guid torrentId,
         CancellationToken cancellationToken)
     {

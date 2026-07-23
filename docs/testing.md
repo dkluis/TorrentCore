@@ -23,6 +23,24 @@ Representative coverage areas:
 - metadata recovery and connection policy behavior
 - data-path cleanup
 - client options and path defaults
+- normalized OpenAPI contract generation for native clients
+
+## Native Apple Contract
+
+The committed Apple contract is
+`clients/apple/Packages/TorrentCoreKit/Sources/TorrentCoreAPI/openapi.json`. The normal .NET suite compares it with a
+normalized document produced by an in-process Development test host.
+
+After an intentional public service-contract change, regenerate it with:
+
+```bash
+TORRENTCORE_UPDATE_OPENAPI=1 dotnet test \
+  tests/TorrentCore.Service.Tests/TorrentCore.Service.Tests.csproj \
+  --filter FullyQualifiedName~OpenApiContractTests
+```
+
+Then run the normal .NET suite and the Swift package tests. Live Apple integration remains opt-in through
+`TORRENTCORE_INTEGRATION_BASE_URL` and is read-only unless the operator explicitly approves a mutation.
 
 ## Testing Rules
 

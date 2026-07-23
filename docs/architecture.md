@@ -64,6 +64,10 @@ TVMaze must not own:
 
 External clients should talk to TorrentCore only through stable HTTP contracts or the versioned client library.
 
+The service reports its additive native-client contract version through `apiVersion` on health and host-status
+responses. Version `1` is the current contract. Clients may tolerate a missing value while older private installations
+are being updated, but must reject a future version they do not understand.
+
 The WebUI stays a thin client over service contracts. It must not:
 
 - call MonoTorrent directly

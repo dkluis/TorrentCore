@@ -1,6 +1,7 @@
 #region
 
 using Microsoft.AspNetCore.Mvc;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Service.Application;
 
@@ -23,7 +24,7 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpGet("{torrentId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentDetailDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentDetailDto>> GetById(Guid torrentId, CancellationToken cancellationToken)
     {
         var torrent = await torrentApplicationService.GetTorrentAsync(torrentId, cancellationToken);
@@ -32,7 +33,7 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpGet("{torrentId:guid}/peers")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(IReadOnlyList<TorrentPeerDto>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<IReadOnlyList<TorrentPeerDto>>> GetPeers(Guid torrentId,
         CancellationToken                                                      cancellationToken)
     {
@@ -42,7 +43,7 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpGet("{torrentId:guid}/trackers")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(IReadOnlyList<TorrentTrackerDto>))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<IReadOnlyList<TorrentTrackerDto>>> GetTrackers(Guid torrentId,
         CancellationToken                                                         cancellationToken)
     {
@@ -52,9 +53,9 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created,    Type = typeof(TorrentDetailDto))]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status409Conflict,   Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict,   Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentDetailDto>> Add([FromBody] AddMagnetRequest request,
         CancellationToken                                                             cancellationToken)
     {
@@ -64,8 +65,8 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/pause")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentActionResultDto>> Pause(Guid torrentId, CancellationToken cancellationToken)
     {
         var result = await torrentApplicationService.PauseAsync(torrentId, cancellationToken);
@@ -74,8 +75,8 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/resume")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentActionResultDto>> Resume(Guid torrentId, CancellationToken cancellationToken)
     {
         var result = await torrentApplicationService.ResumeAsync(torrentId, cancellationToken);
@@ -84,8 +85,8 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/metadata/refresh")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentActionResultDto>> RefreshMetadata(Guid torrentId,
         CancellationToken                                                        cancellationToken)
     {
@@ -95,8 +96,8 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/metadata/reset")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentActionResultDto>> ResetMetadataSession(Guid torrentId,
         CancellationToken                                                             cancellationToken)
     {
@@ -106,8 +107,8 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/completion-callback/retry")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentActionResultDto>> RetryCompletionCallback(Guid torrentId,
         CancellationToken                                                                cancellationToken)
     {
@@ -117,8 +118,8 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/completion-callback/result")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ProblemDetails))]
-    [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound,   Type = typeof(ServiceProblemDetailsDto))]
     public async Task<IActionResult> ReportCompletionCallbackResult(Guid torrentId,
         [FromBody] ReportCompletionCallbackResultRequest request, CancellationToken cancellationToken)
     {
@@ -128,7 +129,7 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
 
     [HttpPost("{torrentId:guid}/remove")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
-    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ProblemDetails))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
     public async Task<ActionResult<TorrentActionResultDto>> Remove(Guid torrentId,
         [FromBody] RemoveTorrentRequest?                                request, CancellationToken cancellationToken)
     {

@@ -50,6 +50,7 @@ xcodebuild \
   -scheme TorrentCoreMac \
   -configuration Debug \
   -destination 'platform=macOS,arch=arm64' \
+  -skipPackagePluginValidation \
   CODE_SIGNING_ALLOWED=NO \
   build
 
@@ -58,14 +59,10 @@ xcodebuild \
   -scheme TorrentCoreMobile \
   -configuration Debug \
   -destination 'generic/platform=iOS Simulator' \
+  -skipPackagePluginValidation \
   CODE_SIGNING_ALLOWED=NO \
   build
 ```
 
 Run the relevant Swift tests and target builds before finishing Apple-client changes. If a service contract changes,
 also update .NET callers and tests and run the relevant .NET verification.
-
-On the current development Mac, the normal Swift/Xcode cache locations may point to an optional external volume. When
-that volume is unavailable, redirect package caches, module caches, and DerivedData to a task-specific directory under
-`/private/tmp`; do not replace the user's cache symlinks. A signed command-line build also needs a temporary
-`CFFIXED_USER_HOME` containing copies of the current Xcode preference files so account metadata remains available.

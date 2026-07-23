@@ -3,6 +3,7 @@
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
+using TorrentCore.Contracts;
 using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
@@ -72,6 +73,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
 
         return new EngineHostStatusDto
         {
+            ApiVersion                       = ServiceApiContract.CurrentVersion,
             ServiceName                      = "TorrentCore.Service",
             ServiceVersion                   = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "0.0.0",
             ServiceInstanceId                = serviceInstanceContext.ServiceInstanceId,

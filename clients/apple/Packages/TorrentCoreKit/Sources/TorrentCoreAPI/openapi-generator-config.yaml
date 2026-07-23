@@ -1,0 +1,13 @@
+generate:
+  - types
+  - client
+accessModifier: internal
+namingStrategy: idiomatic
+typeOverrides:
+  schemas:
+    ActivityLogLevel: Swift.Int32
+    EngineHostStatus: Swift.String
+    TorrentHistoryOutcome: Swift.String
+    TorrentRemovalKind: Swift.String
+    TorrentState: Swift.String
+    TorrentWaitReason: Swift.String
