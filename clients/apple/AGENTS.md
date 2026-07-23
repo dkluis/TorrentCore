@@ -23,13 +23,14 @@ These instructions apply to the native Apple clients under `clients/apple/`.
 
 ## Runtime And Preview Rules
 
-- TorrentCore does not run on the development Mac.
 - SwiftUI previews and routine tests must use fakes and fixtures.
+- A deployed TorrentCore runtime may coexist on the development Mac, but routine builds and tests must not depend on it.
 - Live integration is opt-in through `TORRENTCORE_INTEGRATION_BASE_URL`.
 - Do not commit a live endpoint, signing secret, provisioning profile, or credential.
-- Use `ca-server.local` only when the operator explicitly requests live integration.
+- Use `ca-desktop.local`, `ca-server.local`, or another installation only when the operator explicitly requests live
+  integration.
 - Run read-only live checks before any mutation.
-- Mutating or administrative live tests require explicit operator confirmation.
+- Mutating or administrative live tests require explicit operator confirmation and a designated disposable target.
 
 ## Network Model
 

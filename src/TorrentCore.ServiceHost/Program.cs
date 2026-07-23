@@ -144,16 +144,13 @@ builder.Services.AddSingleton<ILaunchAgentServiceRestartScheduler, LaunchAgentSe
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-        {
-            options.SwaggerEndpoint("/swagger/v1/swagger.json", "TorrentCore Service API v1");
-            options.RoutePrefix = "swagger";
-        }
-    );
-}
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "TorrentCore Service API v1");
+        options.RoutePrefix = "swagger";
+    }
+);
 
 app.UseExceptionHandler();
 app.MapControllers();

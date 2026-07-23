@@ -129,8 +129,8 @@ Default ports:
 
 | Component | Default HTTP Port |
 |---|---:|
-| `TorrentCore.Service` | `5078` |
-| `TorrentCore.WebUI` | `5131` |
+| `TorrentCore.Service` | `7033` |
+| `TorrentCore.WebUI` | `7053` |
 
 Repo defaults stay on `localhost` for normal development. LAN binding is a deploy-time concern.
 
@@ -147,6 +147,18 @@ Rules:
 
 Use the WebUI restart action for normal remote restarts.
 Use the local runtime scripts when you need explicit host-side control.
+
+## Service API And Swagger
+
+The service exposes Swagger UI and the OpenAPI v1 document in Development, Integration, and Production:
+
+```text
+http://<torrentcore-host>:7033/swagger
+http://<torrentcore-host>:7033/swagger/v1/swagger.json
+```
+
+Swagger exposes existing mutation operations through an interactive UI. It does not provide authentication or TLS.
+Keep the service bound to the trusted LAN/VPN boundary and do not expose it directly to the public internet.
 
 ## MonoTorrent Refactor Cutover
 
@@ -177,6 +189,6 @@ Basic checks:
 
 ```bash
 ./agentstatus.zsh
-curl http://127.0.0.1:7033/health
+curl http://127.0.0.1:7033/api/health
 curl -I http://127.0.0.1:7053/
 ```

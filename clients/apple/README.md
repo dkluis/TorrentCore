@@ -2,8 +2,9 @@
 
 ## Status
 
-Milestones 0 and 1 are complete. The targets, shared package, build configurations, network boundary, automatic
-signing, generated service contract, and shared HTTP client foundation are established.
+Milestones 0 through 2 are complete. The targets, shared package, build configurations, network boundary, automatic
+signing, generated service contract, HTTP client, connection profiles, and shared feature-state foundation are
+established.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -19,14 +20,14 @@ exists at the baseline so shared code is continuously buildable for iOS.
 
 ## Development Model
 
-TorrentCore does not run on the development Mac. Routine development, tests, and SwiftUI previews use fakes and
-fixtures. A live service address is not compiled into the app or committed as executable configuration; the
-operator-approved integration host is documented only to support explicit integration work.
+A deployed TorrentCore runtime may coexist on the development Mac, but routine development, tests, and SwiftUI
+previews use fakes and fixtures. A live service address is not compiled into the app or committed as executable
+configuration; operator-approved integration hosts are documented only to support explicit integration work.
 
 Live integration is opt-in:
 
 ```bash
-export TORRENTCORE_INTEGRATION_BASE_URL='http://ca-server.local:7033'
+export TORRENTCORE_INTEGRATION_BASE_URL='http://ca-desktop.local:7033'
 swift test \
   --package-path clients/apple/Packages/TorrentCoreKit \
   --filter liveReadOnlyIntegrationProbe
@@ -46,6 +47,28 @@ timeout is reported as an uncertain outcome and must be followed by a refresh ra
 
 On the first Xcode build, trust and enable Apple’s `OpenAPIGenerator` package plugin when Xcode asks. Command-line
 automation may use `-skipPackagePluginValidation` with the pinned package versions.
+
+## Connection Profiles And Refresh
+
+Connection profiles are nonsecret, device-local client settings. `UserDefaultsTorrentCoreProfileStore` stores one
+versioned JSON document under `TorrentCore.ClientPreferences.v1`; it is not written to iCloud. The document contains:
+
+- named profiles with stable UUIDs, normalized base URLs, and created/updated timestamps
+- the selected profile UUID
+- one client-wide refresh interval
+
+There is no compiled or automatically created server profile. Operators create profiles at runtime. Addresses accept
+HTTP or HTTPS hostnames and IP addresses with optional ports; missing schemes become HTTP. Credentials, query strings,
+fragments, and non-root paths are rejected. Duplicate normalized service addresses are not allowed.
+
+The selectable refresh intervals are 5, 10, and 15 seconds, with 15 seconds as the default. Refresh runs only while the
+application is active and only for the open feature context. Returning to the foreground triggers an immediate refresh;
+backgrounded and suspended applications do not poll. Offline state retains last-known values in memory and marks them
+stale. Service actions are disabled until refresh reconnects, and mutations are never retried automatically.
+
+`TorrentCoreCredentialStoring` reserves a credential boundary and the Keychain service name
+`com.conadv.TorrentCore.credentials`. The initial trusted-LAN/VPN model uses
+`UnconfiguredTorrentCoreCredentialStore`, so it creates no Keychain items or permission prompts.
 
 ## Build And Test
 

@@ -7,7 +7,7 @@ This document is an implementation plan, not a statement of current product supp
 `TorrentCore.WebUI` remains the supported operator UI until the native macOS client reaches its release milestone and
 the active architecture documentation is deliberately updated.
 
-Milestones 0 and 1 were completed on July 23, 2026.
+Milestones 0 through 2 were completed on July 23, 2026.
 
 ## Outcome
 
@@ -37,22 +37,27 @@ native interaction models rather than sharing complete screens.
 - Continue using HTTP inside the trusted LAN/VPN boundary initially.
 - Keep `TorrentCore.WebUI` available for Windows systems and as a fallback operator surface.
 - Use manual connection profiles first; defer Bonjour discovery unless it proves necessary.
+- Persist profiles and the selected profile device-locally rather than through iCloud.
+- Use one client-wide selectable refresh interval of 5, 10, or 15 seconds, defaulting to 15 seconds.
+- Refresh only the open feature context while the application is active; do not poll in the background.
+- Keep torrent actions single-item. Defer native multi-selection unless later operator experience establishes a need.
 
 ## Development And Runtime Model
 
-Source development occurs on the development Mac. The live TorrentCore runtime does not.
+Source development and an independently deployed integration runtime may coexist on the development Mac. Routine
+builds, tests, and previews must not depend on that runtime.
 
-The current integration host is:
+Current explicitly approved integration hosts include:
 
-- hostname: `ca-server.local`
-- LAN address: `192.168.68.80`
+- `ca-desktop.local` for local ARM integration, including designated mutation testing
+- `ca-server.local` (`192.168.68.80`) for the Intel installation
 
 Normal Apple-client development must use fakes, fixtures, and an injected transport. SwiftUI previews and routine tests
 must not require a locally running .NET service.
 
-Live integration against `ca-server.local` is opt-in. Read-only checks should precede any mutating test. Tests that add,
-pause, resume, remove, change settings, or restart the service must use an explicit test procedure and operator
-confirmation.
+Live integration is opt-in. Read-only checks should precede any mutating test. Tests that add, pause, resume, remove,
+change settings, or restart the service must use an explicit test procedure, operator confirmation, and a designated
+disposable target.
 
 The native clients never read or copy the TorrentCore SQLite database. Database snapshots remain a separate diagnostic
 workflow and must be copied consistently before offline analysis.
@@ -232,6 +237,19 @@ Exit criteria:
 
 ### Milestone 2: Shared Connection And Feature State
 
+Status: complete (July 23, 2026).
+
+Completion evidence:
+
+- profiles and the selected profile persist in one versioned, device-local `UserDefaults` document
+- addresses normalize consistently and reject unsafe URL components or duplicate service addresses
+- 5, 10, and 15-second client-wide refresh choices are available, with 15 seconds as the default
+- foreground refresh loads only the open feature context and stops when the application is inactive
+- offline state retains last-known values in memory, marks them stale, and disables service actions
+- profile changes cancel in-flight work, clear all remote state, and reject late responses from the old installation
+- successful single-item mutations refresh the open authoritative context
+- deterministic tests cover persistence, context routing, lifecycle, reconnect, mutation refresh, and response ordering
+
 Build reusable application behavior without committing to macOS or mobile presentation.
 
 Work:
@@ -242,10 +260,12 @@ Work:
 - reserve Keychain-backed credential support without requiring credentials in the initial HTTP/VPN model
 - implement reconnect and explicit refresh behavior
 - pause periodic refresh when the application is not active
+- use one client-wide 5/10/15-second refresh preference with a 15-second default
+- refresh only health, dashboard, torrent, detail, or category data required by the open feature context
 - implement shared dashboard and torrent feature models
 - implement capability-driven action availability
 - refresh authoritative state after successful mutations
-- aggregate multi-item results without hiding partial failures
+- allow only one client mutation at a time and defer multi-item actions
 - prevent overlapping refreshes and stale response replacement
 
 Exit criteria:
@@ -293,14 +313,13 @@ Work:
 - add metadata refresh and metadata-session reset
 - add callback retry and callback-state detail
 - add service restart with outage and recovery feedback
-- add multi-selection where it improves torrent operations
+- reassess multi-selection only if single-item operator experience establishes a concrete need
 - add context menus, toolbar items, application commands, and keyboard shortcuts
 - add cross-navigation between torrents, history, and filtered logs
 
 Exit criteria:
 
 - every supported WebUI operator capability is either present or has a documented native-platform exception
-- multi-item operations report each failure and never imply atomic behavior
 - long history and log collections remain responsive
 - settings validation and restart-required behavior match the service contract
 
@@ -393,7 +412,7 @@ Exit criteria:
 
 ### Routine Development
 
-- Swift unit tests for DTOs, transport, feature state, formatting, and action coordination
+- Swift unit tests for DTOs, transport, feature state, formatting, and single-action coordination
 - fixture-based contract tests for representative service payloads
 - mock-transport integration tests
 - SwiftUI previews backed exclusively by fixtures and fakes
@@ -402,7 +421,7 @@ Exit criteria:
 
 ### Live Integration
 
-Live tests are opt-in and target `ca-server.local` or another explicitly named installation.
+Live tests are opt-in and target `ca-desktop.local`, `ca-server.local`, or another explicitly named installation.
 
 Order:
 
@@ -466,7 +485,7 @@ deployment changes before enabling it.
 | Swift DTOs drift from .NET contracts | Reproducible OpenAPI or typed contract fixtures plus compatibility tests |
 | Shared code becomes lowest-common-denominator UI | Share behavior and state, not entire screens |
 | Polling creates duplicate requests or stale state | Central refresh coordination, cancellation, lifecycle awareness, and response ordering |
-| Multi-item actions partially fail | Report per-item results and avoid claiming atomic behavior |
+| Multi-item actions introduce unclear partial outcomes | Keep actions single-item unless a later milestone approves explicit batch semantics |
 | HTTP is accidentally exposed publicly | LAN/VPN-only deployment rule and no router port forwarding |
 | iOS background suspension conflicts with expectations | Promise foreground monitoring only unless a notification design is added |
 | Native work breaks WebUI behavior | Keep service semantics authoritative and run .NET/WebUI regression verification for contract changes |

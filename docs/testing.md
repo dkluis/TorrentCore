@@ -42,6 +42,12 @@ TORRENTCORE_UPDATE_OPENAPI=1 dotnet test \
 Then run the normal .NET suite and the Swift package tests. Live Apple integration remains opt-in through
 `TORRENTCORE_INTEGRATION_BASE_URL` and is read-only unless the operator explicitly approves a mutation.
 
+Milestone 2 shared-state tests cover device-local profile persistence, URL normalization, active profile isolation,
+client-wide refresh preferences, open-context request routing, foreground/background behavior, last-known stale state,
+single-item mutation refresh, and rejection of late responses from a previous profile.
+
+Production Swagger availability is verified by `OpenApiContractTests` alongside normalized contract comparison.
+
 ## Testing Rules
 
 - use real SQLite-backed tests for persistence behavior

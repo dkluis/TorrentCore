@@ -20,9 +20,14 @@ dotnet build TorrentCore.sln
 dotnet test TorrentCore.sln
 ```
 
-The service exposes Swagger only in development:
+The service exposes Swagger and its OpenAPI document in every environment:
 
-- `https://localhost:7033/swagger`
+- local development: `http://localhost:5050/swagger`
+- deployed default: `http://<torrentcore-host>:7033/swagger`
+- OpenAPI document: `/swagger/v1/swagger.json`
+
+Swagger does not add separate operations; it documents and can execute the same service API, including mutations.
+Keep deployed service access inside the trusted LAN/VPN boundary.
 
 ## Runtime Configuration Model
 

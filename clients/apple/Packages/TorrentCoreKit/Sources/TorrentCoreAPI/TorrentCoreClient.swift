@@ -247,8 +247,11 @@ public struct TorrentCoreClient: Sendable {
         guard let scheme = baseURL.scheme?.lowercased(),
               scheme == "http" || scheme == "https",
               baseURL.host?.isEmpty == false,
+              baseURL.user == nil,
+              baseURL.password == nil,
               baseURL.query == nil,
-              baseURL.fragment == nil
+              baseURL.fragment == nil,
+              baseURL.path.isEmpty || baseURL.path == "/"
         else {
             throw TorrentCoreClientError.invalidBaseURL
         }
@@ -256,13 +259,28 @@ public struct TorrentCoreClient: Sendable {
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             throw TorrentCoreClientError.invalidBaseURL
         }
-        while components.percentEncodedPath.hasSuffix("/") {
-            components.percentEncodedPath.removeLast()
-        }
+        components.scheme = scheme
+        components.host = components.host?.lowercased()
+        components.percentEncodedPath = ""
         guard let normalizedURL = components.url else {
             throw TorrentCoreClientError.invalidBaseURL
         }
         return normalizedURL
+    }
+
+    public static func normalizedBaseURL(_ address: String) throws -> URL {
+        let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAddress.isEmpty else {
+            throw TorrentCoreClientError.invalidBaseURL
+        }
+
+        let addressWithScheme = trimmedAddress.contains("://")
+            ? trimmedAddress
+            : "http://\(trimmedAddress)"
+        guard let baseURL = URL(string: addressWithScheme) else {
+            throw TorrentCoreClientError.invalidBaseURL
+        }
+        return try normalizedBaseURL(baseURL)
     }
 
     private func perform<Value: Sendable>(

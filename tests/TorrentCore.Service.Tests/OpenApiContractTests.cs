@@ -65,7 +65,35 @@ public sealed class OpenApiContractTests
         }
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string rootPath)
+    [Fact]
+    public async Task Swagger_IsAvailableInProduction()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-production-swagger-{Guid.NewGuid():N}");
+
+        try
+        {
+            await using var factory = CreateFactory(rootPath, "Production");
+            using var httpClient = factory.CreateClient();
+
+            var swaggerPage = await httpClient.GetStringAsync("swagger/index.html");
+            var openApiJson = await httpClient.GetStringAsync("swagger/v1/swagger.json");
+
+            Assert.Contains("Swagger UI", swaggerPage, StringComparison.Ordinal);
+            Assert.Equal("TorrentCore Service API", JsonNode.Parse(openApiJson)?["info"]?["title"]?.GetValue<string>());
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    private static WebApplicationFactory<Program> CreateFactory(
+        string rootPath,
+        string environment = "Development"
+    )
     {
         var downloadPath = Path.Combine(rootPath, "downloads");
         var storagePath  = Path.Combine(rootPath, "storage");
@@ -73,7 +101,7 @@ public sealed class OpenApiContractTests
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
                 {
-                    builder.UseEnvironment("Development");
+                    builder.UseEnvironment(environment);
                     builder.ConfigureAppConfiguration((_, configurationBuilder) =>
                         {
                             configurationBuilder.AddInMemoryCollection(
