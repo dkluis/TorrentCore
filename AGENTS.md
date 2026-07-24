@@ -42,6 +42,13 @@ Do not treat `docs/archive/` as active requirements unless the current code or a
 - Start troubleshooting questions in `docs/troubleshooting.md`
 - Start verification questions in `docs/testing.md`
 - Before adding a new doc, prefer merging into an existing active doc
+- When `functions.exec` is available, batch independent read-only or diagnostic tool calls within the same bounded
+  stage into one `functions.exec` call. Use `await Promise.allSettled([...])` when individual calls may fail or their
+  partial results remain useful, and inspect every settled result. Use `await Promise.all([...])` only when every result
+  is required and failures do not need individual handling; it does not cancel calls already in progress. Keep
+  dependent or adaptive investigations, waits and resumes, approval-requiring actions, and conflicting or
+  interdependent mutations sequential. Do not split otherwise clearly batchable inspections across separate outer tool
+  calls.
 - Run the relevant build and tests before finishing
 
 ## Documentation Rules
