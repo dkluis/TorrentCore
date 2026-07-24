@@ -10,12 +10,18 @@ public enum TorrentCoreFeatureContext: Equatable, Sendable {
     case torrentDetail(UUID)
     case torrentListAndDetail(UUID)
     case addMagnet
+    case history(query: TorrentCoreHistoryQuery, selectedTorrentID: UUID?)
+    case logs(TorrentCoreLogQuery)
+    case peers(UUID)
+    case trackers(UUID)
+    case serviceSettings
 
     var refreshesPeriodically: Bool {
         switch self {
-        case .connection, .dashboard, .torrents, .torrentDetail, .torrentListAndDetail:
+        case .connection, .dashboard, .torrents, .torrentDetail, .torrentListAndDetail,
+             .history, .logs:
             true
-        case .none, .addMagnet:
+        case .none, .addMagnet, .peers, .trackers, .serviceSettings:
             false
         }
     }
@@ -107,6 +113,13 @@ public final class TorrentCoreFeatureSession {
     public private(set) var torrents = TorrentCoreFeatureSnapshot<[TorrentCoreTorrentSummary]>()
     public private(set) var torrentDetail = TorrentCoreFeatureSnapshot<TorrentCoreTorrentDetail>()
     public private(set) var categories = TorrentCoreFeatureSnapshot<[TorrentCoreCategory]>()
+    public private(set) var history = TorrentCoreFeatureSnapshot<[TorrentCoreHistorySummary]>()
+    public private(set) var historyDetail = TorrentCoreFeatureSnapshot<TorrentCoreHistoryDetail>()
+    public private(set) var abandonedHistory = TorrentCoreFeatureSnapshot<[TorrentCoreHistorySummary]>()
+    public private(set) var logs = TorrentCoreFeatureSnapshot<[TorrentCoreActivityLogEntry]>()
+    public private(set) var peers = TorrentCoreFeatureSnapshot<[TorrentCorePeer]>()
+    public private(set) var trackers = TorrentCoreFeatureSnapshot<[TorrentCoreTracker]>()
+    public private(set) var runtimeSettings = TorrentCoreFeatureSnapshot<TorrentCoreRuntimeSettings>()
     public private(set) var activeMutation: TorrentCoreOperation?
     public private(set) var context: TorrentCoreFeatureContext = .none
     public private(set) var isApplicationActive = false
@@ -119,6 +132,7 @@ public final class TorrentCoreFeatureSession {
     @ObservationIgnored private let clientFactory: any TorrentCoreServiceClientBuilding
     @ObservationIgnored private let sleeper: any TorrentCoreSleeping
     @ObservationIgnored private let now: @Sendable () -> Date
+    @ObservationIgnored private let restartRecoveryDelay: TimeInterval
     @ObservationIgnored private var client: (any TorrentCoreServiceClientProtocol)?
     @ObservationIgnored private var clientProfileID: UUID?
     @ObservationIgnored private var generation = 0
@@ -130,12 +144,14 @@ public final class TorrentCoreFeatureSession {
         profileStore: any TorrentCoreProfilePersisting = UserDefaultsTorrentCoreProfileStore(),
         clientFactory: any TorrentCoreServiceClientBuilding = LiveTorrentCoreServiceClientFactory(),
         sleeper: any TorrentCoreSleeping = ContinuousTorrentCoreSleeper(),
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        restartRecoveryDelay: TimeInterval = 2
     ) {
         self.profileStore = profileStore
         self.clientFactory = clientFactory
         self.sleeper = sleeper
         self.now = now
+        self.restartRecoveryDelay = restartRecoveryDelay
     }
 
     deinit {
@@ -360,6 +376,18 @@ public final class TorrentCoreFeatureSession {
             && torrent.canRemove
     }
 
+    public func canRefreshMetadata(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canRefreshMetadata
+    }
+
+    public func canResetMetadataSession(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.torrentID != nil
+    }
+
+    public func canRetryCompletionCallback(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canRetryCompletionCallback
+    }
+
     public func addMagnet(
         _ magnetURI: String,
         categoryKey: String? = nil
@@ -447,6 +475,152 @@ public final class TorrentCoreFeatureSession {
         }
     }
 
+    public func refreshMetadata(
+        _ torrent: TorrentCoreTorrentSummary
+    ) async throws -> TorrentCoreActionResult {
+        guard canRefreshMetadata(torrent), let torrentID = torrent.torrentID else {
+            throw connectionState.isConnected
+                ? TorrentCoreFeatureActionError.capabilityUnavailable
+                : TorrentCoreFeatureActionError.offline
+        }
+        return try await performTorrentMutation(.refreshMetadata) { serviceClient in
+            try await serviceClient.refreshMetadata(id: torrentID)
+        }
+    }
+
+    public func resetMetadataSession(
+        _ torrent: TorrentCoreTorrentSummary
+    ) async throws -> TorrentCoreActionResult {
+        guard canResetMetadataSession(torrent), let torrentID = torrent.torrentID else {
+            throw connectionState.isConnected
+                ? TorrentCoreFeatureActionError.capabilityUnavailable
+                : TorrentCoreFeatureActionError.offline
+        }
+        return try await performTorrentMutation(.resetMetadata) { serviceClient in
+            try await serviceClient.resetMetadataSession(id: torrentID)
+        }
+    }
+
+    public func retryCompletionCallback(
+        _ torrent: TorrentCoreTorrentSummary
+    ) async throws -> TorrentCoreActionResult {
+        guard canRetryCompletionCallback(torrent), let torrentID = torrent.torrentID else {
+            throw connectionState.isConnected
+                ? TorrentCoreFeatureActionError.capabilityUnavailable
+                : TorrentCoreFeatureActionError.offline
+        }
+        return try await performTorrentMutation(.retryCompletionCallback) { serviceClient in
+            try await serviceClient.retryCompletionCallback(id: torrentID)
+        }
+    }
+
+    public func deleteOrphanedLogs() async throws -> TorrentCoreDeleteOrphanedLogsResult {
+        let serviceClient = try beginMutation(.deleteOrphanedLogs)
+        do {
+            let result = try await serviceClient.deleteOrphanedLogs()
+            activeMutation = nil
+            await refresh()
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
+    public func updateRuntimeSettings(
+        _ update: TorrentCoreRuntimeSettingsUpdate
+    ) async throws -> TorrentCoreRuntimeSettings {
+        let serviceClient = try beginMutation(.updateRuntimeSettings)
+        do {
+            let result = try await serviceClient.updateRuntimeSettings(update)
+            activeMutation = nil
+            runtimeSettings.succeed(result, at: now())
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
+    public func updateCategory(
+        key: String,
+        update: TorrentCoreCategoryUpdate
+    ) async throws -> TorrentCoreCategory {
+        let serviceClient = try beginMutation(.updateCategory)
+        do {
+            let result = try await serviceClient.updateCategory(key: key, update: update)
+            activeMutation = nil
+            var values = categories.value ?? []
+            if let index = values.firstIndex(where: { $0.key == key }) {
+                values[index] = result
+            } else {
+                values.append(result)
+            }
+            values.sort { $0.sortOrder < $1.sortOrder }
+            categories.succeed(values, at: now())
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
+    public func restartService() async throws -> TorrentCoreServiceRestartResult {
+        let serviceClient = try beginMutation(.restartService)
+        do {
+            let result = try await serviceClient.restartService()
+            if let profileID = activeProfile?.id {
+                connectionState = .notConnected(profileID: profileID)
+            }
+
+            if restartRecoveryDelay > 0 {
+                try await Task.sleep(
+                    nanoseconds: UInt64(restartRecoveryDelay * 1_000_000_000)
+                )
+            }
+            for attempt in 0..<15 {
+                do {
+                    let serviceHealth = try await serviceClient.probe()
+                    health = serviceHealth
+                    if let profileID = activeProfile?.id {
+                        connectionState = .connected(profileID: profileID, connectedAt: now())
+                    }
+                    activeMutation = nil
+                    await refresh()
+                    return result
+                } catch where attempt < 14 {
+                    try await Task.sleep(for: .seconds(2))
+                }
+            }
+
+            throw TorrentCoreClientError.offline
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
+    private func performTorrentMutation(
+        _ operation: TorrentCoreOperation,
+        request: (any TorrentCoreServiceClientProtocol) async throws -> TorrentCoreActionResult
+    ) async throws -> TorrentCoreActionResult {
+        let serviceClient = try beginMutation(operation)
+        do {
+            let result = try await request(serviceClient)
+            activeMutation = nil
+            await refresh()
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
     private func beginMutation(
         _ operation: TorrentCoreOperation
     ) throws -> any TorrentCoreServiceClientProtocol {
@@ -523,6 +697,13 @@ public final class TorrentCoreFeatureSession {
         torrents.reset()
         torrentDetail.reset()
         categories.reset()
+        history.reset()
+        historyDetail.reset()
+        abandonedHistory.reset()
+        logs.reset()
+        peers.reset()
+        trackers.reset()
+        runtimeSettings.reset()
         activeMutation = nil
 
         if let profileID = preferences.activeProfileID {
@@ -646,6 +827,62 @@ public final class TorrentCoreFeatureSession {
                     return
                 }
                 categories.succeed(availableCategories, at: now())
+            case let .history(query, selectedTorrentID):
+                async let historyRequest = serviceClient.history(query: query)
+                async let abandonedRequest = serviceClient.history(
+                    query: .init(outcome: .abandoned, take: 500)
+                )
+                let (historyValues, abandonedValues) = try await (
+                    historyRequest,
+                    abandonedRequest
+                )
+                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    return
+                }
+                let completedAt = now()
+                history.succeed(historyValues, at: completedAt)
+                abandonedHistory.succeed(abandonedValues, at: completedAt)
+
+                if let selectedTorrentID {
+                    let detail = try await serviceClient.historyDetail(torrentID: selectedTorrentID)
+                    guard isCurrent(profile: profile, context: context, generation: generation) else {
+                        return
+                    }
+                    historyDetail.succeed(detail, at: now())
+                } else {
+                    historyDetail.reset()
+                }
+            case let .logs(query):
+                let values = try await serviceClient.logs(query: query)
+                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    return
+                }
+                logs.succeed(values, at: now())
+            case let .peers(torrentID):
+                let values = try await serviceClient.peers(torrentID: torrentID)
+                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    return
+                }
+                peers.succeed(values, at: now())
+            case let .trackers(torrentID):
+                let values = try await serviceClient.trackers(torrentID: torrentID)
+                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    return
+                }
+                trackers.succeed(values, at: now())
+            case .serviceSettings:
+                async let settingsRequest = serviceClient.runtimeSettings()
+                async let categoriesRequest = serviceClient.categories()
+                let (settings, availableCategories) = try await (
+                    settingsRequest,
+                    categoriesRequest
+                )
+                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    return
+                }
+                let completedAt = now()
+                runtimeSettings.succeed(settings, at: completedAt)
+                categories.succeed(availableCategories, at: completedAt)
             }
         } catch {
             guard isCurrent(profile: profile, context: context, generation: generation),
@@ -710,6 +947,19 @@ public final class TorrentCoreFeatureSession {
             torrentDetail.beginLoading()
         case .addMagnet:
             categories.beginLoading()
+        case .history:
+            history.beginLoading()
+            abandonedHistory.beginLoading()
+            historyDetail.beginLoading()
+        case .logs:
+            logs.beginLoading()
+        case .peers:
+            peers.beginLoading()
+        case .trackers:
+            trackers.beginLoading()
+        case .serviceSettings:
+            runtimeSettings.beginLoading()
+            categories.beginLoading()
         case .none, .connection:
             break
         }
@@ -728,6 +978,19 @@ public final class TorrentCoreFeatureSession {
             torrents.fail(message: message)
             torrentDetail.fail(message: message)
         case .addMagnet:
+            categories.fail(message: message)
+        case .history:
+            history.fail(message: message)
+            abandonedHistory.fail(message: message)
+            historyDetail.fail(message: message)
+        case .logs:
+            logs.fail(message: message)
+        case .peers:
+            peers.fail(message: message)
+        case .trackers:
+            trackers.fail(message: message)
+        case .serviceSettings:
+            runtimeSettings.fail(message: message)
             categories.fail(message: message)
         case .none, .connection:
             break

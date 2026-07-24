@@ -8,14 +8,37 @@ public enum TorrentCoreOperation: String, Sendable {
     case torrentList
     case torrentDetail
     case categories
+    case history
+    case historyDetail
+    case logs
+    case peers
+    case trackers
+    case runtimeSettings
     case addMagnet
     case pause
     case resume
     case remove
+    case refreshMetadata
+    case resetMetadata
+    case retryCompletionCallback
+    case deleteOrphanedLogs
+    case updateRuntimeSettings
+    case updateCategory
+    case restartService
 
     public var isMutation: Bool {
         switch self {
-        case .addMagnet, .pause, .resume, .remove:
+        case .addMagnet,
+             .pause,
+             .resume,
+             .remove,
+             .refreshMetadata,
+             .resetMetadata,
+             .retryCompletionCallback,
+             .deleteOrphanedLogs,
+             .updateRuntimeSettings,
+             .updateCategory,
+             .restartService:
             true
         default:
             false

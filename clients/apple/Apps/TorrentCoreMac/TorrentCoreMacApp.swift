@@ -28,6 +28,9 @@ struct TorrentCoreMacApp: App {
             TorrentCoreMacContentView(session: session)
         }
         .defaultSize(width: 1_180, height: 760)
+        .commands {
+            TorrentCoreMacNavigationCommands()
+        }
 
         Settings {
             TorrentCoreMacSettingsView(session: session)

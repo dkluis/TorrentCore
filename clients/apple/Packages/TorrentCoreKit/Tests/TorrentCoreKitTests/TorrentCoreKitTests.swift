@@ -161,8 +161,26 @@ func liveReadOnlyIntegrationProbe() async throws {
     _ = try await liveStep("dashboard lifecycle") { try await client.dashboardLifecycle() }
     let torrents = try await liveStep("torrent list") { try await client.torrents() }
     _ = try await liveStep("categories") { try await client.categories() }
+    let history = try await liveStep("history") {
+        try await client.history(query: .init(take: 100))
+    }
+    _ = try await liveStep("logs") {
+        try await client.logs(query: .init(take: 100))
+    }
+    _ = try await liveStep("runtime settings") {
+        try await client.runtimeSettings()
+    }
     if let torrentID = torrents.first?.torrentID {
         _ = try await liveStep("torrent detail") { try await client.torrent(id: torrentID) }
+        _ = try await liveStep("peers") { try await client.peers(torrentID: torrentID) }
+        _ = try await liveStep("trackers") {
+            try await client.trackers(torrentID: torrentID)
+        }
+    }
+    if let historyID = history.compactMap(\.torrentID).first {
+        _ = try await liveStep("history detail") {
+            try await client.historyDetail(torrentID: historyID)
+        }
     }
 }
 

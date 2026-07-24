@@ -223,6 +223,111 @@ func refreshOnlyLoadsTheOpenFeatureContext() async throws {
 
 @Test
 @MainActor
+func operationalContextsLoadOnlyTheirVisibleData() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Operations",
+        address: "http://operations.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [.initPreview])
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(profiles: [profile], activeProfileID: profile.id)),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client])
+    )
+    try await session.load()
+
+    session.setContext(.history(
+        query: .init(outcome: .active, take: 100),
+        selectedTorrentID: TorrentCorePreviewFixtures.torrentID
+    ))
+    await session.refresh()
+    var calls = await client.calls
+    #expect(calls.history == 2)
+    #expect(calls.historyDetail == 1)
+    #expect(calls.logs == 0)
+    #expect(session.history.value?.isEmpty == false)
+    #expect(session.abandonedHistory.value?.isEmpty == false)
+
+    session.setContext(.logs(.init(take: 500, level: .warning)))
+    await session.refresh()
+    calls = await client.calls
+    #expect(calls.logs == 1)
+    #expect(calls.history == 2)
+    #expect(session.logs.value?.count == TorrentCorePreviewFixtures.activityLogs.count)
+
+    session.setContext(.peers(TorrentCorePreviewFixtures.torrentID))
+    await session.refresh()
+    session.setContext(.trackers(TorrentCorePreviewFixtures.torrentID))
+    await session.refresh()
+    calls = await client.calls
+    #expect(calls.peers == 1)
+    #expect(calls.trackers == 1)
+    #expect(session.peers.value == TorrentCorePreviewFixtures.peers)
+    #expect(session.trackers.value == TorrentCorePreviewFixtures.trackers)
+
+    session.setContext(.serviceSettings)
+    await session.refresh()
+    calls = await client.calls
+    #expect(calls.runtimeSettings == 1)
+    #expect(calls.categories == 1)
+    #expect(session.runtimeSettings.value == TorrentCorePreviewFixtures.runtimeSettings)
+}
+
+@Test
+@MainActor
+func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Mutations",
+        address: "http://mutations.test:7033"
+    )
+    var actionableTorrent = TorrentCorePreviewFixtures.downloadingTorrent
+    actionableTorrent.canRefreshMetadata = true
+    actionableTorrent.canRetryCompletionCallback = true
+    let client = FakeServiceClient(torrents: [actionableTorrent])
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(profiles: [profile], activeProfileID: profile.id)),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client]),
+        restartRecoveryDelay: 0
+    )
+    try await session.load()
+    session.setContext(.torrents)
+    await session.refresh()
+
+    _ = try await session.refreshMetadata(actionableTorrent)
+    _ = try await session.resetMetadataSession(actionableTorrent)
+    _ = try await session.retryCompletionCallback(actionableTorrent)
+
+    session.setContext(.logs(.init()))
+    await session.refresh()
+    _ = try await session.deleteOrphanedLogs()
+
+    session.setContext(.serviceSettings)
+    await session.refresh()
+    var update = TorrentCoreRuntimeSettingsUpdate(
+        settings: TorrentCorePreviewFixtures.runtimeSettings
+    )
+    update.maxActiveDownloads = 8
+    _ = try await session.updateRuntimeSettings(update)
+    let category = try #require(TorrentCorePreviewFixtures.categories.first)
+    _ = try await session.updateCategory(
+        key: try #require(category.key),
+        update: TorrentCoreCategoryUpdate(category: category)
+    )
+    _ = try await session.restartService()
+
+    let calls = await client.calls
+    #expect(calls.refreshMetadata == 1)
+    #expect(calls.resetMetadataSession == 1)
+    #expect(calls.retryCompletionCallback == 1)
+    #expect(calls.deleteOrphanedLogs == 1)
+    #expect(calls.updateRuntimeSettings == 1)
+    #expect(calls.updateCategory == 1)
+    #expect(calls.restartService == 1)
+    #expect(session.activeMutation == nil)
+    #expect(session.connectionState.isConnected)
+}
+
+@Test
+@MainActor
 func torrentInspectorContextRefreshesListAndSelectedDetail() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Inspector",
@@ -443,10 +548,23 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         var torrents = 0
         var torrentDetail = 0
         var categories = 0
+        var history = 0
+        var historyDetail = 0
+        var logs = 0
+        var peers = 0
+        var trackers = 0
+        var runtimeSettings = 0
         var addMagnet = 0
         var pause = 0
         var resume = 0
         var remove = 0
+        var refreshMetadata = 0
+        var resetMetadataSession = 0
+        var retryCompletionCallback = 0
+        var deleteOrphanedLogs = 0
+        var updateRuntimeSettings = 0
+        var updateCategory = 0
+        var restartService = 0
     }
 
     private(set) var calls = Calls()
@@ -524,6 +642,44 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         return TorrentCorePreviewFixtures.categories
     }
 
+    func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary] {
+        calls.history += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.history
+    }
+
+    func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
+        calls.historyDetail += 1
+        try checkConnection()
+        var detail = TorrentCorePreviewFixtures.historyDetail
+        detail.torrentID = torrentID
+        return detail
+    }
+
+    func logs(query: TorrentCoreLogQuery) async throws -> [TorrentCoreActivityLogEntry] {
+        calls.logs += 1
+        try checkConnection()
+        return Array(TorrentCorePreviewFixtures.activityLogs.prefix(query.take))
+    }
+
+    func peers(torrentID: UUID) async throws -> [TorrentCorePeer] {
+        calls.peers += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.peers
+    }
+
+    func trackers(torrentID: UUID) async throws -> [TorrentCoreTracker] {
+        calls.trackers += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.trackers
+    }
+
+    func runtimeSettings() async throws -> TorrentCoreRuntimeSettings {
+        calls.runtimeSettings += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.runtimeSettings
+    }
+
     func addMagnet(
         _ magnetURI: String,
         categoryKey: String?
@@ -553,6 +709,64 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
             state: .removed,
             dataDeleted: deleteData
         )
+    }
+
+    func refreshMetadata(id: UUID) async throws -> TorrentCoreActionResult {
+        calls.refreshMetadata += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.actionResult(
+            action: "refreshMetadata",
+            state: .resolvingMetadata
+        )
+    }
+
+    func resetMetadataSession(id: UUID) async throws -> TorrentCoreActionResult {
+        calls.resetMetadataSession += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.actionResult(
+            action: "resetMetadataSession",
+            state: .resolvingMetadata
+        )
+    }
+
+    func retryCompletionCallback(id: UUID) async throws -> TorrentCoreActionResult {
+        calls.retryCompletionCallback += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.actionResult(
+            action: "retryCompletionCallback",
+            state: .completed
+        )
+    }
+
+    func deleteOrphanedLogs() async throws -> TorrentCoreDeleteOrphanedLogsResult {
+        calls.deleteOrphanedLogs += 1
+        try checkConnection()
+        return .init(deletedLogEntryCount: 1)
+    }
+
+    func updateRuntimeSettings(
+        _ update: TorrentCoreRuntimeSettingsUpdate
+    ) async throws -> TorrentCoreRuntimeSettings {
+        calls.updateRuntimeSettings += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.runtimeSettings
+    }
+
+    func updateCategory(
+        key: String,
+        update: TorrentCoreCategoryUpdate
+    ) async throws -> TorrentCoreCategory {
+        calls.updateCategory += 1
+        try checkConnection()
+        return try #require(
+            TorrentCorePreviewFixtures.categories.first(where: { $0.key == key })
+        )
+    }
+
+    func restartService() async throws -> TorrentCoreServiceRestartResult {
+        calls.restartService += 1
+        try checkConnection()
+        return TorrentCorePreviewFixtures.restartResult
     }
 
     private func checkConnection() throws {

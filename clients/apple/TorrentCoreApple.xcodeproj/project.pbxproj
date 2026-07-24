@@ -21,6 +21,10 @@
 		100000000000000000000012 /* TorrentCoreAPI in Frameworks */ = {isa = PBXBuildFile; productRef = D00000000000000000000003 /* TorrentCoreAPI */; };
 		100000000000000000000013 /* TorrentCoreMacTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000015 /* TorrentCoreMacTests.swift */; };
 		100000000000000000000014 /* TorrentCoreMacUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000016 /* TorrentCoreMacUITests.swift */; };
+		100000000000000000000015 /* TorrentCoreMacHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000019 /* TorrentCoreMacHistoryView.swift */; };
+		100000000000000000000016 /* TorrentCoreMacLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000020 /* TorrentCoreMacLogsView.swift */; };
+		100000000000000000000017 /* TorrentCoreMacServiceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000021 /* TorrentCoreMacServiceSettingsView.swift */; };
+		100000000000000000000018 /* TorrentCoreMacTorrentDiagnosticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000022 /* TorrentCoreMacTorrentDiagnosticsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +63,10 @@
 		200000000000000000000016 /* TorrentCoreMacUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacUITests.swift; sourceTree = "<group>"; };
 		200000000000000000000017 /* TorrentCoreMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TorrentCoreMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		200000000000000000000018 /* TorrentCoreMacUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TorrentCoreMacUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		200000000000000000000019 /* TorrentCoreMacHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacHistoryView.swift; sourceTree = "<group>"; };
+		200000000000000000000020 /* TorrentCoreMacLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacLogsView.swift; sourceTree = "<group>"; };
+		200000000000000000000021 /* TorrentCoreMacServiceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacServiceSettingsView.swift; sourceTree = "<group>"; };
+		200000000000000000000022 /* TorrentCoreMacTorrentDiagnosticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TorrentCoreMacTorrentDiagnosticsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -123,6 +131,10 @@
 				200000000000000000000011 /* TorrentCoreMacConnectionView.swift */,
 				200000000000000000000012 /* TorrentCoreMacDashboardView.swift */,
 				200000000000000000000013 /* TorrentCoreMacTorrentsView.swift */,
+				200000000000000000000019 /* TorrentCoreMacHistoryView.swift */,
+				200000000000000000000020 /* TorrentCoreMacLogsView.swift */,
+				200000000000000000000021 /* TorrentCoreMacServiceSettingsView.swift */,
+				200000000000000000000022 /* TorrentCoreMacTorrentDiagnosticsView.swift */,
 				200000000000000000000014 /* TorrentCoreMacSettingsView.swift */,
 				200000000000000000000005 /* TorrentCoreMac.entitlements */,
 				200000000000000000000008 /* Info.plist */,
@@ -350,6 +362,10 @@
 				100000000000000000000008 /* TorrentCoreMacConnectionView.swift in Sources */,
 				100000000000000000000009 /* TorrentCoreMacDashboardView.swift in Sources */,
 				100000000000000000000010 /* TorrentCoreMacTorrentsView.swift in Sources */,
+				100000000000000000000015 /* TorrentCoreMacHistoryView.swift in Sources */,
+				100000000000000000000016 /* TorrentCoreMacLogsView.swift in Sources */,
+				100000000000000000000017 /* TorrentCoreMacServiceSettingsView.swift in Sources */,
+				100000000000000000000018 /* TorrentCoreMacTorrentDiagnosticsView.swift in Sources */,
 				100000000000000000000011 /* TorrentCoreMacSettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

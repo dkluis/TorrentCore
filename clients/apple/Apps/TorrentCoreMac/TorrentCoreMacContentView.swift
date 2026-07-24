@@ -1,32 +1,48 @@
 import SwiftUI
+import TorrentCoreAPI
 import TorrentCoreFeatures
 
 enum TorrentCoreMacDestination: String, CaseIterable, Identifiable {
-    case connection
     case dashboard
     case torrents
+    case history
+    case logs
+    case serviceSettings
+    case connection
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .connection:
-            "Connection"
         case .dashboard:
             "Dashboard"
         case .torrents:
             "Torrents"
+        case .history:
+            "History"
+        case .logs:
+            "Logs"
+        case .serviceSettings:
+            "Service Settings"
+        case .connection:
+            "Connection"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .connection:
-            "network"
         case .dashboard:
             "gauge.with.dots.needle.50percent"
         case .torrents:
             "arrow.down.circle"
+        case .history:
+            "clock.arrow.trianglehead.counterclockwise.rotate.90"
+        case .logs:
+            "doc.text.magnifyingglass"
+        case .serviceSettings:
+            "server.rack"
+        case .connection:
+            "network"
         }
     }
 }
@@ -41,6 +57,13 @@ struct TorrentCoreMacContentView: View {
     @State private var destination: TorrentCoreMacDestination
     @State private var selectedTorrentID: UUID?
     @State private var isTorrentInspectorPresented = false
+    @State private var historyQuery = TorrentCoreMacHistoryView.defaultQuery
+    @State private var selectedHistoryTorrentID: UUID?
+    @State private var logQuery = TorrentCoreMacLogsView.defaultQuery
+    @State private var serviceSettingsDirty = false
+    @State private var pendingDestination: TorrentCoreMacDestination?
+    @State private var saveServiceSettings: (() async -> Bool)?
+    @State private var discardServiceSettings: (() -> Void)?
     @State private var isLoaded = false
     @State private var loadError: String?
 
@@ -56,7 +79,7 @@ struct TorrentCoreMacContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(TorrentCoreMacDestination.allCases, selection: $destination) { item in
+            List(TorrentCoreMacDestination.allCases, selection: destinationSelection) { item in
                 Label(item.title, systemImage: item.systemImage)
                     .tag(item)
                     .accessibilityIdentifier("navigation.\(item.rawValue)")
@@ -88,6 +111,7 @@ struct TorrentCoreMacContentView: View {
             }
         }
         .frame(minWidth: 1_000, minHeight: 650)
+        .focusedSceneValue(\.torrentCoreDestination, destinationSelection)
         .task {
             await loadIfNeeded()
         }
@@ -115,6 +139,32 @@ struct TorrentCoreMacContentView: View {
         } message: {
             Text(loadError ?? "The saved settings could not be read.")
         }
+        .confirmationDialog(
+            "Save Service Settings Before Leaving?",
+            isPresented: Binding(
+                get: { pendingDestination != nil },
+                set: { if !$0 { pendingDestination = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Save") {
+                Task {
+                    if await saveServiceSettings?() == true {
+                        finishPendingNavigation()
+                    }
+                }
+            }
+            Button("Discard Changes", role: .destructive) {
+                discardServiceSettings?()
+                serviceSettingsDirty = false
+                finishPendingNavigation()
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDestination = nil
+            }
+        } message: {
+            Text("The current service-settings group has unsaved changes.")
+        }
     }
 
     @ViewBuilder
@@ -129,9 +179,45 @@ struct TorrentCoreMacContentView: View {
                 session: session,
                 selectedTorrentID: $selectedTorrentID,
                 isInspectorPresented: $isTorrentInspectorPresented,
-                contextChanged: updateFeatureContext
+                contextChanged: updateFeatureContext,
+                showHistory: showHistory,
+                showLogs: showLogs
+            )
+        case .history:
+            TorrentCoreMacHistoryView(
+                session: session,
+                query: $historyQuery,
+                selectedTorrentID: $selectedHistoryTorrentID,
+                contextChanged: updateFeatureContext,
+                showTorrent: showTorrent
+            )
+        case .logs:
+            TorrentCoreMacLogsView(
+                session: session,
+                query: $logQuery,
+                contextChanged: updateFeatureContext,
+                showTorrent: showTorrent,
+                showHistory: showHistory
+            )
+        case .serviceSettings:
+            TorrentCoreMacServiceSettingsView(
+                session: session,
+                dirtyChanged: { serviceSettingsDirty = $0 },
+                registerLeaveActions: { save, discard in
+                    saveServiceSettings = save
+                    discardServiceSettings = discard
+                }
             )
         }
+    }
+
+    private var destinationSelection: Binding<TorrentCoreMacDestination> {
+        Binding(
+            get: { destination },
+            set: { requestedDestination in
+                requestNavigation(to: requestedDestination)
+            }
+        )
     }
 
     private var manualRefreshButton: some View {
@@ -196,7 +282,7 @@ struct TorrentCoreMacContentView: View {
 
     private var connectionStatusButton: some View {
         Button {
-            destination = .connection
+            requestNavigation(to: .connection)
         } label: {
             Label(connectionLabel, systemImage: connectionSystemImage)
         }
@@ -269,6 +355,87 @@ struct TorrentCoreMacContentView: View {
             } else {
                 session.setContext(.torrents)
             }
+        case .history:
+            session.setContext(.history(
+                query: historyQuery,
+                selectedTorrentID: selectedHistoryTorrentID
+            ))
+        case .logs:
+            session.setContext(.logs(logQuery))
+        case .serviceSettings:
+            session.setContext(.serviceSettings)
         }
+    }
+
+    private func finishPendingNavigation() {
+        guard let pendingDestination else { return }
+        serviceSettingsDirty = false
+        self.pendingDestination = nil
+        destination = pendingDestination
+    }
+
+    private func requestNavigation(to requestedDestination: TorrentCoreMacDestination) {
+        guard requestedDestination != destination else { return }
+        if destination == .serviceSettings, serviceSettingsDirty {
+            pendingDestination = requestedDestination
+        } else {
+            destination = requestedDestination
+        }
+    }
+
+    private func showTorrent(_ torrentID: UUID) {
+        selectedTorrentID = torrentID
+        isTorrentInspectorPresented = true
+        destination = .torrents
+    }
+
+    private func showHistory(_ torrentID: UUID) {
+        historyQuery = TorrentCoreHistoryQuery(take: 500)
+        selectedHistoryTorrentID = torrentID
+        destination = .history
+    }
+
+    private func showLogs(_ torrentID: UUID) {
+        logQuery = TorrentCoreLogQuery(take: 1_000, torrentID: torrentID)
+        destination = .logs
+    }
+}
+
+private struct TorrentCoreMacDestinationFocusedValueKey: FocusedValueKey {
+    typealias Value = Binding<TorrentCoreMacDestination>
+}
+
+extension FocusedValues {
+    var torrentCoreDestination: Binding<TorrentCoreMacDestination>? {
+        get { self[TorrentCoreMacDestinationFocusedValueKey.self] }
+        set { self[TorrentCoreMacDestinationFocusedValueKey.self] = newValue }
+    }
+}
+
+struct TorrentCoreMacNavigationCommands: Commands {
+    @FocusedValue(\.torrentCoreDestination)
+    private var destination
+
+    var body: some Commands {
+        CommandMenu("Navigate") {
+            navigationButton("Dashboard", destination: .dashboard, key: "1")
+            navigationButton("Torrents", destination: .torrents, key: "2")
+            navigationButton("History", destination: .history, key: "3")
+            navigationButton("Logs", destination: .logs, key: "4")
+            navigationButton("Service Settings", destination: .serviceSettings, key: "5")
+            navigationButton("Connection", destination: .connection, key: "6")
+        }
+    }
+
+    private func navigationButton(
+        _ title: String,
+        destination requestedDestination: TorrentCoreMacDestination,
+        key: KeyEquivalent
+    ) -> some View {
+        Button(title) {
+            destination?.wrappedValue = requestedDestination
+        }
+        .keyboardShortcut(key, modifiers: .command)
+        .disabled(destination == nil)
     }
 }

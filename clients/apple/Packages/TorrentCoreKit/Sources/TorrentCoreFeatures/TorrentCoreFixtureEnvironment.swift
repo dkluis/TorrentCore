@@ -55,6 +55,8 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         TorrentCorePreviewFixtures.downloadingTorrent,
         TorrentCorePreviewFixtures.pausedTorrent,
     ]
+    private var categoryValues = TorrentCorePreviewFixtures.categories
+    private var runtimeSettingsValue = TorrentCorePreviewFixtures.runtimeSettings
 
     func probe() async throws -> TorrentCoreServiceHealth {
         TorrentCorePreviewFixtures.connectedHealth
@@ -116,7 +118,96 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
     }
 
     func categories() async throws -> [TorrentCoreCategory] {
-        TorrentCorePreviewFixtures.categories
+        categoryValues
+    }
+
+    func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary] {
+        var values = TorrentCorePreviewFixtures.history
+        if let name = query.torrentName, !name.isEmpty {
+            values = values.filter {
+                $0.name?.localizedCaseInsensitiveContains(name) == true
+            }
+        }
+        if let categoryKey = query.categoryKey, !categoryKey.isEmpty {
+            values = values.filter { $0.categoryKey == categoryKey }
+        }
+        if let state = query.state, !state.isEmpty {
+            values = values.filter { $0.latestTorrentState == state }
+        }
+        if let outcome = query.outcome {
+            values = values.filter { $0.outcome == outcome }
+        }
+        if let removed = query.removed {
+            values = values.filter { ($0.removedAt != nil) == removed }
+        }
+        if let take = query.take {
+            values = Array(values.prefix(max(0, take)))
+        }
+        return values
+    }
+
+    func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
+        guard let history = TorrentCorePreviewFixtures.history.first(where: {
+            $0.torrentID == torrentID
+        }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        var detail = TorrentCorePreviewFixtures.historyDetail
+        detail.torrentID = history.torrentID
+        detail.name = history.name
+        detail.categoryKey = history.categoryKey
+        detail.outcome = history.outcome
+        detail.latestTorrentState = history.latestTorrentState
+        detail.latestProgressPercent = history.latestProgressPercent
+        detail.removalKind = history.removalKind
+        detail.removalReason = history.removalReason
+        detail.removedAt = history.removedAt
+        detail.dataDeleted = history.dataDeleted
+        return detail
+    }
+
+    func logs(query: TorrentCoreLogQuery) async throws -> [TorrentCoreActivityLogEntry] {
+        var values = TorrentCorePreviewFixtures.activityLogs
+        if let level = query.level {
+            values = values.filter { logLevel($0.level) == level }
+        }
+        if let category = query.category, !category.isEmpty {
+            values = values.filter { $0.category == category }
+        }
+        if let eventType = query.eventType, !eventType.isEmpty {
+            values = values.filter { $0.eventType == eventType }
+        }
+        if let torrentID = query.torrentID {
+            values = values.filter { $0.torrentID == torrentID }
+        }
+        if let serviceInstanceID = query.serviceInstanceID {
+            values = values.filter { $0.serviceInstanceID == serviceInstanceID }
+        }
+        if let fromUTC = query.fromUTC {
+            values = values.filter { $0.occurredAt >= fromUTC }
+        }
+        if let toUTC = query.toUTC {
+            values = values.filter { $0.occurredAt <= toUTC }
+        }
+        return Array(values.prefix(max(0, query.take)))
+    }
+
+    func peers(torrentID: UUID) async throws -> [TorrentCorePeer] {
+        guard torrentValues.contains(where: { $0.torrentID == torrentID }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        return TorrentCorePreviewFixtures.peers
+    }
+
+    func trackers(torrentID: UUID) async throws -> [TorrentCoreTracker] {
+        guard torrentValues.contains(where: { $0.torrentID == torrentID }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        return TorrentCorePreviewFixtures.trackers
+    }
+
+    func runtimeSettings() async throws -> TorrentCoreRuntimeSettings {
+        runtimeSettingsValue
     }
 
     func addMagnet(
@@ -193,6 +284,104 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         )
     }
 
+    func refreshMetadata(id: UUID) async throws -> TorrentCoreActionResult {
+        guard torrentValues.contains(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        return TorrentCoreActionResult(
+            action: "refreshMetadata",
+            dataDeleted: nil,
+            processedAt: Date(),
+            state: .downloading,
+            torrentID: id
+        )
+    }
+
+    func resetMetadataSession(id: UUID) async throws -> TorrentCoreActionResult {
+        guard torrentValues.contains(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        return TorrentCoreActionResult(
+            action: "resetMetadataSession",
+            dataDeleted: nil,
+            processedAt: Date(),
+            state: .resolvingMetadata,
+            torrentID: id
+        )
+    }
+
+    func retryCompletionCallback(id: UUID) async throws -> TorrentCoreActionResult {
+        guard torrentValues.contains(where: { $0.torrentID == id }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        return TorrentCoreActionResult(
+            action: "retryCompletionCallback",
+            dataDeleted: nil,
+            processedAt: Date(),
+            state: torrentValues.first(where: { $0.torrentID == id })?.state ?? .completed,
+            torrentID: id
+        )
+    }
+
+    func deleteOrphanedLogs() async throws -> TorrentCoreDeleteOrphanedLogsResult {
+        TorrentCoreDeleteOrphanedLogsResult(deletedLogEntryCount: 2)
+    }
+
+    func updateRuntimeSettings(
+        _ update: TorrentCoreRuntimeSettingsUpdate
+    ) async throws -> TorrentCoreRuntimeSettings {
+        runtimeSettingsValue.coldDownloadAbandonAfterHours = update.coldDownloadAbandonAfterHours
+        runtimeSettingsValue.coldDownloadRecoveryIntervalMinutes = update.coldDownloadRecoveryIntervalMinutes
+        runtimeSettingsValue.coldDownloadRecoveryThresholdMinutes = update.coldDownloadRecoveryThresholdMinutes
+        runtimeSettingsValue.completedTorrentCleanupMinutes = update.completedTorrentCleanupMinutes
+        runtimeSettingsValue.completedTorrentCleanupMode = update.completedTorrentCleanupMode
+        runtimeSettingsValue.completionCallbackAPIBaseURLOverride = update.completionCallbackAPIBaseURLOverride
+        runtimeSettingsValue.completionCallbackAPIKeyOverride = update.completionCallbackAPIKeyOverride
+        runtimeSettingsValue.completionCallbackArguments = update.completionCallbackArguments
+        runtimeSettingsValue.completionCallbackCommandPath = update.completionCallbackCommandPath
+        runtimeSettingsValue.completionCallbackEnabled = update.completionCallbackEnabled
+        runtimeSettingsValue.completionCallbackFinalizationTimeoutSeconds = update.completionCallbackFinalizationTimeoutSeconds
+        runtimeSettingsValue.completionCallbackTimeoutSeconds = update.completionCallbackTimeoutSeconds
+        runtimeSettingsValue.completionCallbackWorkingDirectory = update.completionCallbackWorkingDirectory
+        runtimeSettingsValue.deleteLogsForCompletedTorrents = update.deleteLogsForCompletedTorrents
+        runtimeSettingsValue.engineConnectionFailureLogBurstLimit = update.engineConnectionFailureLogBurstLimit
+        runtimeSettingsValue.engineConnectionFailureLogWindowSeconds = update.engineConnectionFailureLogWindowSeconds
+        runtimeSettingsValue.engineEncryptionMode = update.engineEncryptionMode
+        runtimeSettingsValue.engineMaximumConnections = update.engineMaximumConnections
+        runtimeSettingsValue.engineMaximumDownloadRateBytesPerSecond = update.engineMaximumDownloadRateBytesPerSecond
+        runtimeSettingsValue.engineMaximumHalfOpenConnections = update.engineMaximumHalfOpenConnections
+        runtimeSettingsValue.engineMaximumUploadRateBytesPerSecond = update.engineMaximumUploadRateBytesPerSecond
+        runtimeSettingsValue.maxActiveDownloads = update.maxActiveDownloads
+        runtimeSettingsValue.maxActiveMetadataResolutions = update.maxActiveMetadataResolutions
+        runtimeSettingsValue.metadataRefreshRestartDelaySeconds = update.metadataRefreshRestartDelaySeconds
+        runtimeSettingsValue.metadataRefreshStaleSeconds = update.metadataRefreshStaleSeconds
+        runtimeSettingsValue.seedingStopMinutes = update.seedingStopMinutes
+        runtimeSettingsValue.seedingStopMode = update.seedingStopMode
+        runtimeSettingsValue.seedingStopRatio = update.seedingStopRatio
+        runtimeSettingsValue.updatedAt = Date()
+        return runtimeSettingsValue
+    }
+
+    func updateCategory(
+        key: String,
+        update: TorrentCoreCategoryUpdate
+    ) async throws -> TorrentCoreCategory {
+        guard let index = categoryValues.firstIndex(where: { $0.key == key }) else {
+            throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
+        }
+        categoryValues[index].callbackLabel = update.callbackLabel
+        categoryValues[index].displayName = update.displayName
+        categoryValues[index].downloadRootPath = update.downloadRootPath
+        categoryValues[index].enabled = update.enabled
+        categoryValues[index].invokeCompletionCallback = update.invokeCompletionCallback
+        categoryValues[index].sortOrder = update.sortOrder
+        return categoryValues[index]
+    }
+
+    func restartService() async throws -> TorrentCoreServiceRestartResult {
+        TorrentCorePreviewFixtures.restartResult
+    }
+
     private func update(
         id: UUID,
         _ mutation: (inout TorrentCoreTorrentSummary) -> Void
@@ -201,5 +390,17 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
             throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
         }
         mutation(&torrentValues[index])
+    }
+
+    private func logLevel(_ level: String?) -> TorrentCoreActivityLogLevel? {
+        switch level?.lowercased() {
+        case "trace": .trace
+        case "debug": .debug
+        case "information": .information
+        case "warning": .warning
+        case "error": .error
+        case "critical": .critical
+        default: nil
+        }
     }
 }

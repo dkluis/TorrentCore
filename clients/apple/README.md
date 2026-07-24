@@ -2,8 +2,9 @@
 
 ## Status
 
-Milestones 0 through 3 are complete. The macOS Connection, Dashboard, and Torrents operator screens are implemented.
-The fixture-only signed UI tests and the operator-approved disposable live mutation sequence passed on July 23, 2026.
+Milestones 0 through 4 are complete. The macOS client implements the current supported WebUI operator capabilities
+through native workflows. Milestone 4 shared, build, signed fixture UI, and live read-only verification passed on
+July 24, 2026. The operator-approved disposable live mutation sequence last passed on July 23, 2026.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -90,10 +91,10 @@ disabled until refresh reconnects, and mutations are never retried automatically
 `com.conadv.TorrentCore.credentials`. The initial trusted-LAN/VPN model uses
 `UnconfiguredTorrentCoreCredentialStore`, so it creates no Keychain items or permission prompts.
 
-## macOS Core Operator MVP
+## macOS Operator UI
 
-The macOS app uses a native sidebar for Connection, Dashboard, and Torrents. It remembers the last destination, but
-opens Connection when there is no active saved connection.
+The macOS app uses a native sidebar for Dashboard, Torrents, History, Logs, Service Settings, and Connection. It
+remembers the last destination, but opens Connection when there is no active saved connection.
 
 - Connection manages named installations and keeps Test Connection separate from Save & Connect. Unreachable
   installations can still be saved for later LAN or VPN use.
@@ -102,10 +103,21 @@ opens Connection when there is no active saved connection.
 - Torrents uses a native sortable table with name, state, and category filters; local pagination matches the WebUI
   choices of 25, 50, 100, and 250 rows.
 - Single selection drives a resizable trailing inspector. The inspector exposes pause, resume, remove, and
-  remove-with-data according to service capabilities.
+  remove-with-data according to service capabilities, plus peer/tracker diagnostics, metadata recovery, callback retry,
+  and cross-navigation to History and filtered Logs.
 - Add Magnet uses enabled service categories in service sort order and permits Uncategorized.
 - Both remove paths require native destructive confirmation. A mutation timeout is shown as uncertain and is followed
   by authoritative refresh rather than automatic retry.
+- History starts with Today, uses the existing service filters, preserves abandonment visibility, and locally sorts
+  and pages bounded results at 25, 50, 100, or 250 rows.
+- Logs combine service-side filters and selectable recent-row limits with search over the loaded rows. Orphaned-log
+  cleanup requires confirmation.
+- Service Settings edits one group at a time with Save/Revert and guarded navigation. It administers current runtime
+  settings and existing categories, and confirms service restart while waiting for reconnection.
+- History and Logs follow the global foreground refresh policy. Peers refresh every five seconds only while visible;
+  Trackers and Service Settings load once and support manual refresh.
+- The Navigate menu maps Command-1 through Command-6 to the six sidebar destinations. Context menus and direct
+  cross-navigation keep actions scoped to one torrent.
 - Standard macOS Settings and the main toolbar share the same global Auto Refresh and interval preferences.
 
 The app has no compiled live endpoint. `--torrentcore-ui-fixtures` is reserved for the Xcode UI-test target and starts

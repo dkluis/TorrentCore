@@ -308,6 +308,9 @@ Exit criteria:
 
 ### Milestone 4: macOS Functional Parity
 
+Status: complete (July 24, 2026). Shared/unit, unsigned macOS test-build, iOS Simulator build, signed fixture UI, and
+opt-in live read-only verification pass. No TorrentCore service or WebUI implementation changed.
+
 Express the supported WebUI capabilities through native macOS workflows.
 
 Work:
@@ -332,6 +335,22 @@ Exit criteria:
 
 Potential service changes discovered here, such as server paging or bulk operations, must be evaluated as separate API
 slices. The Mac client must not simulate new service semantics silently.
+
+Implementation notes:
+
+- History uses the existing server filters, defaults to Today, preserves a separate abandonment summary, and performs
+  local sorting and 25/50/100/250-row paging over the bounded server result.
+- Logs use existing server filters with selectable 100/500/1,000/5,000 recent-row limits and local search. The app
+  clearly marks a result that reaches the selected limit; no paging API was added.
+- History and Logs follow the global foreground auto-refresh policy. Peer diagnostics refresh every five seconds only
+  while their sheet is visible. Tracker diagnostics and Service Settings are one-shot with manual refresh.
+- Service settings remain distinct from device-local macOS Settings. One service-settings group can be dirty at a
+  time, with Save/Revert and Save/Discard/Cancel navigation protection. Callback API-key text is transient form state
+  and is neither persisted nor logged by the Mac client.
+- Existing categories can be edited, but category creation and deletion are not invented by the native client.
+- Service restart requires confirmation and polls for recovery for about 30 seconds.
+- All actions remain single-torrent operations. Multi-selection and bulk APIs remain deferred because no concrete
+  operator need was established.
 
 ### Milestone 5: macOS Hardening And Limited Release
 

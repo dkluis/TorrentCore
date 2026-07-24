@@ -59,6 +59,36 @@ final class TorrentCoreMacUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Preview Torrent"].exists)
     }
 
+    func testOperationalDestinationsLoadFixtureContent() {
+        let app = launchApp()
+
+        let historyNavigation = app.descendants(matching: .any)["navigation.history"]
+        XCTAssertTrue(historyNavigation.waitForExistence(timeout: 10))
+        historyNavigation.click()
+        app.descendants(matching: .any)["toolbar.refresh"].click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.row"]
+                .firstMatch
+                .waitForExistence(timeout: 10)
+        )
+
+        let logsNavigation = app.descendants(matching: .any)["navigation.logs"]
+        logsNavigation.click()
+        app.descendants(matching: .any)["toolbar.refresh"].click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.row"]
+                .firstMatch
+                .waitForExistence(timeout: 10)
+        )
+
+        let settingsNavigation = app.descendants(matching: .any)[
+            "navigation.serviceSettings"
+        ]
+        settingsNavigation.click()
+        app.descendants(matching: .any)["toolbar.refresh"].click()
+        XCTAssertTrue(app.staticTexts["Downloads"].waitForExistence(timeout: 10))
+    }
+
     private func launchApp() -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -71,6 +101,11 @@ final class TorrentCoreMacUITests: XCTestCase {
         let torrentsNavigation = app.descendants(matching: .any)["navigation.torrents"]
         XCTAssertTrue(torrentsNavigation.waitForExistence(timeout: 10))
         torrentsNavigation.click()
+
+        let clearFiltersButton = app.buttons["Clear"]
+        if clearFiltersButton.waitForExistence(timeout: 5), clearFiltersButton.isEnabled {
+            clearFiltersButton.click()
+        }
 
         let refreshButton = app.descendants(matching: .any)["toolbar.refresh"]
         XCTAssertTrue(refreshButton.waitForExistence(timeout: 5))

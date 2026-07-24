@@ -8,10 +8,28 @@ public protocol TorrentCoreServiceClientProtocol: Sendable {
     func torrents() async throws -> [TorrentCoreTorrentSummary]
     func torrent(id: UUID) async throws -> TorrentCoreTorrentDetail
     func categories() async throws -> [TorrentCoreCategory]
+    func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary]
+    func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail
+    func logs(query: TorrentCoreLogQuery) async throws -> [TorrentCoreActivityLogEntry]
+    func peers(torrentID: UUID) async throws -> [TorrentCorePeer]
+    func trackers(torrentID: UUID) async throws -> [TorrentCoreTracker]
+    func runtimeSettings() async throws -> TorrentCoreRuntimeSettings
     func addMagnet(_ magnetURI: String, categoryKey: String?) async throws -> TorrentCoreTorrentDetail
     func pause(id: UUID) async throws -> TorrentCoreActionResult
     func resume(id: UUID) async throws -> TorrentCoreActionResult
     func remove(id: UUID, deleteData: Bool) async throws -> TorrentCoreActionResult
+    func refreshMetadata(id: UUID) async throws -> TorrentCoreActionResult
+    func resetMetadataSession(id: UUID) async throws -> TorrentCoreActionResult
+    func retryCompletionCallback(id: UUID) async throws -> TorrentCoreActionResult
+    func deleteOrphanedLogs() async throws -> TorrentCoreDeleteOrphanedLogsResult
+    func updateRuntimeSettings(
+        _ update: TorrentCoreRuntimeSettingsUpdate
+    ) async throws -> TorrentCoreRuntimeSettings
+    func updateCategory(
+        key: String,
+        update: TorrentCoreCategoryUpdate
+    ) async throws -> TorrentCoreCategory
+    func restartService() async throws -> TorrentCoreServiceRestartResult
 }
 
 extension TorrentCoreClient: TorrentCoreServiceClientProtocol {}

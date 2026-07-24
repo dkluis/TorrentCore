@@ -93,6 +93,8 @@ struct TorrentCoreMacTorrentsView: View {
     @Binding var selectedTorrentID: UUID?
     @Binding var isInspectorPresented: Bool
     let contextChanged: () -> Void
+    let showHistory: (UUID) -> Void
+    let showLogs: (UUID) -> Void
 
     @State private var searchText = ""
     @State private var pageIndex = 0
@@ -102,17 +104,25 @@ struct TorrentCoreMacTorrentsView: View {
     @State private var actionError: String?
     @State private var actionMessage: String?
     @State private var pendingRemoval: PendingRemoval?
+    @State private var isPeersPresented = false
+    @State private var isTrackersPresented = false
+    @State private var isMetadataResetConfirmationPresented = false
+    @State private var isCallbackRetryConfirmationPresented = false
 
     init(
         session: TorrentCoreFeatureSession,
         selectedTorrentID: Binding<UUID?>,
         isInspectorPresented: Binding<Bool>,
-        contextChanged: @escaping () -> Void
+        contextChanged: @escaping () -> Void,
+        showHistory: @escaping (UUID) -> Void,
+        showLogs: @escaping (UUID) -> Void
     ) {
         self.session = session
         _selectedTorrentID = selectedTorrentID
         _isInspectorPresented = isInspectorPresented
         self.contextChanged = contextChanged
+        self.showHistory = showHistory
+        self.showLogs = showLogs
 
         let defaults = UserDefaults.standard
         let storedField = defaults.string(
@@ -194,6 +204,25 @@ struct TorrentCoreMacTorrentsView: View {
                 isActing: isActing,
                 pause: pauseSelected,
                 resume: resumeSelected,
+                showPeers: { isPeersPresented = true },
+                showTrackers: { isTrackersPresented = true },
+                showHistory: {
+                    if let torrentID = selectedItem?.summary.torrentID {
+                        showHistory(torrentID)
+                    }
+                },
+                showLogs: {
+                    if let torrentID = selectedItem?.summary.torrentID {
+                        showLogs(torrentID)
+                    }
+                },
+                refreshMetadata: refreshSelectedMetadata,
+                requestMetadataReset: {
+                    isMetadataResetConfirmationPresented = true
+                },
+                requestCallbackRetry: {
+                    isCallbackRetryConfirmationPresented = true
+                },
                 requestRemoval: { deleteData in
                     guard let selectedItem else {
                         return
@@ -211,6 +240,26 @@ struct TorrentCoreMacTorrentsView: View {
                 selectedTorrentID = newTorrentID
                 isInspectorPresented = true
                 actionMessage = "Magnet added to TorrentCore."
+            }
+        }
+        .sheet(isPresented: $isPeersPresented) {
+            if let selectedItem, let torrentID = selectedItem.summary.torrentID {
+                TorrentCoreMacPeersSheet(
+                    session: session,
+                    torrentID: torrentID,
+                    torrentName: selectedItem.name,
+                    restoreContext: contextChanged
+                )
+            }
+        }
+        .sheet(isPresented: $isTrackersPresented) {
+            if let selectedItem, let torrentID = selectedItem.summary.torrentID {
+                TorrentCoreMacTrackersSheet(
+                    session: session,
+                    torrentID: torrentID,
+                    torrentName: selectedItem.name,
+                    restoreContext: contextChanged
+                )
             }
         }
         .onChange(of: isAddMagnetPresented) { _, isPresented in
@@ -279,6 +328,34 @@ struct TorrentCoreMacTorrentsView: View {
                         : "Remove “\(pendingRemoval.item.name)” from TorrentCore tracking? Downloaded data will remain on disk."
                 )
             }
+        }
+        .confirmationDialog(
+            "Reset Metadata Session?",
+            isPresented: $isMetadataResetConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Reset Metadata Session", role: .destructive) {
+                resetSelectedMetadata()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Stop the current metadata resolution session and start it again for the selected torrent?"
+            )
+        }
+        .confirmationDialog(
+            "Retry Completion Callback?",
+            isPresented: $isCallbackRetryConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button("Retry Callback") {
+                retrySelectedCallback()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Ask TorrentCore to invoke the completion callback again for the selected torrent?"
+            )
         }
         .alert(
             "Torrent Action Failed",
@@ -370,6 +447,21 @@ struct TorrentCoreMacTorrentsView: View {
             ) { item in
                 Text(item.name)
                     .lineLimit(2)
+                    .contextMenu {
+                        Button("Show Details") {
+                            selectedTorrentID = item.summary.torrentID
+                            isInspectorPresented = true
+                            contextChanged()
+                        }
+                        if let torrentID = item.summary.torrentID {
+                            Button("Show History") {
+                                showHistory(torrentID)
+                            }
+                            Button("Show Filtered Logs") {
+                                showLogs(torrentID)
+                            }
+                        }
+                    }
             }
             .width(min: 220, ideal: 340)
 
@@ -674,6 +766,33 @@ struct TorrentCoreMacTorrentsView: View {
         }
     }
 
+    private func refreshSelectedMetadata() {
+        guard let selectedItem else {
+            return
+        }
+        performAction(successMessage: "Requested metadata refresh for \(selectedItem.name).") {
+            _ = try await session.refreshMetadata(selectedItem.summary)
+        }
+    }
+
+    private func resetSelectedMetadata() {
+        guard let selectedItem else {
+            return
+        }
+        performAction(successMessage: "Reset metadata session for \(selectedItem.name).") {
+            _ = try await session.resetMetadataSession(selectedItem.summary)
+        }
+    }
+
+    private func retrySelectedCallback() {
+        guard let selectedItem else {
+            return
+        }
+        performAction(successMessage: "Requested callback retry for \(selectedItem.name).") {
+            _ = try await session.retryCompletionCallback(selectedItem.summary)
+        }
+    }
+
     private func performRemoval(_ removal: PendingRemoval) {
         pendingRemoval = nil
         performAction(
@@ -728,6 +847,13 @@ private struct TorrentCoreMacTorrentInspector: View {
     let isActing: Bool
     let pause: () -> Void
     let resume: () -> Void
+    let showPeers: () -> Void
+    let showTrackers: () -> Void
+    let showHistory: () -> Void
+    let showLogs: () -> Void
+    let refreshMetadata: () -> Void
+    let requestMetadataReset: () -> Void
+    let requestCallbackRetry: () -> Void
     let requestRemoval: (Bool) -> Void
 
     var body: some View {
@@ -770,6 +896,29 @@ private struct TorrentCoreMacTorrentInspector: View {
                                 .accessibilityIdentifier("inspector.resume")
                         }
 
+                        HStack {
+                            Button("Peers", action: showPeers)
+                                .disabled(
+                                    selectedItem.summary.torrentID == nil
+                                        || !session.connectionState.isConnected
+                                )
+                                .accessibilityIdentifier("inspector.peers")
+                            Button("Trackers", action: showTrackers)
+                                .disabled(
+                                    selectedItem.summary.torrentID == nil
+                                        || !session.connectionState.isConnected
+                                )
+                                .accessibilityIdentifier("inspector.trackers")
+                        }
+                        HStack {
+                            Button("History", action: showHistory)
+                                .disabled(selectedItem.summary.torrentID == nil)
+                                .accessibilityIdentifier("inspector.history")
+                            Button("Logs", action: showLogs)
+                                .disabled(selectedItem.summary.torrentID == nil)
+                                .accessibilityIdentifier("inspector.logs")
+                        }
+
                         Divider()
 
                         TorrentCoreMacPhaseBanner(
@@ -778,6 +927,31 @@ private struct TorrentCoreMacTorrentInspector: View {
                         )
 
                         detailRows(fallback: selectedItem)
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Recovery Actions")
+                                .font(.headline)
+                            Button("Refresh Metadata", action: refreshMetadata)
+                                .disabled(
+                                    !session.canRefreshMetadata(selectedItem.summary)
+                                        || isActing
+                                )
+                                .accessibilityIdentifier("inspector.refreshMetadata")
+                            Button("Reset Metadata Session", action: requestMetadataReset)
+                                .disabled(
+                                    !session.canResetMetadataSession(selectedItem.summary)
+                                        || isActing
+                                )
+                                .accessibilityIdentifier("inspector.resetMetadata")
+                            Button("Retry Completion Callback", action: requestCallbackRetry)
+                                .disabled(
+                                    !session.canRetryCompletionCallback(selectedItem.summary)
+                                        || isActing
+                                )
+                                .accessibilityIdentifier("inspector.retryCallback")
+                        }
 
                         Divider()
 
