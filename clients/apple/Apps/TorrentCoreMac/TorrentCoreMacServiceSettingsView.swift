@@ -70,8 +70,7 @@ struct TorrentCoreMacServiceSettingsView: View {
     @State private var selectedGroup = SettingsGroup.downloads
     @State private var pendingGroup: SettingsGroup?
     @State private var runtimeDraft: TorrentCoreRuntimeSettingsUpdate?
-    @State private var selectedCategoryKey: String?
-    @State private var categoryDraft: TorrentCoreCategoryUpdate?
+    @State private var categoryDrafts: [String: TorrentCoreCategoryUpdate] = [:]
     @State private var isSaving = false
     @State private var isRestartConfirmationPresented = false
     @State private var actionMessage: String?
@@ -113,10 +112,16 @@ struct TorrentCoreMacServiceSettingsView: View {
                 .padding()
 
                 if hasLoadedSelectedGroup {
-                    Form {
-                        selectedGroupContent
+                    if selectedGroup == .categories {
+                        ScrollView {
+                            categoryEditor
+                        }
+                    } else {
+                        Form {
+                            selectedGroupContent
+                        }
+                        .formStyle(.grouped)
                     }
-                    .formStyle(.grouped)
                 } else {
                     ContentUnavailableView {
                         Label(unavailableTitle, systemImage: unavailableSystemImage)
@@ -250,25 +255,20 @@ struct TorrentCoreMacServiceSettingsView: View {
         case .downloads:
             if let draft = runtimeBinding {
                 Section("Concurrency") {
-                    Stepper(
+                    integerField(
+                        "Active downloads",
                         value: draft.maxActiveDownloads,
-                        in: 1...Int.max
-                    ) {
-                        TorrentCoreMacHelpLabel(
-                            "Active downloads: \(draft.maxActiveDownloads.wrappedValue)",
-                            content: TorrentCoreHelpCatalog.Settings.maxActiveDownloads
-                        )
-                    }
-                    Stepper(
+                        content: TorrentCoreHelpCatalog.Settings.maxActiveDownloads,
+                        identifier: "serviceSettings.maxActiveDownloads"
+                    )
+                    integerField(
+                        "Active metadata resolutions",
                         value: draft.maxActiveMetadataResolutions,
-                        in: 1...Int.max
-                    ) {
-                        TorrentCoreMacHelpLabel(
-                            "Active metadata resolutions: \(draft.maxActiveMetadataResolutions.wrappedValue)",
-                            content: TorrentCoreHelpCatalog.Settings.maxActiveMetadataResolutions
-                        )
-                    }
+                        content: TorrentCoreHelpCatalog.Settings.maxActiveMetadataResolutions,
+                        identifier: "serviceSettings.maxActiveMetadataResolutions"
+                    )
                 }
+                validationMessage
             }
         case .seedingCleanup:
             if let draft = runtimeBinding {
@@ -281,6 +281,7 @@ struct TorrentCoreMacServiceSettingsView: View {
                     )
                     LabeledContent {
                         TextField("Ratio", value: draft.seedingStopRatio, format: .number)
+                            .labelsHidden()
                             .frame(width: 120)
                             .disabled(!seedingModeUsesRatio)
                     } label: {
@@ -291,6 +292,7 @@ struct TorrentCoreMacServiceSettingsView: View {
                     }
                     LabeledContent {
                         TextField("Minutes", value: draft.seedingStopMinutes, format: .number)
+                            .labelsHidden()
                             .frame(width: 120)
                             .disabled(!seedingModeUsesTime)
                     } label: {
@@ -313,6 +315,7 @@ struct TorrentCoreMacServiceSettingsView: View {
                             value: draft.completedTorrentCleanupMinutes,
                             format: .number
                         )
+                        .labelsHidden()
                         .frame(width: 120)
                         .disabled(!cleanupModeUsesMinutes)
                     } label: {
@@ -452,6 +455,7 @@ struct TorrentCoreMacServiceSettingsView: View {
                             "API key override",
                             text: optionalString(draft.completionCallbackAPIKeyOverride)
                         )
+                        .labelsHidden()
                         .privacySensitive()
                     } label: {
                         TorrentCoreMacHelpLabel(
@@ -479,56 +483,125 @@ struct TorrentCoreMacServiceSettingsView: View {
                 validationMessage
             }
         case .categories:
-            categoryEditor
+            EmptyView()
         }
     }
 
     @ViewBuilder
     private var categoryEditor: some View {
-        Section("Existing Category") {
-            Picker("Category", selection: categorySelection) {
-                ForEach(session.categories.value ?? [], id: \.key) { category in
-                    Text(category.displayName ?? category.key ?? "Category")
-                        .tag(category.key)
+        VStack(alignment: .leading, spacing: 12) {
+            GroupBox("Existing Categories") {
+                VStack(alignment: .leading, spacing: 10) {
+                    ScrollView(.horizontal) {
+                        categoryGrid
+                    }
+                    .accessibilityIdentifier("serviceSettings.categories.grid")
+
+                    Text("Edit any category in place, then save all changed rows together.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
             }
-            if let draft = categoryBinding {
-                stringField(
-                    "Display name",
-                    text: draft.displayName,
-                    content: TorrentCoreHelpCatalog.Settings.categoryDisplayName
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            validationMessage
+        }
+        .padding([.horizontal, .bottom])
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var categoryGrid: some View {
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
+            GridRow {
+                categoryColumnHeader("Key", width: 90)
+                categoryColumnHeader(
+                    content: TorrentCoreHelpCatalog.Settings.categoryDisplayName,
+                    width: 150
                 )
-                stringField(
-                    "Download root path",
-                    text: draft.downloadRootPath,
-                    content: TorrentCoreHelpCatalog.Settings.categoryDownloadRootPath
+                categoryColumnHeader(
+                    content: TorrentCoreHelpCatalog.Settings.categoryDownloadRootPath,
+                    width: 300
                 )
-                stringField(
-                    "Callback label",
-                    text: draft.callbackLabel,
-                    content: TorrentCoreHelpCatalog.Settings.categoryCallbackLabel
+                categoryColumnHeader(
+                    content: TorrentCoreHelpCatalog.Settings.categoryCallbackLabel,
+                    width: 150
                 )
-                Toggle(isOn: draft.enabled) {
-                    TorrentCoreMacHelpLabel(
-                        "Enabled",
-                        content: TorrentCoreHelpCatalog.Settings.categoryEnabled
-                    )
+                categoryColumnHeader(
+                    content: TorrentCoreHelpCatalog.Settings.categoryEnabled,
+                    width: 70
+                )
+                categoryColumnHeader(
+                    "Completion callback",
+                    content: TorrentCoreHelpCatalog.Settings
+                        .categoryInvokeCompletionCallback,
+                    width: 150
+                )
+                categoryColumnHeader(
+                    content: TorrentCoreHelpCatalog.Settings.categorySortOrder,
+                    width: 80
+                )
+            }
+
+            Divider()
+                .gridCellColumns(7)
+
+            ForEach(session.categories.value ?? [], id: \.key) { category in
+                if let key = category.key,
+                   let draft = categoryBinding(for: key)
+                {
+                    GridRow {
+                        Text(key)
+                            .lineLimit(1)
+                            .frame(width: 90, alignment: .leading)
+                        TextField("Display name", text: draft.displayName)
+                            .labelsHidden()
+                            .frame(width: 150)
+                            .accessibilityIdentifier(
+                                "serviceSettings.category.\(key).displayName"
+                            )
+                        TextField("Download root path", text: draft.downloadRootPath)
+                            .labelsHidden()
+                            .frame(width: 300)
+                            .accessibilityIdentifier(
+                                "serviceSettings.category.\(key).downloadRootPath"
+                            )
+                        TextField("Callback label", text: draft.callbackLabel)
+                            .labelsHidden()
+                            .frame(width: 150)
+                            .accessibilityIdentifier(
+                                "serviceSettings.category.\(key).callbackLabel"
+                            )
+                        Toggle("Enabled", isOn: draft.enabled)
+                            .labelsHidden()
+                            .frame(width: 70)
+                            .accessibilityIdentifier(
+                                "serviceSettings.category.\(key).enabled"
+                            )
+                        Toggle(
+                            "Invoke completion callback",
+                            isOn: draft.invokeCompletionCallback
+                        )
+                        .labelsHidden()
+                        .frame(width: 150)
+                        .accessibilityIdentifier(
+                            "serviceSettings.category.\(key).completionCallback"
+                        )
+                        TextField("Sort order", value: draft.sortOrder, format: .number)
+                            .labelsHidden()
+                            .frame(width: 80)
+                            .accessibilityIdentifier(
+                                "serviceSettings.category.\(key).sortOrder"
+                            )
+                    }
+
+                    Divider()
+                        .gridCellColumns(7)
                 }
-                Toggle(isOn: draft.invokeCompletionCallback) {
-                    TorrentCoreMacHelpLabel(
-                        "Invoke completion callback",
-                        content: TorrentCoreHelpCatalog.Settings
-                            .categoryInvokeCompletionCallback
-                    )
-                }
-                integerField(
-                    "Sort order",
-                    value: draft.sortOrder,
-                    content: TorrentCoreHelpCatalog.Settings.categorySortOrder
-                )
             }
         }
-        validationMessage
+        .padding(.vertical, 4)
     }
 
     private var groupSelection: Binding<SettingsGroup?> {
@@ -546,20 +619,6 @@ struct TorrentCoreMacServiceSettingsView: View {
         )
     }
 
-    private var categorySelection: Binding<String?> {
-        Binding(
-            get: { selectedCategoryKey },
-            set: { key in
-                guard key != selectedCategoryKey else { return }
-                if isDirty {
-                    return
-                }
-                selectedCategoryKey = key
-                loadCategoryDraft()
-            }
-        )
-    }
-
     private var runtimeBinding: Binding<TorrentCoreRuntimeSettingsUpdate>? {
         guard runtimeDraft != nil else { return nil }
         return Binding(
@@ -568,22 +627,19 @@ struct TorrentCoreMacServiceSettingsView: View {
         )
     }
 
-    private var categoryBinding: Binding<TorrentCoreCategoryUpdate>? {
-        guard categoryDraft != nil else { return nil }
+    private func categoryBinding(
+        for key: String
+    ) -> Binding<TorrentCoreCategoryUpdate>? {
+        guard categoryDrafts[key] != nil else { return nil }
         return Binding(
-            get: { categoryDraft! },
-            set: { categoryDraft = $0 }
+            get: { categoryDrafts[key]! },
+            set: { categoryDrafts[key] = $0 }
         )
     }
 
     private var isDirty: Bool {
         if selectedGroup == .categories {
-            guard let category = selectedCategory,
-                  let categoryDraft
-            else {
-                return false
-            }
-            return categoryDraft != TorrentCoreCategoryUpdate(category: category)
+            return !changedCategoryDrafts.isEmpty
         }
         guard let settings = session.runtimeSettings.value, let runtimeDraft else {
             return false
@@ -591,8 +647,18 @@ struct TorrentCoreMacServiceSettingsView: View {
         return runtimeDraft != TorrentCoreRuntimeSettingsUpdate(settings: settings)
     }
 
-    private var selectedCategory: TorrentCoreCategory? {
-        session.categories.value?.first(where: { $0.key == selectedCategoryKey })
+    private var changedCategoryDrafts: [
+        (key: String, draft: TorrentCoreCategoryUpdate)
+    ] {
+        (session.categories.value ?? []).compactMap { category in
+            guard let key = category.key,
+                  let draft = categoryDrafts[key],
+                  draft != TorrentCoreCategoryUpdate(category: category)
+            else {
+                return nil
+            }
+            return (key, draft)
+        }
     }
 
     private var hasLoadedSelectedGroup: Bool {
@@ -657,24 +723,34 @@ struct TorrentCoreMacServiceSettingsView: View {
 
     private var validationError: String? {
         if selectedGroup == .categories {
-            guard let categoryDraft else { return nil }
-            if categoryDraft.displayName.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ).isEmpty {
-                return "Display name is required."
-            }
-            if categoryDraft.downloadRootPath.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ).isEmpty {
-                return "Download root path is required."
-            }
-            if categoryDraft.callbackLabel.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            ).isEmpty {
-                return "Callback label is required."
-            }
-            if categoryDraft.sortOrder < 0 {
-                return "Sort order must be 0 or greater."
+            for category in session.categories.value ?? [] {
+                guard let key = category.key else {
+                    return "TorrentCore returned a category without a key."
+                }
+                guard let draft = categoryDrafts[key] else {
+                    return "Category '\(key)' could not be edited."
+                }
+                let categoryName = draft.displayName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty ? key : draft.displayName
+                if draft.displayName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty {
+                    return "\(categoryName): display name is required."
+                }
+                if draft.downloadRootPath.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty {
+                    return "\(categoryName): download root path is required."
+                }
+                if draft.callbackLabel.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty {
+                    return "\(categoryName): callback label is required."
+                }
+                if draft.sortOrder < 0 {
+                    return "\(categoryName): sort order must be 0 or greater."
+                }
             }
             return nil
         }
@@ -798,6 +874,7 @@ struct TorrentCoreMacServiceSettingsView: View {
     ) -> some View {
         LabeledContent {
             TextField(label, text: text)
+                .labelsHidden()
         } label: {
             TorrentCoreMacHelpLabel(label, content: content)
         }
@@ -806,14 +883,41 @@ struct TorrentCoreMacServiceSettingsView: View {
     private func integerField(
         _ label: String,
         value: Binding<Int>,
-        content: TorrentCoreHelpContent
+        content: TorrentCoreHelpContent,
+        identifier: String? = nil
     ) -> some View {
         LabeledContent {
             TextField(label, value: value, format: .number)
+                .labelsHidden()
                 .frame(width: 140)
+                .accessibilityIdentifier(identifier ?? label)
         } label: {
             TorrentCoreMacHelpLabel(label, content: content)
         }
+    }
+
+    private func categoryColumnHeader(
+        content: TorrentCoreHelpContent,
+        width: CGFloat
+    ) -> some View {
+        categoryColumnHeader(content.label, content: content, width: width)
+    }
+
+    @ViewBuilder
+    private func categoryColumnHeader(
+        _ title: String,
+        content: TorrentCoreHelpContent? = nil,
+        width: CGFloat
+    ) -> some View {
+        Group {
+            if let content {
+                TorrentCoreMacHelpLabel(title, content: content)
+            } else {
+                Text(title)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .frame(width: width, alignment: .leading)
     }
 
     private func optionalString(_ binding: Binding<String?>) -> Binding<String> {
@@ -827,16 +931,18 @@ struct TorrentCoreMacServiceSettingsView: View {
         if (force || !isDirty), let settings = session.runtimeSettings.value {
             runtimeDraft = TorrentCoreRuntimeSettingsUpdate(settings: settings)
         }
-        if selectedCategoryKey == nil {
-            selectedCategoryKey = session.categories.value?.first?.key
-        }
         if force || !isDirty {
-            loadCategoryDraft()
+            loadCategoryDrafts()
         }
     }
 
-    private func loadCategoryDraft() {
-        categoryDraft = selectedCategory.map(TorrentCoreCategoryUpdate.init(category:))
+    private func loadCategoryDrafts() {
+        categoryDrafts = Dictionary(
+            uniqueKeysWithValues: (session.categories.value ?? []).compactMap { category in
+                guard let key = category.key else { return nil }
+                return (key, TorrentCoreCategoryUpdate(category: category))
+            }
+        )
     }
 
     @MainActor
@@ -849,17 +955,26 @@ struct TorrentCoreMacServiceSettingsView: View {
 
         do {
             if selectedGroup == .categories {
-                guard let key = selectedCategoryKey, let categoryDraft else {
-                    return false
+                let changes = changedCategoryDrafts
+                guard !changes.isEmpty else {
+                    return true
                 }
-                _ = try await session.updateCategory(key: key, update: categoryDraft)
-                loadCategoryDraft()
+                for change in changes {
+                    _ = try await session.updateCategory(
+                        key: change.key,
+                        update: change.draft
+                    )
+                }
+                loadCategoryDrafts()
+                actionMessage = changes.count == 1
+                    ? "Saved 1 category."
+                    : "Saved \(changes.count) categories."
             } else {
                 guard let runtimeDraft else { return false }
                 let updated = try await session.updateRuntimeSettings(runtimeDraft)
                 self.runtimeDraft = TorrentCoreRuntimeSettingsUpdate(settings: updated)
+                actionMessage = "Saved \(selectedGroup.title)."
             }
-            actionMessage = "Saved \(selectedGroup.title)."
             dirtyChanged(false)
             return true
         } catch {
@@ -871,7 +986,7 @@ struct TorrentCoreMacServiceSettingsView: View {
     @MainActor
     private func revertCurrentGroup() {
         if selectedGroup == .categories {
-            loadCategoryDraft()
+            loadCategoryDrafts()
         } else if let settings = session.runtimeSettings.value {
             runtimeDraft = TorrentCoreRuntimeSettingsUpdate(settings: settings)
         }

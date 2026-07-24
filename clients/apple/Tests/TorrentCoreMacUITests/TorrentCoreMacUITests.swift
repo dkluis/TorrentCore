@@ -128,6 +128,18 @@ final class TorrentCoreMacUITests: XCTestCase {
         XCTAssertTrue(settingsNavigation.waitForExistence(timeout: 10))
         settingsNavigation.click()
 
+        let activeDownloads = app.descendants(matching: .any)[
+            "serviceSettings.maxActiveDownloads"
+        ]
+        XCTAssertTrue(activeDownloads.waitForExistence(timeout: 5))
+        XCTAssertEqual(activeDownloads.value as? String, "4")
+
+        let activeMetadataResolutions = app.descendants(matching: .any)[
+            "serviceSettings.maxActiveMetadataResolutions"
+        ]
+        XCTAssertTrue(activeMetadataResolutions.exists)
+        XCTAssertEqual(activeMetadataResolutions.value as? String, "4")
+
         let seedingGroup = app.staticTexts["Seeding & Cleanup"].firstMatch
         XCTAssertTrue(seedingGroup.waitForExistence(timeout: 10))
         seedingGroup.click()
@@ -155,6 +167,16 @@ final class TorrentCoreMacUITests: XCTestCase {
             app.descendants(matching: .any)["serviceSettings.engineEncryptionMode"]
                 .waitForExistence(timeout: 5)
         )
+
+        app.staticTexts["Categories"].firstMatch.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["serviceSettings.categories.grid"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["serviceSettings.category.tv.displayName"]
+                .waitForExistence(timeout: 5)
+        )
     }
 
     private func launchApp() -> XCUIApplication {
@@ -162,6 +184,13 @@ final class TorrentCoreMacUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["--torrentcore-ui-fixtures"]
         app.launch()
+        let dashboardNavigation = app.descendants(matching: .any)[
+            "navigation.dashboard"
+        ]
+        if !dashboardNavigation.waitForExistence(timeout: 3) {
+            app.typeKey("n", modifierFlags: .command)
+            _ = dashboardNavigation.waitForExistence(timeout: 5)
+        }
         return app
     }
 

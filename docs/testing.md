@@ -58,7 +58,8 @@ abandonment history; synchronous first-load presentation on context changes; and
 with authoritative refresh. Its signed fixture UI suite covers the existing torrent inspector and removal confirmation
 plus automatic History, Logs, and Service Settings loading without manual refresh. The post-parity refinement coverage
 also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
-show/hide behavior for the Torrents, History, and Logs inspectors.
+show/hide behavior for the Torrents, History, and Logs inspectors. Service Settings UI coverage also verifies populated
+Downloads values and the inline category grid.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail
 when corresponding records exist.
 The `TorrentCoreMac` scheme includes a unit target and a fixture-only UI target. Compile both without launching an app:

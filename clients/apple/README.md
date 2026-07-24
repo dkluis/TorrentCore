@@ -117,6 +117,9 @@ remembers the last destination, but opens Connection when there is no active sav
 - Service Settings edits one group at a time with Save/Revert and guarded navigation. Closed server values use readable
   selectors for seeding stop mode, completed-torrent cleanup mode, and engine encryption mode. Dependent controls are
   disabled when their selected policy does not use them, and service validation rules are enforced before Save.
+  Numeric settings show their current values in editable fields. Categories use one full-width inline editable grid,
+  falling back to horizontal scrolling only when the tab is genuinely too narrow. Save submits only changed category
+  rows sequentially through the existing single-category API.
 - Compact information buttons beside native fields open anchored help popovers. The help content is shared through
   `TorrentCoreFeatures` for later iOS/iPadOS presentation, while the popover renderer remains macOS-specific.
 - History and Logs follow the global foreground refresh policy. Peers refresh every five seconds only while visible;

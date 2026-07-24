@@ -353,7 +353,9 @@ Implementation notes:
 - Native field and action help uses compact information buttons with hover summaries and anchored macOS popovers. Help
   content lives in the shared feature package so later iOS and iPadOS presentation can reuse it without sharing
   platform-specific UI.
-- Existing categories can be edited, but category creation and deletion are not invented by the native client.
+- Existing categories are maintained together in a full-width inline editable grid, with horizontal scrolling reserved
+  for widths where the complete grid cannot fit. Save submits only changed rows sequentially through the existing
+  single-category API; category creation and deletion are not invented by the native client.
 - Service restart requires confirmation and polls for recovery for about 30 seconds.
 - All actions remain single-torrent operations. Multi-selection and bulk APIs remain deferred because no concrete
   operator need was established.
