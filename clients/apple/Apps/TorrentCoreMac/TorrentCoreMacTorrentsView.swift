@@ -93,13 +93,13 @@ struct TorrentCoreMacTorrentsView: View {
     @Binding var selectedTorrentID: UUID?
     @Binding var isInspectorPresented: Bool
     let contextChanged: () -> Void
+    let addMagnet: () -> Void
     let showHistory: (UUID) -> Void
     let showLogs: (UUID) -> Void
 
     @State private var searchText = ""
     @State private var pageIndex = 0
     @State private var sortOrder: [KeyPathComparator<TorrentCoreTorrentListItem>]
-    @State private var isAddMagnetPresented = false
     @State private var isActing = false
     @State private var actionError: String?
     @State private var actionMessage: String?
@@ -114,6 +114,7 @@ struct TorrentCoreMacTorrentsView: View {
         selectedTorrentID: Binding<UUID?>,
         isInspectorPresented: Binding<Bool>,
         contextChanged: @escaping () -> Void,
+        addMagnet: @escaping () -> Void,
         showHistory: @escaping (UUID) -> Void,
         showLogs: @escaping (UUID) -> Void
     ) {
@@ -121,6 +122,7 @@ struct TorrentCoreMacTorrentsView: View {
         _selectedTorrentID = selectedTorrentID
         _isInspectorPresented = isInspectorPresented
         self.contextChanged = contextChanged
+        self.addMagnet = addMagnet
         self.showHistory = showHistory
         self.showLogs = showLogs
 
@@ -161,42 +163,6 @@ struct TorrentCoreMacTorrentsView: View {
                 unavailableTorrentList
             }
         }
-        .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    isAddMagnetPresented = true
-                } label: {
-                    Label("Add Magnet", systemImage: "plus")
-                }
-                .disabled(!session.canAddMagnet() || isActing)
-                .accessibilityIdentifier("torrents.add")
-
-                Button {
-                    pauseSelected()
-                } label: {
-                    Label("Pause", systemImage: "pause")
-                }
-                .disabled(!canPauseSelected || isActing)
-                .accessibilityIdentifier("torrents.pause")
-
-                Button {
-                    resumeSelected()
-                } label: {
-                    Label("Resume", systemImage: "play")
-                }
-                .disabled(!canResumeSelected || isActing)
-                .accessibilityIdentifier("torrents.resume")
-
-                Button {
-                    isInspectorPresented.toggle()
-                    contextChanged()
-                } label: {
-                    Label("Inspector", systemImage: "sidebar.trailing")
-                }
-                .disabled(selectedTorrentID == nil)
-                .accessibilityIdentifier("torrents.inspector")
-            }
-        }
         .inspector(isPresented: $isInspectorPresented) {
             TorrentCoreMacTorrentInspector(
                 session: session,
@@ -235,13 +201,6 @@ struct TorrentCoreMacTorrentsView: View {
             )
             .inspectorColumnWidth(min: 320, ideal: 390, max: 520)
         }
-        .sheet(isPresented: $isAddMagnetPresented) {
-            TorrentCoreMacAddMagnetView(session: session) { newTorrentID in
-                selectedTorrentID = newTorrentID
-                isInspectorPresented = true
-                actionMessage = "Magnet added to TorrentCore."
-            }
-        }
         .sheet(isPresented: $isPeersPresented) {
             if let selectedItem, let torrentID = selectedItem.summary.torrentID {
                 TorrentCoreMacPeersSheet(
@@ -260,13 +219,6 @@ struct TorrentCoreMacTorrentsView: View {
                     torrentName: selectedItem.name,
                     restoreContext: contextChanged
                 )
-            }
-        }
-        .onChange(of: isAddMagnetPresented) { _, isPresented in
-            if isPresented {
-                session.setContext(.addMagnet)
-            } else {
-                contextChanged()
             }
         }
         .onChange(of: selectedTorrentID) { _, newValue in
@@ -372,38 +324,47 @@ struct TorrentCoreMacTorrentsView: View {
 
     private var filterBar: some View {
         HStack(spacing: 12) {
-            TextField("Search by name", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 180, idealWidth: 260, maxWidth: 340)
-                .accessibilityIdentifier("torrents.search")
-                .onChange(of: searchText) { _, _ in
+            HStack(spacing: 4) {
+                TextField("Search by name", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 180, idealWidth: 260, maxWidth: 340)
+                    .accessibilityIdentifier("torrents.search")
+                    .onChange(of: searchText) { _, _ in
+                        pageIndex = 0
+                    }
+                TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.Torrents.name)
+            }
+
+            HStack(spacing: 4) {
+                Picker("State", selection: $storedStateFilter) {
+                    Text("All States").tag("")
+                    ForEach(TorrentCoreKnownTorrentState.allCases, id: \.rawValue) { state in
+                        Text(TorrentCoreDisplayFormatter.splitIdentifier(state.rawValue))
+                            .tag(state.rawValue)
+                    }
+                }
+                .frame(maxWidth: 210)
+                .accessibilityIdentifier("torrents.stateFilter")
+                .onChange(of: storedStateFilter) { _, _ in
                     pageIndex = 0
                 }
-
-            Picker("State", selection: $storedStateFilter) {
-                Text("All States").tag("")
-                ForEach(TorrentCoreKnownTorrentState.allCases, id: \.rawValue) { state in
-                    Text(TorrentCoreDisplayFormatter.splitIdentifier(state.rawValue))
-                        .tag(state.rawValue)
-                }
-            }
-            .frame(maxWidth: 210)
-            .accessibilityIdentifier("torrents.stateFilter")
-            .onChange(of: storedStateFilter) { _, _ in
-                pageIndex = 0
+                TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.Torrents.state)
             }
 
-            Picker("Category", selection: $storedCategoryFilter) {
-                Text("All Categories").tag("")
-                Text("Uncategorized").tag(Self.uncategorizedFilter)
-                ForEach(categoryOptions, id: \.self) { category in
-                    Text(category).tag(category)
+            HStack(spacing: 4) {
+                Picker("Category", selection: $storedCategoryFilter) {
+                    Text("All Categories").tag("")
+                    Text("Uncategorized").tag(Self.uncategorizedFilter)
+                    ForEach(categoryOptions, id: \.self) { category in
+                        Text(category).tag(category)
+                    }
                 }
-            }
-            .frame(maxWidth: 220)
-            .accessibilityIdentifier("torrents.categoryFilter")
-            .onChange(of: storedCategoryFilter) { _, _ in
-                pageIndex = 0
+                .frame(maxWidth: 220)
+                .accessibilityIdentifier("torrents.categoryFilter")
+                .onChange(of: storedCategoryFilter) { _, _ in
+                    pageIndex = 0
+                }
+                TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.Torrents.category)
             }
 
             Button("Clear") {
@@ -573,9 +534,9 @@ struct TorrentCoreMacTorrentsView: View {
             Text("The service is connected and has no torrents.")
         } actions: {
             Button("Add Magnet") {
-                isAddMagnetPresented = true
+                addMagnet()
             }
-            .disabled(!session.canAddMagnet())
+            .disabled(!session.connectionState.isConnected)
         }
         .accessibilityIdentifier("torrents.empty")
     }
@@ -710,7 +671,10 @@ struct TorrentCoreMacTorrentsView: View {
     }
 
     private var unavailableTitle: String {
-        switch session.connectionState {
+        if case .loading = session.torrents.phase {
+            return "Loading Torrents"
+        }
+        return switch session.connectionState {
         case .noProfile:
             "No TorrentCore Connection"
         case .offline:
@@ -723,7 +687,10 @@ struct TorrentCoreMacTorrentsView: View {
     }
 
     private var unavailableSystemImage: String {
-        switch session.connectionState {
+        if case .loading = session.torrents.phase {
+            return "arrow.trianglehead.2.clockwise"
+        }
+        return switch session.connectionState {
         case .offline:
             "network.slash"
         case .connecting:
@@ -734,7 +701,10 @@ struct TorrentCoreMacTorrentsView: View {
     }
 
     private var unavailableMessage: String {
-        switch session.connectionState {
+        if case .loading = session.torrents.phase {
+            return "Requesting the current torrent list from TorrentCore."
+        }
+        return switch session.connectionState {
         case .noProfile:
             "Create or select a connection before loading torrents."
         case let .offline(_, _, message):
@@ -862,9 +832,14 @@ private struct TorrentCoreMacTorrentInspector: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(selectedItem.name)
-                                .font(.title2.weight(.semibold))
-                                .textSelection(.enabled)
+                            HStack {
+                                Text(selectedItem.name)
+                                    .font(.title2.weight(.semibold))
+                                    .textSelection(.enabled)
+                                TorrentCoreMacHelpButton(
+                                    content: TorrentCoreHelpCatalog.Torrents.selectedTorrent
+                                )
+                            }
                             HStack {
                                 Text(TorrentCoreDisplayFormatter.state(
                                     selectedItem.summary.state
@@ -891,9 +866,11 @@ private struct TorrentCoreMacTorrentInspector: View {
                             Button("Pause", action: pause)
                                 .disabled(!session.canPause(selectedItem.summary) || isActing)
                                 .accessibilityIdentifier("inspector.pause")
+                                .help(TorrentCoreHelpCatalog.Torrents.pause.summary)
                             Button("Resume", action: resume)
                                 .disabled(!session.canResume(selectedItem.summary) || isActing)
                                 .accessibilityIdentifier("inspector.resume")
+                                .help(TorrentCoreHelpCatalog.Torrents.resume.summary)
                         }
 
                         HStack {
@@ -903,12 +880,14 @@ private struct TorrentCoreMacTorrentInspector: View {
                                         || !session.connectionState.isConnected
                                 )
                                 .accessibilityIdentifier("inspector.peers")
+                                .help(TorrentCoreHelpCatalog.Torrents.peers.summary)
                             Button("Trackers", action: showTrackers)
                                 .disabled(
                                     selectedItem.summary.torrentID == nil
                                         || !session.connectionState.isConnected
                                 )
                                 .accessibilityIdentifier("inspector.trackers")
+                                .help(TorrentCoreHelpCatalog.Torrents.trackers.summary)
                         }
                         HStack {
                             Button("History", action: showHistory)
@@ -939,18 +918,21 @@ private struct TorrentCoreMacTorrentInspector: View {
                                         || isActing
                                 )
                                 .accessibilityIdentifier("inspector.refreshMetadata")
+                                .help(TorrentCoreHelpCatalog.Torrents.refreshMetadata.summary)
                             Button("Reset Metadata Session", action: requestMetadataReset)
                                 .disabled(
                                     !session.canResetMetadataSession(selectedItem.summary)
                                         || isActing
                                 )
                                 .accessibilityIdentifier("inspector.resetMetadata")
+                                .help(TorrentCoreHelpCatalog.Torrents.resetMetadata.summary)
                             Button("Retry Completion Callback", action: requestCallbackRetry)
                                 .disabled(
                                     !session.canRetryCompletionCallback(selectedItem.summary)
                                         || isActing
                                 )
                                 .accessibilityIdentifier("inspector.retryCallback")
+                                .help(TorrentCoreHelpCatalog.Torrents.retryCallback.summary)
                         }
 
                         Divider()
@@ -963,12 +945,14 @@ private struct TorrentCoreMacTorrentInspector: View {
                             }
                             .disabled(!session.canRemove(selectedItem.summary) || isActing)
                             .accessibilityIdentifier("inspector.remove")
+                            .help(TorrentCoreHelpCatalog.Torrents.remove.summary)
 
                             Button("Remove & Delete Data", role: .destructive) {
                                 requestRemoval(true)
                             }
                             .disabled(!session.canRemove(selectedItem.summary) || isActing)
                             .accessibilityIdentifier("inspector.deleteData")
+                            .help(TorrentCoreHelpCatalog.Torrents.deleteData.summary)
                         }
                     }
                     .padding(16)
@@ -1065,7 +1049,7 @@ private struct TorrentCoreMacTorrentInspector: View {
     }
 }
 
-private struct TorrentCoreMacAddMagnetView: View {
+struct TorrentCoreMacAddMagnetView: View {
     @Environment(\.dismiss) private var dismiss
 
     let session: TorrentCoreFeatureSession

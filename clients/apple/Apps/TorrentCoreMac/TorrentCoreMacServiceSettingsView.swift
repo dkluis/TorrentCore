@@ -3,6 +3,30 @@ import TorrentCoreAPI
 import TorrentCoreFeatures
 
 struct TorrentCoreMacServiceSettingsView: View {
+    private struct SettingChoice: Identifiable {
+        let value: String
+        let label: String
+
+        var id: String { value }
+    }
+
+    private static let seedingStopModes = [
+        SettingChoice(value: "Unlimited", label: "Unlimited"),
+        SettingChoice(value: "StopImmediately", label: "Stop immediately"),
+        SettingChoice(value: "StopAfterRatio", label: "Stop after ratio"),
+        SettingChoice(value: "StopAfterTime", label: "Stop after time"),
+        SettingChoice(value: "StopAfterRatioOrTime", label: "Stop after ratio or time"),
+    ]
+    private static let completedTorrentCleanupModes = [
+        SettingChoice(value: "Never", label: "Never"),
+        SettingChoice(value: "AfterCompletedMinutes", label: "After completion delay"),
+    ]
+    private static let engineEncryptionModes = [
+        SettingChoice(value: "PlainTextPreferred", label: "Plain text preferred"),
+        SettingChoice(value: "EncryptedPreferred", label: "Encrypted preferred"),
+        SettingChoice(value: "EncryptedRequired", label: "Encrypted required"),
+    ]
+
     enum SettingsGroup: String, CaseIterable, Identifiable {
         case downloads
         case seedingCleanup
@@ -94,11 +118,16 @@ struct TorrentCoreMacServiceSettingsView: View {
                     }
                     .formStyle(.grouped)
                 } else {
-                    ContentUnavailableView(
-                        "Service Settings Unavailable",
-                        systemImage: "server.rack",
-                        description: Text(unavailableMessage)
-                    )
+                    ContentUnavailableView {
+                        Label(unavailableTitle, systemImage: unavailableSystemImage)
+                    } description: {
+                        Text(unavailableMessage)
+                    } actions: {
+                        if isLoadingSelectedGroup {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
                 }
             }
         }
@@ -194,7 +223,12 @@ struct TorrentCoreMacServiceSettingsView: View {
                 Task { _ = await saveCurrentGroup() }
             }
             .keyboardShortcut("s", modifiers: .command)
-            .disabled(!isDirty || isSaving || !session.connectionState.isConnected)
+            .disabled(
+                !isDirty
+                    || !isCurrentDraftValid
+                    || isSaving
+                    || !session.connectionState.isConnected
+            )
             Button(role: .destructive) {
                 isRestartConfirmationPresented = true
             } label: {
@@ -217,102 +251,162 @@ struct TorrentCoreMacServiceSettingsView: View {
             if let draft = runtimeBinding {
                 Section("Concurrency") {
                     Stepper(
-                        "Active downloads: \(draft.maxActiveDownloads.wrappedValue)",
                         value: draft.maxActiveDownloads,
-                        in: 1...100
-                    )
+                        in: 1...Int.max
+                    ) {
+                        TorrentCoreMacHelpLabel(
+                            "Active downloads: \(draft.maxActiveDownloads.wrappedValue)",
+                            content: TorrentCoreHelpCatalog.Settings.maxActiveDownloads
+                        )
+                    }
                     Stepper(
-                        "Active metadata resolutions: \(draft.maxActiveMetadataResolutions.wrappedValue)",
                         value: draft.maxActiveMetadataResolutions,
-                        in: 1...100
-                    )
+                        in: 1...Int.max
+                    ) {
+                        TorrentCoreMacHelpLabel(
+                            "Active metadata resolutions: \(draft.maxActiveMetadataResolutions.wrappedValue)",
+                            content: TorrentCoreHelpCatalog.Settings.maxActiveMetadataResolutions
+                        )
+                    }
                 }
             }
         case .seedingCleanup:
             if let draft = runtimeBinding {
                 Section("Seeding Stop Policy") {
-                    TextField("Mode", text: draft.seedingStopMode)
-                    LabeledContent("Ratio") {
+                    choiceField(
+                        selection: draft.seedingStopMode,
+                        choices: Self.seedingStopModes,
+                        content: TorrentCoreHelpCatalog.Settings.seedingStopMode,
+                        identifier: "serviceSettings.seedingStopMode"
+                    )
+                    LabeledContent {
                         TextField("Ratio", value: draft.seedingStopRatio, format: .number)
                             .frame(width: 120)
+                            .disabled(!seedingModeUsesRatio)
+                    } label: {
+                        TorrentCoreMacHelpLabel(
+                            "Ratio",
+                            content: TorrentCoreHelpCatalog.Settings.seedingStopRatio
+                        )
                     }
-                    LabeledContent("Minutes") {
+                    LabeledContent {
                         TextField("Minutes", value: draft.seedingStopMinutes, format: .number)
                             .frame(width: 120)
+                            .disabled(!seedingModeUsesTime)
+                    } label: {
+                        TorrentCoreMacHelpLabel(
+                            "Minutes",
+                            content: TorrentCoreHelpCatalog.Settings.seedingStopMinutes
+                        )
                     }
                 }
                 Section("Completed Torrent Cleanup") {
-                    TextField("Mode", text: draft.completedTorrentCleanupMode)
-                    LabeledContent("Minutes") {
+                    choiceField(
+                        selection: draft.completedTorrentCleanupMode,
+                        choices: Self.completedTorrentCleanupModes,
+                        content: TorrentCoreHelpCatalog.Settings.completedTorrentCleanupMode,
+                        identifier: "serviceSettings.completedTorrentCleanupMode"
+                    )
+                    LabeledContent {
                         TextField(
                             "Minutes",
                             value: draft.completedTorrentCleanupMinutes,
                             format: .number
                         )
                         .frame(width: 120)
+                        .disabled(!cleanupModeUsesMinutes)
+                    } label: {
+                        TorrentCoreMacHelpLabel(
+                            "Minutes",
+                            content: TorrentCoreHelpCatalog.Settings.completedTorrentCleanupMinutes
+                        )
                     }
-                    Toggle(
-                        "Delete logs for completed torrents",
-                        isOn: draft.deleteLogsForCompletedTorrents
-                    )
+                    Toggle(isOn: draft.deleteLogsForCompletedTorrents) {
+                        TorrentCoreMacHelpLabel(
+                            "Delete logs for completed torrents",
+                            content: TorrentCoreHelpCatalog.Settings.deleteLogsForCompletedTorrents
+                        )
+                    }
                 }
+                validationMessage
             }
         case .metadataRecovery:
             if let draft = runtimeBinding {
                 Section("Metadata Refresh") {
                     integerField(
                         "Stale after seconds",
-                        value: draft.metadataRefreshStaleSeconds
+                        value: draft.metadataRefreshStaleSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.metadataRefreshStaleSeconds
                     )
                     integerField(
                         "Restart delay seconds",
-                        value: draft.metadataRefreshRestartDelaySeconds
+                        value: draft.metadataRefreshRestartDelaySeconds,
+                        content: TorrentCoreHelpCatalog.Settings.metadataRefreshRestartDelaySeconds
                     )
                 }
                 Section("Cold Download Recovery") {
                     integerField(
                         "Recovery threshold minutes",
-                        value: draft.coldDownloadRecoveryThresholdMinutes
+                        value: draft.coldDownloadRecoveryThresholdMinutes,
+                        content: TorrentCoreHelpCatalog.Settings.coldDownloadRecoveryThresholdMinutes
                     )
                     integerField(
                         "Recovery interval minutes",
-                        value: draft.coldDownloadRecoveryIntervalMinutes
+                        value: draft.coldDownloadRecoveryIntervalMinutes,
+                        content: TorrentCoreHelpCatalog.Settings.coldDownloadRecoveryIntervalMinutes
                     )
                     integerField(
                         "Abandon after hours",
-                        value: draft.coldDownloadAbandonAfterHours
+                        value: draft.coldDownloadAbandonAfterHours,
+                        content: TorrentCoreHelpCatalog.Settings.coldDownloadAbandonAfterHours
                     )
                 }
+                validationMessage
             }
         case .engine:
             if let draft = runtimeBinding {
                 Section("MonoTorrent Engine") {
-                    TextField("Encryption mode", text: draft.engineEncryptionMode)
+                    choiceField(
+                        selection: draft.engineEncryptionMode,
+                        choices: Self.engineEncryptionModes,
+                        content: TorrentCoreHelpCatalog.Settings.engineEncryptionMode,
+                        identifier: "serviceSettings.engineEncryptionMode"
+                    )
                     integerField(
                         "Maximum connections",
-                        value: draft.engineMaximumConnections
+                        value: draft.engineMaximumConnections,
+                        content: TorrentCoreHelpCatalog.Settings.engineMaximumConnections
                     )
                     integerField(
                         "Maximum half-open connections",
-                        value: draft.engineMaximumHalfOpenConnections
+                        value: draft.engineMaximumHalfOpenConnections,
+                        content: TorrentCoreHelpCatalog.Settings.engineMaximumHalfOpenConnections
                     )
                     integerField(
                         "Maximum download bytes/second (0 = unlimited)",
-                        value: draft.engineMaximumDownloadRateBytesPerSecond
+                        value: draft.engineMaximumDownloadRateBytesPerSecond,
+                        content: TorrentCoreHelpCatalog.Settings
+                            .engineMaximumDownloadRateBytesPerSecond
                     )
                     integerField(
                         "Maximum upload bytes/second (0 = unlimited)",
-                        value: draft.engineMaximumUploadRateBytesPerSecond
+                        value: draft.engineMaximumUploadRateBytesPerSecond,
+                        content: TorrentCoreHelpCatalog.Settings
+                            .engineMaximumUploadRateBytesPerSecond
                     )
                 }
                 Section("Connection Failure Logging") {
                     integerField(
                         "Burst limit",
-                        value: draft.engineConnectionFailureLogBurstLimit
+                        value: draft.engineConnectionFailureLogBurstLimit,
+                        content: TorrentCoreHelpCatalog.Settings
+                            .engineConnectionFailureLogBurstLimit
                     )
                     integerField(
                         "Window seconds",
-                        value: draft.engineConnectionFailureLogWindowSeconds
+                        value: draft.engineConnectionFailureLogWindowSeconds,
+                        content: TorrentCoreHelpCatalog.Settings
+                            .engineConnectionFailureLogWindowSeconds
                     )
                 }
                 if session.runtimeSettings.value?.engineSettingsRequireRestart == true {
@@ -322,39 +416,59 @@ struct TorrentCoreMacServiceSettingsView: View {
                     )
                     .foregroundStyle(.orange)
                 }
+                validationMessage
             }
         case .completionCallback:
             if let draft = runtimeBinding {
                 Section("Callback") {
-                    Toggle("Enabled", isOn: draft.completionCallbackEnabled)
-                    TextField(
+                    Toggle(isOn: draft.completionCallbackEnabled) {
+                        TorrentCoreMacHelpLabel(
+                            "Enabled",
+                            content: TorrentCoreHelpCatalog.Settings.completionCallbackEnabled
+                        )
+                    }
+                    stringField(
                         "Command path",
-                        text: optionalString(draft.completionCallbackCommandPath)
+                        text: optionalString(draft.completionCallbackCommandPath),
+                        content: TorrentCoreHelpCatalog.Settings.completionCallbackCommandPath
                     )
-                    TextField(
+                    stringField(
                         "Arguments",
-                        text: optionalString(draft.completionCallbackArguments)
+                        text: optionalString(draft.completionCallbackArguments),
+                        content: TorrentCoreHelpCatalog.Settings.completionCallbackArguments
                     )
-                    TextField(
+                    stringField(
                         "Working directory",
-                        text: optionalString(draft.completionCallbackWorkingDirectory)
+                        text: optionalString(draft.completionCallbackWorkingDirectory),
+                        content: TorrentCoreHelpCatalog.Settings.completionCallbackWorkingDirectory
                     )
-                    TextField(
+                    stringField(
                         "API base URL override",
-                        text: optionalString(draft.completionCallbackAPIBaseURLOverride)
+                        text: optionalString(draft.completionCallbackAPIBaseURLOverride),
+                        content: TorrentCoreHelpCatalog.Settings.completionCallbackAPIBaseURLOverride
                     )
-                    SecureField(
-                        "API key override",
-                        text: optionalString(draft.completionCallbackAPIKeyOverride)
-                    )
-                    .privacySensitive()
+                    LabeledContent {
+                        SecureField(
+                            "API key override",
+                            text: optionalString(draft.completionCallbackAPIKeyOverride)
+                        )
+                        .privacySensitive()
+                    } label: {
+                        TorrentCoreMacHelpLabel(
+                            "API key override",
+                            content: TorrentCoreHelpCatalog.Settings.completionCallbackAPIKeyOverride
+                        )
+                    }
                     integerField(
                         "Timeout seconds",
-                        value: draft.completionCallbackTimeoutSeconds
+                        value: draft.completionCallbackTimeoutSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.completionCallbackTimeoutSeconds
                     )
                     integerField(
                         "Finalization timeout seconds",
-                        value: draft.completionCallbackFinalizationTimeoutSeconds
+                        value: draft.completionCallbackFinalizationTimeoutSeconds,
+                        content: TorrentCoreHelpCatalog.Settings
+                            .completionCallbackFinalizationTimeoutSeconds
                     )
                 }
                 Text(
@@ -362,12 +476,14 @@ struct TorrentCoreMacServiceSettingsView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                validationMessage
             }
         case .categories:
             categoryEditor
         }
     }
 
+    @ViewBuilder
     private var categoryEditor: some View {
         Section("Existing Category") {
             Picker("Category", selection: categorySelection) {
@@ -377,14 +493,42 @@ struct TorrentCoreMacServiceSettingsView: View {
                 }
             }
             if let draft = categoryBinding {
-                TextField("Display name", text: draft.displayName)
-                TextField("Download root path", text: draft.downloadRootPath)
-                TextField("Callback label", text: draft.callbackLabel)
-                Toggle("Enabled", isOn: draft.enabled)
-                Toggle("Invoke completion callback", isOn: draft.invokeCompletionCallback)
-                integerField("Sort order", value: draft.sortOrder)
+                stringField(
+                    "Display name",
+                    text: draft.displayName,
+                    content: TorrentCoreHelpCatalog.Settings.categoryDisplayName
+                )
+                stringField(
+                    "Download root path",
+                    text: draft.downloadRootPath,
+                    content: TorrentCoreHelpCatalog.Settings.categoryDownloadRootPath
+                )
+                stringField(
+                    "Callback label",
+                    text: draft.callbackLabel,
+                    content: TorrentCoreHelpCatalog.Settings.categoryCallbackLabel
+                )
+                Toggle(isOn: draft.enabled) {
+                    TorrentCoreMacHelpLabel(
+                        "Enabled",
+                        content: TorrentCoreHelpCatalog.Settings.categoryEnabled
+                    )
+                }
+                Toggle(isOn: draft.invokeCompletionCallback) {
+                    TorrentCoreMacHelpLabel(
+                        "Invoke completion callback",
+                        content: TorrentCoreHelpCatalog.Settings
+                            .categoryInvokeCompletionCallback
+                    )
+                }
+                integerField(
+                    "Sort order",
+                    value: draft.sortOrder,
+                    content: TorrentCoreHelpCatalog.Settings.categorySortOrder
+                )
             }
         }
+        validationMessage
     }
 
     private var groupSelection: Binding<SettingsGroup?> {
@@ -458,7 +602,10 @@ struct TorrentCoreMacServiceSettingsView: View {
     }
 
     private var unavailableMessage: String {
-        switch session.connectionState {
+        if isLoadingSelectedGroup {
+            return "Requesting the current service settings from TorrentCore."
+        }
+        return switch session.connectionState {
         case .noProfile:
             "Create or select a connection before loading service settings."
         case let .offline(_, _, message):
@@ -472,11 +619,200 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
     }
 
+    private var isLoadingSelectedGroup: Bool {
+        let phase = selectedGroup == .categories
+            ? session.categories.phase
+            : session.runtimeSettings.phase
+        if case .loading = phase {
+            return true
+        }
+        return false
+    }
+
+    private var unavailableTitle: String {
+        isLoadingSelectedGroup ? "Loading Service Settings" : "Service Settings Unavailable"
+    }
+
+    private var unavailableSystemImage: String {
+        isLoadingSelectedGroup ? "arrow.trianglehead.2.clockwise" : "server.rack"
+    }
+
+    private var seedingModeUsesRatio: Bool {
+        guard let mode = runtimeDraft?.seedingStopMode else { return false }
+        return mode == "StopAfterRatio" || mode == "StopAfterRatioOrTime"
+    }
+
+    private var seedingModeUsesTime: Bool {
+        guard let mode = runtimeDraft?.seedingStopMode else { return false }
+        return mode == "StopAfterTime" || mode == "StopAfterRatioOrTime"
+    }
+
+    private var cleanupModeUsesMinutes: Bool {
+        runtimeDraft?.completedTorrentCleanupMode == "AfterCompletedMinutes"
+    }
+
+    private var isCurrentDraftValid: Bool {
+        validationError == nil
+    }
+
+    private var validationError: String? {
+        if selectedGroup == .categories {
+            guard let categoryDraft else { return nil }
+            if categoryDraft.displayName.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty {
+                return "Display name is required."
+            }
+            if categoryDraft.downloadRootPath.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty {
+                return "Download root path is required."
+            }
+            if categoryDraft.callbackLabel.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty {
+                return "Callback label is required."
+            }
+            if categoryDraft.sortOrder < 0 {
+                return "Sort order must be 0 or greater."
+            }
+            return nil
+        }
+
+        guard let draft = runtimeDraft else { return nil }
+        if !Self.seedingStopModes.contains(where: { $0.value == draft.seedingStopMode }) {
+            return "Choose a supported seeding stop mode."
+        }
+        if !Self.completedTorrentCleanupModes.contains(
+            where: { $0.value == draft.completedTorrentCleanupMode }
+        ) {
+            return "Choose a supported completed-torrent cleanup mode."
+        }
+        if !Self.engineEncryptionModes.contains(
+            where: { $0.value == draft.engineEncryptionMode }
+        ) {
+            return "Choose a supported engine encryption mode."
+        }
+        if draft.seedingStopRatio <= 0 {
+            return "Seeding stop ratio must be greater than 0."
+        }
+        if draft.seedingStopMinutes < 1 {
+            return "Seeding stop minutes must be 1 or greater."
+        }
+        if draft.completedTorrentCleanupMinutes < 0 {
+            return "Completed-torrent cleanup minutes must be 0 or greater."
+        }
+        if draft.maxActiveMetadataResolutions < 1 {
+            return "Active metadata resolutions must be 1 or greater."
+        }
+        if draft.maxActiveDownloads < 1 {
+            return "Active downloads must be 1 or greater."
+        }
+        if draft.metadataRefreshStaleSeconds < 1 {
+            return "Metadata refresh stale seconds must be 1 or greater."
+        }
+        if draft.metadataRefreshRestartDelaySeconds < 1 {
+            return "Metadata refresh restart delay must be 1 or greater."
+        }
+        if draft.coldDownloadRecoveryThresholdMinutes < 1 {
+            return "Cold-download recovery threshold must be 1 or greater."
+        }
+        if draft.coldDownloadRecoveryIntervalMinutes < 1 {
+            return "Cold-download recovery interval must be 1 or greater."
+        }
+        if draft.coldDownloadAbandonAfterHours < 0 {
+            return "Cold-download abandonment hours must be 0 or greater."
+        }
+        if draft.engineConnectionFailureLogBurstLimit < 1 {
+            return "Connection-failure burst limit must be 1 or greater."
+        }
+        if draft.engineConnectionFailureLogWindowSeconds < 1 {
+            return "Connection-failure window must be 1 or greater."
+        }
+        if draft.engineMaximumConnections < 1 {
+            return "Maximum connections must be 1 or greater."
+        }
+        if draft.engineMaximumHalfOpenConnections < 1 {
+            return "Maximum half-open connections must be 1 or greater."
+        }
+        if draft.engineMaximumDownloadRateBytesPerSecond < 0 {
+            return "Maximum download rate must be 0 or greater."
+        }
+        if draft.engineMaximumUploadRateBytesPerSecond < 0 {
+            return "Maximum upload rate must be 0 or greater."
+        }
+        if draft.completionCallbackTimeoutSeconds < 1 {
+            return "Callback timeout must be 1 or greater."
+        }
+        if draft.completionCallbackFinalizationTimeoutSeconds < 1 {
+            return "Callback finalization timeout must be 1 or greater."
+        }
+        if draft.completionCallbackEnabled,
+           draft.completionCallbackCommandPath?.trimmingCharacters(
+               in: .whitespacesAndNewlines
+           ).isEmpty != false
+        {
+            return "Command path is required when the completion callback is enabled."
+        }
+        return nil
+    }
+
     @ViewBuilder
-    private func integerField(_ label: String, value: Binding<Int>) -> some View {
-        LabeledContent(label) {
+    private var validationMessage: some View {
+        if let validationError {
+            Label(validationError, systemImage: "exclamationmark.triangle")
+                .font(.caption)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("serviceSettings.validationError")
+        }
+    }
+
+    private func choiceField(
+        selection: Binding<String>,
+        choices: [SettingChoice],
+        content: TorrentCoreHelpContent,
+        identifier: String
+    ) -> some View {
+        LabeledContent {
+            Picker(content.label, selection: selection) {
+                ForEach(choices) { choice in
+                    Text(choice.label).tag(choice.value)
+                }
+                if !choices.contains(where: { $0.value == selection.wrappedValue }) {
+                    Text("Unsupported (\(selection.wrappedValue))")
+                        .tag(selection.wrappedValue)
+                }
+            }
+            .labelsHidden()
+            .frame(minWidth: 210)
+            .accessibilityIdentifier(identifier)
+        } label: {
+            TorrentCoreMacHelpLabel(content: content)
+        }
+    }
+
+    private func stringField(
+        _ label: String,
+        text: Binding<String>,
+        content: TorrentCoreHelpContent
+    ) -> some View {
+        LabeledContent {
+            TextField(label, text: text)
+        } label: {
+            TorrentCoreMacHelpLabel(label, content: content)
+        }
+    }
+
+    private func integerField(
+        _ label: String,
+        value: Binding<Int>,
+        content: TorrentCoreHelpContent
+    ) -> some View {
+        LabeledContent {
             TextField(label, value: value, format: .number)
                 .frame(width: 140)
+        } label: {
+            TorrentCoreMacHelpLabel(label, content: content)
         }
     }
 
@@ -505,7 +841,7 @@ struct TorrentCoreMacServiceSettingsView: View {
 
     @MainActor
     private func saveCurrentGroup() async -> Bool {
-        guard isDirty, !isSaving else { return !isDirty }
+        guard isDirty, isCurrentDraftValid, !isSaving else { return !isDirty }
         isSaving = true
         actionError = nil
         actionMessage = nil

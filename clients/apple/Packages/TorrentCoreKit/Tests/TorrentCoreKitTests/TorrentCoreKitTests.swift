@@ -14,6 +14,18 @@ func sharedTargetsExposeTheSameProductIdentity() {
 }
 
 @Test
+func sharedHelpCatalogCoversEveryServiceSetting() {
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 34)
+    #expect(
+        Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
+            == TorrentCoreHelpCatalog.Settings.all.count
+    )
+    #expect(TorrentCoreHelpCatalog.Settings.seedingStopMode.detail.contains("live"))
+    #expect(TorrentCoreHelpCatalog.Settings.engineEncryptionMode.detail.contains("restart"))
+    #expect(TorrentCoreHelpCatalog.Settings.categoryDownloadRootPath.detail.contains("Existing"))
+}
+
+@Test
 func initialSliceBuildsDeterministicRequestsAndDecodesFixtures() async throws {
     let recorder = RequestRecorder()
     let transport = FixtureTransport(recorder: recorder)

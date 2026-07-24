@@ -254,7 +254,10 @@ struct TorrentCoreMacDashboardView: View {
     }
 
     private var emptyTitle: String {
-        switch session.connectionState {
+        if case .loading = session.hostStatus.phase {
+            return "Loading Dashboard"
+        }
+        return switch session.connectionState {
         case .noProfile:
             "No TorrentCore Connection"
         case .offline:
@@ -267,7 +270,10 @@ struct TorrentCoreMacDashboardView: View {
     }
 
     private var emptySystemImage: String {
-        switch session.connectionState {
+        if case .loading = session.hostStatus.phase {
+            return "arrow.trianglehead.2.clockwise"
+        }
+        return switch session.connectionState {
         case .offline:
             "network.slash"
         case .connecting:
@@ -278,7 +284,10 @@ struct TorrentCoreMacDashboardView: View {
     }
 
     private var emptyMessage: String {
-        switch session.connectionState {
+        if case .loading = session.hostStatus.phase {
+            return "Requesting current dashboard information from TorrentCore."
+        }
+        return switch session.connectionState {
         case .noProfile:
             "Create or select a connection before opening the dashboard."
         case let .offline(_, _, message):

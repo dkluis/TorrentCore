@@ -347,10 +347,24 @@ Implementation notes:
 - Service settings remain distinct from device-local macOS Settings. One service-settings group can be dirty at a
   time, with Save/Revert and Save/Discard/Cancel navigation protection. Callback API-key text is transient form state
   and is neither persisted nor logged by the Mac client.
+- Service enum values are presented with readable selectors while retaining their exact API tokens. Fields that do not
+  apply to the selected policy remain visible but disabled, and client-side validation mirrors the service rules before
+  Save.
+- Native field and action help uses compact information buttons with hover summaries and anchored macOS popovers. Help
+  content lives in the shared feature package so later iOS and iPadOS presentation can reuse it without sharing
+  platform-specific UI.
 - Existing categories can be edited, but category creation and deletion are not invented by the native client.
 - Service restart requires confirmation and polls for recovery for about 30 seconds.
 - All actions remain single-torrent operations. Multi-selection and bulk APIs remain deferred because no concrete
   operator need was established.
+- Destination changes synchronously enter a loading state and immediately request only the newly visible context.
+  Empty-state messaging is reserved for successful zero-row responses; connectivity and request failures remain
+  unavailable states.
+- The main macOS toolbar is customizable through the standard system command. Add Magnet and Refresh are permanent
+  reorderable items, torrent actions are contextual customizable items, and Connection Status is optional and hidden
+  by default. Refresh is owned by the main navigation toolbar rather than an inspector. One contextual Inspector item
+  and View-menu command operate the active Torrents, History, or Logs inspector and remain available for toolbar
+  customization.
 
 ### Milestone 5: macOS Hardening And Limited Release
 

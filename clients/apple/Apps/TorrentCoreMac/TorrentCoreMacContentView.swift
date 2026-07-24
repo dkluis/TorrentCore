@@ -57,15 +57,20 @@ struct TorrentCoreMacContentView: View {
     @State private var destination: TorrentCoreMacDestination
     @State private var selectedTorrentID: UUID?
     @State private var isTorrentInspectorPresented = false
+    @State private var isAddMagnetPresented = false
     @State private var historyQuery = TorrentCoreMacHistoryView.defaultQuery
     @State private var selectedHistoryTorrentID: UUID?
+    @State private var isHistoryInspectorPresented = false
     @State private var logQuery = TorrentCoreMacLogsView.defaultQuery
+    @State private var selectedLogID: Int64?
+    @State private var isLogInspectorPresented = false
     @State private var serviceSettingsDirty = false
     @State private var pendingDestination: TorrentCoreMacDestination?
     @State private var saveServiceSettings: (() async -> Bool)?
     @State private var discardServiceSettings: (() -> Void)?
     @State private var isLoaded = false
     @State private var loadError: String?
+    @State private var toolbarActionError: String?
 
     init(session: TorrentCoreFeatureSession) {
         self.session = session
@@ -78,6 +83,79 @@ struct TorrentCoreMacContentView: View {
     }
 
     var body: some View {
+        mainWindow
+            .task {
+                await loadIfNeeded()
+            }
+            .onChange(of: destination) { _, newValue in
+                storedDestination = newValue.rawValue
+                updateFeatureContext()
+            }
+            .onChange(of: isAddMagnetPresented) { _, isPresented in
+                if isPresented {
+                    session.setContext(.addMagnet)
+                } else {
+                    updateFeatureContext()
+                }
+            }
+            .onChange(of: scenePhase) { _, newValue in
+                session.setApplicationActive(newValue == .active)
+            }
+            .alert(
+                "Couldn’t Load Settings",
+                isPresented: loadErrorPresented
+            ) {
+                Button("Retry") {
+                    Task {
+                        isLoaded = false
+                        await loadIfNeeded()
+                    }
+                }
+                Button("Dismiss", role: .cancel) {}
+            } message: {
+                Text(loadError ?? "The saved settings could not be read.")
+            }
+            .alert(
+                "Torrent Action Failed",
+                isPresented: toolbarActionErrorPresented
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(toolbarActionError ?? "TorrentCore could not complete the torrent action.")
+            }
+            .confirmationDialog(
+                "Save Service Settings Before Leaving?",
+                isPresented: pendingDestinationConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Save") {
+                    Task {
+                        if await saveServiceSettings?() == true {
+                            finishPendingNavigation()
+                        }
+                    }
+                }
+                Button("Discard Changes", role: .destructive) {
+                    discardServiceSettings?()
+                    serviceSettingsDirty = false
+                    finishPendingNavigation()
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingDestination = nil
+                }
+            } message: {
+                Text("The current service-settings group has unsaved changes.")
+            }
+            .sheet(isPresented: $isAddMagnetPresented) {
+                TorrentCoreMacAddMagnetView(session: session) { _ in
+                    selectedTorrentID = nil
+                    isTorrentInspectorPresented = false
+                    destination = .torrents
+                }
+            }
+    }
+
+    private var mainWindow: some View {
         NavigationSplitView {
             List(TorrentCoreMacDestination.allCases, selection: destinationSelection) { item in
                 Label(item.title, systemImage: item.systemImage)
@@ -102,69 +180,49 @@ struct TorrentCoreMacContentView: View {
                 }
             }
             .navigationTitle(destination.title)
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    refreshMenu
-                    manualRefreshButton
-                    connectionStatusButton
-                }
+        }
+        .toolbar(id: "TorrentCore.MainToolbar.v6") {
+            ToolbarItem(id: "addMagnet", placement: .navigation) {
+                addMagnetButton
             }
+            .customizationBehavior(.reorderable)
+
+            ToolbarItem(id: "refresh", placement: .navigation) {
+                manualRefreshButton
+            }
+            .customizationBehavior(.reorderable)
+
+            ToolbarItem(id: "autoRefresh", placement: .secondaryAction) {
+                refreshMenu
+            }
+
+            if destination == .torrents {
+                ToolbarItem(id: "pauseTorrent", placement: .secondaryAction) {
+                    pauseTorrentButton
+                }
+
+                ToolbarItem(id: "resumeTorrent", placement: .secondaryAction) {
+                    resumeTorrentButton
+                }
+
+            }
+
+            ToolbarItem(id: "torrentInspector", placement: .primaryAction) {
+                inspectorButton
+            }
+            .hidden(!isInspectorControlAvailable)
+
+            ToolbarItem(
+                id: "optionalConnectionStatus.v1",
+                placement: .automatic
+            ) {
+                connectionStatusButton
+            }
+            .defaultCustomization(.hidden)
         }
         .frame(minWidth: 1_000, minHeight: 650)
         .focusedSceneValue(\.torrentCoreDestination, destinationSelection)
-        .task {
-            await loadIfNeeded()
-        }
-        .onChange(of: destination) { _, newValue in
-            storedDestination = newValue.rawValue
-            updateFeatureContext()
-        }
-        .onChange(of: scenePhase) { _, newValue in
-            session.setApplicationActive(newValue == .active)
-        }
-        .alert(
-            "Couldn’t Load Settings",
-            isPresented: Binding(
-                get: { loadError != nil },
-                set: { if !$0 { loadError = nil } }
-            )
-        ) {
-            Button("Retry") {
-                Task {
-                    isLoaded = false
-                    await loadIfNeeded()
-                }
-            }
-            Button("Dismiss", role: .cancel) {}
-        } message: {
-            Text(loadError ?? "The saved settings could not be read.")
-        }
-        .confirmationDialog(
-            "Save Service Settings Before Leaving?",
-            isPresented: Binding(
-                get: { pendingDestination != nil },
-                set: { if !$0 { pendingDestination = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Save") {
-                Task {
-                    if await saveServiceSettings?() == true {
-                        finishPendingNavigation()
-                    }
-                }
-            }
-            Button("Discard Changes", role: .destructive) {
-                discardServiceSettings?()
-                serviceSettingsDirty = false
-                finishPendingNavigation()
-            }
-            Button("Cancel", role: .cancel) {
-                pendingDestination = nil
-            }
-        } message: {
-            Text("The current service-settings group has unsaved changes.")
-        }
+        .focusedSceneValue(\.torrentCoreInspectorCommand, inspectorCommand)
     }
 
     @ViewBuilder
@@ -180,6 +238,7 @@ struct TorrentCoreMacContentView: View {
                 selectedTorrentID: $selectedTorrentID,
                 isInspectorPresented: $isTorrentInspectorPresented,
                 contextChanged: updateFeatureContext,
+                addMagnet: { isAddMagnetPresented = true },
                 showHistory: showHistory,
                 showLogs: showLogs
             )
@@ -188,6 +247,7 @@ struct TorrentCoreMacContentView: View {
                 session: session,
                 query: $historyQuery,
                 selectedTorrentID: $selectedHistoryTorrentID,
+                isInspectorPresented: $isHistoryInspectorPresented,
                 contextChanged: updateFeatureContext,
                 showTorrent: showTorrent
             )
@@ -195,6 +255,8 @@ struct TorrentCoreMacContentView: View {
             TorrentCoreMacLogsView(
                 session: session,
                 query: $logQuery,
+                selectedLogID: $selectedLogID,
+                isInspectorPresented: $isLogInspectorPresented,
                 contextChanged: updateFeatureContext,
                 showTorrent: showTorrent,
                 showHistory: showHistory
@@ -220,6 +282,39 @@ struct TorrentCoreMacContentView: View {
         )
     }
 
+    private var pendingDestinationConfirmation: Binding<Bool> {
+        Binding(
+            get: { pendingDestination != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingDestination = nil
+                }
+            }
+        )
+    }
+
+    private var loadErrorPresented: Binding<Bool> {
+        Binding(
+            get: { loadError != nil },
+            set: { isPresented in
+                if !isPresented {
+                    loadError = nil
+                }
+            }
+        )
+    }
+
+    private var toolbarActionErrorPresented: Binding<Bool> {
+        Binding(
+            get: { toolbarActionError != nil },
+            set: { isPresented in
+                if !isPresented {
+                    toolbarActionError = nil
+                }
+            }
+        )
+    }
+
     private var manualRefreshButton: some View {
         Button {
             Task {
@@ -232,6 +327,106 @@ struct TorrentCoreMacContentView: View {
         .disabled(session.activeProfile == nil || !isLoaded)
         .accessibilityIdentifier("toolbar.refresh")
         .help("Refresh \(destination.title)")
+    }
+
+    private var addMagnetButton: some View {
+        Button {
+            isAddMagnetPresented = true
+        } label: {
+            Label("Add Magnet", systemImage: "plus")
+        }
+        .disabled(!session.connectionState.isConnected)
+        .accessibilityIdentifier("toolbar.addMagnet")
+        .help("Add a magnet to TorrentCore")
+    }
+
+    private var pauseTorrentButton: some View {
+        Button {
+            performToolbarTorrentAction { summary in
+                _ = try await session.pause(summary)
+            }
+        } label: {
+            Label("Pause", systemImage: "pause")
+        }
+        .disabled(!canPauseSelectedTorrent)
+        .accessibilityIdentifier("torrents.pause")
+        .help("Pause the selected torrent")
+    }
+
+    private var resumeTorrentButton: some View {
+        Button {
+            performToolbarTorrentAction { summary in
+                _ = try await session.resume(summary)
+            }
+        } label: {
+            Label("Resume", systemImage: "play")
+        }
+        .disabled(!canResumeSelectedTorrent)
+        .accessibilityIdentifier("torrents.resume")
+        .help("Resume the selected torrent")
+    }
+
+    private var inspectorButton: some View {
+        Button {
+            toggleActiveInspector()
+        } label: {
+            Label(
+                isActiveInspectorPresented ? "Hide Inspector" : "Show Inspector",
+                systemImage: "sidebar.trailing"
+            )
+        }
+        .disabled(!isInspectorControlAvailable)
+        .accessibilityIdentifier("toolbar.inspector")
+        .help(isActiveInspectorPresented ? "Hide Inspector" : "Show Inspector")
+    }
+
+    private var isInspectorControlAvailable: Bool {
+        switch destination {
+        case .torrents:
+            selectedTorrentID != nil || isTorrentInspectorPresented
+        case .history:
+            selectedHistoryTorrentID != nil || isHistoryInspectorPresented
+        case .logs:
+            selectedLogID != nil || isLogInspectorPresented
+        case .dashboard, .serviceSettings, .connection:
+            false
+        }
+    }
+
+    private var isActiveInspectorPresented: Bool {
+        switch destination {
+        case .torrents:
+            isTorrentInspectorPresented
+        case .history:
+            isHistoryInspectorPresented
+        case .logs:
+            isLogInspectorPresented
+        case .dashboard, .serviceSettings, .connection:
+            false
+        }
+    }
+
+    private var inspectorCommand: TorrentCoreMacInspectorCommand {
+        TorrentCoreMacInspectorCommand(
+            isAvailable: isInspectorControlAvailable,
+            isPresented: isActiveInspectorPresented,
+            toggle: toggleActiveInspector
+        )
+    }
+
+    private func toggleActiveInspector() {
+        guard isInspectorControlAvailable else { return }
+        switch destination {
+        case .torrents:
+            isTorrentInspectorPresented.toggle()
+        case .history:
+            isHistoryInspectorPresented.toggle()
+        case .logs:
+            isLogInspectorPresented.toggle()
+        case .dashboard, .serviceSettings, .connection:
+            return
+        }
+        updateFeatureContext()
     }
 
     private var refreshMenu: some View {
@@ -288,6 +483,44 @@ struct TorrentCoreMacContentView: View {
         }
         .accessibilityIdentifier("toolbar.connectionStatus")
         .help("Manage TorrentCore connections")
+    }
+
+    private var selectedTorrentSummary: TorrentCoreTorrentSummary? {
+        guard let selectedTorrentID else {
+            return nil
+        }
+        return session.torrents.value?.first(where: {
+            $0.torrentID == selectedTorrentID
+        })
+    }
+
+    private var canPauseSelectedTorrent: Bool {
+        guard let selectedTorrentSummary else {
+            return false
+        }
+        return session.activeMutation == nil && session.canPause(selectedTorrentSummary)
+    }
+
+    private var canResumeSelectedTorrent: Bool {
+        guard let selectedTorrentSummary else {
+            return false
+        }
+        return session.activeMutation == nil && session.canResume(selectedTorrentSummary)
+    }
+
+    private func performToolbarTorrentAction(
+        _ action: @escaping (TorrentCoreTorrentSummary) async throws -> Void
+    ) {
+        guard let selectedTorrentSummary else {
+            return
+        }
+        Task {
+            do {
+                try await action(selectedTorrentSummary)
+            } catch {
+                toolbarActionError = TorrentCoreMacErrorPresenter.message(error)
+            }
+        }
     }
 
     private var connectionLabel: String {
@@ -358,12 +591,17 @@ struct TorrentCoreMacContentView: View {
         case .history:
             session.setContext(.history(
                 query: historyQuery,
-                selectedTorrentID: selectedHistoryTorrentID
+                selectedTorrentID: isHistoryInspectorPresented
+                    ? selectedHistoryTorrentID
+                    : nil
             ))
         case .logs:
             session.setContext(.logs(logQuery))
         case .serviceSettings:
             session.setContext(.serviceSettings)
+        }
+        Task {
+            await session.refresh()
         }
     }
 
@@ -392,11 +630,14 @@ struct TorrentCoreMacContentView: View {
     private func showHistory(_ torrentID: UUID) {
         historyQuery = TorrentCoreHistoryQuery(take: 500)
         selectedHistoryTorrentID = torrentID
+        isHistoryInspectorPresented = true
         destination = .history
     }
 
     private func showLogs(_ torrentID: UUID) {
         logQuery = TorrentCoreLogQuery(take: 1_000, torrentID: torrentID)
+        selectedLogID = nil
+        isLogInspectorPresented = false
         destination = .logs
     }
 }
@@ -409,6 +650,23 @@ extension FocusedValues {
     var torrentCoreDestination: Binding<TorrentCoreMacDestination>? {
         get { self[TorrentCoreMacDestinationFocusedValueKey.self] }
         set { self[TorrentCoreMacDestinationFocusedValueKey.self] = newValue }
+    }
+}
+
+struct TorrentCoreMacInspectorCommand {
+    let isAvailable: Bool
+    let isPresented: Bool
+    let toggle: () -> Void
+}
+
+private struct TorrentCoreMacInspectorFocusedValueKey: FocusedValueKey {
+    typealias Value = TorrentCoreMacInspectorCommand
+}
+
+extension FocusedValues {
+    var torrentCoreInspectorCommand: TorrentCoreMacInspectorCommand? {
+        get { self[TorrentCoreMacInspectorFocusedValueKey.self] }
+        set { self[TorrentCoreMacInspectorFocusedValueKey.self] = newValue }
     }
 }
 
@@ -437,5 +695,20 @@ struct TorrentCoreMacNavigationCommands: Commands {
         }
         .keyboardShortcut(key, modifiers: .command)
         .disabled(destination == nil)
+    }
+}
+
+struct TorrentCoreMacInspectorCommands: Commands {
+    @FocusedValue(\.torrentCoreInspectorCommand)
+    private var inspector
+
+    var body: some Commands {
+        CommandGroup(after: .toolbar) {
+            Button(inspector?.isPresented == true ? "Hide Inspector" : "Show Inspector") {
+                inspector?.toggle()
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+            .disabled(inspector?.isAvailable != true)
+        }
     }
 }

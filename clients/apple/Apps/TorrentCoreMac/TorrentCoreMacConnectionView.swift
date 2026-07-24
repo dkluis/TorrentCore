@@ -61,15 +61,26 @@ struct TorrentCoreMacConnectionView: View {
             .frame(minWidth: 280, idealWidth: 330, maxWidth: 420)
 
             Form {
-                Section("TorrentCore Connection") {
+                Section {
                     TextField("Name", text: $name)
                         .accessibilityIdentifier("connection.name")
-                    TextField("Service Address", text: $address)
-                        .textContentType(.URL)
-                        .accessibilityIdentifier("connection.address")
+                    LabeledContent {
+                        TextField("Service Address", text: $address)
+                            .textContentType(.URL)
+                            .accessibilityIdentifier("connection.address")
+                    } label: {
+                        TorrentCoreMacHelpLabel(
+                            content: TorrentCoreHelpCatalog.Connection.serviceBaseURL
+                        )
+                    }
                     Text("Enter an HTTP or HTTPS hostname or IP address with an optional port. The connection can be saved while its LAN or VPN is unavailable.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                } header: {
+                    TorrentCoreMacHelpSectionTitle(
+                        title: "TorrentCore Connection",
+                        content: TorrentCoreHelpCatalog.Connection.currentEndpoint
+                    )
                 }
 
                 Section {
@@ -95,6 +106,7 @@ struct TorrentCoreMacConnectionView: View {
                         }
                         .disabled(isWorking || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         .accessibilityIdentifier("connection.test")
+                        .help(TorrentCoreHelpCatalog.Connection.test.summary)
 
                         Button("Use Connection") {
                             activateSelectedConnection()
@@ -114,6 +126,7 @@ struct TorrentCoreMacConnectionView: View {
                                 || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         )
                         .accessibilityIdentifier("connection.save")
+                        .help(TorrentCoreHelpCatalog.Connection.save.summary)
                     }
                 }
             }

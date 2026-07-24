@@ -308,6 +308,9 @@ public final class TorrentCoreFeatureSession {
         }
         self.context = context
         cancelCurrentRefresh()
+        if activeProfile != nil {
+            beginLoading(context)
+        }
         restartRefreshLoop()
     }
 

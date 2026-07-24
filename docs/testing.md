@@ -54,8 +54,11 @@ single-item mutation refresh, and rejection of late responses from a previous pr
 Milestone 3 adds shared tests for version 1-to-2 client-preference migration, Auto Refresh disablement, combined
 torrent-list and selected-detail refresh, WebUI-equivalent torrent filtering, and 25/50/100/250-row local pagination.
 Milestone 4 adds shared tests for open-context History, Logs, peers, trackers, and Service Settings reads; separate
-abandonment history; and single-item operational mutations with authoritative refresh. Its signed fixture UI suite
-covers the existing torrent inspector and removal confirmation plus History, Logs, and Service Settings navigation.
+abandonment history; synchronous first-load presentation on context changes; and single-item operational mutations
+with authoritative refresh. Its signed fixture UI suite covers the existing torrent inspector and removal confirmation
+plus automatic History, Logs, and Service Settings loading without manual refresh. The post-parity refinement coverage
+also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
+show/hide behavior for the Torrents, History, and Logs inspectors.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail
 when corresponding records exist.
 The `TorrentCoreMac` scheme includes a unit target and a fixture-only UI target. Compile both without launching an app:
@@ -76,7 +79,7 @@ xcodebuild \
 Run `TorrentCoreMacUITests` only from a normal development-signed test build. The target supplies
 `--torrentcore-ui-fixtures`, which uses an in-memory service and never reads a saved endpoint or contacts a live
 TorrentCore installation. Do not execute an unsigned UI-test product because macOS rejects it before test bootstrap.
-The July 24, 2026 Milestone 4 signed fixture run passed all three UI tests.
+The July 24, 2026 Milestone 4 signed fixture run passed all four UI tests.
 
 Production Swagger availability is verified by `OpenApiContractTests` alongside normalized contract comparison.
 

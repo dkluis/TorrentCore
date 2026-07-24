@@ -31,6 +31,7 @@ struct TorrentCoreMacHistoryView: View {
     let session: TorrentCoreFeatureSession
     @Binding var query: TorrentCoreHistoryQuery
     @Binding var selectedTorrentID: UUID?
+    @Binding var isInspectorPresented: Bool
     let contextChanged: () -> Void
     let showTorrent: (UUID) -> Void
 
@@ -54,12 +55,14 @@ struct TorrentCoreMacHistoryView: View {
         session: TorrentCoreFeatureSession,
         query: Binding<TorrentCoreHistoryQuery>,
         selectedTorrentID: Binding<UUID?>,
+        isInspectorPresented: Binding<Bool>,
         contextChanged: @escaping () -> Void,
         showTorrent: @escaping (UUID) -> Void
     ) {
         self.session = session
         _query = query
         _selectedTorrentID = selectedTorrentID
+        _isInspectorPresented = isInspectorPresented
         self.contextChanged = contextChanged
         self.showTorrent = showTorrent
 
@@ -93,11 +96,16 @@ struct TorrentCoreMacHistoryView: View {
             abandonmentSummary
 
             if session.history.value == nil {
-                ContentUnavailableView(
-                    "History Unavailable",
-                    systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90",
-                    description: Text(unavailableMessage)
-                )
+                ContentUnavailableView {
+                    Label(unavailableTitle, systemImage: unavailableSystemImage)
+                } description: {
+                    Text(unavailableMessage)
+                } actions: {
+                    if case .loading = session.history.phase {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
             } else if sortedValues.isEmpty {
                 ContentUnavailableView(
                     "No History Matches",
@@ -110,12 +118,16 @@ struct TorrentCoreMacHistoryView: View {
                 paginationBar
             }
         }
-        .inspector(isPresented: inspectorPresented) {
+        .inspector(isPresented: $isInspectorPresented) {
             historyInspector
                 .inspectorColumnWidth(min: 330, ideal: 400, max: 540)
         }
         .onChange(of: selectedHistoryKey) { _, key in
             selectedTorrentID = sortedValues.first(where: { $0.id == key })?.torrentID
+            isInspectorPresented = selectedTorrentID != nil
+            contextChanged()
+        }
+        .onChange(of: isInspectorPresented) { _, _ in
             contextChanged()
         }
         .onChange(of: pageSize) { _, _ in pageIndex = 0 }
@@ -126,33 +138,61 @@ struct TorrentCoreMacHistoryView: View {
     private var filterBar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                TextField("Torrent name", text: $nameFilter)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 180)
-                TextField("Category", text: $categoryFilter)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 130)
-                TextField("State", text: $stateFilter)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 140)
-                Picker("Outcome", selection: $outcomeFilter) {
-                    Text("All Outcomes").tag("")
-                    Text("Active").tag(TorrentCoreHistoryOutcome.active.rawValue)
-                    Text("Removed").tag(TorrentCoreHistoryOutcome.removed.rawValue)
-                    Text("Abandoned").tag(TorrentCoreHistoryOutcome.abandoned.rawValue)
+                HStack(spacing: 4) {
+                    TextField("Torrent name", text: $nameFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 180)
+                    TorrentCoreMacHelpButton(
+                        content: TorrentCoreHelpCatalog.History.torrentName
+                    )
                 }
-                .frame(width: 190)
+                HStack(spacing: 4) {
+                    TextField("Category", text: $categoryFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 130)
+                    TorrentCoreMacHelpButton(
+                        content: TorrentCoreHelpCatalog.History.category
+                    )
+                }
+                HStack(spacing: 4) {
+                    TextField("State", text: $stateFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 140)
+                    TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.History.state)
+                }
+                HStack(spacing: 4) {
+                    Picker("Outcome", selection: $outcomeFilter) {
+                        Text("All Outcomes").tag("")
+                        Text("Active").tag(TorrentCoreHistoryOutcome.active.rawValue)
+                        Text("Removed").tag(TorrentCoreHistoryOutcome.removed.rawValue)
+                        Text("Abandoned").tag(TorrentCoreHistoryOutcome.abandoned.rawValue)
+                    }
+                    .frame(width: 190)
+                    TorrentCoreMacHelpButton(
+                        content: TorrentCoreHelpCatalog.History.outcome
+                    )
+                }
             }
 
             HStack(spacing: 10) {
-                Toggle("From", isOn: $includesFromDate)
-                    .toggleStyle(.checkbox)
+                HStack(spacing: 4) {
+                    Toggle("From", isOn: $includesFromDate)
+                        .toggleStyle(.checkbox)
+                    TorrentCoreMacHelpButton(
+                        content: TorrentCoreHelpCatalog.History.fromDate
+                    )
+                }
                 DatePicker("", selection: $fromDate, displayedComponents: .date)
                     .labelsHidden()
                     .disabled(!includesFromDate)
 
-                Toggle("Through", isOn: $includesToDate)
-                    .toggleStyle(.checkbox)
+                HStack(spacing: 4) {
+                    Toggle("Through", isOn: $includesToDate)
+                        .toggleStyle(.checkbox)
+                    TorrentCoreMacHelpButton(
+                        content: TorrentCoreHelpCatalog.History.toDate
+                    )
+                }
                 DatePicker("", selection: $toDate, displayedComponents: .date)
                     .labelsHidden()
                     .disabled(!includesToDate)
@@ -250,6 +290,7 @@ struct TorrentCoreMacHistoryView: View {
         HStack {
             Text(resultRangeLabel)
                 .foregroundStyle(.secondary)
+            TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.History.results)
             Spacer()
             Picker("Rows", selection: $pageSize) {
                 ForEach([25, 50, 100, 250], id: \.self) { Text("\($0)").tag($0) }
@@ -275,8 +316,13 @@ struct TorrentCoreMacHistoryView: View {
         ScrollView {
             if let detail = session.historyDetail.value {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(detail.name ?? "History Detail")
-                        .font(.title2.weight(.semibold))
+                    HStack {
+                        Text(detail.name ?? "History Detail")
+                            .font(.title2.weight(.semibold))
+                        TorrentCoreMacHelpButton(
+                            content: TorrentCoreHelpCatalog.History.selectedEntry
+                        )
+                    }
                         .textSelection(.enabled)
                     TorrentCoreMacPhaseBanner(
                         phase: session.historyDetail.phase,
@@ -338,19 +384,7 @@ struct TorrentCoreMacHistoryView: View {
                 )
             }
         }
-    }
-
-    private var inspectorPresented: Binding<Bool> {
-        Binding(
-            get: { selectedTorrentID != nil },
-            set: {
-                if !$0 {
-                    selectedHistoryKey = nil
-                    selectedTorrentID = nil
-                    contextChanged()
-                }
-            }
-        )
+        .accessibilityIdentifier("history.inspector.content")
     }
 
     private var sortedValues: [TorrentCoreHistorySummary] {
@@ -410,7 +444,10 @@ struct TorrentCoreMacHistoryView: View {
     }
 
     private var unavailableMessage: String {
-        switch session.connectionState {
+        if case .loading = session.history.phase {
+            return "Requesting torrent history from TorrentCore."
+        }
+        return switch session.connectionState {
         case .noProfile:
             "Create or select a connection before loading history."
         case let .offline(_, _, message):
@@ -422,6 +459,20 @@ struct TorrentCoreMacHistoryView: View {
         case .connected:
             "TorrentCore did not return history."
         }
+    }
+
+    private var unavailableTitle: String {
+        if case .loading = session.history.phase {
+            return "Loading History"
+        }
+        return "History Unavailable"
+    }
+
+    private var unavailableSystemImage: String {
+        if case .loading = session.history.phase {
+            return "arrow.trianglehead.2.clockwise"
+        }
+        return "clock.arrow.trianglehead.counterclockwise.rotate.90"
     }
 
     private func applyFilters() {
@@ -440,6 +491,7 @@ struct TorrentCoreMacHistoryView: View {
         pageIndex = 0
         selectedHistoryKey = nil
         selectedTorrentID = nil
+        isInspectorPresented = false
         contextChanged()
     }
 

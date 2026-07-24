@@ -184,6 +184,37 @@ func aCancelledOldProfileResponseCannotReplaceNewProfileState() async throws {
 
 @Test
 @MainActor
+func changingFeatureContextPublishesInitialLoadingStateSynchronously() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Loading",
+        address: "http://loading.test:7033"
+    )
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id
+        )),
+        clientFactory: FakeClientFactory(clients: [:])
+    )
+    try await session.load()
+
+    #expect(session.torrents.phase == .idle)
+    session.setContext(.torrents)
+    #expect(session.torrents.phase == .loading)
+
+    #expect(session.logs.phase == .idle)
+    session.setContext(.logs(.init(take: 100)))
+    #expect(session.logs.phase == .loading)
+
+    #expect(session.runtimeSettings.phase == .idle)
+    #expect(session.categories.phase == .idle)
+    session.setContext(.serviceSettings)
+    #expect(session.runtimeSettings.phase == .loading)
+    #expect(session.categories.phase == .loading)
+}
+
+@Test
+@MainActor
 func refreshOnlyLoadsTheOpenFeatureContext() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Context",

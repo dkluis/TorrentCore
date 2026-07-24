@@ -30,6 +30,8 @@ struct TorrentCoreMacApp: App {
         .defaultSize(width: 1_180, height: 760)
         .commands {
             TorrentCoreMacNavigationCommands()
+            TorrentCoreMacInspectorCommands()
+            ToolbarCommands()
         }
 
         Settings {

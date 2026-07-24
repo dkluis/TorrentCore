@@ -102,23 +102,32 @@ remembers the last destination, but opens Connection when there is no active sav
   recent lifecycle events.
 - Torrents uses a native sortable table with name, state, and category filters; local pagination matches the WebUI
   choices of 25, 50, 100, and 250 rows.
-- Single selection drives a resizable trailing inspector. The inspector exposes pause, resume, remove, and
-  remove-with-data according to service capabilities, plus peer/tracker diagnostics, metadata recovery, callback retry,
-  and cross-navigation to History and filtered Logs.
+- Single selection drives resizable trailing inspectors for Torrents, History, and Logs. One standard toolbar and View
+  menu command shows or hides the inspector for the active destination. Torrent details expose pause, resume, remove,
+  remove-with-data, peer/tracker diagnostics, metadata recovery, callback retry, and cross-navigation.
 - Add Magnet uses enabled service categories in service sort order and permits Uncategorized.
+- Add Magnet and Refresh are permanent window-toolbar items. Add Magnet remains available from every destination while
+  connected and returns to Torrents without selecting a row or opening the inspector after a successful add.
 - Both remove paths require native destructive confirmation. A mutation timeout is shown as uncertain and is followed
   by authoritative refresh rather than automatic retry.
 - History starts with Today, uses the existing service filters, preserves abandonment visibility, and locally sorts
   and pages bounded results at 25, 50, 100, or 250 rows.
 - Logs combine service-side filters and selectable recent-row limits with search over the loaded rows. Orphaned-log
   cleanup requires confirmation.
-- Service Settings edits one group at a time with Save/Revert and guarded navigation. It administers current runtime
-  settings and existing categories, and confirms service restart while waiting for reconnection.
+- Service Settings edits one group at a time with Save/Revert and guarded navigation. Closed server values use readable
+  selectors for seeding stop mode, completed-torrent cleanup mode, and engine encryption mode. Dependent controls are
+  disabled when their selected policy does not use them, and service validation rules are enforced before Save.
+- Compact information buttons beside native fields open anchored help popovers. The help content is shared through
+  `TorrentCoreFeatures` for later iOS/iPadOS presentation, while the popover renderer remains macOS-specific.
 - History and Logs follow the global foreground refresh policy. Peers refresh every five seconds only while visible;
   Trackers and Service Settings load once and support manual refresh.
 - The Navigate menu maps Command-1 through Command-6 to the six sidebar destinations. Context menus and direct
   cross-navigation keep actions scoped to one torrent.
-- Standard macOS Settings and the main toolbar share the same global Auto Refresh and interval preferences.
+- Opening a destination immediately loads its visible service data. First loads show progress, successful empty
+  responses show an empty state, and failures show an unavailable state.
+- Standard macOS Settings and the customizable main toolbar share the same global Auto Refresh and interval
+  preferences. Inspector is a contextual customizable item, and Connection Status is available from toolbar
+  customization but is not included by default.
 
 The app has no compiled live endpoint. `--torrentcore-ui-fixtures` is reserved for the Xcode UI-test target and starts
 an in-memory fixture service; it never contacts or mutates a deployed TorrentCore installation.

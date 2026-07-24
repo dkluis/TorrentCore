@@ -16,17 +16,28 @@ final class TorrentCoreMacUITests: XCTestCase {
                 .waitForExistence(timeout: 10)
         )
         XCTAssertTrue(
-            app.descendants(matching: .any)["toolbar.connectionStatus"].exists
+            app.descendants(matching: .any)["toolbar.refresh"].exists
         )
         XCTAssertTrue(
-            app.descendants(matching: .any)["toolbar.refresh"].exists
+            app.descendants(matching: .any)["toolbar.addMagnet"].exists
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["toolbar.connectionStatus"].isHittable
         )
 
         app.staticTexts["Preview Torrent"].click()
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["torrents.inspector.content"]
-                .waitForExistence(timeout: 5)
+        let inspectorContent = app.descendants(matching: .any)[
+            "torrents.inspector.content"
+        ]
+        XCTAssertTrue(inspectorContent.waitForExistence(timeout: 5))
+        let inspectorToggle = app.descendants(matching: .any)["toolbar.inspector"]
+        XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
+        let refreshButton = app.descendants(matching: .any)["toolbar.refresh"]
+        XCTAssertLessThanOrEqual(
+            refreshButton.frame.maxX,
+            inspectorContent.frame.minX,
+            "Refresh should remain in the main-content toolbar, outside the inspector."
         )
         XCTAssertTrue(
             app.descendants(matching: .any)["inspector.remove"].exists
@@ -34,6 +45,11 @@ final class TorrentCoreMacUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["inspector.deleteData"].exists
         )
+
+        inspectorToggle.click()
+        XCTAssertTrue(inspectorContent.waitForNonExistence(timeout: 5))
+        inspectorToggle.click()
+        XCTAssertTrue(inspectorContent.waitForExistence(timeout: 5))
     }
 
     func testRemoveRequiresConfirmationAndCanBeCancelled() {
@@ -65,28 +81,80 @@ final class TorrentCoreMacUITests: XCTestCase {
         let historyNavigation = app.descendants(matching: .any)["navigation.history"]
         XCTAssertTrue(historyNavigation.waitForExistence(timeout: 10))
         historyNavigation.click()
-        app.descendants(matching: .any)["toolbar.refresh"].click()
         XCTAssertTrue(
             app.descendants(matching: .any)["history.row"]
                 .firstMatch
                 .waitForExistence(timeout: 10)
         )
+        XCTAssertTrue(app.descendants(matching: .any)["toolbar.addMagnet"].exists)
+        app.descendants(matching: .any)["history.row"].firstMatch.click()
+        let historyInspector = app.descendants(matching: .any)[
+            "history.inspector.content"
+        ]
+        XCTAssertTrue(historyInspector.waitForExistence(timeout: 5))
+        let inspectorToggle = app.descendants(matching: .any)["toolbar.inspector"]
+        XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
+        inspectorToggle.click()
+        XCTAssertTrue(historyInspector.waitForNonExistence(timeout: 5))
 
         let logsNavigation = app.descendants(matching: .any)["navigation.logs"]
         logsNavigation.click()
-        app.descendants(matching: .any)["toolbar.refresh"].click()
         XCTAssertTrue(
             app.descendants(matching: .any)["logs.row"]
                 .firstMatch
                 .waitForExistence(timeout: 10)
         )
+        app.descendants(matching: .any)["logs.row"].firstMatch.click()
+        let logsInspector = app.descendants(matching: .any)[
+            "logs.inspector.content"
+        ]
+        XCTAssertTrue(logsInspector.waitForExistence(timeout: 5))
+        XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
+        inspectorToggle.click()
+        XCTAssertTrue(logsInspector.waitForNonExistence(timeout: 5))
 
         let settingsNavigation = app.descendants(matching: .any)[
             "navigation.serviceSettings"
         ]
         settingsNavigation.click()
-        app.descendants(matching: .any)["toolbar.refresh"].click()
         XCTAssertTrue(app.staticTexts["Downloads"].waitForExistence(timeout: 10))
+    }
+
+    func testServiceSettingsExposeHelpAndConstrainedModeChoices() {
+        let app = launchApp()
+        let settingsNavigation = app.descendants(matching: .any)[
+            "navigation.serviceSettings"
+        ]
+        XCTAssertTrue(settingsNavigation.waitForExistence(timeout: 10))
+        settingsNavigation.click()
+
+        let seedingGroup = app.staticTexts["Seeding & Cleanup"].firstMatch
+        XCTAssertTrue(seedingGroup.waitForExistence(timeout: 10))
+        seedingGroup.click()
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["serviceSettings.seedingStopMode"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)[
+                "serviceSettings.completedTorrentCleanupMode"
+            ].exists
+        )
+
+        let helpButton = app.descendants(matching: .any)["help.seeding-stop-mode"]
+        XCTAssertTrue(helpButton.waitForExistence(timeout: 5))
+        helpButton.click()
+        XCTAssertTrue(
+            app.staticTexts["Controls when a completed torrent stops seeding."]
+                .waitForExistence(timeout: 5)
+        )
+
+        app.staticTexts["Engine"].firstMatch.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["serviceSettings.engineEncryptionMode"]
+                .waitForExistence(timeout: 5)
+        )
     }
 
     private func launchApp() -> XCUIApplication {
@@ -106,9 +174,9 @@ final class TorrentCoreMacUITests: XCTestCase {
         if clearFiltersButton.waitForExistence(timeout: 5), clearFiltersButton.isEnabled {
             clearFiltersButton.click()
         }
-
-        let refreshButton = app.descendants(matching: .any)["toolbar.refresh"]
-        XCTAssertTrue(refreshButton.waitForExistence(timeout: 5))
-        refreshButton.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["torrents.table"]
+                .waitForExistence(timeout: 10)
+        )
     }
 }

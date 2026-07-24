@@ -8,6 +8,8 @@ struct TorrentCoreMacLogsView: View {
 
     let session: TorrentCoreFeatureSession
     @Binding var query: TorrentCoreLogQuery
+    @Binding var selectedLogID: Int64?
+    @Binding var isInspectorPresented: Bool
     let contextChanged: () -> Void
     let showTorrent: (UUID) -> Void
     let showHistory: (UUID) -> Void
@@ -22,7 +24,6 @@ struct TorrentCoreMacLogsView: View {
     @State private var includesToDate: Bool
     @State private var fromDate: Date
     @State private var toDate: Date
-    @State private var selectedLogID: Int64?
     @State private var isDeleteConfirmationPresented = false
     @State private var actionMessage: String?
     @State private var actionError: String?
@@ -30,12 +31,16 @@ struct TorrentCoreMacLogsView: View {
     init(
         session: TorrentCoreFeatureSession,
         query: Binding<TorrentCoreLogQuery>,
+        selectedLogID: Binding<Int64?>,
+        isInspectorPresented: Binding<Bool>,
         contextChanged: @escaping () -> Void,
         showTorrent: @escaping (UUID) -> Void,
         showHistory: @escaping (UUID) -> Void
     ) {
         self.session = session
         _query = query
+        _selectedLogID = selectedLogID
+        _isInspectorPresented = isInspectorPresented
         self.contextChanged = contextChanged
         self.showTorrent = showTorrent
         self.showHistory = showHistory
@@ -78,11 +83,16 @@ struct TorrentCoreMacLogsView: View {
             }
 
             if session.logs.value == nil {
-                ContentUnavailableView(
-                    "Logs Unavailable",
-                    systemImage: "doc.text.magnifyingglass",
-                    description: Text(unavailableMessage)
-                )
+                ContentUnavailableView {
+                    Label(unavailableTitle, systemImage: unavailableSystemImage)
+                } description: {
+                    Text(unavailableMessage)
+                } actions: {
+                    if case .loading = session.logs.phase {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
             } else if filteredLogs.isEmpty {
                 ContentUnavailableView(
                     "No Logs Match",
@@ -93,9 +103,14 @@ struct TorrentCoreMacLogsView: View {
                 logList
             }
         }
-        .inspector(isPresented: inspectorPresented) {
+        .inspector(isPresented: $isInspectorPresented) {
             logInspector
                 .inspectorColumnWidth(min: 330, ideal: 420, max: 580)
+        }
+        .onChange(of: selectedLogID) { _, value in
+            if value != nil {
+                isInspectorPresented = true
+            }
         }
         .confirmationDialog(
             "Delete Orphaned Torrent Logs?",
@@ -136,51 +151,100 @@ struct TorrentCoreMacLogsView: View {
     private var filterBar: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                TextField("Search loaded logs", text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(minWidth: 190)
-                Picker("Level", selection: $levelFilter) {
-                    Text("All Levels").tag(Int32?.none)
-                    Text("Trace").tag(Int32?.some(0))
-                    Text("Debug").tag(Int32?.some(1))
-                    Text("Information").tag(Int32?.some(2))
-                    Text("Warning").tag(Int32?.some(3))
-                    Text("Error").tag(Int32?.some(4))
-                    Text("Critical").tag(Int32?.some(5))
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(
+                        "Search",
+                        content: TorrentCoreHelpCatalog.Logs.searchMessage
+                    )
+                    TextField("Search loaded logs", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(minWidth: 190)
                 }
-                .frame(width: 180)
-                TextField("Category", text: $categoryFilter)
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.level)
+                    Picker("Level", selection: $levelFilter) {
+                        Text("All Levels").tag(Int32?.none)
+                        Text("Trace").tag(Int32?.some(0))
+                        Text("Debug").tag(Int32?.some(1))
+                        Text("Information").tag(Int32?.some(2))
+                        Text("Warning").tag(Int32?.some(3))
+                        Text("Error").tag(Int32?.some(4))
+                        Text("Critical").tag(Int32?.some(5))
+                    }
+                    .labelsHidden()
+                    .frame(width: 150)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.category)
+                    TextField("Category", text: $categoryFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 130)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.eventType)
+                    TextField("Event type", text: $eventTypeFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 155)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(
+                        "Recent",
+                        content: TorrentCoreHelpCatalog.Logs.recentLimit
+                    )
+                    Picker("Recent", selection: limitBinding) {
+                        Text("100 rows").tag(100)
+                        Text("500 rows").tag(500)
+                        Text("1,000 rows").tag(1_000)
+                        Text("5,000 rows").tag(5_000)
+                    }
+                    .labelsHidden()
                     .frame(width: 130)
-                TextField("Event type", text: $eventTypeFilter)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 155)
-                Picker("Recent", selection: limitBinding) {
-                    Text("100 rows").tag(100)
-                    Text("500 rows").tag(500)
-                    Text("1,000 rows").tag(1_000)
-                    Text("5,000 rows").tag(5_000)
                 }
-                .frame(width: 150)
             }
 
             HStack(spacing: 10) {
-                TextField("Torrent ID", text: $torrentIDFilter)
-                    .textFieldStyle(.roundedBorder)
-                TextField("Service instance ID", text: $serviceInstanceIDFilter)
-                    .textFieldStyle(.roundedBorder)
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.torrentID)
+                    TextField("Torrent ID", text: $torrentIDFilter)
+                        .textFieldStyle(.roundedBorder)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(
+                        content: TorrentCoreHelpCatalog.Logs.serviceInstanceID
+                    )
+                    TextField("Service instance ID", text: $serviceInstanceIDFilter)
+                        .textFieldStyle(.roundedBorder)
+                }
 
-                Toggle("From", isOn: $includesFromDate)
-                    .toggleStyle(.checkbox)
-                DatePicker("", selection: $fromDate)
-                    .labelsHidden()
-                    .disabled(!includesFromDate)
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(
+                        "From",
+                        content: TorrentCoreHelpCatalog.Logs.fromDateTime
+                    )
+                    HStack(spacing: 4) {
+                        Toggle("", isOn: $includesFromDate)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                        DatePicker("", selection: $fromDate)
+                            .labelsHidden()
+                            .disabled(!includesFromDate)
+                    }
+                }
 
-                Toggle("To", isOn: $includesToDate)
-                    .toggleStyle(.checkbox)
-                DatePicker("", selection: $toDate)
-                    .labelsHidden()
-                    .disabled(!includesToDate)
+                VStack(alignment: .leading, spacing: 3) {
+                    TorrentCoreMacHelpLabel(
+                        "To",
+                        content: TorrentCoreHelpCatalog.Logs.toDateTime
+                    )
+                    HStack(spacing: 4) {
+                        Toggle("", isOn: $includesToDate)
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                        DatePicker("", selection: $toDate)
+                            .labelsHidden()
+                            .disabled(!includesToDate)
+                    }
+                }
 
                 Button("Apply", action: applyFilters)
                     .accessibilityIdentifier("logs.apply")
@@ -191,6 +255,7 @@ struct TorrentCoreMacLogsView: View {
                     Label("Delete Orphaned", systemImage: "trash")
                 }
                 .disabled(!session.connectionState.isConnected || session.activeMutation != nil)
+                .help(TorrentCoreHelpCatalog.Logs.deleteOrphaned.summary)
             }
         }
         .padding(12)
@@ -238,8 +303,13 @@ struct TorrentCoreMacLogsView: View {
         ScrollView {
             if let log = selectedLog {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(log.eventType ?? "Log Entry")
-                        .font(.title2.weight(.semibold))
+                    HStack {
+                        Text(log.eventType ?? "Log Entry")
+                            .font(.title2.weight(.semibold))
+                        TorrentCoreMacHelpButton(
+                            content: TorrentCoreHelpCatalog.Logs.selectedEntry
+                        )
+                    }
                     Text(log.message ?? "No message")
                         .textSelection(.enabled)
                     Divider()
@@ -285,6 +355,7 @@ struct TorrentCoreMacLogsView: View {
                 .padding(16)
             }
         }
+        .accessibilityIdentifier("logs.inspector.content")
     }
 
     private var limitBinding: Binding<Int> {
@@ -294,13 +365,6 @@ struct TorrentCoreMacLogsView: View {
                 query.take = $0
                 applyFilters()
             }
-        )
-    }
-
-    private var inspectorPresented: Binding<Bool> {
-        Binding(
-            get: { selectedLogID != nil },
-            set: { if !$0 { selectedLogID = nil } }
         )
     }
 
@@ -333,7 +397,10 @@ struct TorrentCoreMacLogsView: View {
     }
 
     private var unavailableMessage: String {
-        switch session.connectionState {
+        if case .loading = session.logs.phase {
+            return "Requesting recent activity logs from TorrentCore."
+        }
+        return switch session.connectionState {
         case .noProfile:
             "Create or select a connection before loading logs."
         case let .offline(_, _, message):
@@ -345,6 +412,20 @@ struct TorrentCoreMacLogsView: View {
         case .connected:
             "TorrentCore did not return log entries."
         }
+    }
+
+    private var unavailableTitle: String {
+        if case .loading = session.logs.phase {
+            return "Loading Logs"
+        }
+        return "Logs Unavailable"
+    }
+
+    private var unavailableSystemImage: String {
+        if case .loading = session.logs.phase {
+            return "arrow.trianglehead.2.clockwise"
+        }
+        return "doc.text.magnifyingglass"
     }
 
     private func applyFilters() {
@@ -363,6 +444,7 @@ struct TorrentCoreMacLogsView: View {
             toUTC: includesToDate ? toDate : nil
         )
         selectedLogID = nil
+        isInspectorPresented = false
         contextChanged()
     }
 
