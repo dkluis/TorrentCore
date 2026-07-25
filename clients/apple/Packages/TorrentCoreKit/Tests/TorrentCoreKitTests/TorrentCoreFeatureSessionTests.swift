@@ -512,6 +512,174 @@ func offlineRefreshKeepsLastKnownStateAndDisablesActions() async throws {
 
 @Test
 @MainActor
+func aLateResponseFromAnOldContextCannotPopulateHiddenState() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Slow context",
+        address: "http://slow-context.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [torrent(named: "Late torrent")])
+    await client.suspendNextTorrentRequest()
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client])
+    )
+    try await session.load()
+    session.setContext(.torrents)
+
+    let oldRefresh = Task { @MainActor in
+        await session.refresh()
+    }
+    await waitUntil {
+        await client.hasSuspendedTorrentRequest
+    }
+
+    session.setContext(.logs(.init(take: 100)))
+    await session.refresh()
+    #expect(session.logs.value?.isEmpty == false)
+
+    await client.resumeTorrentRequest()
+    await oldRefresh.value
+    #expect(session.logs.value?.isEmpty == false)
+    #expect(session.torrents.value == nil)
+}
+
+@Test
+@MainActor
+func reconnectingToANewServiceInstanceClearsOldSnapshotsAndReloadsOpenContext() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Restarted host",
+        address: "http://restarted-host.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [.initPreview])
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client])
+    )
+    try await session.load()
+
+    session.setContext(.torrents)
+    await session.refresh()
+    #expect(session.torrents.value?.isEmpty == false)
+
+    session.setContext(.logs(.init(take: 100)))
+    await session.refresh()
+    #expect(session.logs.value?.isEmpty == false)
+
+    let replacementInstanceID = UUID()
+    await client.setServiceInstanceID(replacementInstanceID)
+    await client.setOffline(true)
+    await session.refresh()
+    #expect(!session.connectionState.isConnected)
+
+    await client.setOffline(false)
+    await session.refresh()
+
+    #expect(session.connectionState.isConnected)
+    #expect(session.hostStatus.value?.serviceInstanceID == replacementInstanceID)
+    #expect(session.logs.value?.isEmpty == false)
+    #expect(session.logs.phase == .current)
+    #expect(session.torrents.value == nil)
+    #expect(session.history.value == nil)
+    #expect(session.runtimeSettings.value == nil)
+    #expect(session.preferences.activeProfile == profile)
+}
+
+@Test
+@MainActor
+func requestedRestartRetriesThenAcceptsTheNewServiceInstance() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Restart recovery",
+        address: "http://restart-recovery.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [.initPreview])
+    let sleeper = ImmediateSleeper()
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client]),
+        sleeper: sleeper,
+        restartRecoveryDelay: 0
+    )
+    try await session.load()
+    session.setContext(.torrents)
+    await session.refresh()
+    #expect(session.torrents.value?.isEmpty == false)
+
+    session.setContext(.serviceSettings)
+    await session.refresh()
+    let replacementInstanceID = UUID()
+    await client.setServiceInstanceID(replacementInstanceID)
+    await client.failNextProbes(2)
+
+    _ = try await session.restartService()
+
+    #expect(session.connectionState.isConnected)
+    #expect(session.activeMutation == nil)
+    #expect(session.hostStatus.value?.serviceInstanceID == replacementInstanceID)
+    #expect(session.runtimeSettings.phase == .current)
+    #expect(session.categories.phase == .current)
+    #expect(session.torrents.value == nil)
+    #expect(await sleeper.intervals == [2, 2])
+    let calls = await client.calls
+    #expect(calls.restartService == 1)
+    #expect(calls.probe == 4)
+    #expect(calls.hostStatus == 2)
+}
+
+@Test
+@MainActor
+func agreedMaximumFixtureCollectionsLoadWithoutClientTruncation() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Large fixtures",
+        address: "http://large-fixtures.test:7033"
+    )
+    let client = FakeServiceClient(
+        torrents: makeTorrents(count: 100),
+        history: makeHistory(count: 500),
+        logs: makeLogs(count: 5_000),
+        peers: makePeers(count: 250),
+        trackers: makeTrackers(count: 50)
+    )
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client])
+    )
+    try await session.load()
+
+    session.setContext(.torrents)
+    await session.refresh()
+    #expect(session.torrents.value?.count == 100)
+
+    session.setContext(.history(query: .init(take: 500), selectedTorrentID: nil))
+    await session.refresh()
+    #expect(session.history.value?.count == 500)
+
+    session.setContext(.logs(.init(take: 5_000)))
+    await session.refresh()
+    #expect(session.logs.value?.count == 5_000)
+
+    session.setContext(.peers(TorrentCorePreviewFixtures.torrentID))
+    await session.refresh()
+    #expect(session.peers.value?.count == 250)
+
+    session.setContext(.trackers(TorrentCorePreviewFixtures.torrentID))
+    await session.refresh()
+    #expect(session.trackers.value?.count == 50)
+}
+
+@Test
+@MainActor
 func aSuccessfulSingleItemMutationRefreshesTheOpenContext() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Mutation",
@@ -560,6 +728,14 @@ private actor RecordingSleeper: TorrentCoreSleeping {
     }
 }
 
+private actor ImmediateSleeper: TorrentCoreSleeping {
+    private(set) var intervals: [TimeInterval] = []
+
+    func sleep(for interval: TimeInterval) async throws {
+        intervals.append(interval)
+    }
+}
+
 private struct FakeClientFactory: TorrentCoreServiceClientBuilding {
     let clients: [URL: FakeServiceClient]
 
@@ -600,7 +776,13 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
 
     private(set) var calls = Calls()
     private var isOffline = false
+    private var probeFailuresRemaining = 0
+    private var hostStatusValue: TorrentCoreHostStatus
     private var torrentValues: [TorrentCoreTorrentSummary]
+    private var historyValues: [TorrentCoreHistorySummary]
+    private var logValues: [TorrentCoreActivityLogEntry]
+    private var peerValues: [TorrentCorePeer]
+    private var trackerValues: [TorrentCoreTracker]
     private var shouldSuspendTorrentRequest = false
     private var suspendedTorrentContinuation: CheckedContinuation<Void, Never>?
 
@@ -608,12 +790,31 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         suspendedTorrentContinuation != nil
     }
 
-    init(torrents: [TorrentCoreTorrentSummary]) {
+    init(
+        torrents: [TorrentCoreTorrentSummary],
+        history: [TorrentCoreHistorySummary] = TorrentCorePreviewFixtures.history,
+        logs: [TorrentCoreActivityLogEntry] = TorrentCorePreviewFixtures.activityLogs,
+        peers: [TorrentCorePeer] = TorrentCorePreviewFixtures.peers,
+        trackers: [TorrentCoreTracker] = TorrentCorePreviewFixtures.trackers
+    ) {
+        hostStatusValue = TorrentCorePreviewFixtures.hostStatus
         torrentValues = torrents
+        historyValues = history
+        logValues = logs
+        peerValues = peers
+        trackerValues = trackers
     }
 
     func setOffline(_ isOffline: Bool) {
         self.isOffline = isOffline
+    }
+
+    func setServiceInstanceID(_ serviceInstanceID: UUID) {
+        hostStatusValue.serviceInstanceID = serviceInstanceID
+    }
+
+    func failNextProbes(_ count: Int) {
+        probeFailuresRemaining = count
     }
 
     func suspendNextTorrentRequest() {
@@ -628,13 +829,17 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
     func probe() async throws -> TorrentCoreServiceHealth {
         calls.probe += 1
         try checkConnection()
+        if probeFailuresRemaining > 0 {
+            probeFailuresRemaining -= 1
+            throw TorrentCoreClientError.offline
+        }
         return TorrentCorePreviewFixtures.connectedHealth
     }
 
     func hostStatus() async throws -> TorrentCoreHostStatus {
         calls.hostStatus += 1
         try checkConnection()
-        return TorrentCorePreviewFixtures.hostStatus
+        return hostStatusValue
     }
 
     func dashboardLifecycle() async throws -> TorrentCoreDashboardLifecycle {
@@ -676,7 +881,14 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
     func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary] {
         calls.history += 1
         try checkConnection()
-        return TorrentCorePreviewFixtures.history
+        var values = historyValues
+        if let outcome = query.outcome {
+            values = values.filter { $0.outcome == outcome }
+        }
+        if let take = query.take, take > 0 {
+            values = Array(values.prefix(take))
+        }
+        return values
     }
 
     func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
@@ -690,19 +902,19 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
     func logs(query: TorrentCoreLogQuery) async throws -> [TorrentCoreActivityLogEntry] {
         calls.logs += 1
         try checkConnection()
-        return Array(TorrentCorePreviewFixtures.activityLogs.prefix(query.take))
+        return Array(logValues.prefix(query.take))
     }
 
     func peers(torrentID: UUID) async throws -> [TorrentCorePeer] {
         calls.peers += 1
         try checkConnection()
-        return TorrentCorePreviewFixtures.peers
+        return peerValues
     }
 
     func trackers(torrentID: UUID) async throws -> [TorrentCoreTracker] {
         calls.trackers += 1
         try checkConnection()
-        return TorrentCorePreviewFixtures.trackers
+        return trackerValues
     }
 
     func runtimeSettings() async throws -> TorrentCoreRuntimeSettings {
@@ -817,6 +1029,77 @@ private func torrent(named name: String) -> TorrentCoreTorrentSummary {
     var torrent = TorrentCoreTorrentSummary.initPreview
     torrent.name = name
     return torrent
+}
+
+private func makeTorrents(count: Int) -> [TorrentCoreTorrentSummary] {
+    (0..<count).map { index in
+        var torrent = TorrentCoreTorrentSummary.initPreview
+        torrent.torrentID = UUID()
+        torrent.name = "Fixture Torrent \(index + 1)"
+        switch index {
+        case 0..<10:
+            torrent.state = .downloading
+            torrent.canPause = true
+            torrent.canResume = false
+        case 10..<20:
+            torrent.state = .resolvingMetadata
+            torrent.canPause = true
+            torrent.canResume = false
+        default:
+            torrent.state = index.isMultiple(of: 2) ? .paused : .completed
+            torrent.canPause = false
+            torrent.canResume = torrent.state == .paused
+        }
+        return torrent
+    }
+}
+
+private func makeHistory(count: Int) -> [TorrentCoreHistorySummary] {
+    let template = TorrentCorePreviewFixtures.history.first {
+        $0.outcome == .active
+    }!
+    return (0..<count).map { index in
+        var history = template
+        history.torrentID = UUID()
+        history.name = "Fixture History \(index + 1)"
+        history.submittedAt = template.submittedAt.addingTimeInterval(
+            -TimeInterval(index)
+        )
+        history.lastUpdatedAt = history.submittedAt
+        return history
+    }
+}
+
+private func makeLogs(count: Int) -> [TorrentCoreActivityLogEntry] {
+    let template = TorrentCorePreviewFixtures.activityLogs[0]
+    return (0..<count).map { index in
+        var log = template
+        log.logEntryID = Int64(index + 1)
+        log.message = "Fixture log \(index + 1)"
+        log.occurredAt = template.occurredAt.addingTimeInterval(
+            -TimeInterval(index)
+        )
+        return log
+    }
+}
+
+private func makePeers(count: Int) -> [TorrentCorePeer] {
+    let template = TorrentCorePreviewFixtures.peers[0]
+    return (0..<count).map { index in
+        var peer = template
+        peer.endpoint = "192.0.2.\((index % 250) + 1):\(10_000 + index)"
+        return peer
+    }
+}
+
+private func makeTrackers(count: Int) -> [TorrentCoreTracker] {
+    let template = TorrentCorePreviewFixtures.trackers[0]
+    return (0..<count).map { index in
+        var tracker = template
+        tracker.tierNumber = index / 10
+        tracker.trackerNumber = index
+        return tracker
+    }
 }
 
 @MainActor

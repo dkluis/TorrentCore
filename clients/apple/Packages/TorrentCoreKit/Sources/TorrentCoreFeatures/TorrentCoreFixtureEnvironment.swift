@@ -3,12 +3,16 @@ import TorrentCoreAPI
 
 public enum TorrentCoreFixtureEnvironment {
     @MainActor
-    public static func makeSession() throws -> TorrentCoreFeatureSession {
+    public static func makeSession(
+        largeCollections: Bool = false
+    ) throws -> TorrentCoreFeatureSession {
         let profile = try TorrentCoreConnectionProfile(
             name: "Fixture Service",
             address: "http://fixture.torrentcore.test:7033"
         )
-        let client = TorrentCoreFixtureServiceClient()
+        let client = TorrentCoreFixtureServiceClient(
+            largeCollections: largeCollections
+        )
         return TorrentCoreFeatureSession(
             profileStore: TorrentCoreFixtureProfileStore(.init(
                 profiles: [profile],
@@ -51,12 +55,32 @@ private struct TorrentCoreFixtureClientFactory: TorrentCoreServiceClientBuilding
 }
 
 private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol {
-    private var torrentValues = [
-        TorrentCorePreviewFixtures.downloadingTorrent,
-        TorrentCorePreviewFixtures.pausedTorrent,
-    ]
+    private var torrentValues: [TorrentCoreTorrentSummary]
+    private var historyValues: [TorrentCoreHistorySummary]
+    private var logValues: [TorrentCoreActivityLogEntry]
+    private var peerValues: [TorrentCorePeer]
+    private var trackerValues: [TorrentCoreTracker]
     private var categoryValues = TorrentCorePreviewFixtures.categories
     private var runtimeSettingsValue = TorrentCorePreviewFixtures.runtimeSettings
+
+    init(largeCollections: Bool) {
+        if largeCollections {
+            torrentValues = Self.makeTorrents(count: 100)
+            historyValues = Self.makeHistory(count: 500)
+            logValues = Self.makeLogs(count: 5_000)
+            peerValues = Self.makePeers(count: 250)
+            trackerValues = Self.makeTrackers(count: 50)
+        } else {
+            torrentValues = [
+                TorrentCorePreviewFixtures.downloadingTorrent,
+                TorrentCorePreviewFixtures.pausedTorrent,
+            ]
+            historyValues = TorrentCorePreviewFixtures.history
+            logValues = TorrentCorePreviewFixtures.activityLogs
+            peerValues = TorrentCorePreviewFixtures.peers
+            trackerValues = TorrentCorePreviewFixtures.trackers
+        }
+    }
 
     func probe() async throws -> TorrentCoreServiceHealth {
         TorrentCorePreviewFixtures.connectedHealth
@@ -122,7 +146,7 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
     }
 
     func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary] {
-        var values = TorrentCorePreviewFixtures.history
+        var values = historyValues
         if let name = query.torrentName, !name.isEmpty {
             values = values.filter {
                 $0.name?.localizedCaseInsensitiveContains(name) == true
@@ -147,7 +171,7 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
     }
 
     func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
-        guard let history = TorrentCorePreviewFixtures.history.first(where: {
+        guard let history = historyValues.first(where: {
             $0.torrentID == torrentID
         }) else {
             throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
@@ -167,7 +191,7 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
     }
 
     func logs(query: TorrentCoreLogQuery) async throws -> [TorrentCoreActivityLogEntry] {
-        var values = TorrentCorePreviewFixtures.activityLogs
+        var values = logValues
         if let level = query.level {
             values = values.filter { logLevel($0.level) == level }
         }
@@ -196,14 +220,14 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         guard torrentValues.contains(where: { $0.torrentID == torrentID }) else {
             throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
         }
-        return TorrentCorePreviewFixtures.peers
+        return peerValues
     }
 
     func trackers(torrentID: UUID) async throws -> [TorrentCoreTracker] {
         guard torrentValues.contains(where: { $0.torrentID == torrentID }) else {
             throw TorrentCoreClientError.unexpectedResponse(statusCode: 404)
         }
-        return TorrentCorePreviewFixtures.trackers
+        return trackerValues
     }
 
     func runtimeSettings() async throws -> TorrentCoreRuntimeSettings {
@@ -401,6 +425,81 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         case "error": .error
         case "critical": .critical
         default: nil
+        }
+    }
+
+    private static func makeTorrents(
+        count: Int
+    ) -> [TorrentCoreTorrentSummary] {
+        (0..<count).map { index in
+            var torrent = TorrentCorePreviewFixtures.downloadingTorrent
+            torrent.torrentID = UUID()
+            torrent.name = "Fixture Torrent \(index + 1)"
+            switch index {
+            case 0..<10:
+                torrent.state = .downloading
+                torrent.canPause = true
+                torrent.canResume = false
+            case 10..<20:
+                torrent.state = .resolvingMetadata
+                torrent.canPause = true
+                torrent.canResume = false
+            default:
+                torrent.state = index.isMultiple(of: 2) ? .paused : .completed
+                torrent.canPause = false
+                torrent.canResume = torrent.state == .paused
+            }
+            return torrent
+        }
+    }
+
+    private static func makeHistory(
+        count: Int
+    ) -> [TorrentCoreHistorySummary] {
+        let template = TorrentCorePreviewFixtures.history[0]
+        return (0..<count).map { index in
+            var history = template
+            history.torrentID = UUID()
+            history.name = "Fixture History \(index + 1)"
+            history.submittedAt = template.submittedAt.addingTimeInterval(
+                -TimeInterval(index)
+            )
+            history.lastUpdatedAt = history.submittedAt
+            return history
+        }
+    }
+
+    private static func makeLogs(
+        count: Int
+    ) -> [TorrentCoreActivityLogEntry] {
+        let template = TorrentCorePreviewFixtures.activityLogs[0]
+        return (0..<count).map { index in
+            var log = template
+            log.logEntryID = Int64(index + 1)
+            log.message = "Fixture log \(index + 1)"
+            log.occurredAt = template.occurredAt.addingTimeInterval(
+                -TimeInterval(index)
+            )
+            return log
+        }
+    }
+
+    private static func makePeers(count: Int) -> [TorrentCorePeer] {
+        let template = TorrentCorePreviewFixtures.peers[0]
+        return (0..<count).map { index in
+            var peer = template
+            peer.endpoint = "192.0.2.\((index % 250) + 1):\(10_000 + index)"
+            return peer
+        }
+    }
+
+    private static func makeTrackers(count: Int) -> [TorrentCoreTracker] {
+        let template = TorrentCorePreviewFixtures.trackers[0]
+        return (0..<count).map { index in
+            var tracker = template
+            tracker.tierNumber = index / 10
+            tracker.trackerNumber = index
+            return tracker
         }
     }
 }

@@ -118,6 +118,7 @@ extension TorrentCoreClientError {
                 return .timedOut(operation: operation, outcomeUncertain: operation.isMutation)
             case .cannotFindHost,
                  .cannotConnectToHost,
+                 .dataNotAllowed,
                  .dnsLookupFailed,
                  .networkConnectionLost,
                  .notConnectedToInternet:

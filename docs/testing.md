@@ -62,6 +62,12 @@ show/hide behavior for the Torrents, History, and Logs inspectors. Service Setti
 Downloads values and the inline category grid.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail
 when corresponding records exist.
+
+Milestone 5A adds direct coverage for denied and interrupted networks, read and mutation timeout meaning, late
+old-context responses, restart recovery retries, changed service-instance identity, and the agreed fixture maxima of
+100 torrents, 500 history rows, 5,000 log rows, 250 peers, and 50 trackers. A changed instance must clear cached remote
+snapshots, preserve device profiles and preferences, and reload only the open feature context.
+
 The `TorrentCoreMac` scheme includes a unit target and a fixture-only UI target. Compile both without launching an app:
 
 ```bash
@@ -80,7 +86,9 @@ xcodebuild \
 Run `TorrentCoreMacUITests` only from a normal development-signed test build. The target supplies
 `--torrentcore-ui-fixtures`, which uses an in-memory service and never reads a saved endpoint or contacts a live
 TorrentCore installation. Do not execute an unsigned UI-test product because macOS rejects it before test bootstrap.
-The July 24, 2026 Milestone 4 signed fixture run passed all four UI tests.
+The private `--torrentcore-ui-large-fixtures` mode provides the agreed maximum collections to UI automation under the
+same no-network boundary. The July 25, 2026 Milestone 5A signed fixture run passed all six UI tests, including keyboard
+navigation, initial Add Magnet focus, and large-list pagination.
 
 Production Swagger availability is verified by `OpenApiContractTests` alongside normalized contract comparison.
 

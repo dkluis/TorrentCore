@@ -572,30 +572,37 @@ public final class TorrentCoreFeatureSession {
     }
 
     public func restartService() async throws -> TorrentCoreServiceRestartResult {
+        guard let restartingProfile = activeProfile else {
+            throw TorrentCoreFeatureActionError.offline
+        }
         let serviceClient = try beginMutation(.restartService)
         do {
             let result = try await serviceClient.restartService()
-            if let profileID = activeProfile?.id {
-                connectionState = .notConnected(profileID: profileID)
-            }
+            connectionState = .notConnected(profileID: restartingProfile.id)
 
             if restartRecoveryDelay > 0 {
-                try await Task.sleep(
-                    nanoseconds: UInt64(restartRecoveryDelay * 1_000_000_000)
-                )
+                try await sleeper.sleep(for: restartRecoveryDelay)
             }
             for attempt in 0..<15 {
                 do {
                     let serviceHealth = try await serviceClient.probe()
-                    health = serviceHealth
-                    if let profileID = activeProfile?.id {
-                        connectionState = .connected(profileID: profileID, connectedAt: now())
+                    let status = try await serviceClient.hostStatus()
+                    guard activeProfile?.id == restartingProfile.id else {
+                        throw TorrentCoreClientError.cancelled
                     }
+                    health = serviceHealth
+                    acceptHostStatus(status, for: context)
+                    connectionState = .connected(
+                        profileID: restartingProfile.id,
+                        connectedAt: now()
+                    )
                     activeMutation = nil
                     await refresh()
                     return result
+                } catch TorrentCoreClientError.cancelled {
+                    throw TorrentCoreClientError.cancelled
                 } catch where attempt < 14 {
-                    try await Task.sleep(for: .seconds(2))
+                    try await sleeper.sleep(for: 2)
                 }
             }
 
@@ -695,6 +702,17 @@ public final class TorrentCoreFeatureSession {
         client = nil
         clientProfileID = nil
         health = nil
+        resetFeatureSnapshots()
+        activeMutation = nil
+
+        if let profileID = preferences.activeProfileID {
+            connectionState = .notConnected(profileID: profileID)
+        } else {
+            connectionState = .noProfile
+        }
+    }
+
+    private func resetFeatureSnapshots() {
         hostStatus.reset()
         dashboardLifecycle.reset()
         torrents.reset()
@@ -707,13 +725,6 @@ public final class TorrentCoreFeatureSession {
         peers.reset()
         trackers.reset()
         runtimeSettings.reset()
-        activeMutation = nil
-
-        if let profileID = preferences.activeProfileID {
-            connectionState = .notConnected(profileID: profileID)
-        } else {
-            connectionState = .noProfile
-        }
     }
 
     private func ensureUniqueAddress(_ baseURL: URL, excluding profileID: UUID?) throws {
@@ -776,7 +787,7 @@ public final class TorrentCoreFeatureSession {
                     return
                 }
                 let completedAt = now()
-                hostStatus.succeed(status, at: completedAt)
+                acceptHostStatus(status, for: context, at: completedAt)
                 dashboardLifecycle.succeed(lifecycle, at: completedAt)
             case .torrents:
                 let summaries = try await serviceClient.torrents()
@@ -918,22 +929,31 @@ public final class TorrentCoreFeatureSession {
             throw CancellationError()
         }
 
-        let loadedHost: TorrentCoreHostStatus?
-        if hostStatus.value == nil {
-            loadedHost = try await serviceClient.hostStatus()
-        } else {
-            loadedHost = nil
-        }
+        let loadedHost = try await serviceClient.hostStatus()
         guard isCurrent(profile: profile, context: context, generation: generation) else {
             throw CancellationError()
         }
 
         health = serviceHealth
-        if let loadedHost {
-            hostStatus.succeed(loadedHost, at: now())
-        }
+        acceptHostStatus(loadedHost, for: context)
         connectionState = .connected(profileID: profile.id, connectedAt: now())
         return loadedHost
+    }
+
+    private func acceptHostStatus(
+        _ status: TorrentCoreHostStatus,
+        for context: TorrentCoreFeatureContext,
+        at completedAt: Date? = nil
+    ) {
+        let previousInstanceID = hostStatus.value?.serviceInstanceID
+        let changedInstance = previousInstanceID != nil
+            && status.serviceInstanceID != nil
+            && previousInstanceID != status.serviceInstanceID
+        if changedInstance {
+            resetFeatureSnapshots()
+            beginLoading(context)
+        }
+        hostStatus.succeed(status, at: completedAt ?? now())
     }
 
     private func beginLoading(_ context: TorrentCoreFeatureContext) {

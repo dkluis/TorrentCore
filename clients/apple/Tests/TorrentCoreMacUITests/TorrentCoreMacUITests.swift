@@ -179,10 +179,98 @@ final class TorrentCoreMacUITests: XCTestCase {
         )
     }
 
-    private func launchApp() -> XCUIApplication {
+    func testKeyboardCommandsAndAddMagnetInitialFocus() {
+        let app = launchApp()
+
+        app.typeKey("2", modifierFlags: .command)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["torrents.table"]
+                .waitForExistence(timeout: 10)
+        )
+
+        let addButton = app.descendants(matching: .any)["toolbar.addMagnet"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 5))
+        addButton.click()
+
+        let magnetField = app.descendants(matching: .any)["addMagnet.uri"]
+        XCTAssertTrue(magnetField.waitForExistence(timeout: 5))
+        let magnet = "magnet:?xt=urn:btih:keyboardfocus"
+        app.typeText(magnet)
+        XCTAssertEqual(magnetField.value as? String, magnet)
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(magnetField.waitForNonExistence(timeout: 5))
+
+        app.typeKey("3", modifierFlags: .command)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.row"].firstMatch
+                .waitForExistence(timeout: 10)
+        )
+
+        app.typeKey("4", modifierFlags: .command)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.row"].firstMatch
+                .waitForExistence(timeout: 10)
+        )
+
+        app.typeKey("5", modifierFlags: .command)
+        XCTAssertTrue(app.staticTexts["Downloads"].waitForExistence(timeout: 10))
+
+        app.typeKey("6", modifierFlags: .command)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["connection.list"]
+                .waitForExistence(timeout: 10)
+        )
+
+        app.typeKey("1", modifierFlags: .command)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["dashboard.content"]
+                .waitForExistence(timeout: 10)
+        )
+    }
+
+    func testAgreedLargeCollectionsRenderAndPaginate() {
+        let app = launchApp(largeCollections: true)
+
+        app.typeKey("2", modifierFlags: .command)
+        XCTAssertTrue(
+            app.staticTexts["1–25 of 100"].waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(app.staticTexts["Page 1 of 4"].exists)
+        let nextTorrentPage = app.descendants(matching: .any)[
+            "torrents.nextPage"
+        ]
+        XCTAssertTrue(nextTorrentPage.isEnabled)
+        nextTorrentPage.click()
+        XCTAssertTrue(
+            app.staticTexts["26–50 of 100"].waitForExistence(timeout: 5)
+        )
+
+        app.typeKey("3", modifierFlags: .command)
+        XCTAssertTrue(
+            app.staticTexts["1–50 of 500"].waitForExistence(timeout: 10)
+        )
+
+        app.typeKey("4", modifierFlags: .command)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.row"].firstMatch
+                .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.limitNotice"]
+                .waitForExistence(timeout: 5)
+        )
+    }
+
+    private func launchApp(
+        largeCollections: Bool = false
+    ) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
-        app.launchArguments = ["--torrentcore-ui-fixtures"]
+        app.launchArguments = [
+            largeCollections
+                ? "--torrentcore-ui-large-fixtures"
+                : "--torrentcore-ui-fixtures",
+        ]
         app.launch()
         let dashboardNavigation = app.descendants(matching: .any)[
             "navigation.dashboard"

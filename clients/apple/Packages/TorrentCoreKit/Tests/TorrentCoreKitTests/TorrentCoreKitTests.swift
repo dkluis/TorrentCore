@@ -108,6 +108,8 @@ func problemDetailsAndNetworkFailuresKeepTheirMeaning() async throws {
 
     for (failure, expected) in [
         (FailureTransport.Failure.offline, "offline"),
+        (.interrupted, "offline"),
+        (.denied, "offline"),
         (.timeout, "timeout"),
         (.cancelled, "cancelled"),
     ] {
@@ -129,6 +131,20 @@ func problemDetailsAndNetworkFailuresKeepTheirMeaning() async throws {
         } catch TorrentCoreClientError.cancelled {
             #expect(expected == "cancelled")
         }
+    }
+
+    let readTimeoutClient = try TorrentCoreClient(
+        baseURL: #require(URL(string: "http://torrentcore.test:7033")),
+        healthTransport: FailureTransport(failure: .timeout),
+        readTransport: FailureTransport(failure: .timeout),
+        mutationTransport: FailureTransport(failure: .timeout)
+    )
+    do {
+        _ = try await readTimeoutClient.torrents()
+        Issue.record("Expected a read timeout")
+    } catch let TorrentCoreClientError.timedOut(operation, outcomeUncertain) {
+        #expect(operation == .torrentList)
+        #expect(!outcomeUncertain)
     }
 
     let invalidPayloadClient = try TorrentCoreClient(
@@ -518,6 +534,8 @@ private struct FailureTransport: ClientTransport {
     enum Failure: Sendable {
         case problem
         case offline
+        case interrupted
+        case denied
         case timeout
         case cancelled
     }
@@ -539,6 +557,10 @@ private struct FailureTransport: ClientTransport {
             )
         case .offline:
             throw URLError(.cannotConnectToHost)
+        case .interrupted:
+            throw URLError(.networkConnectionLost)
+        case .denied:
+            throw URLError(.dataNotAllowed)
         case .timeout:
             throw URLError(.timedOut)
         case .cancelled:

@@ -7,7 +7,8 @@ This document is an implementation plan, not a statement of current product supp
 `TorrentCore.WebUI` remains the supported operator UI until the native macOS client reaches its release milestone and
 the active architecture documentation is deliberately updated.
 
-Milestones 0 through 3 were completed on July 23, 2026.
+Milestones 0 through 3 were completed on July 23, 2026, and Milestone 4 was completed on July 24, 2026.
+Milestone 5 is in progress; its automated hardening stage was completed on July 25, 2026.
 
 ## Outcome
 
@@ -44,6 +45,8 @@ native interaction models rather than sharing complete screens.
 - Keep torrent actions single-item. Defer native multi-selection unless later operator experience establishes a need.
 - Paginate the native torrent table locally with 25, 50, 100, or 250 rows after local filtering and sorting.
 - Present selected torrent details in the standard resizable trailing macOS inspector.
+- Keep the limited-release accessibility scope proportional: verify keyboard and focus behavior, readable native text and
+  contrast, useful control labels, and no color-only state. A comprehensive VoiceOver pass is not required.
 
 ## Development And Runtime Model
 
@@ -370,11 +373,15 @@ Implementation notes:
 
 ### Milestone 5: macOS Hardening And Limited Release
 
+Status: in progress. Stage 5A automated hardening completed July 25, 2026. Manual verification, release packaging, and
+separate-Mac acceptance remain pending.
+
 Turn feature parity into a supportable application.
 
 Work:
 
-- complete VoiceOver, keyboard navigation, focus, contrast, and Dynamic Type review
+- complete the agreed limited accessibility review: keyboard navigation, focus, readable native text and contrast,
+  useful control labels, and no color-only state
 - test slow, interrupted, denied, and changing network conditions
 - test service restart, service-instance changes, and stale responses
 - test large torrent, history, peer, tracker, and log collections
@@ -382,6 +389,32 @@ Work:
 - add release build, signing, notarization, packaging, and installation instructions
 - add a repeatable opt-in live integration checklist
 - document recovery through the WebUI when the native client is unavailable
+
+Implementation stages:
+
+- **5A — automated hardening:** complete. Deterministic shared tests cover read and mutation timeout meaning, denied and
+  interrupted network failures, late responses from an old feature context, restart recovery retries, service-instance
+  replacement, and the agreed maximum fixture collections of 100 torrents, 500 history rows, 5,000 log rows, 250
+  peers, and 50 trackers. The signed fixture UI suite covers Command-1 through Command-6 navigation, initial Add Magnet
+  focus, torrent and history paging, and the log result-limit notice.
+- **5B — limited accessibility and manual failure verification:** pending. Use the agreed keyboard/focus/readability
+  scope and manually verify Wi-Fi interruption and a controlled service-only outage on a disposable installation.
+- **5C — release construction:** pending. Configure and verify release signing, Developer ID distribution,
+  notarization, DMG packaging, installation, and recovery instructions.
+- **5D — separate-Mac acceptance:** pending. Install the release candidate on an Apple Silicon macOS 26 laptop and
+  perform a secondary compatibility check on the Apple Silicon macOS 27 beta laptop.
+
+Stage 5A behavior:
+
+- A reconnect checks the service instance identity. If it changed, all cached remote snapshots are discarded, device
+  profiles and preferences are preserved, and only the open feature context is loaded again. Mutations remain disabled
+  until that context is current.
+- Requested service restart uses the same identity check and bounded recovery polling. Cancellation or a profile change
+  aborts recovery instead of retrying against a different installation.
+- The native client contains no diagnostic logging calls. No callback API key, magnet URI, saved endpoint, or full URL
+  is written to a native-client diagnostic log.
+- Verification passed with 26 shared Swift tests, six development-signed macOS fixture UI tests, an unsigned macOS
+  build-for-testing, and an unsigned iOS Simulator build. No service or WebUI source changed.
 
 Exit criteria:
 

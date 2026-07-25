@@ -2,9 +2,10 @@
 
 ## Status
 
-Milestones 0 through 4 are complete. The macOS client implements the current supported WebUI operator capabilities
-through native workflows. Milestone 4 shared, build, signed fixture UI, and live read-only verification passed on
-July 24, 2026. The operator-approved disposable live mutation sequence last passed on July 23, 2026.
+Milestones 0 through 4 are complete. Milestone 5 is in progress; its automated hardening stage passed shared, macOS
+build, iOS Simulator build, and signed fixture UI verification on July 25, 2026. Manual failure checks, release
+packaging, and separate-Mac acceptance remain pending. The operator-approved disposable live mutation sequence last
+passed on July 23, 2026.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -87,6 +88,10 @@ and suspended applications do not poll. When a torrent inspector is visible, the
 selected detail together. Offline state retains last-known values in memory and marks them stale. Service actions are
 disabled until refresh reconnects, and mutations are never retried automatically.
 
+Reconnect also verifies the service instance identity. If the service has been replaced or restarted with a new
+identity, all cached remote snapshots are cleared while device profiles and preferences remain intact. Only the open
+feature context reloads, and mutations stay disabled until its authoritative state is current.
+
 `TorrentCoreCredentialStoring` reserves a credential boundary and the Keychain service name
 `com.conadv.TorrentCore.credentials`. The initial trusted-LAN/VPN model uses
 `UnconfiguredTorrentCoreCredentialStore`, so it creates no Keychain items or permission prompts.
@@ -132,8 +137,9 @@ remembers the last destination, but opens Connection when there is no active sav
   preferences. Inspector is a contextual customizable item, and Connection Status is available from toolbar
   customization but is not included by default.
 
-The app has no compiled live endpoint. `--torrentcore-ui-fixtures` is reserved for the Xcode UI-test target and starts
-an in-memory fixture service; it never contacts or mutates a deployed TorrentCore installation.
+The app has no compiled live endpoint. `--torrentcore-ui-fixtures` and the large-collection variant
+`--torrentcore-ui-large-fixtures` are reserved for Xcode UI testing and start an in-memory fixture service; neither
+contacts nor mutates a deployed TorrentCore installation.
 
 ## Build And Test
 

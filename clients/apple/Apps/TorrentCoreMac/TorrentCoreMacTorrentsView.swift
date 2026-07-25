@@ -1059,6 +1059,7 @@ struct TorrentCoreMacAddMagnetView: View {
     @State private var selectedCategoryKey: String?
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @FocusState private var isMagnetURIFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -1068,6 +1069,7 @@ struct TorrentCoreMacAddMagnetView: View {
             TextEditor(text: $magnetURI)
                 .font(.body.monospaced())
                 .frame(minHeight: 130)
+                .focused($isMagnetURIFieldFocused)
                 .overlay {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(.separator)
@@ -1120,6 +1122,7 @@ struct TorrentCoreMacAddMagnetView: View {
         .frame(width: 620)
         .interactiveDismissDisabled(isSubmitting)
         .onAppear {
+            isMagnetURIFieldFocused = true
             if session.categories.value == nil {
                 Task {
                     await session.refresh()

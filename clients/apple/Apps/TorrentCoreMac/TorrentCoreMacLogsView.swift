@@ -80,6 +80,7 @@ struct TorrentCoreMacLogsView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("logs.limitNotice")
             }
 
             if session.logs.value == nil {
