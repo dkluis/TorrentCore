@@ -373,8 +373,8 @@ Implementation notes:
 
 ### Milestone 5: macOS Hardening And Limited Release
 
-Status: in progress. Stage 5A automated hardening completed July 25, 2026. Manual verification, release packaging, and
-separate-Mac acceptance remain pending.
+Status: in progress. Stage 5A automated hardening completed July 25, 2026. Stage 5B manual verification is in progress;
+release packaging and separate-Mac acceptance remain pending.
 
 Turn feature parity into a supportable application.
 
@@ -397,8 +397,15 @@ Implementation stages:
   replacement, and the agreed maximum fixture collections of 100 torrents, 500 history rows, 5,000 log rows, 250
   peers, and 50 trackers. The signed fixture UI suite covers Command-1 through Command-6 navigation, initial Add Magnet
   focus, torrent and history paging, and the log result-limit notice.
-- **5B — limited accessibility and manual failure verification:** pending. Use the agreed keyboard/focus/readability
-  scope and manually verify Wi-Fi interruption and a controlled service-only outage on a disposable installation.
+- **5B — limited accessibility and manual failure verification:** in progress. The agreed visual review, app-local
+  System/Light/Dark appearance choices, Command-1 through Command-6 navigation, inspector controls, Add Magnet focus,
+  and the main read screens passed operator verification on CA-Desktop. The Add Magnet sheet performs one category
+  load when opened, quietly revalidates cached categories, rejects only clearly invalid magnet syntax locally, and
+  presents structured TorrentCore problem details. The guarded disposable add/observe/pause/resume/remove sequence
+  passed against CA-Desktop on July 25, 2026. A controlled service-only outage also passed: cached data remained
+  coherent and read-only, mutations were disabled, Refresh remained available, and the open context recovered without
+  strange or stale cross-instance data after the service restarted. Wi-Fi interruption on a separate Mac remains
+  pending because CA-Desktop must retain its active Ethernet connection.
 - **5C — release construction:** pending. Configure and verify release signing, Developer ID distribution,
   notarization, DMG packaging, installation, and recovery instructions.
 - **5D — separate-Mac acceptance:** pending. Install the release candidate on an Apple Silicon macOS 26 laptop and
@@ -415,6 +422,27 @@ Stage 5A behavior:
   is written to a native-client diagnostic log.
 - Verification passed with 26 shared Swift tests, six development-signed macOS fixture UI tests, an unsigned macOS
   build-for-testing, and an unsigned iOS Simulator build. No service or WebUI source changed.
+
+Stage 5B behavior completed so far:
+
+- Appearance is a device-local app preference with System, Light, and Dark choices. System remains the default.
+- The service's existing `application/problem+json` error responses are described with that media type in OpenAPI, so
+  the generated Swift client decodes the existing structured error body instead of reporting a content-type mismatch.
+  This is contract-metadata correction only; the service runtime response and handwritten C# WebUI client behavior are
+  unchanged.
+- Add Magnet does a single category refresh when the sheet opens. Existing category values remain usable without a
+  misleading continuous-refresh message, and a category-load failure still permits an Uncategorized add.
+- Local validation requires only the `magnet:?` prefix and a nonempty `xt` query value. TorrentCore and MonoTorrent
+  remain authoritative for duplicate, category, and complete magnet validation.
+- During the controlled service-only outage, the app retained its last-known data without replacing it with a false
+  empty state. After the local service restarted and its read-only live probe passed, the app reconnected and continued
+  from the open context without operator intervention or inconsistent data.
+- History rows show the completion callback Final Result from an additive summary-contract field, avoiding a
+  per-row detail-request fan-out. Rows without feedback show an em dash.
+- The History inspector always presents callback Summary, Received, Final Result, and Reason fields. Summary uses the
+  feedback display message and falls back to Final Result; unavailable values show an em dash.
+- The History inspector can copy the full stored magnet URI to the macOS pasteboard. This local-only action remains
+  available during a service outage and is disabled only when the history record has no magnet URI.
 
 Exit criteria:
 

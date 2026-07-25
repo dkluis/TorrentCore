@@ -5,6 +5,8 @@ import TorrentCoreFeatures
 @MainActor
 struct TorrentCoreMacApp: App {
     @State private var session: TorrentCoreFeatureSession
+    @AppStorage(TorrentCoreMacAppearance.storageKey)
+    private var appearanceRawValue = TorrentCoreMacAppearance.system.rawValue
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -45,6 +47,7 @@ struct TorrentCoreMacApp: App {
     var body: some Scene {
         WindowGroup {
             TorrentCoreMacContentView(session: session)
+                .preferredColorScheme(appearance.colorScheme)
         }
         .defaultSize(width: 1_180, height: 760)
         .commands {
@@ -55,6 +58,11 @@ struct TorrentCoreMacApp: App {
 
         Settings {
             TorrentCoreMacSettingsView(session: session)
+                .preferredColorScheme(appearance.colorScheme)
         }
+    }
+
+    private var appearance: TorrentCoreMacAppearance {
+        TorrentCoreMacAppearance(rawValue: appearanceRawValue) ?? .system
     }
 }

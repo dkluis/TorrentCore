@@ -1,7 +1,36 @@
+import AppKit
 import Foundation
 import SwiftUI
 import TorrentCoreAPI
 import TorrentCoreFeatures
+
+private enum TorrentCoreMacMagnetCopyStatus {
+    case idle
+    case copied
+    case failed
+
+    var label: String {
+        switch self {
+        case .idle:
+            "Copy Magnet"
+        case .copied:
+            "Copied"
+        case .failed:
+            "Copy Failed"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .idle:
+            "doc.on.doc"
+        case .copied:
+            "checkmark"
+        case .failed:
+            "exclamationmark.triangle"
+        }
+    }
+}
 
 struct TorrentCoreMacHistoryView: View {
     enum SortField: String, CaseIterable {
@@ -50,6 +79,8 @@ struct TorrentCoreMacHistoryView: View {
     @State private var includesToDate: Bool
     @State private var selectedHistoryKey: String?
     @State private var pageIndex = 0
+    @State private var magnetCopyStatus = TorrentCoreMacMagnetCopyStatus.idle
+    @State private var magnetCopyResetTask: Task<Void, Never>?
 
     init(
         session: TorrentCoreFeatureSession,
@@ -123,6 +154,8 @@ struct TorrentCoreMacHistoryView: View {
                 .inspectorColumnWidth(min: 330, ideal: 400, max: 540)
         }
         .onChange(of: selectedHistoryKey) { _, key in
+            magnetCopyResetTask?.cancel()
+            magnetCopyStatus = .idle
             selectedTorrentID = sortedValues.first(where: { $0.id == key })?.torrentID
             isInspectorPresented = selectedTorrentID != nil
             contextChanged()
@@ -133,6 +166,9 @@ struct TorrentCoreMacHistoryView: View {
         .onChange(of: pageSize) { _, _ in pageIndex = 0 }
         .onChange(of: sortRaw) { _, _ in pageIndex = 0 }
         .onChange(of: sortDescending) { _, _ in pageIndex = 0 }
+        .onDisappear {
+            magnetCopyResetTask?.cancel()
+        }
     }
 
     private var filterBar: some View {
@@ -262,6 +298,10 @@ struct TorrentCoreMacHistoryView: View {
                         .frame(width: 110, alignment: .leading)
                     Text(item.outcome.rawValue)
                         .frame(width: 95, alignment: .leading)
+                    Text("Final Result: \(item.completionCallbackFinalResult ?? "—")")
+                        .lineLimit(1)
+                        .frame(width: 155, alignment: .leading)
+                        .help("Completion callback final result")
                     Text(TorrentCoreDisplayFormatter.percent(item.latestProgressPercent))
                         .monospacedDigit()
                         .frame(width: 75, alignment: .trailing)
@@ -360,6 +400,34 @@ struct TorrentCoreMacHistoryView: View {
                         label: "Removal Reason",
                         value: detail.removalReason ?? "—"
                     )
+                    Divider()
+                    Text("Callback Feedback")
+                        .font(.headline)
+                    TorrentCoreMacDetailRow(
+                        label: "Summary",
+                        value: TorrentCoreCompletionCallbackPresentation.feedbackSummary(
+                            detail.completionCallbackFeedback
+                        ) ?? "—"
+                    )
+                    .accessibilityIdentifier("history.feedback.summary")
+                    TorrentCoreMacDetailRow(
+                        label: "Received",
+                        value: TorrentCoreDisplayFormatter.timestamp(
+                            detail.completionCallbackFeedback?.receivedAt
+                        )
+                    )
+                    .accessibilityIdentifier("history.feedback.received")
+                    TorrentCoreMacDetailRow(
+                        label: "Final Result",
+                        value: detail.completionCallbackFeedback?.finalState ?? "—"
+                    )
+                    .accessibilityIdentifier("history.feedback.finalResult")
+                    TorrentCoreMacDetailRow(
+                        label: "Reason",
+                        value: detail.completionCallbackFeedback?.reasonCode ?? "—"
+                    )
+                    .accessibilityIdentifier("history.feedback.reason")
+                    historyMagnetRow(detail.magnetURI)
                     TorrentCoreMacDetailRow(label: "Info Hash", value: detail.infoHash ?? "—")
                     TorrentCoreMacDetailRow(
                         label: "Torrent ID",
@@ -385,6 +453,47 @@ struct TorrentCoreMacHistoryView: View {
             }
         }
         .accessibilityIdentifier("history.inspector.content")
+    }
+
+    private func historyMagnetRow(_ magnetURI: String?) -> some View {
+        LabeledContent("Magnet") {
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(copyableMagnetURI(magnetURI) ?? "—")
+                    .multilineTextAlignment(.trailing)
+                    .textSelection(.enabled)
+
+                Button {
+                    copyMagnet(magnetURI)
+                } label: {
+                    Label(magnetCopyStatus.label, systemImage: magnetCopyStatus.systemImage)
+                }
+                .disabled(copyableMagnetURI(magnetURI) == nil)
+                .accessibilityIdentifier("history.copyMagnet")
+            }
+        }
+    }
+
+    private func copyMagnet(_ magnetURI: String?) {
+        guard let magnetURI = copyableMagnetURI(magnetURI) else {
+            return
+        }
+
+        magnetCopyResetTask?.cancel()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        magnetCopyStatus = pasteboard.setString(magnetURI, forType: .string) ? .copied : .failed
+        magnetCopyResetTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else {
+                return
+            }
+            magnetCopyStatus = .idle
+        }
+    }
+
+    private func copyableMagnetURI(_ value: String?) -> String? {
+        let magnetURI = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return magnetURI.isEmpty ? nil : magnetURI
     }
 
     private var sortedValues: [TorrentCoreHistorySummary] {

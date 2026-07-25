@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using TorrentCore.Contracts;
 using TorrentCore.Contracts.Diagnostics;
+using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Service.Configuration;
 
@@ -201,5 +202,27 @@ public sealed class OpenApiContractTests
         Assert.NotNull(problemProperties["code"]);
         Assert.NotNull(problemProperties["target"]);
         Assert.NotNull(problemProperties["traceId"]);
+
+        var historySummaryProperties =
+                document["components"]?["schemas"]?[nameof(TorrentHistorySummaryDto)]?["properties"];
+        Assert.NotNull(historySummaryProperties);
+        Assert.NotNull(historySummaryProperties["completionCallbackFinalResult"]);
+
+        var problemResponseContentTypes = document["paths"]?
+            .AsObject()
+            .SelectMany(path => path.Value?.AsObject() ?? [])
+            .SelectMany(operation => operation.Value?["responses"]?.AsObject() ?? [])
+            .SelectMany(response => response.Value?["content"]?.AsObject() ?? [])
+            .Where(content => content.Value?["schema"]?["$ref"]?.GetValue<string>() ==
+                              $"#/components/schemas/{nameof(ServiceProblemDetailsDto)}")
+            .Select(content => content.Key)
+            .ToArray();
+
+        Assert.NotNull(problemResponseContentTypes);
+        Assert.NotEmpty(problemResponseContentTypes);
+        Assert.All(
+            problemResponseContentTypes,
+            contentType => Assert.Equal("application/problem+json", contentType)
+        );
     }
 }

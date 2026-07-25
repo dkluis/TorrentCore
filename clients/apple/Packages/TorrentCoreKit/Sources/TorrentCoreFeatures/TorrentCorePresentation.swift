@@ -192,3 +192,23 @@ public enum TorrentCoreDisplayFormatter {
         return output
     }
 }
+
+public enum TorrentCoreCompletionCallbackPresentation {
+    public static func feedbackSummary(
+        _ feedback: TorrentCoreCompletionCallbackFeedback?
+    ) -> String? {
+        guard let feedback else {
+            return nil
+        }
+
+        let displayMessage = (feedback.displayMessage ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !displayMessage.isEmpty {
+            return displayMessage
+        }
+
+        let finalResult = (feedback.finalState ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return finalResult.isEmpty ? nil : finalResult
+    }
+}

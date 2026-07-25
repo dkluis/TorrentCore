@@ -29,6 +29,7 @@ public sealed class TorrentHistorySummaryDto
     public required TorrentHistoryOutcome Outcome                    { get; init; }
     public          TorrentRemovalKind? RemovalKind                  { get; init; }
     public          string?         LatestCallbackStatus             { get; init; }
+    public          string?         CompletionCallbackFinalResult    { get; init; }
     public required bool            DataDeleted                      { get; init; }
     public          string?         RemovalReason                    { get; init; }
     public required bool            RemovedByCleanupPolicy           { get; init; }

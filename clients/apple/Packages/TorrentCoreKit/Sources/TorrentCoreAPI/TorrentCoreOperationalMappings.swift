@@ -3,6 +3,7 @@ import Foundation
 extension TorrentCoreHistorySummary {
     init(_ value: Components.Schemas.TorrentHistorySummaryDto) {
         categoryKey = value.categoryKey
+        completionCallbackFinalResult = value.completionCallbackFinalResult
         dataDeleted = value.dataDeleted
         downloadCompletedAt = value.downloadCompletedAt
         downloadRootPath = value.downloadRootPath

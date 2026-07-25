@@ -58,6 +58,7 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
 
 public struct TorrentCoreHistorySummary: Codable, Hashable, Sendable, Identifiable {
     public var categoryKey: String?
+    public var completionCallbackFinalResult: String?
     public var dataDeleted: Bool
     public var downloadCompletedAt: Date?
     public var downloadRootPath: String?

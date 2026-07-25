@@ -26,6 +26,23 @@ func sharedHelpCatalogCoversEveryServiceSetting() {
 }
 
 @Test
+func callbackFeedbackSummaryUsesDisplayMessageThenFinalResult() {
+    var feedback = TorrentCorePreviewFixtures.completionCallbackFeedback
+
+    #expect(
+        TorrentCoreCompletionCallbackPresentation.feedbackSummary(feedback)
+            == "TVMaze accepted the completed download."
+    )
+
+    feedback.displayMessage = " "
+    #expect(TorrentCoreCompletionCallbackPresentation.feedbackSummary(feedback) == "Success")
+
+    feedback.finalState = " "
+    #expect(TorrentCoreCompletionCallbackPresentation.feedbackSummary(feedback) == nil)
+    #expect(TorrentCoreCompletionCallbackPresentation.feedbackSummary(nil) == nil)
+}
+
+@Test
 func initialSliceBuildsDeterministicRequestsAndDecodesFixtures() async throws {
     let recorder = RequestRecorder()
     let transport = FixtureTransport(recorder: recorder)
@@ -550,7 +567,7 @@ private struct FailureTransport: ClientTransport {
     ) async throws -> (HTTPResponse, HTTPBody?) {
         switch failure {
         case .problem:
-            let headers: HTTPFields = [.contentType: "application/json"]
+            let headers: HTTPFields = [.contentType: "application/problem+json"]
             return (
                 HTTPResponse(status: .badRequest, headerFields: headers),
                 HTTPBody(FixturePayloads.problem)

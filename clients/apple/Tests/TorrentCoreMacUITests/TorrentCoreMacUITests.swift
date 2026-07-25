@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor
@@ -92,6 +93,35 @@ final class TorrentCoreMacUITests: XCTestCase {
             "history.inspector.content"
         ]
         XCTAssertTrue(historyInspector.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.staticTexts["Final Result: Success"].waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.feedback.summary"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.feedback.received"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.feedback.finalResult"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.feedback.reason"].exists
+        )
+
+        let copyMagnetButton = app.descendants(matching: .any)["history.copyMagnet"]
+        XCTAssertTrue(copyMagnetButton.waitForExistence(timeout: 5))
+        copyMagnetButton.click()
+        XCTAssertEqual(
+            NSPasteboard.general.string(forType: .string),
+            "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+        )
+        expectation(
+            for: NSPredicate(format: "label == %@", "Copied"),
+            evaluatedWith: copyMagnetButton
+        )
+        waitForExpectations(timeout: 1)
+
         let inspectorToggle = app.descendants(matching: .any)["toolbar.inspector"]
         XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
         inspectorToggle.click()

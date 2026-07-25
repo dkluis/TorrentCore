@@ -1,3 +1,4 @@
+using System.Text.Json;
 using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.History;
@@ -318,7 +319,19 @@ public sealed class TorrentHistoryServiceTests
             var addedAt = DateTimeOffset.UtcNow.AddMinutes(-5);
             var pendingAt = addedAt.AddMinutes(1);
             var invokedAt = addedAt.AddMinutes(2);
-            const string feedbackJson = """{"FinalState":"Success"}""";
+            var feedbackJson = JsonSerializer.Serialize(
+                new CompletionCallbackFeedbackDto
+                {
+                    TorrentId = TorrentId,
+                    FinalState = "Success",
+                    CallbackFinished = true,
+                    MediaConsideredDone = true,
+                    AllowResubmit = false,
+                    NeedsManualIntervention = false,
+                    AttemptCount = 1,
+                    ReceivedAtUtc = invokedAt,
+                }
+            );
 
             await service.ObserveSnapshotAsync(
                 CreateSnapshot(
@@ -349,12 +362,18 @@ public sealed class TorrentHistoryServiceTests
                 CancellationToken.None);
 
             var history = await store.GetAsync(TorrentId, CancellationToken.None);
+            var summary = Assert.Single(
+                await service.GetHistoryAsync(new TorrentHistoryQueryRequest(), CancellationToken.None)
+            );
+            var detail = await service.GetHistoryByTorrentIdAsync(TorrentId, CancellationToken.None);
 
             Assert.NotNull(history);
             Assert.Equal("Invoked", history.LatestCallbackStatus);
             Assert.Equal(invokedAt, history.CallbackCompletedAtUtc);
             Assert.Equal(invokedAt, history.LatestCompletionCallbackFeedbackReceivedAtUtc);
             Assert.Equal(feedbackJson, history.LatestCompletionCallbackFeedbackJson);
+            Assert.Equal("Success", summary.CompletionCallbackFinalResult);
+            Assert.Equal("Success", detail.CompletionCallbackFeedback?.FinalState);
         }
         finally
         {

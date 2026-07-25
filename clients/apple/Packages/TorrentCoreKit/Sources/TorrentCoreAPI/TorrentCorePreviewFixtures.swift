@@ -193,6 +193,7 @@ public enum TorrentCorePreviewFixtures {
     public static let history = [
         TorrentCoreHistorySummary(
             categoryKey: "tv",
+            completionCallbackFinalResult: nil,
             dataDeleted: false,
             downloadCompletedAt: nil,
             downloadRootPath: "/preview/downloads/tv",
@@ -225,6 +226,7 @@ public enum TorrentCorePreviewFixtures {
         ),
         TorrentCoreHistorySummary(
             categoryKey: "movie",
+            completionCallbackFinalResult: "Success",
             dataDeleted: false,
             downloadCompletedAt: checkedAt.addingTimeInterval(-90_000),
             downloadRootPath: "/preview/downloads/movies",
@@ -257,6 +259,7 @@ public enum TorrentCorePreviewFixtures {
         ),
         TorrentCoreHistorySummary(
             categoryKey: "tv",
+            completionCallbackFinalResult: nil,
             dataDeleted: false,
             downloadCompletedAt: nil,
             downloadRootPath: "/preview/downloads/tv",
@@ -289,12 +292,37 @@ public enum TorrentCorePreviewFixtures {
         ),
     ]
 
+    public static let completionCallbackFeedback = TorrentCoreCompletionCallbackFeedback(
+        allowResubmit: false,
+        attemptCount: 1,
+        callbackFinished: true,
+        callbackLocalTimestamp: checkedAt.addingTimeInterval(-85_800),
+        callbackMachine: "ca-desktop",
+        callbackSource: "TVMaze",
+        completionTimestamp: checkedAt.addingTimeInterval(-86_400),
+        contractVersion: "1",
+        correlationID: "preview-callback",
+        detailMessage: "TVMaze accepted the completed download.",
+        displayMessage: "TVMaze accepted the completed download.",
+        finalState: "Success",
+        mediaConsideredDone: true,
+        needsManualIntervention: false,
+        rawResponseJSON: nil,
+        reasonCode: "Imported",
+        receivedAt: checkedAt.addingTimeInterval(-85_800),
+        recommendedAction: nil,
+        resubmitAdvice: nil,
+        sourceState: "Completed",
+        torrentHash: "89abcdef0123456789abcdef0123456789abcdef",
+        torrentID: UUID(uuidString: "bbbbbbbb-cccc-dddd-eeee-ffffffffffff")
+    )
+
     public static let historyDetail = TorrentCoreHistoryDetail(
-        callbackCompletedAt: nil,
+        callbackCompletedAt: checkedAt.addingTimeInterval(-85_800),
         callbackLastError: nil,
-        callbackStartedAt: nil,
+        callbackStartedAt: checkedAt.addingTimeInterval(-86_400),
         categoryKey: "tv",
-        completionCallbackFeedback: nil,
+        completionCallbackFeedback: completionCallbackFeedback,
         completionCallbackLabel: "TV Show",
         dataDeleted: false,
         downloadCompletedAt: nil,

@@ -1049,6 +1049,25 @@ private struct TorrentCoreMacTorrentInspector: View {
     }
 }
 
+enum TorrentCoreMacMagnetValidation {
+    static let guidance = "Enter a valid magnet link that begins with magnet:? and includes an xt value."
+
+    static func isValid(_ value: String) -> Bool {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedValue.lowercased().hasPrefix("magnet:?"),
+              let components = URLComponents(string: trimmedValue),
+              components.scheme?.lowercased() == "magnet"
+        else {
+            return false
+        }
+
+        return components.queryItems?.contains { queryItem in
+            queryItem.name.lowercased() == "xt"
+                && queryItem.value?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        } == true
+    }
+}
+
 struct TorrentCoreMacAddMagnetView: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -1086,15 +1105,16 @@ struct TorrentCoreMacAddMagnetView: View {
             }
             .accessibilityIdentifier("addMagnet.category")
 
-            TorrentCoreMacPhaseBanner(
-                phase: session.categories.phase,
-                lastSuccessfulAt: session.categories.lastSuccessfulAt
-            )
+            categoryStatus
 
             if let errorMessage {
                 Label(errorMessage, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("addMagnet.error")
+            } else if showsMagnetGuidance {
+                Label(TorrentCoreMacMagnetValidation.guidance, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                    .accessibilityIdentifier("addMagnet.validation")
             }
 
             HStack {
@@ -1113,7 +1133,7 @@ struct TorrentCoreMacAddMagnetView: View {
                 .disabled(
                     isSubmitting
                         || !session.canAddMagnet()
-                        || magnetURI.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || validatedMagnetURI == nil
                 )
                 .accessibilityIdentifier("addMagnet.submit")
             }
@@ -1123,12 +1143,50 @@ struct TorrentCoreMacAddMagnetView: View {
         .interactiveDismissDisabled(isSubmitting)
         .onAppear {
             isMagnetURIFieldFocused = true
-            if session.categories.value == nil {
-                Task {
-                    await session.refresh()
-                }
-            }
         }
+        .onChange(of: magnetURI) {
+            errorMessage = nil
+        }
+    }
+
+    @ViewBuilder
+    private var categoryStatus: some View {
+        switch session.categories.phase {
+        case .loading where session.categories.value == nil:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Loading categories…")
+            }
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("addMagnet.categories.loading")
+        case .stale where session.categories.value == nil:
+            Label(
+                "Categories could not be loaded. You can still add the torrent as Uncategorized.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .foregroundStyle(.orange)
+            .accessibilityIdentifier("addMagnet.categories.unavailable")
+        case .stale:
+            Label(
+                "Categories could not be updated. Showing the last available values.",
+                systemImage: "exclamationmark.triangle"
+            )
+            .foregroundStyle(.orange)
+            .accessibilityIdentifier("addMagnet.categories.stale")
+        case .idle, .loading, .current:
+            EmptyView()
+        }
+    }
+
+    private var validatedMagnetURI: String? {
+        let trimmedMagnet = magnetURI.trimmingCharacters(in: .whitespacesAndNewlines)
+        return TorrentCoreMacMagnetValidation.isValid(trimmedMagnet) ? trimmedMagnet : nil
+    }
+
+    private var showsMagnetGuidance: Bool {
+        !magnetURI.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && validatedMagnetURI == nil
     }
 
     private var enabledCategories: [TorrentCoreCategory] {
@@ -1146,14 +1204,18 @@ struct TorrentCoreMacAddMagnetView: View {
     }
 
     private func submit() {
+        guard let validatedMagnetURI else {
+            errorMessage = TorrentCoreMacMagnetValidation.guidance
+            return
+        }
+
         isSubmitting = true
         errorMessage = nil
-        let trimmedMagnet = magnetURI.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
             defer { isSubmitting = false }
             do {
                 let detail = try await session.addMagnet(
-                    trimmedMagnet,
+                    validatedMagnetURI,
                     categoryKey: selectedCategoryKey
                 )
                 added(detail.torrentID)

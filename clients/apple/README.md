@@ -3,9 +3,9 @@
 ## Status
 
 Milestones 0 through 4 are complete. Milestone 5 is in progress; its automated hardening stage passed shared, macOS
-build, iOS Simulator build, and signed fixture UI verification on July 25, 2026. Manual failure checks, release
-packaging, and separate-Mac acceptance remain pending. The operator-approved disposable live mutation sequence last
-passed on July 23, 2026.
+build, iOS Simulator build, and signed fixture UI verification on July 25, 2026. The initial Milestone 5B visual,
+keyboard, app-local appearance, disposable mutation, and controlled service-outage/recovery checks passed on
+CA-Desktop. Separate-Mac Wi-Fi interruption, release packaging, and separate-Mac acceptance remain pending.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -116,7 +116,9 @@ remembers the last destination, but opens Connection when there is no active sav
 - Both remove paths require native destructive confirmation. A mutation timeout is shown as uncertain and is followed
   by authoritative refresh rather than automatic retry.
 - History starts with Today, uses the existing service filters, preserves abandonment visibility, and locally sorts
-  and pages bounded results at 25, 50, 100, or 250 rows.
+  and pages bounded results at 25, 50, 100, or 250 rows. Rows show the callback Final Result when feedback exists.
+  The inspector always presents callback Summary, Received, Final Result, and Reason values and can copy the full
+  stored magnet URI. Copy Magnet is local-only and remains available while the service is offline.
 - Logs combine service-side filters and selectable recent-row limits with search over the loaded rows. Orphaned-log
   cleanup requires confirmation.
 - Service Settings edits one group at a time with Save/Revert and guarded navigation. Closed server values use readable

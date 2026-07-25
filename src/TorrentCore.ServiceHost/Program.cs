@@ -36,6 +36,7 @@ builder.Services.AddSwaggerGen(options =>
                 Description = "Management API for the TorrentCore service host.",
             }
         );
+        options.OperationFilter<ServiceProblemDetailsContentTypeOperationFilter>();
         options.CustomOperationIds(apiDescription =>
             {
                 var controller = apiDescription.ActionDescriptor.RouteValues["controller"];

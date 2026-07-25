@@ -68,6 +68,10 @@ old-context responses, restart recovery retries, changed service-instance identi
 100 torrents, 500 history rows, 5,000 log rows, 250 peers, and 50 trackers. A changed instance must clear cached remote
 snapshots, preserve device profiles and preferences, and reload only the open feature context.
 
+Milestone 5B coverage verifies the additive History callback Final Result summary contract, generated Swift mapping,
+Summary fallback from display message to Final Result, the four callback feedback fields in the History inspector, and
+copying the complete stored magnet URI to the macOS pasteboard.
+
 The `TorrentCoreMac` scheme includes a unit target and a fixture-only UI target. Compile both without launching an app:
 
 ```bash
@@ -91,6 +95,13 @@ same no-network boundary. The July 25, 2026 Milestone 5A signed fixture run pass
 navigation, initial Add Magnet focus, and large-list pagination.
 
 Production Swagger availability is verified by `OpenApiContractTests` alongside normalized contract comparison.
+The same contract regression requires every `ServiceProblemDetailsDto` response to advertise
+`application/problem+json`, matching the service's existing runtime response. Swift transport coverage verifies that
+this media type is decoded into a structured operator-facing service error.
+
+Milestone 5B also compiles direct checks for the device-local System/Light/Dark appearance choices and intentionally
+narrow Add Magnet validation. The validation catches non-magnet text and missing or empty `xt` values without
+duplicating MonoTorrent's authoritative parsing.
 
 ## Testing Rules
 

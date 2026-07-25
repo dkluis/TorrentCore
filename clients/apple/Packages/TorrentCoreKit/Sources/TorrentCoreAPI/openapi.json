@@ -1439,6 +1439,10 @@
             "nullable": true,
             "type": "string"
           },
+          "completionCallbackFinalResult": {
+            "nullable": true,
+            "type": "string"
+          },
           "dataDeleted": {
             "type": "boolean"
           },
@@ -2108,7 +2112,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2118,7 +2122,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2128,7 +2132,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2273,7 +2277,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2323,7 +2327,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2353,7 +2357,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2400,7 +2404,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2410,7 +2414,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2527,7 +2531,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2557,7 +2561,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2627,7 +2631,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2637,7 +2641,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2647,7 +2651,7 @@
           },
           "503": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2688,7 +2692,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2741,7 +2745,7 @@
           },
           "400": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2751,7 +2755,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2792,7 +2796,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2802,7 +2806,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2843,7 +2847,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2853,7 +2857,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2894,7 +2898,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2904,7 +2908,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2945,7 +2949,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2955,7 +2959,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -2999,7 +3003,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -3059,7 +3063,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -3100,7 +3104,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -3110,7 +3114,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }
@@ -3154,7 +3158,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "application/problem\u002Bjson": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceProblemDetailsDto"
                 }

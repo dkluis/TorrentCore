@@ -140,7 +140,7 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreTorrentDetail(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -191,7 +191,7 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreHistoryDetail(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -218,7 +218,7 @@ public struct TorrentCoreClient: Sendable {
                 return try response.body.json.map(TorrentCoreActivityLogEntry.init)
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -235,7 +235,7 @@ public struct TorrentCoreClient: Sendable {
                 return try response.body.json.map(TorrentCorePeer.init)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -252,7 +252,7 @@ public struct TorrentCoreClient: Sendable {
                 return try response.body.json.map(TorrentCoreTracker.init)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -267,7 +267,7 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreRuntimeSettings(try response.body.json)
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -286,15 +286,15 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreTorrentDetail(try response.body.json)
             case let .badRequest(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .conflict(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -309,11 +309,11 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreActionResult(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .conflict(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -328,11 +328,11 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreActionResult(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .conflict(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -351,7 +351,7 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreActionResult(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -368,11 +368,11 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreActionResult(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .conflict(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -389,11 +389,11 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreActionResult(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .conflict(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -410,11 +410,11 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreActionResult(try response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .conflict(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -431,7 +431,7 @@ public struct TorrentCoreClient: Sendable {
                 )
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -449,11 +449,11 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreRuntimeSettings(try response.body.json)
             case let .badRequest(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -475,15 +475,15 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreCategory(try response.body.json)
             case let .badRequest(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
@@ -498,7 +498,7 @@ public struct TorrentCoreClient: Sendable {
                 return TorrentCoreServiceRestartResult(try response.body.json)
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
-                    TorrentCoreServiceProblem(try response.body.json)
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
                 )
             case let .undocumented(statusCode, _):
                 throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)

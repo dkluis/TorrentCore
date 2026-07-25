@@ -556,6 +556,9 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
 
     private static TorrentHistorySummaryDto MapSummary(TorrentHistoryRecord record)
     {
+        var completionCallbackFeedback =
+                CompletionCallbackFeedbackMapper.Deserialize(record.LatestCompletionCallbackFeedbackJson);
+
         return new TorrentHistorySummaryDto
         {
             TorrentId = record.TorrentId,
@@ -585,6 +588,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             Outcome = ResolveOutcome(record),
             RemovalKind = record.RemovalKind,
             LatestCallbackStatus = record.LatestCallbackStatus,
+            CompletionCallbackFinalResult = completionCallbackFeedback?.FinalState,
             DataDeleted = record.DataDeleted,
             RemovalReason = record.RemovalReason,
             RemovedByCleanupPolicy = record.RemovedByCleanupPolicy,
