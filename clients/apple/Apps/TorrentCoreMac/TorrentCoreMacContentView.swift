@@ -216,25 +216,26 @@ struct TorrentCoreMacContentView: View {
             .navigationTitle("TorrentCore")
             .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
         } detail: {
-            VStack(spacing: 0) {
-                Group {
-                    if !isLoaded {
-                        ContentUnavailableView {
-                            Label("Loading TorrentCore", systemImage: "arrow.trianglehead.2.clockwise")
-                        } description: {
-                            Text("Reading the saved connection settings.")
-                        } actions: {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                    } else {
-                        selectedDestinationView
+            Group {
+                if !isLoaded {
+                    ContentUnavailableView {
+                        Label("Loading TorrentCore", systemImage: "arrow.trianglehead.2.clockwise")
+                    } description: {
+                        Text("Reading the saved connection settings.")
+                    } actions: {
+                        ProgressView()
+                            .controlSize(.small)
                     }
+                } else {
+                    selectedDestinationView
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                Divider()
-                connectionStatusBar
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    Divider()
+                    connectionStatusBar
+                }
             }
             .navigationTitle(destination.title)
         }

@@ -12,8 +12,10 @@ The signed, notarized, and stapled 0.2.0/build 2 app also passed installation-ov
 Off-site routed-VPN verification remains environmentally deferred.
 
 The next active workstream is further macOS UI refinement. Its first operator-prioritized slice is implemented in the
-0.2.0 candidate. Milestone 6 iPad Adaptation remains open but is deferred because no iPad test device is currently
-available.
+0.2.0 candidate. A 0.2.1/build 3 compatibility hotfix is in progress after 0.2.0 exposed a SwiftUI/AppKit
+`NavigationSplitView` constraint-loop abort on the macOS 27 beta. The hotfix preserves the global bottom connection
+status while avoiding the direct split-view detail wrapper that triggered the failure. Milestone 6 iPad Adaptation
+remains open but is deferred because no iPad test device is currently available.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
