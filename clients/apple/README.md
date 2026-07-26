@@ -5,8 +5,14 @@
 Milestones 0 through 4 are complete. Milestone 5 is in progress; its automated hardening stage passed shared, macOS
 build, iOS Simulator build, and signed fixture UI verification on July 25, 2026. The initial Milestone 5B visual,
 keyboard, app-local appearance, disposable mutation, and controlled service-outage/recovery checks passed on
-CA-Desktop. Stage 5C produced the signed, notarized, and stapled 0.1.0 release DMG on July 26, 2026. Separate-Mac Wi-Fi
-interruption and Stage 5D acceptance remain pending.
+CA-Desktop. Stage 5C produced the signed, notarized, and stapled 0.1.0 release DMG on July 26, 2026. Stage 5D acceptance
+is complete: the DMG installed and worked normally on Apple Silicon systems running macOS 26 and macOS 27, including
+normal Gatekeeper launch on CA-Dick-MBA, LAN connection to CA-Desktop, and add, pause, and remove-with-data mutations.
+Off-site routed-VPN verification remains environmentally deferred.
+
+The next active workstream is further macOS UI refinement. Its implementation scope remains pending operator
+prioritization. Milestone 6 iPad Adaptation remains open but is deferred because no iPad test device is currently
+available.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 

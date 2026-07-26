@@ -8,7 +8,9 @@ This document is an implementation plan, not a statement of current product supp
 the active architecture documentation is deliberately updated.
 
 Milestones 0 through 3 were completed on July 23, 2026, and Milestone 4 was completed on July 24, 2026.
-Milestone 5 is in progress; its automated hardening stage was completed on July 25, 2026.
+Milestone 5 is in progress; its automated hardening stage was completed on July 25, 2026, release construction was
+completed on July 26, 2026, and Stage 5D acceptance passed on Apple Silicon systems running macOS 26 and macOS 27.
+Off-site routed-VPN verification remains environmentally deferred.
 
 ## Outcome
 
@@ -376,7 +378,8 @@ Implementation notes:
 ### Milestone 5: macOS Hardening And Limited Release
 
 Status: in progress. Stage 5A automated hardening completed July 25, 2026. Stage 5B manual verification is in progress;
-Stage 5C release construction completed July 26, 2026. Separate-Mac acceptance remains pending.
+Stage 5C release construction completed July 26, 2026. Stage 5D separate-Mac acceptance is complete on both planned
+macOS versions. Off-site routed-VPN verification remains environmentally deferred.
 
 Turn feature parity into a supportable application.
 
@@ -406,16 +409,18 @@ Implementation stages:
   presents structured TorrentCore problem details. The guarded disposable add/observe/pause/resume/remove sequence
   passed against CA-Desktop on July 25, 2026. A controlled service-only outage also passed: cached data remained
   coherent and read-only, mutations were disabled, Refresh remained available, and the open context recovered without
-  strange or stale cross-instance data after the service restarted. Wi-Fi interruption on a separate Mac remains
-  pending because CA-Desktop must retain its active Ethernet connection.
+  strange or stale cross-instance data after the service restarted. Off-site routed-VPN verification remains
+  environmentally deferred.
 - **5C — release construction:** complete July 26, 2026. Version 0.1.0/build 1, Team ID, Arm64/macOS 26 release
   settings, automatic Developer ID export options, deterministic DMG naming, and the fail-fast
   archive/export/sign/notarize/staple/verify script are configured. Installation, upgrade, client-only uninstall,
   WebUI recovery, certificate, and Keychain credential procedures are documented. Apple accepted notarization
   submission `09e87103-e918-471f-a6e3-daf16558b46e`; the copied deployment artifact passed signature, stapler,
   disk-image, and Gatekeeper verification.
-- **5D — separate-Mac acceptance:** pending. Install the release candidate on an Apple Silicon macOS 26 laptop and
-  perform a secondary compatibility check on the Apple Silicon macOS 27 beta laptop.
+- **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
+  worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
+  bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations
+  passed there. These results cover both planned OS-version acceptance targets.
 
 Stage 5A behavior:
 
@@ -466,7 +471,17 @@ Exit criteria:
 Only after this milestone should the active architecture documentation consider describing the Mac client as a
 supported operator UI.
 
+### macOS UI Refinement Workstream
+
+Status: planning. The operator chose to continue improving the macOS presentation before beginning iPad adaptation.
+Implementation priorities and acceptance criteria must be enumerated and ranked by the operator before UI code
+changes begin. Preserve Service and WebUI behavior and keep reusable, non-UI behavior in the iOS-capable
+`TorrentCoreKit` package.
+
 ### Milestone 6: iPad Adaptation
+
+Status: open but deferred. The operator does not currently own an iPad test device. Keep this milestone available for
+later work rather than deleting or treating it as complete.
 
 Reuse the stable package while building an iPad-native presentation.
 
