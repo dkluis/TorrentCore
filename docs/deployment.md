@@ -205,12 +205,15 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Initial version | `0.1.0` |
-| Initial build | `1` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.1.0.dmg` |
+| Current version | `0.2.0` |
+| Current build | `2` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.2.0.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
+The 0.2.0/build 2 upgrade candidate was accepted and stapled the same day under notarization submission
+`f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`. Its SHA-256 checksum is
+`26fd5d1b3d4ce2d1a92834f56aea68a8842b75a9a8ed061c994e535dc2e78bd2`.
 
 ### One-Time Developer ID Setup
 
@@ -280,7 +283,7 @@ The script:
 1. validates the Developer ID identity and local notary Keychain profile
 2. creates a Release archive with automatic signing
 3. exports and verifies the Developer ID-signed `TorrentCore.app`
-4. verifies version `0.1.0`, build `1`, and an Arm64-only executable
+4. verifies the requested version and build and an Arm64-only executable
 5. creates a compressed DMG containing `TorrentCore.app` and an `Applications` shortcut
 6. signs the DMG, submits it with `notarytool --wait`, and staples the accepted ticket
 7. verifies the ticket, disk image, and Gatekeeper assessment
@@ -293,7 +296,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.1.1 --build 2
+./Scripts/release-macos-app.zsh --version 0.2.1 --build 3
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
@@ -316,9 +319,9 @@ release.
 Optional command-line checks:
 
 ```bash
-xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.1.0.dmg"
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.2.0.dmg"
 spctl --assess --type open --context context:primary-signature --verbose=4 \
-  "/path/to/TorrentCore-macOS-App-0.1.0.dmg"
+  "/path/to/TorrentCore-macOS-App-0.2.0.dmg"
 ```
 
 ### Uninstall And Recovery
