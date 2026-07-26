@@ -125,7 +125,7 @@ the final copied DMG independently passed code-signature, stapler-ticket, disk-i
 assessment.
 The 0.2.0/build 2 upgrade candidate completed the same release workflow on July 26, 2026. Apple accepted submission
 `f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`; the copied DMG passed signature, stapler-ticket, disk-image, and Gatekeeper
-checks. Installing it over 0.1.0 and confirming retained device-local settings remains the operator acceptance step.
+checks. Installation over 0.1.0 subsequently passed operator upgrade acceptance.
 
 ## Testing Rules
 

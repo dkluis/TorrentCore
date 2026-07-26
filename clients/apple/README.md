@@ -8,7 +8,7 @@ keyboard, app-local appearance, disposable mutation, and controlled service-outa
 CA-Desktop. Stage 5C produced the signed, notarized, and stapled 0.1.0 release DMG on July 26, 2026. Stage 5D acceptance
 is complete: the DMG installed and worked normally on Apple Silicon systems running macOS 26 and macOS 27, including
 normal Gatekeeper launch on CA-Dick-MBA, LAN connection to CA-Desktop, and add, pause, and remove-with-data mutations.
-The signed, notarized, and stapled 0.2.0/build 2 upgrade candidate is ready for installation-over-0.1.0 acceptance.
+The signed, notarized, and stapled 0.2.0/build 2 app also passed installation-over-0.1.0 upgrade acceptance.
 Off-site routed-VPN verification remains environmentally deferred.
 
 The next active workstream is further macOS UI refinement. Its first operator-prioritized slice is implemented in the

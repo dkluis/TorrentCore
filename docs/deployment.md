@@ -214,6 +214,7 @@ The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2
 The 0.2.0/build 2 upgrade candidate was accepted and stapled the same day under notarization submission
 `f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`. Its SHA-256 checksum is
 `26fd5d1b3d4ce2d1a92834f56aea68a8842b75a9a8ed061c994e535dc2e78bd2`.
+Installation over 0.1.0 passed operator upgrade acceptance on July 26, 2026.
 
 ### One-Time Developer ID Setup
 

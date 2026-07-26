@@ -417,8 +417,8 @@ Implementation stages:
   WebUI recovery, certificate, and Keychain credential procedures are documented. Apple accepted notarization
   submission `09e87103-e918-471f-a6e3-daf16558b46e`; the copied deployment artifact passed signature, stapler,
   disk-image, and Gatekeeper verification. The subsequent 0.2.0/build 2 UI-refinement upgrade candidate was accepted
-  under submission `f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`; its copied DMG passed the same release checks and awaits
-  installation-over-0.1.0 acceptance.
+  under submission `f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`; its copied DMG passed the same release checks and subsequently
+  passed installation-over-0.1.0 upgrade acceptance.
 - **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
   worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
   bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations
@@ -495,6 +495,13 @@ Accepted first refinement slice:
 - add local Copy actions for Torrent ID and Service Instance ID in inspectors where those identifiers are present
 - keep Dashboard metric layouts, forms, connection lists, sidebar lists, and the editable category-maintenance surface
   outside the sortable-table requirement
+
+Next confirmed refinement:
+
+- Peer and Tracker pop-up sections still open with horizontal scrolling instead of sizing to expose all columns when
+  display space permits.
+- User-adjusted Peer and Tracker column widths do not appear to persist. Confirm the native table customization
+  behavior and implement durable width restoration without assuming that visibility customization also saves widths.
 
 ### Milestone 6: iPad Adaptation
 
