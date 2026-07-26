@@ -345,8 +345,9 @@ Implementation notes:
   local sorting and 25/50/100/250-row paging over the bounded server result.
 - Logs use existing server filters with selectable 100/500/1,000/5,000 recent-row limits and local search. The app
   clearly marks a result that reaches the selected limit; no paging API was added.
-- History and Logs follow the global foreground auto-refresh policy. Peer diagnostics refresh every five seconds only
-  while their sheet is visible. Tracker diagnostics and Service Settings are one-shot with manual refresh.
+- The macOS app has one main operator window so exactly one visible feature context owns polling. Dashboard, Torrents,
+  History, Logs, Peers, and Trackers use the global foreground auto-refresh interval only while visible. Add Magnet
+  categories and Service Settings are master-data loads performed once when presented and remain manually refreshable.
 - Service settings remain distinct from device-local macOS Settings. One service-settings group can be dirty at a
   time, with Save/Revert and Save/Discard/Cancel navigation protection. Callback API-key text is transient form state
   and is neither persisted nor logged by the Mac client.
@@ -426,6 +427,9 @@ Stage 5A behavior:
 Stage 5B behavior completed so far:
 
 - Appearance is a device-local app preference with System, Light, and Dark choices. System remains the default.
+- The main operator scene is single-window so restored or inactive windows cannot compete for the shared feature
+  context. Peer and tracker diagnostics use the same global 5/10/15-second foreground refresh policy as the other live
+  operational views; Add Magnet categories and Service Settings remain one-time master-data loads.
 - The service's existing `application/problem+json` error responses are described with that media type in OpenAPI, so
   the generated Swift client decodes the existing structured error body instead of reporting a content-type mismatch.
   This is contract-metadata correction only; the service runtime response and handwritten C# WebUI client behavior are

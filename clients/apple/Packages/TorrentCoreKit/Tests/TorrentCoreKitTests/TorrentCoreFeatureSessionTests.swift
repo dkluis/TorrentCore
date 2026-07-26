@@ -420,6 +420,95 @@ func foregroundStartsOneLoopAndBackgroundStopsIt() async throws {
 
 @Test
 @MainActor
+func peerAndTrackerDiagnosticsUseTheGlobalRefreshInterval() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Diagnostics polling",
+        address: "http://diagnostics-polling.test:7033"
+    )
+    let client = FakeServiceClient(
+        torrents: [.initPreview],
+        peers: TorrentCorePreviewFixtures.peers,
+        trackers: TorrentCorePreviewFixtures.trackers
+    )
+    let sleeper = ImmediateSleeper()
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id,
+            refreshInterval: .tenSeconds
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client]),
+        sleeper: sleeper
+    )
+    try await session.load()
+
+    session.setContext(.peers(TorrentCorePreviewFixtures.torrentID))
+    session.setApplicationActive(true)
+    await waitUntil {
+        await client.calls.peers >= 2
+    }
+    session.setApplicationActive(false)
+    #expect(await client.calls.peers >= 2)
+
+    session.setContext(.trackers(TorrentCorePreviewFixtures.torrentID))
+    session.setApplicationActive(true)
+    await waitUntil {
+        await client.calls.trackers >= 2
+    }
+    session.setApplicationActive(false)
+    #expect(await client.calls.trackers >= 2)
+    #expect(await sleeper.intervals.isEmpty == false)
+    #expect(await sleeper.intervals.allSatisfy { $0 == 10 })
+}
+
+@Test
+@MainActor
+func masterDataContextsLoadOnceEvenWhenAutoRefreshIsEnabled() async throws {
+    let profile = try TorrentCoreConnectionProfile(
+        name: "Master data",
+        address: "http://master-data.test:7033"
+    )
+    let client = FakeServiceClient(torrents: [.initPreview])
+    let sleeper = ImmediateSleeper()
+    let session = TorrentCoreFeatureSession(
+        profileStore: MemoryProfileStore(.init(
+            profiles: [profile],
+            activeProfileID: profile.id,
+            refreshInterval: .fiveSeconds
+        )),
+        clientFactory: FakeClientFactory(clients: [profile.baseURL: client]),
+        sleeper: sleeper
+    )
+    try await session.load()
+
+    session.setContext(.addMagnet)
+    session.setApplicationActive(true)
+    await waitUntil {
+        await client.calls.categories == 1
+    }
+    for _ in 0..<20 {
+        await Task.yield()
+    }
+    #expect(await client.calls.categories == 1)
+
+    session.setContext(.serviceSettings)
+    await waitUntil {
+        let calls = await client.calls
+        return calls.runtimeSettings == 1 && calls.categories == 2
+    }
+    for _ in 0..<20 {
+        await Task.yield()
+    }
+    session.setApplicationActive(false)
+
+    let calls = await client.calls
+    #expect(calls.runtimeSettings == 1)
+    #expect(calls.categories == 2)
+    #expect(await sleeper.intervals.isEmpty)
+}
+
+@Test
+@MainActor
 func disabledAutoRefreshLoadsTheContextOnceWithoutPolling() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Manual",

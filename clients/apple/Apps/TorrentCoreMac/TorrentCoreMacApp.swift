@@ -7,6 +7,7 @@ struct TorrentCoreMacApp: App {
     @State private var session: TorrentCoreFeatureSession
     @AppStorage(TorrentCoreMacAppearance.storageKey)
     private var appearanceRawValue = TorrentCoreMacAppearance.system.rawValue
+    private let usesFixtures: Bool
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -15,6 +16,7 @@ struct TorrentCoreMacApp: App {
         )
         let usesFixtures = usesLargeFixtures
             || arguments.contains("--torrentcore-ui-fixtures")
+        self.usesFixtures = usesFixtures
         if usesFixtures {
             UserDefaults.standard.set(
                 TorrentCoreMacDestination.dashboard.rawValue,
@@ -45,12 +47,15 @@ struct TorrentCoreMacApp: App {
     }
 
     var body: some Scene {
-        WindowGroup {
+        Window("TorrentCore", id: "main") {
             TorrentCoreMacContentView(session: session)
                 .preferredColorScheme(appearance.colorScheme)
         }
         .defaultSize(width: 1_180, height: 760)
+        .defaultPosition(.center)
+        .restorationBehavior(usesFixtures ? .disabled : .automatic)
         .commands {
+            TorrentCoreMacWindowCommands()
             TorrentCoreMacNavigationCommands()
             TorrentCoreMacInspectorCommands()
             ToolbarCommands()
@@ -64,5 +69,18 @@ struct TorrentCoreMacApp: App {
 
     private var appearance: TorrentCoreMacAppearance {
         TorrentCoreMacAppearance(rawValue: appearanceRawValue) ?? .system
+    }
+}
+
+private struct TorrentCoreMacWindowCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button("Show Main Window") {
+                openWindow(id: "main")
+            }
+            .keyboardShortcut("n", modifiers: .command)
+        }
     }
 }

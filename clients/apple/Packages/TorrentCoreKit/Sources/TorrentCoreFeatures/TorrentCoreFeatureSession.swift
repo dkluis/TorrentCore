@@ -19,9 +19,9 @@ public enum TorrentCoreFeatureContext: Equatable, Sendable {
     var refreshesPeriodically: Bool {
         switch self {
         case .connection, .dashboard, .torrents, .torrentDetail, .torrentListAndDetail,
-             .history, .logs:
+             .history, .logs, .peers, .trackers:
             true
-        case .none, .addMagnet, .peers, .trackers, .serviceSettings:
+        case .none, .addMagnet, .serviceSettings:
             false
         }
     }

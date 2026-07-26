@@ -102,6 +102,8 @@ this media type is decoded into a structured operator-facing service error.
 Milestone 5B also compiles direct checks for the device-local System/Light/Dark appearance choices and intentionally
 narrow Add Magnet validation. The validation catches non-magnet text and missing or empty `xt` values without
 duplicating MonoTorrent's authoritative parsing.
+Refresh regression coverage drives more than one Peer and Tracker request through the shared global interval and
+separately proves that Add Magnet categories and Service Settings remain one-time master-data loads.
 
 ## Testing Rules
 

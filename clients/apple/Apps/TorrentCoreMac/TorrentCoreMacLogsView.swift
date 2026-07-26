@@ -73,7 +73,7 @@ struct TorrentCoreMacLogsView: View {
             if isLimited {
                 Label(
                     "Showing the most recent \(query.take.formatted()) log entries. Narrow the server filters to inspect older activity.",
-                    systemImage: "text.badge.ellipsis"
+                    systemImage: "ellipsis.rectangle"
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

@@ -84,9 +84,11 @@ fragments, and non-root paths are rejected. Duplicate normalized service address
 The selectable refresh intervals are 5, 10, and 15 seconds, with 15 seconds as the default. Auto Refresh defaults on
 and can be disabled without disabling manual Refresh. Initial screen loads and foreground reconnection remain one-shot
 loads; periodic refresh runs only while the application is active and only for the open feature context. Backgrounded
-and suspended applications do not poll. When a torrent inspector is visible, the open context refreshes the list and
-selected detail together. Offline state retains last-known values in memory and marks them stale. Service actions are
-disabled until refresh reconnects, and mutations are never retried automatically.
+and suspended applications do not poll. Dashboard, Torrents, History, Logs, Peers, and Trackers all use the selected
+global interval. Add Magnet categories and Service Settings are master-data loads performed once when presented and
+remain manually refreshable. When a torrent inspector is visible, the open context refreshes the list and selected
+detail together. Offline state retains last-known values in memory and marks them stale. Service actions are disabled
+until refresh reconnects, and mutations are never retried automatically.
 
 Reconnect also verifies the service instance identity. If the service has been replaced or restarted with a new
 identity, all cached remote snapshots are cleared while device profiles and preferences remain intact. Only the open
@@ -98,8 +100,9 @@ feature context reloads, and mutations stay disabled until its authoritative sta
 
 ## macOS Operator UI
 
-The macOS app uses a native sidebar for Dashboard, Torrents, History, Logs, Service Settings, and Connection. It
-remembers the last destination, but opens Connection when there is no active saved connection.
+The macOS app has one main operator window and uses a native sidebar for Dashboard, Torrents, History, Logs, Service
+Settings, and Connection. A single window owns the one shared feature context and polling loop. The app remembers the
+last destination, but opens Connection when there is no active saved connection.
 
 - Connection manages named installations and keeps Test Connection separate from Save & Connect. Unreachable
   installations can still be saved for later LAN or VPN use.
@@ -129,8 +132,8 @@ remembers the last destination, but opens Connection when there is no active sav
   rows sequentially through the existing single-category API.
 - Compact information buttons beside native fields open anchored help popovers. The help content is shared through
   `TorrentCoreFeatures` for later iOS/iPadOS presentation, while the popover renderer remains macOS-specific.
-- History and Logs follow the global foreground refresh policy. Peers refresh every five seconds only while visible;
-  Trackers and Service Settings load once and support manual refresh.
+- Dashboard, Torrents, History, Logs, Peers, and Trackers follow the global foreground refresh policy only while their
+  context is visible. Add Magnet categories and Service Settings load once when presented and support manual refresh.
 - The Navigate menu maps Command-1 through Command-6 to the six sidebar destinations. Context menus and direct
   cross-navigation keep actions scoped to one torrent.
 - Opening a destination immediately loads its visible service data. First loads show progress, successful empty

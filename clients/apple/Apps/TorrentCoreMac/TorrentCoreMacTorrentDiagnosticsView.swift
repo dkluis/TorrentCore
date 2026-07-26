@@ -82,14 +82,6 @@ struct TorrentCoreMacPeersSheet: View {
         .frame(minWidth: 840, minHeight: 500)
         .task {
             session.setContext(.peers(torrentID))
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: .seconds(5))
-                } catch {
-                    return
-                }
-                await session.refresh()
-            }
         }
         .onDisappear(perform: restoreContext)
     }
