@@ -18,6 +18,13 @@ struct TorrentCoreMacApp: App {
             || arguments.contains("--torrentcore-ui-fixtures")
         self.usesFixtures = usesFixtures
         if usesFixtures {
+            [
+                "TorrentCore.Mac.Torrents.Columns.v1",
+                "TorrentCore.Mac.History.Columns.v1",
+                "TorrentCore.Mac.Logs.Columns.v1",
+                "TorrentCore.Mac.Peers.Columns.v1",
+                "TorrentCore.Mac.Trackers.Columns.v1",
+            ].forEach(UserDefaults.standard.removeObject(forKey:))
             UserDefaults.standard.set(
                 TorrentCoreMacDestination.dashboard.rawValue,
                 forKey: "TorrentCore.Mac.SelectedDestination.v1"
@@ -31,6 +38,10 @@ struct TorrentCoreMacApp: App {
             UserDefaults.standard.set(
                 50,
                 forKey: "TorrentCore.Mac.History.PageSize.v1"
+            )
+            UserDefaults.standard.set(
+                50,
+                forKey: "TorrentCore.Mac.Logs.PageSize.v1"
             )
         }
         let session: TorrentCoreFeatureSession
@@ -51,7 +62,7 @@ struct TorrentCoreMacApp: App {
             TorrentCoreMacContentView(session: session)
                 .preferredColorScheme(appearance.colorScheme)
         }
-        .defaultSize(width: 1_180, height: 760)
+        .defaultSize(width: 1_580, height: 760)
         .defaultPosition(.center)
         .restorationBehavior(usesFixtures ? .disabled : .automatic)
         .commands {

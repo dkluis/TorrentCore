@@ -32,21 +32,85 @@ private enum TorrentCoreMacMagnetCopyStatus {
     }
 }
 
-struct TorrentCoreMacHistoryView: View {
-    enum SortField: String, CaseIterable {
-        case updated
-        case submitted
-        case name
-        case category
-        case state
-        case outcome
-        case progress
+private struct TorrentCoreMacHistoryTableItem: Identifiable {
+    let summary: TorrentCoreHistorySummary
 
-        var label: String {
-            TorrentCoreDisplayFormatter.splitIdentifier(rawValue)
+    var id: String { summary.id }
+    var submitted: Date { summary.submittedAt }
+    var name: String { summary.name ?? "Unnamed Torrent" }
+    var category: String { TorrentCoreDisplayFormatter.category(summary.categoryKey) }
+    var state: String { summary.latestTorrentState ?? "—" }
+    var outcome: String { summary.outcome.rawValue }
+    var progress: Double { summary.latestProgressPercent }
+    var downloaded: Int64 { summary.latestDownloadedBytes }
+    var total: Int64 { summary.latestTotalBytes ?? -1 }
+    var callback: String { summary.latestCallbackStatus ?? "—" }
+    var removed: Date { summary.removedAt ?? .distantPast }
+    var removalReason: String { summary.removalReason ?? "—" }
+}
+
+private enum TorrentCoreMacHistorySortField: String {
+    case submitted
+    case name
+    case category
+    case state
+    case outcome
+    case progress
+    case downloaded
+    case total
+    case callback
+    case removed
+    case removalReason
+
+    func comparator(descending: Bool) -> KeyPathComparator<TorrentCoreMacHistoryTableItem> {
+        let order: SortOrder = descending ? .reverse : .forward
+        return switch self {
+        case .submitted:
+            KeyPathComparator(\.submitted, order: order)
+        case .name:
+            KeyPathComparator(\.name, comparator: .localizedStandard, order: order)
+        case .category:
+            KeyPathComparator(\.category, comparator: .localizedStandard, order: order)
+        case .state:
+            KeyPathComparator(\.state, comparator: .localizedStandard, order: order)
+        case .outcome:
+            KeyPathComparator(\.outcome, comparator: .localizedStandard, order: order)
+        case .progress:
+            KeyPathComparator(\.progress, order: order)
+        case .downloaded:
+            KeyPathComparator(\.downloaded, order: order)
+        case .total:
+            KeyPathComparator(\.total, order: order)
+        case .callback:
+            KeyPathComparator(\.callback, comparator: .localizedStandard, order: order)
+        case .removed:
+            KeyPathComparator(\.removed, order: order)
+        case .removalReason:
+            KeyPathComparator(\.removalReason, comparator: .localizedStandard, order: order)
         }
     }
 
+    static func field(
+        for keyPath: PartialKeyPath<TorrentCoreMacHistoryTableItem>
+    ) -> Self? {
+        switch keyPath {
+        case \TorrentCoreMacHistoryTableItem.submitted: .submitted
+        case \TorrentCoreMacHistoryTableItem.name: .name
+        case \TorrentCoreMacHistoryTableItem.category: .category
+        case \TorrentCoreMacHistoryTableItem.state: .state
+        case \TorrentCoreMacHistoryTableItem.outcome: .outcome
+        case \TorrentCoreMacHistoryTableItem.progress: .progress
+        case \TorrentCoreMacHistoryTableItem.downloaded: .downloaded
+        case \TorrentCoreMacHistoryTableItem.total: .total
+        case \TorrentCoreMacHistoryTableItem.callback: .callback
+        case \TorrentCoreMacHistoryTableItem.removed: .removed
+        case \TorrentCoreMacHistoryTableItem.removalReason: .removalReason
+        default: nil
+        }
+    }
+}
+
+struct TorrentCoreMacHistoryView: View {
     static var defaultQuery: TorrentCoreHistoryQuery {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -65,9 +129,13 @@ struct TorrentCoreMacHistoryView: View {
     let showTorrent: (UUID) -> Void
 
     @AppStorage("TorrentCore.Mac.History.PageSize.v1") private var pageSize = 50
-    @AppStorage("TorrentCore.Mac.History.Sort.v1") private var sortRaw = SortField.updated.rawValue
+    @AppStorage("TorrentCore.Mac.History.Sort.v2")
+    private var storedSortField = TorrentCoreMacHistorySortField.submitted.rawValue
     @AppStorage("TorrentCore.Mac.History.SortDescending.v1")
-    private var sortDescending = true
+    private var storedSortDescending = true
+    @AppStorage("TorrentCore.Mac.History.Columns.v1")
+    private var columnCustomization =
+        TableColumnCustomization<TorrentCoreMacHistoryTableItem>()
 
     @State private var nameFilter: String
     @State private var categoryFilter: String
@@ -79,6 +147,7 @@ struct TorrentCoreMacHistoryView: View {
     @State private var includesToDate: Bool
     @State private var selectedHistoryKey: String?
     @State private var pageIndex = 0
+    @State private var sortOrder: [KeyPathComparator<TorrentCoreMacHistoryTableItem>]
     @State private var magnetCopyStatus = TorrentCoreMacMagnetCopyStatus.idle
     @State private var magnetCopyResetTask: Task<Void, Never>?
 
@@ -110,6 +179,16 @@ struct TorrentCoreMacHistoryView: View {
         _toDate = State(
             initialValue: Self.dateOnlyFormatter.date(from: initial.toDate ?? "") ?? Date()
         )
+        let defaults = UserDefaults.standard
+        let storedField = defaults.string(
+            forKey: "TorrentCore.Mac.History.Sort.v2"
+        )
+        let field = TorrentCoreMacHistorySortField(rawValue: storedField ?? "")
+            ?? .submitted
+        let descending = defaults.object(
+            forKey: "TorrentCore.Mac.History.SortDescending.v1"
+        ) as? Bool ?? true
+        _sortOrder = State(initialValue: [field.comparator(descending: descending)])
     }
 
     var body: some View {
@@ -137,14 +216,14 @@ struct TorrentCoreMacHistoryView: View {
                             .controlSize(.small)
                     }
                 }
-            } else if sortedValues.isEmpty {
+            } else if sortedItems.isEmpty {
                 ContentUnavailableView(
                     "No History Matches",
                     systemImage: "line.3.horizontal.decrease.circle",
                     description: Text("Adjust the history filters and apply them again.")
                 )
             } else {
-                historyList
+                historyTable
                 Divider()
                 paginationBar
             }
@@ -156,7 +235,7 @@ struct TorrentCoreMacHistoryView: View {
         .onChange(of: selectedHistoryKey) { _, key in
             magnetCopyResetTask?.cancel()
             magnetCopyStatus = .idle
-            selectedTorrentID = sortedValues.first(where: { $0.id == key })?.torrentID
+            selectedTorrentID = sortedItems.first(where: { $0.id == key })?.summary.torrentID
             isInspectorPresented = selectedTorrentID != nil
             contextChanged()
         }
@@ -164,8 +243,18 @@ struct TorrentCoreMacHistoryView: View {
             contextChanged()
         }
         .onChange(of: pageSize) { _, _ in pageIndex = 0 }
-        .onChange(of: sortRaw) { _, _ in pageIndex = 0 }
-        .onChange(of: sortDescending) { _, _ in pageIndex = 0 }
+        .onChange(of: sortOrder) { _, newValue in
+            guard let comparator = newValue.first,
+                  let field = TorrentCoreMacHistorySortField.field(
+                      for: comparator.keyPath
+                  )
+            else {
+                return
+            }
+            storedSortField = field.rawValue
+            storedSortDescending = comparator.order == .reverse
+            pageIndex = 0
+        }
         .onDisappear {
             magnetCopyResetTask?.cancel()
         }
@@ -194,17 +283,25 @@ struct TorrentCoreMacHistoryView: View {
                     )
                 }
                 HStack(spacing: 4) {
-                    TextField("Category", text: $categoryFilter)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 130)
+                    Picker("Category", selection: $categoryFilter) {
+                        Text("All Categories").tag("")
+                        ForEach(historyCategoryOptions, id: \.self) {
+                            Text($0).tag($0)
+                        }
+                    }
+                    .frame(width: 180)
                     TorrentCoreMacHelpButton(
                         content: TorrentCoreHelpCatalog.History.category
                     )
                 }
                 HStack(spacing: 4) {
-                    TextField("State", text: $stateFilter)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 140)
+                    Picker("State", selection: $stateFilter) {
+                        Text("All States").tag("")
+                        ForEach(historyStateOptions, id: \.self) {
+                            Text(TorrentCoreDisplayFormatter.splitIdentifier($0)).tag($0)
+                        }
+                    }
+                    .frame(width: 180)
                     TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.History.state)
                 }
                 HStack(spacing: 4) {
@@ -246,24 +343,6 @@ struct TorrentCoreMacHistoryView: View {
 
                 Spacer()
 
-                Picker("Sort", selection: $sortRaw) {
-                    ForEach(SortField.allCases, id: \.rawValue) {
-                        Text($0.label).tag($0.rawValue)
-                    }
-                }
-                .frame(width: 165)
-
-                Button {
-                    sortDescending.toggle()
-                } label: {
-                    Label(
-                        sortDescending ? "Descending" : "Ascending",
-                        systemImage: sortDescending
-                            ? "arrow.down"
-                            : "arrow.up"
-                    )
-                }
-
                 Button("Apply", action: applyFilters)
                     .keyboardShortcut(.return, modifiers: [])
                     .accessibilityIdentifier("history.apply")
@@ -290,51 +369,109 @@ struct TorrentCoreMacHistoryView: View {
         .padding(.vertical, 8)
     }
 
-    private var historyList: some View {
-        List(selection: $selectedHistoryKey) {
-            ForEach(currentPage) { item in
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(item.name ?? "Unnamed Torrent")
-                            .lineLimit(1)
-                        Text(TorrentCoreDisplayFormatter.timestamp(item.lastUpdatedAt))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(minWidth: 220, maxWidth: .infinity, alignment: .leading)
+    private var historyTable: some View {
+        Table(
+            currentPage,
+            selection: $selectedHistoryKey,
+            sortOrder: $sortOrder,
+            columnCustomization: $columnCustomization
+        ) {
+            TableColumn("Submitted", value: \.submitted) {
+                Text(TorrentCoreDisplayFormatter.timestamp($0.summary.submittedAt))
+                    .monospacedDigit()
+            }
+            .width(min: 85, ideal: 165)
+            .customizationID("submitted")
 
-                    Text(item.categoryKey ?? "—")
-                        .frame(width: 90, alignment: .leading)
-                    Text(item.latestTorrentState ?? "—")
-                        .frame(width: 110, alignment: .leading)
-                    Text(item.outcome.rawValue)
-                        .frame(width: 95, alignment: .leading)
-                    Text("Final Result: \(item.completionCallbackFinalResult ?? "—")")
-                        .lineLimit(1)
-                        .frame(width: 155, alignment: .leading)
-                        .help("Completion callback final result")
-                    Text(TorrentCoreDisplayFormatter.percent(item.latestProgressPercent))
-                        .monospacedDigit()
-                        .frame(width: 75, alignment: .trailing)
-                    Text(TorrentCoreDisplayFormatter.bytes(item.latestDownloadedBytes))
-                        .monospacedDigit()
-                        .frame(width: 90, alignment: .trailing)
-                }
-                .tag(item.id)
-                .contextMenu {
-                    Button("Inspect History") {
-                        selectedHistoryKey = item.id
-                    }
-                    if item.outcome == .active, let torrentID = item.torrentID {
-                        Button("Show in Torrents") {
-                            showTorrent(torrentID)
+            TableColumn("Name", value: \.name, comparator: .localizedStandard) { item in
+                Text(item.name)
+                    .lineLimit(2)
+                    .contextMenu {
+                        Button("Inspect History") {
+                            selectedHistoryKey = item.id
+                        }
+                        if item.summary.outcome == .active,
+                           let torrentID = item.summary.torrentID
+                        {
+                            Button("Show in Torrents") {
+                                showTorrent(torrentID)
+                            }
                         }
                     }
+                    .accessibilityIdentifier("history.row")
+            }
+            .width(min: 130, ideal: 340)
+            .customizationID("name")
+
+            TableColumn("Category", value: \.category, comparator: .localizedStandard) {
+                Text($0.category)
+            }
+            .width(min: 55, ideal: 135)
+            .customizationID("category")
+
+            TableColumn("State", value: \.state, comparator: .localizedStandard) {
+                Text(TorrentCoreDisplayFormatter.splitIdentifier($0.state))
+            }
+            .width(min: 65, ideal: 160)
+            .customizationID("state")
+
+            TableColumn("Outcome", value: \.outcome, comparator: .localizedStandard) {
+                Text(TorrentCoreDisplayFormatter.splitIdentifier($0.outcome))
+            }
+            .width(min: 55, ideal: 125)
+            .customizationID("outcome")
+
+            TableColumn("Progress", value: \.progress) {
+                Text(TorrentCoreDisplayFormatter.percent($0.progress))
+                    .monospacedDigit()
+            }
+            .width(min: 50, ideal: 95)
+            .customizationID("progress")
+
+            TableColumn("Downloaded", value: \.downloaded) {
+                Text(TorrentCoreDisplayFormatter.bytes($0.downloaded))
+                    .monospacedDigit()
+            }
+            .width(min: 65, ideal: 120)
+            .customizationID("downloaded")
+
+            TableColumn("Total", value: \.total) {
+                Text(TorrentCoreDisplayFormatter.bytes($0.summary.latestTotalBytes))
+                    .monospacedDigit()
+            }
+            .width(min: 65, ideal: 120)
+            .customizationID("total")
+
+            TableColumn("Callback", value: \.callback, comparator: .localizedStandard) {
+                Text(TorrentCoreDisplayFormatter.splitIdentifier($0.callback))
+            }
+            .width(min: 75, ideal: 190)
+            .customizationID("callback")
+
+            Group {
+                TableColumn(
+                    "Removed",
+                    value: \TorrentCoreMacHistoryTableItem.removed
+                ) {
+                    Text(TorrentCoreDisplayFormatter.timestamp($0.summary.removedAt))
+                        .monospacedDigit()
                 }
-                .accessibilityIdentifier("history.row")
+                .width(min: 85, ideal: 165)
+                .customizationID("removed")
+
+                TableColumn(
+                    "Removal Reason",
+                    value: \TorrentCoreMacHistoryTableItem.removalReason,
+                    comparator: .localizedStandard
+                ) {
+                    Text($0.removalReason)
+                        .lineLimit(2)
+                }
+                .width(min: 70, ideal: 280)
+                .customizationID("removalReason")
             }
         }
-        .listStyle(.inset)
+        .accessibilityIdentifier("history.table")
     }
 
     private var paginationBar: some View {
@@ -440,9 +577,15 @@ struct TorrentCoreMacHistoryView: View {
                     .accessibilityIdentifier("history.feedback.reason")
                     historyMagnetRow(detail.magnetURI)
                     TorrentCoreMacDetailRow(label: "Info Hash", value: detail.infoHash ?? "—")
-                    TorrentCoreMacDetailRow(
+                    TorrentCoreMacCopyableDetailRow(
                         label: "Torrent ID",
-                        value: detail.torrentID?.uuidString ?? "—"
+                        value: detail.torrentID?.uuidString,
+                        accessibilityIdentifier: "history.copyTorrentID"
+                    )
+                    TorrentCoreMacCopyableDetailRow(
+                        label: "Service Instance ID",
+                        value: detail.serviceInstanceIDLastSeen?.uuidString,
+                        accessibilityIdentifier: "history.copyServiceInstanceID"
                     )
                     if detail.outcome == .active, let torrentID = detail.torrentID {
                         Divider()
@@ -507,60 +650,60 @@ struct TorrentCoreMacHistoryView: View {
         return magnetURI.isEmpty ? nil : magnetURI
     }
 
-    private var sortedValues: [TorrentCoreHistorySummary] {
-        let field = SortField(rawValue: sortRaw) ?? .updated
-        return (session.history.value ?? []).sorted { lhs, rhs in
-            let comparison: ComparisonResult
-            switch field {
-            case .updated:
-                comparison = lhs.lastUpdatedAt.compare(rhs.lastUpdatedAt)
-            case .submitted:
-                comparison = lhs.submittedAt.compare(rhs.submittedAt)
-            case .name:
-                comparison = (lhs.name ?? "").localizedStandardCompare(
-                    rhs.name ?? ""
-                )
-            case .category:
-                comparison = (lhs.categoryKey ?? "").localizedStandardCompare(
-                    rhs.categoryKey ?? ""
-                )
-            case .state:
-                comparison = (lhs.latestTorrentState ?? "").localizedStandardCompare(
-                    rhs.latestTorrentState ?? ""
-                )
-            case .outcome:
-                comparison = lhs.outcome.rawValue.localizedStandardCompare(
-                    rhs.outcome.rawValue
-                )
-            case .progress:
-                comparison = lhs.latestProgressPercent == rhs.latestProgressPercent
-                    ? .orderedSame
-                    : lhs.latestProgressPercent < rhs.latestProgressPercent
-                        ? .orderedAscending
-                        : .orderedDescending
-            }
-            return sortDescending
-                ? comparison == .orderedDescending
-                : comparison == .orderedAscending
-        }
+    private var sortedItems: [TorrentCoreMacHistoryTableItem] {
+        (session.history.value ?? [])
+            .map { TorrentCoreMacHistoryTableItem(summary: $0) }
+            .sorted(using: sortOrder)
     }
 
-    private var currentPage: [TorrentCoreHistorySummary] {
+    private var currentPage: [TorrentCoreMacHistoryTableItem] {
         let safeIndex = min(pageIndex, maxPageIndex)
         let start = safeIndex * pageSize
-        guard start < sortedValues.count else { return [] }
-        return Array(sortedValues[start..<min(sortedValues.count, start + pageSize)])
+        guard start < sortedItems.count else { return [] }
+        return Array(sortedItems[start..<min(sortedItems.count, start + pageSize)])
     }
 
     private var maxPageIndex: Int {
-        max(0, (sortedValues.count - 1) / max(1, pageSize))
+        max(0, (sortedItems.count - 1) / max(1, pageSize))
     }
 
     private var resultRangeLabel: String {
-        guard !sortedValues.isEmpty else { return "0 records" }
+        guard !sortedItems.isEmpty else { return "0 records" }
         let start = min(pageIndex, maxPageIndex) * pageSize + 1
         let end = start + currentPage.count - 1
-        return "\(start)–\(end) of \(sortedValues.count)"
+        return "\(start)–\(end) of \(sortedItems.count)"
+    }
+
+    private var historyCategoryOptions: [String] {
+        uniqueOptions(
+            (session.history.value ?? []).compactMap(\.categoryKey),
+            preserving: categoryFilter
+        )
+    }
+
+    private var historyStateOptions: [String] {
+        uniqueOptions(
+            TorrentCoreKnownTorrentState.allCases.map(\.rawValue)
+                + (session.history.value ?? []).compactMap(\.latestTorrentState),
+            preserving: stateFilter
+        )
+    }
+
+    private func uniqueOptions(
+        _ values: [String],
+        preserving selectedValue: String
+    ) -> [String] {
+        (values + [selectedValue])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .reduce(into: [String]()) { result, value in
+                if !result.contains(where: {
+                    $0.localizedCaseInsensitiveCompare(value) == .orderedSame
+                }) {
+                    result.append(value)
+                }
+            }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     private var unavailableMessage: String {

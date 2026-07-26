@@ -23,12 +23,10 @@ final class TorrentCoreMacUITests: XCTestCase {
             app.descendants(matching: .any)["toolbar.addMagnet"].exists
         )
         XCTAssertTrue(
-            app.descendants(matching: .any)["toolbar.connectionStatus"]
+            app.descendants(matching: .any)["status.connection"]
                 .waitForExistence(timeout: 5)
         )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["toolbar.connectionStatus"].isHittable
-        )
+        XCTAssertFalse(app.descendants(matching: .any)["toolbar.connectionStatus"].exists)
 
         app.staticTexts["Preview Torrent"].click()
 
@@ -49,6 +47,13 @@ final class TorrentCoreMacUITests: XCTestCase {
         )
         XCTAssertTrue(
             app.descendants(matching: .any)["inspector.deleteData"].exists
+        )
+        let copyTorrentID = app.descendants(matching: .any)["torrents.copyTorrentID"]
+        XCTAssertTrue(copyTorrentID.exists)
+        copyTorrentID.click()
+        XCTAssertEqual(
+            NSPasteboard.general.string(forType: .string),
+            "11111111-2222-3333-4444-555555555555"
         )
 
         inspectorToggle.click()
@@ -87,9 +92,12 @@ final class TorrentCoreMacUITests: XCTestCase {
         XCTAssertTrue(historyNavigation.waitForExistence(timeout: 10))
         historyNavigation.click()
         XCTAssertTrue(
-            app.descendants(matching: .any)["history.row"]
-                .firstMatch
+            app.descendants(matching: .any)["history.table"]
                 .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["history.row"].firstMatch
+                .waitForExistence(timeout: 5)
         )
         XCTAssertTrue(app.descendants(matching: .any)["toolbar.addMagnet"].exists)
         app.descendants(matching: .any)["history.row"].firstMatch.click()
@@ -97,9 +105,6 @@ final class TorrentCoreMacUITests: XCTestCase {
             "history.inspector.content"
         ]
         XCTAssertTrue(historyInspector.waitForExistence(timeout: 5))
-        XCTAssertTrue(
-            app.staticTexts["Final Result: Success"].waitForExistence(timeout: 5)
-        )
         XCTAssertTrue(
             app.descendants(matching: .any)["history.feedback.summary"].exists
         )
@@ -113,6 +118,8 @@ final class TorrentCoreMacUITests: XCTestCase {
             app.descendants(matching: .any)["history.feedback.reason"].exists
         )
 
+        historyInspector.scroll(byDeltaX: 0, deltaY: -500)
+
         let copyMagnetButton = app.descendants(matching: .any)["history.copyMagnet"]
         XCTAssertTrue(copyMagnetButton.waitForExistence(timeout: 5))
         copyMagnetButton.click()
@@ -120,11 +127,26 @@ final class TorrentCoreMacUITests: XCTestCase {
             NSPasteboard.general.string(forType: .string),
             "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
         )
-        expectation(
-            for: NSPredicate(format: "label == %@", "Copied"),
-            evaluatedWith: copyMagnetButton
+
+        let copyTorrentID = app.descendants(matching: .any)["history.copyTorrentID"]
+        XCTAssertTrue(copyTorrentID.waitForExistence(timeout: 5))
+        copyTorrentID.click()
+        XCTAssertEqual(
+            NSPasteboard.general.string(forType: .string),
+            "11111111-2222-3333-4444-555555555555"
         )
-        waitForExpectations(timeout: 1)
+
+        historyInspector.scroll(byDeltaX: 0, deltaY: -500)
+
+        let copyServiceInstanceID = app.descendants(matching: .any)[
+            "history.copyServiceInstanceID"
+        ]
+        XCTAssertTrue(copyServiceInstanceID.waitForExistence(timeout: 5))
+        copyServiceInstanceID.click()
+        XCTAssertEqual(
+            NSPasteboard.general.string(forType: .string),
+            "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+        )
 
         let inspectorToggle = app.descendants(matching: .any)["toolbar.inspector"]
         XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
@@ -134,15 +156,24 @@ final class TorrentCoreMacUITests: XCTestCase {
         let logsNavigation = app.descendants(matching: .any)["navigation.logs"]
         logsNavigation.click()
         XCTAssertTrue(
-            app.descendants(matching: .any)["logs.row"]
-                .firstMatch
+            app.descendants(matching: .any)["logs.table"]
                 .waitForExistence(timeout: 10)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.row"].firstMatch
+                .waitForExistence(timeout: 5)
         )
         app.descendants(matching: .any)["logs.row"].firstMatch.click()
         let logsInspector = app.descendants(matching: .any)[
             "logs.inspector.content"
         ]
         XCTAssertTrue(logsInspector.waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.copyTorrentID"].exists
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["logs.copyServiceInstanceID"].exists
+        )
         XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
         inspectorToggle.click()
         XCTAssertTrue(logsInspector.waitForNonExistence(timeout: 5))
@@ -245,13 +276,13 @@ final class TorrentCoreMacUITests: XCTestCase {
 
         app.typeKey("3", modifierFlags: .command)
         XCTAssertTrue(
-            app.descendants(matching: .any)["history.row"].firstMatch
+            app.descendants(matching: .any)["history.table"]
                 .waitForExistence(timeout: 10)
         )
 
         app.typeKey("4", modifierFlags: .command)
         XCTAssertTrue(
-            app.descendants(matching: .any)["logs.row"].firstMatch
+            app.descendants(matching: .any)["logs.table"]
                 .waitForExistence(timeout: 10)
         )
 
@@ -295,9 +326,14 @@ final class TorrentCoreMacUITests: XCTestCase {
 
         app.typeKey("4", modifierFlags: .command)
         XCTAssertTrue(
-            app.descendants(matching: .any)["logs.row"].firstMatch
+            app.descendants(matching: .any)["logs.table"]
                 .waitForExistence(timeout: 10)
         )
+        XCTAssertTrue(app.staticTexts["1–50 of 1,000"].waitForExistence(timeout: 5))
+        let nextLogPage = app.descendants(matching: .any)["logs.nextPage"]
+        XCTAssertTrue(nextLogPage.isEnabled)
+        nextLogPage.click()
+        XCTAssertTrue(app.staticTexts["51–100 of 1,000"].waitForExistence(timeout: 5))
         XCTAssertTrue(
             app.descendants(matching: .any)["logs.limitNotice"]
                 .waitForExistence(timeout: 5)

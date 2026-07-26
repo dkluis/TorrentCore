@@ -370,10 +370,10 @@ Implementation notes:
   Empty-state messaging is reserved for successful zero-row responses; connectivity and request failures remain
   unavailable states.
 - The main macOS toolbar is customizable through the standard system command. Add Magnet and Refresh are permanent
-  reorderable items, torrent actions are contextual customizable items, and the active connection indicator is
-  permanently visible outside toolbar customization. Refresh is owned by the main navigation toolbar rather than an
-  inspector. One contextual Inspector item and View-menu command operate the active Torrents, History, or Logs
-  inspector and remain available for toolbar customization.
+  reorderable items, and torrent actions are contextual customizable items. Connection status is permanently visible
+  in a noninteractive content-area status bar outside toolbar customization. Refresh is owned by the main navigation
+  toolbar rather than an inspector. One contextual Inspector item and View-menu command operate the active Torrents,
+  History, or Logs inspector and remain available for toolbar customization.
 
 ### Milestone 5: macOS Hardening And Limited Release
 
@@ -441,8 +441,8 @@ Stage 5B behavior completed so far:
   5/10/15-second preference without a session-owned polling loop, so presenting master data cannot cancel an unrelated
   request. Peer and tracker diagnostics use the same policy as the other live operational views; Add Magnet categories,
   Connection, and Service Settings remain independent one-time loads.
-- The title bar permanently shows the selected profile name, address, and textual connection state. Activating it
-  navigates to Connection; it is intentionally not removable through toolbar customization.
+- The content-area status bar permanently shows the selected profile name, address, and textual connection state.
+  It is noninteractive and intentionally outside toolbar customization.
 - The service's existing `application/problem+json` error responses are described with that media type in OpenAPI, so
   the generated Swift client decodes the existing structured error body instead of reporting a content-type mismatch.
   This is contract-metadata correction only; the service runtime response and handwritten C# WebUI client behavior are
@@ -473,10 +473,26 @@ supported operator UI.
 
 ### macOS UI Refinement Workstream
 
-Status: planning. The operator chose to continue improving the macOS presentation before beginning iPad adaptation.
-Implementation priorities and acceptance criteria must be enumerated and ranked by the operator before UI code
-changes begin. Preserve Service and WebUI behavior and keep reusable, non-UI behavior in the iOS-capable
-`TorrentCoreKit` package.
+Status: in progress. The operator chose to continue improving the macOS presentation before beginning iPad adaptation.
+Preserve Service and WebUI behavior and keep reusable, non-UI behavior in the iOS-capable `TorrentCoreKit` package.
+
+Accepted first refinement slice:
+
+- replace the title-bar connection item with a noninteractive status bar at the bottom of the content area, showing
+  connection name, service address, and textual connection status
+- let destination content use the full width available to the right of the main sidebar and align content to that edge
+- retain the Torrents table pattern and convert History and Logs from simulated grids to native sortable tables
+- use dropdown filters for bounded values, free-text fields only for wildcard searches and exact identifiers, and
+  native date controls for date ranges
+- populate Log Category and Event Type dropdowns from loaded values while preserving an active selection
+- use the full WebUI-equivalent History column set and add local 25/50/100/250-row pagination to Logs
+- make Peer and Tracker headers sortable, add 10/25/50/100-row pagination, and size their pop-ups to show all columns
+  without horizontal scrolling when display space permits
+- size coded-value columns to remain readable, reserve flexible width for names and messages, keep numeric columns
+  compact, and retain native column resizing
+- add local Copy actions for Torrent ID and Service Instance ID in inspectors where those identifiers are present
+- keep Dashboard metric layouts, forms, connection lists, sidebar lists, and the editable category-maintenance surface
+  outside the sortable-table requirement
 
 ### Milestone 6: iPad Adaptation
 

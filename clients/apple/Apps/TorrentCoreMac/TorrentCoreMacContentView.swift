@@ -216,19 +216,25 @@ struct TorrentCoreMacContentView: View {
             .navigationTitle("TorrentCore")
             .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
         } detail: {
-            Group {
-                if !isLoaded {
-                    ContentUnavailableView {
-                        Label("Loading TorrentCore", systemImage: "arrow.trianglehead.2.clockwise")
-                    } description: {
-                        Text("Reading the saved connection settings.")
-                    } actions: {
-                        ProgressView()
-                            .controlSize(.small)
+            VStack(spacing: 0) {
+                Group {
+                    if !isLoaded {
+                        ContentUnavailableView {
+                            Label("Loading TorrentCore", systemImage: "arrow.trianglehead.2.clockwise")
+                        } description: {
+                            Text("Reading the saved connection settings.")
+                        } actions: {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    } else {
+                        selectedDestinationView
                     }
-                } else {
-                    selectedDestinationView
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+                Divider()
+                connectionStatusBar
             }
             .navigationTitle(destination.title)
         }
@@ -263,11 +269,6 @@ struct TorrentCoreMacContentView: View {
             }
             .hidden(!isInspectorControlAvailable)
 
-        }
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                connectionStatusButton
-            }
         }
         .frame(minWidth: 1_000, minHeight: 650)
         .focusedSceneValue(\.torrentCoreDestination, destinationSelection)
@@ -524,30 +525,29 @@ struct TorrentCoreMacContentView: View {
         .help("Auto refresh settings")
     }
 
-    private var connectionStatusButton: some View {
-        Button {
-            requestNavigation(to: .connection)
-        } label: {
-            HStack(spacing: 7) {
-                Image(systemName: connectionSystemImage)
-                    .foregroundStyle(connectionStatusColor)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(connectionName)
-                        .font(.caption.weight(.semibold))
-                    Text(connectionAddress)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Text(connectionStateLabel)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .lineLimit(1)
+    private var connectionStatusBar: some View {
+        HStack(spacing: 8) {
+            Text(connectionName)
+                .fontWeight(.semibold)
+            Text("→")
+                .foregroundStyle(.tertiary)
+            Text(connectionAddress)
+                .foregroundStyle(.secondary)
+            Text("→")
+                .foregroundStyle(.tertiary)
+            Text(connectionStateLabel)
+                .foregroundStyle(connectionStateColor)
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .font(.caption)
+        .lineLimit(1)
+        .textSelection(.enabled)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.bar)
         .accessibilityLabel("\(connectionName), \(connectionAddress), \(connectionStateLabel)")
-        .accessibilityIdentifier("toolbar.connectionStatus")
-        .help("Manage TorrentCore connections")
+        .accessibilityIdentifier("status.connection")
     }
 
     private var selectedTorrentSummary: TorrentCoreTorrentSummary? {
@@ -593,14 +593,7 @@ struct TorrentCoreMacContentView: View {
     }
 
     private var connectionAddress: String {
-        guard let profile = session.activeProfile else {
-            return "Select an installation"
-        }
-        let host = profile.baseURL.host ?? profile.baseURL.absoluteString
-        if let port = profile.baseURL.port {
-            return "\(host):\(port)"
-        }
-        return host
+        session.activeProfile?.baseURL.absoluteString ?? "Select an installation"
     }
 
     private var connectionStateLabel: String {
@@ -618,20 +611,7 @@ struct TorrentCoreMacContentView: View {
         }
     }
 
-    private var connectionSystemImage: String {
-        switch session.connectionState {
-        case .connected:
-            "checkmark.circle"
-        case .offline:
-            "network.slash"
-        case .connecting:
-            "arrow.trianglehead.2.clockwise"
-        case .notConnected, .noProfile:
-            "network"
-        }
-    }
-
-    private var connectionStatusColor: Color {
+    private var connectionStateColor: Color {
         switch session.connectionState {
         case .connected:
             .green

@@ -126,12 +126,17 @@ no active saved connection.
   connected and returns to Torrents without selecting a row or opening the inspector after a successful add.
 - Both remove paths require native destructive confirmation. A mutation timeout is shown as uncertain and is followed
   by authoritative refresh rather than automatic retry.
-- History starts with Today, uses the existing service filters, preserves abandonment visibility, and locally sorts
-  and pages bounded results at 25, 50, 100, or 250 rows. Rows show the callback Final Result when feedback exists.
-  The inspector always presents callback Summary, Received, Final Result, and Reason values and can copy the full
-  stored magnet URI. Copy Magnet is local-only and remains available while the service is offline.
-- Logs combine service-side filters and selectable recent-row limits with search over the loaded rows. Orphaned-log
+- History starts with Today, uses dropdowns for bounded category, state, and outcome filters, preserves abandonment
+  visibility, and presents the full WebUI-equivalent column set in a native sortable table. Bounded results page
+  locally at 25, 50, 100, or 250 rows. The inspector always presents callback Summary, Received, Final Result, and
+  Reason values and can copy the full stored magnet URI, Torrent ID, and last-seen Service Instance ID. Local Copy
+  actions remain available while the service is offline.
+- Logs combine service-side filters and selectable recent-row limits with search over the loaded rows. Category and
+  Event Type use loaded-value dropdowns; exact identifiers remain text fields. The native sortable table pages locally
+  at 25, 50, 100, or 250 rows, and its inspector can copy Torrent and Service Instance identifiers. Orphaned-log
   cleanup requires confirmation.
+- Peer and Tracker diagnostics use native sortable tables with 10, 25, 50, or 100 rows per page. Their pop-ups prefer
+  enough width for the complete WebUI-equivalent diagnostic column sets when display space permits.
 - Service Settings edits one group at a time with Save/Revert and guarded navigation. Closed server values use readable
   selectors for seeding stop mode, completed-torrent cleanup mode, and engine encryption mode. Dependent controls are
   disabled when their selected policy does not use them, and service validation rules are enforced before Save.
@@ -142,15 +147,15 @@ no active saved connection.
   `TorrentCoreFeatures` for later iOS/iPadOS presentation, while the popover renderer remains macOS-specific.
 - Dashboard, Torrents, History, Logs, Peers, and Trackers follow the global foreground refresh policy only while their
   context is visible. Add Magnet categories and Service Settings load once when presented and support manual refresh.
-- The title-bar toolbar permanently identifies the selected installation by profile name and address, includes a
-  text-and-symbol connection state, and opens Connection when selected.
+- A noninteractive status bar at the bottom of the content area permanently identifies the selected installation as
+  profile name, service address, and textual connection state. Connection remains available through navigation.
 - The Navigate menu maps Command-1 through Command-6 to the six sidebar destinations. Context menus and direct
   cross-navigation keep actions scoped to one torrent.
 - Opening a destination immediately loads its visible service data. First loads show progress, successful empty
   responses show an empty state, and failures show an unavailable state.
 - Standard macOS Settings and the customizable main toolbar share the same global Auto Refresh and interval
-  preferences. Inspector is a contextual customizable item. The active connection indicator is permanently visible
-  and is not part of toolbar customization.
+  preferences. Inspector is a contextual customizable item. Connection status remains permanently visible outside
+  toolbar customization.
 
 The app has no compiled live endpoint. `--torrentcore-ui-fixtures` and the large-collection variant
 `--torrentcore-ui-large-fixtures` are reserved for Xcode UI testing and start an in-memory fixture service; neither

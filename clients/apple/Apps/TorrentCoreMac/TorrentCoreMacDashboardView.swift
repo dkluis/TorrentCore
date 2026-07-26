@@ -26,7 +26,7 @@ struct TorrentCoreMacDashboardView: View {
                         lifecycleSection
                     }
                     .padding(20)
-                    .frame(maxWidth: 1_200, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .accessibilityIdentifier("dashboard.content")
             } else {

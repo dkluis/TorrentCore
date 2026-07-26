@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import TorrentCoreFeatures
 
@@ -83,6 +84,67 @@ struct TorrentCoreMacDetailRow: View {
             Text(value)
                 .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
+        }
+    }
+}
+
+struct TorrentCoreMacCopyableDetailRow: View {
+    let label: String
+    let value: String?
+    let accessibilityIdentifier: String
+
+    @State private var copied = false
+    @State private var resetTask: Task<Void, Never>?
+
+    var body: some View {
+        LabeledContent(label) {
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(displayValue)
+                    .multilineTextAlignment(.trailing)
+                    .textSelection(.enabled)
+
+                Button {
+                    copyToPasteboard()
+                } label: {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                }
+                .disabled(copyValue == nil)
+                .accessibilityLabel(copied ? "Copied \(label)" : "Copy \(label)")
+                .accessibilityIdentifier(accessibilityIdentifier)
+                .help(copied ? "Copied \(label)" : "Copy \(label)")
+            }
+        }
+        .onDisappear {
+            resetTask?.cancel()
+        }
+    }
+
+    private var copyValue: String? {
+        let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var displayValue: String {
+        copyValue ?? "—"
+    }
+
+    private func copyToPasteboard() {
+        guard let copyValue else {
+            return
+        }
+        resetTask?.cancel()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        copied = pasteboard.setString(copyValue, forType: .string)
+        guard copied else {
+            return
+        }
+        resetTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else {
+                return
+            }
+            copied = false
         }
     }
 }

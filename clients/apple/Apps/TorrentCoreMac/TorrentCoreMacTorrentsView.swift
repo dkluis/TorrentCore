@@ -88,6 +88,9 @@ struct TorrentCoreMacTorrentsView: View {
     private var storedSortField = TorrentCoreMacTorrentSortField.name.rawValue
     @AppStorage("TorrentCore.Mac.Torrents.SortDescending.v1")
     private var storedSortDescending = false
+    @AppStorage("TorrentCore.Mac.Torrents.Columns.v1")
+    private var columnCustomization =
+        TableColumnCustomization<TorrentCoreTorrentListItem>()
 
     let session: TorrentCoreFeatureSession
     @Binding var selectedTorrentID: UUID?
@@ -403,7 +406,8 @@ struct TorrentCoreMacTorrentsView: View {
         Table(
             currentPage.values,
             selection: tableSelection,
-            sortOrder: $sortOrder
+            sortOrder: $sortOrder,
+            columnCustomization: $columnCustomization
         ) {
             TableColumn(
                 "Name",
@@ -429,6 +433,7 @@ struct TorrentCoreMacTorrentsView: View {
                     }
             }
             .width(min: 220, ideal: 340)
+            .customizationID("name")
 
             TableColumn(
                 "State",
@@ -437,7 +442,8 @@ struct TorrentCoreMacTorrentsView: View {
             ) { item in
                 Text(TorrentCoreDisplayFormatter.state(item.summary.state))
             }
-            .width(min: 100, ideal: 135)
+            .width(min: 130, ideal: 160)
+            .customizationID("state")
 
             TableColumn("Progress", value: \.progress) { item in
                 HStack(spacing: 6) {
@@ -448,24 +454,28 @@ struct TorrentCoreMacTorrentsView: View {
                 }
             }
             .width(min: 130, ideal: 170)
+            .customizationID("progress")
 
             TableColumn("Download", value: \.downloadRate) { item in
                 Text(TorrentCoreDisplayFormatter.rate(item.downloadRate))
                     .monospacedDigit()
             }
             .width(min: 90, ideal: 110)
+            .customizationID("download")
 
             TableColumn("Upload", value: \.uploadRate) { item in
                 Text(TorrentCoreDisplayFormatter.rate(item.uploadRate))
                     .monospacedDigit()
             }
             .width(min: 90, ideal: 110)
+            .customizationID("upload")
 
             TableColumn("Peers", value: \.peers) { item in
                 Text(item.peers.formatted())
                     .monospacedDigit()
             }
             .width(min: 55, ideal: 70)
+            .customizationID("peers")
 
             TableColumn(
                 "Category",
@@ -474,7 +484,8 @@ struct TorrentCoreMacTorrentsView: View {
             ) { item in
                 Text(TorrentCoreDisplayFormatter.category(item.summary.categoryKey))
             }
-            .width(min: 90, ideal: 120)
+            .width(min: 105, ideal: 135)
+            .customizationID("category")
 
             TableColumn(
                 "Wait",
@@ -484,7 +495,8 @@ struct TorrentCoreMacTorrentsView: View {
                 Text(item.wait)
                     .lineLimit(2)
             }
-            .width(min: 120, ideal: 170)
+            .width(min: 150, ideal: 210)
+            .customizationID("wait")
         }
         .accessibilityIdentifier("torrents.table")
     }
@@ -1045,9 +1057,10 @@ private struct TorrentCoreMacTorrentInspector: View {
                 label: "Info Hash",
                 value: detail?.infoHash ?? "—"
             )
-            TorrentCoreMacDetailRow(
+            TorrentCoreMacCopyableDetailRow(
                 label: "Torrent ID",
-                value: fallback.summary.torrentID?.uuidString ?? "—"
+                value: fallback.summary.torrentID?.uuidString,
+                accessibilityIdentifier: "torrents.copyTorrentID"
             )
             if let error = detail?.errorMessage ?? fallback.summary.errorMessage,
                !error.isEmpty
