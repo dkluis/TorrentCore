@@ -205,9 +205,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.2.0` |
-| Current build | `2` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.2.0.dmg` |
+| Current version | `0.2.1` |
+| Current build | `3` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.2.1.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -215,6 +215,10 @@ The 0.2.0/build 2 upgrade candidate was accepted and stapled the same day under 
 `f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`. Its SHA-256 checksum is
 `26fd5d1b3d4ce2d1a92834f56aea68a8842b75a9a8ed061c994e535dc2e78bd2`.
 Installation over 0.1.0 passed operator upgrade acceptance on July 26, 2026.
+The 0.2.1/build 3 macOS 27 compatibility hotfix was accepted and stapled under notarization submission
+`72257d2e-d315-40dc-a315-71530bfdd9af`. Its SHA-256 checksum is
+`6ab13ffc94fdef761b39a31f575bbff7b3636c1e5f8cde6c84c6ff8b1653079d`.
+Separate-Mac verification that it resolves the macOS 27 launch abort is pending.
 
 ### One-Time Developer ID Setup
 
