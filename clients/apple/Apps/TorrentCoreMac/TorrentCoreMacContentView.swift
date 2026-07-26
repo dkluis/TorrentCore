@@ -47,8 +47,68 @@ enum TorrentCoreMacDestination: String, CaseIterable, Identifiable {
     }
 }
 
-struct TorrentCoreMacContentView: View {
+private struct TorrentCoreMacRefreshTaskID: Equatable {
+    let context: TorrentCoreFeatureContext
+    let profileID: UUID?
+    let interval: TorrentCoreRefreshInterval
+    let autoRefreshEnabled: Bool
+    let isEnabled: Bool
+    let isSceneActive: Bool
+}
+
+private struct TorrentCoreMacPollingAllowedKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+private extension EnvironmentValues {
+    var torrentCorePollingAllowed: Bool {
+        get { self[TorrentCoreMacPollingAllowedKey.self] }
+        set { self[TorrentCoreMacPollingAllowedKey.self] = newValue }
+    }
+}
+
+private struct TorrentCoreMacVisibleRefreshModifier: ViewModifier {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.torrentCorePollingAllowed) private var pollingAllowed
+
+    let session: TorrentCoreFeatureSession
+    let context: TorrentCoreFeatureContext
+    let isEnabled: Bool
+
+    func body(content: Content) -> some View {
+        let taskID = TorrentCoreMacRefreshTaskID(
+            context: context,
+            profileID: session.activeProfile?.id,
+            interval: session.preferences.refreshInterval,
+            autoRefreshEnabled: session.preferences.autoRefreshEnabled,
+            isEnabled: isEnabled && pollingAllowed,
+            isSceneActive: scenePhase == .active
+        )
+
+        content.task(id: taskID) {
+            guard taskID.isEnabled, taskID.isSceneActive, taskID.profileID != nil else {
+                return
+            }
+            await session.refreshWhileVisible(context)
+        }
+    }
+}
+
+extension View {
+    func torrentCoreRefreshWhileVisible(
+        session: TorrentCoreFeatureSession,
+        context: TorrentCoreFeatureContext,
+        isEnabled: Bool = true
+    ) -> some View {
+        modifier(TorrentCoreMacVisibleRefreshModifier(
+            session: session,
+            context: context,
+            isEnabled: isEnabled
+        ))
+    }
+}
+
+struct TorrentCoreMacContentView: View {
     @AppStorage("TorrentCore.Mac.SelectedDestination.v1")
     private var storedDestination = TorrentCoreMacDestination.dashboard.rawValue
 
@@ -84,22 +144,13 @@ struct TorrentCoreMacContentView: View {
 
     var body: some View {
         mainWindow
+            .environment(\.torrentCorePollingAllowed, !isAddMagnetPresented)
             .task {
                 await loadIfNeeded()
             }
             .onChange(of: destination) { _, newValue in
                 storedDestination = newValue.rawValue
                 updateFeatureContext()
-            }
-            .onChange(of: isAddMagnetPresented) { _, isPresented in
-                if isPresented {
-                    session.setContext(.addMagnet)
-                } else {
-                    updateFeatureContext()
-                }
-            }
-            .onChange(of: scenePhase) { _, newValue in
-                session.setApplicationActive(newValue == .active)
             }
             .alert(
                 "Couldn’t Load Settings",
@@ -212,13 +263,11 @@ struct TorrentCoreMacContentView: View {
             }
             .hidden(!isInspectorControlAvailable)
 
-            ToolbarItem(
-                id: "optionalConnectionStatus.v1",
-                placement: .automatic
-            ) {
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
                 connectionStatusButton
             }
-            .defaultCustomization(.hidden)
         }
         .frame(minWidth: 1_000, minHeight: 650)
         .focusedSceneValue(\.torrentCoreDestination, destinationSelection)
@@ -479,8 +528,24 @@ struct TorrentCoreMacContentView: View {
         Button {
             requestNavigation(to: .connection)
         } label: {
-            Label(connectionLabel, systemImage: connectionSystemImage)
+            HStack(spacing: 7) {
+                Image(systemName: connectionSystemImage)
+                    .foregroundStyle(connectionStatusColor)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(connectionName)
+                        .font(.caption.weight(.semibold))
+                    Text(connectionAddress)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(connectionStateLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(connectionName), \(connectionAddress), \(connectionStateLabel)")
         .accessibilityIdentifier("toolbar.connectionStatus")
         .help("Manage TorrentCore connections")
     }
@@ -523,21 +588,33 @@ struct TorrentCoreMacContentView: View {
         }
     }
 
-    private var connectionLabel: String {
+    private var connectionName: String {
+        session.activeProfile?.name ?? "No TorrentCore Connection"
+    }
+
+    private var connectionAddress: String {
         guard let profile = session.activeProfile else {
-            return "No Connection"
+            return "Select an installation"
         }
+        let host = profile.baseURL.host ?? profile.baseURL.absoluteString
+        if let port = profile.baseURL.port {
+            return "\(host):\(port)"
+        }
+        return host
+    }
+
+    private var connectionStateLabel: String {
         switch session.connectionState {
         case .connected:
-            return "\(profile.name) · Connected"
+            return "Connected"
         case .offline:
-            return "\(profile.name) · Offline"
+            return "Offline"
         case .connecting:
-            return "\(profile.name) · Connecting"
+            return "Connecting"
         case .notConnected:
-            return "\(profile.name) · Not Connected"
+            return "Not Connected"
         case .noProfile:
-            return "No Connection"
+            return "Not Connected"
         }
     }
 
@@ -554,6 +631,19 @@ struct TorrentCoreMacContentView: View {
         }
     }
 
+    private var connectionStatusColor: Color {
+        switch session.connectionState {
+        case .connected:
+            .green
+        case .offline:
+            .orange
+        case .connecting:
+            .blue
+        case .notConnected, .noProfile:
+            .secondary
+        }
+    }
+
     @MainActor
     private func loadIfNeeded() async {
         guard !isLoaded else {
@@ -566,7 +656,6 @@ struct TorrentCoreMacContentView: View {
             if session.activeProfile == nil {
                 destination = .connection
             }
-            session.setApplicationActive(scenePhase == .active)
             updateFeatureContext()
         } catch {
             loadError = TorrentCoreMacErrorPresenter.message(error)
@@ -599,9 +688,6 @@ struct TorrentCoreMacContentView: View {
             session.setContext(.logs(logQuery))
         case .serviceSettings:
             session.setContext(.serviceSettings)
-        }
-        Task {
-            await session.refresh()
         }
     }
 

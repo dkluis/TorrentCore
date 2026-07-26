@@ -184,7 +184,7 @@ func aCancelledOldProfileResponseCannotReplaceNewProfileState() async throws {
 
 @Test
 @MainActor
-func changingFeatureContextPublishesInitialLoadingStateSynchronously() async throws {
+func changingFeatureContextDoesNotChangeUnrelatedSnapshotPhases() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Loading",
         address: "http://loading.test:7033"
@@ -200,17 +200,18 @@ func changingFeatureContextPublishesInitialLoadingStateSynchronously() async thr
 
     #expect(session.torrents.phase == .idle)
     session.setContext(.torrents)
-    #expect(session.torrents.phase == .loading)
+    #expect(session.torrents.phase == .idle)
 
     #expect(session.logs.phase == .idle)
     session.setContext(.logs(.init(take: 100)))
-    #expect(session.logs.phase == .loading)
+    #expect(session.logs.phase == .idle)
+    #expect(session.torrents.phase == .idle)
 
     #expect(session.runtimeSettings.phase == .idle)
     #expect(session.categories.phase == .idle)
     session.setContext(.serviceSettings)
-    #expect(session.runtimeSettings.phase == .loading)
-    #expect(session.categories.phase == .loading)
+    #expect(session.runtimeSettings.phase == .idle)
+    #expect(session.categories.phase == .idle)
 }
 
 @Test
@@ -383,7 +384,7 @@ func torrentInspectorContextRefreshesListAndSelectedDetail() async throws {
 
 @Test
 @MainActor
-func foregroundStartsOneLoopAndBackgroundStopsIt() async throws {
+func visibleRefreshUsesTheSelectedIntervalAndStopsWhenCancelled() async throws {
     let profile = try TorrentCoreConnectionProfile(
         name: "Foreground",
         address: "http://foreground.test:7033"
@@ -396,10 +397,10 @@ func foregroundStartsOneLoopAndBackgroundStopsIt() async throws {
         sleeper: sleeper
     )
     try await session.load()
-    session.setContext(.torrents)
 
-    session.setApplicationActive(true)
-    session.setApplicationActive(true)
+    let initialPolling = Task { @MainActor in
+        await session.refreshWhileVisible(.torrents)
+    }
     await waitUntil {
         await client.calls.torrents == 1
     }
@@ -407,15 +408,19 @@ func foregroundStartsOneLoopAndBackgroundStopsIt() async throws {
         await sleeper.intervals == [15]
     }
     #expect(await client.calls.torrents == 1)
+    initialPolling.cancel()
+    await initialPolling.value
 
     try await session.setRefreshInterval(.fiveSeconds)
+    let updatedPolling = Task { @MainActor in
+        await session.refreshWhileVisible(.torrents)
+    }
     await waitUntil {
         await sleeper.intervals.last == 5
     }
     #expect(session.preferences.refreshInterval == .fiveSeconds)
-
-    session.setApplicationActive(false)
-    #expect(!session.isApplicationActive)
+    updatedPolling.cancel()
+    await updatedPolling.value
 }
 
 @Test
@@ -442,20 +447,24 @@ func peerAndTrackerDiagnosticsUseTheGlobalRefreshInterval() async throws {
     )
     try await session.load()
 
-    session.setContext(.peers(TorrentCorePreviewFixtures.torrentID))
-    session.setApplicationActive(true)
+    let peerPolling = Task { @MainActor in
+        await session.refreshWhileVisible(.peers(TorrentCorePreviewFixtures.torrentID))
+    }
     await waitUntil {
         await client.calls.peers >= 2
     }
-    session.setApplicationActive(false)
+    peerPolling.cancel()
+    await peerPolling.value
     #expect(await client.calls.peers >= 2)
 
-    session.setContext(.trackers(TorrentCorePreviewFixtures.torrentID))
-    session.setApplicationActive(true)
+    let trackerPolling = Task { @MainActor in
+        await session.refreshWhileVisible(.trackers(TorrentCorePreviewFixtures.torrentID))
+    }
     await waitUntil {
         await client.calls.trackers >= 2
     }
-    session.setApplicationActive(false)
+    trackerPolling.cancel()
+    await trackerPolling.value
     #expect(await client.calls.trackers >= 2)
     #expect(await sleeper.intervals.isEmpty == false)
     #expect(await sleeper.intervals.allSatisfy { $0 == 10 })
@@ -481,30 +490,25 @@ func masterDataContextsLoadOnceEvenWhenAutoRefreshIsEnabled() async throws {
     )
     try await session.load()
 
-    session.setContext(.addMagnet)
-    session.setApplicationActive(true)
-    await waitUntil {
-        await client.calls.categories == 1
-    }
+    await session.refresh(.addMagnet)
     for _ in 0..<20 {
         await Task.yield()
     }
     #expect(await client.calls.categories == 1)
+    #expect(session.categories.phase == .current)
+    #expect(session.categories.value?.isEmpty == false)
+    #expect(session.context == .none)
 
-    session.setContext(.serviceSettings)
-    await waitUntil {
-        let calls = await client.calls
-        return calls.runtimeSettings == 1 && calls.categories == 2
-    }
+    await session.refresh(.serviceSettings)
     for _ in 0..<20 {
         await Task.yield()
     }
-    session.setApplicationActive(false)
 
     let calls = await client.calls
     #expect(calls.runtimeSettings == 1)
     #expect(calls.categories == 2)
     #expect(await sleeper.intervals.isEmpty)
+    #expect(session.context == .none)
 }
 
 @Test
@@ -526,12 +530,7 @@ func disabledAutoRefreshLoadsTheContextOnceWithoutPolling() async throws {
         sleeper: sleeper
     )
     try await session.load()
-    session.setContext(.torrents)
-    session.setApplicationActive(true)
-
-    await waitUntil {
-        await client.calls.torrents == 1
-    }
+    await session.refreshWhileVisible(.torrents)
     for _ in 0..<20 {
         await Task.yield()
     }

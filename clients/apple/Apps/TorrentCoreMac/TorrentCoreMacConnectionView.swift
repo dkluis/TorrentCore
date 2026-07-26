@@ -136,6 +136,12 @@ struct TorrentCoreMacConnectionView: View {
         .onAppear {
             initializeSelectionIfNeeded()
         }
+        .task {
+            guard session.activeProfile != nil else {
+                return
+            }
+            await session.refresh(.connection)
+        }
         .onChange(of: selectedProfileID) { _, _ in
             loadSelectedProfile()
         }
@@ -284,8 +290,7 @@ struct TorrentCoreMacConnectionView: View {
                 }
                 self.selectedProfileID = profile.id
                 isCreating = false
-                session.setContext(.connection)
-                await session.refresh()
+                await session.refresh(.connection)
 
                 if session.connectionState.isConnected {
                     feedback = Feedback(
@@ -317,8 +322,7 @@ struct TorrentCoreMacConnectionView: View {
             defer { isWorking = false }
             do {
                 try await session.selectProfile(id: selectedProfile.id)
-                session.setContext(.connection)
-                await session.refresh()
+                await session.refresh(.connection)
                 feedback = Feedback(
                     message: session.connectionState.isConnected
                         ? "Connected to \(selectedProfile.name)."

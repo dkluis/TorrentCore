@@ -169,6 +169,17 @@ struct TorrentCoreMacHistoryView: View {
         .onDisappear {
             magnetCopyResetTask?.cancel()
         }
+        .torrentCoreRefreshWhileVisible(
+            session: session,
+            context: refreshContext
+        )
+    }
+
+    private var refreshContext: TorrentCoreFeatureContext {
+        .history(
+            query: query,
+            selectedTorrentID: isInspectorPresented ? selectedTorrentID : nil
+        )
     }
 
     private var filterBar: some View {

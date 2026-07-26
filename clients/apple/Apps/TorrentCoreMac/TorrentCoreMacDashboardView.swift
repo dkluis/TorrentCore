@@ -33,6 +33,10 @@ struct TorrentCoreMacDashboardView: View {
                 emptyState
             }
         }
+        .torrentCoreRefreshWhileVisible(
+            session: session,
+            context: .dashboard
+        )
     }
 
     private func serviceHeader(status: TorrentCoreHostStatus) -> some View {
@@ -244,9 +248,7 @@ struct TorrentCoreMacDashboardView: View {
             }
             if session.activeProfile != nil {
                 Button("Refresh") {
-                    Task {
-                        await session.refresh()
-                    }
+                    Task { await session.refresh(.dashboard) }
                 }
             }
         }

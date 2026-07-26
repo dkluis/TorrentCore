@@ -345,9 +345,10 @@ Implementation notes:
   local sorting and 25/50/100/250-row paging over the bounded server result.
 - Logs use existing server filters with selectable 100/500/1,000/5,000 recent-row limits and local search. The app
   clearly marks a result that reaches the selected limit; no paging API was added.
-- The macOS app has one main operator window so exactly one visible feature context owns polling. Dashboard, Torrents,
-  History, Logs, Peers, and Trackers use the global foreground auto-refresh interval only while visible. Add Magnet
-  categories and Service Settings are master-data loads performed once when presented and remain manually refreshable.
+- The macOS app has one main operator window. Each visible live-data feature owns a structured, cancellable polling
+  task using the global foreground auto-refresh interval; leaving that feature cancels only its task. Dashboard,
+  Torrents, History, Logs, Peers, and Trackers use this policy. Add Magnet categories, Connection, and Service Settings
+  perform independent one-time loads when presented and remain manually refreshable.
 - Service settings remain distinct from device-local macOS Settings. One service-settings group can be dirty at a
   time, with Save/Revert and Save/Discard/Cancel navigation protection. Callback API-key text is transient form state
   and is neither persisted nor logged by the Mac client.
@@ -367,10 +368,10 @@ Implementation notes:
   Empty-state messaging is reserved for successful zero-row responses; connectivity and request failures remain
   unavailable states.
 - The main macOS toolbar is customizable through the standard system command. Add Magnet and Refresh are permanent
-  reorderable items, torrent actions are contextual customizable items, and Connection Status is optional and hidden
-  by default. Refresh is owned by the main navigation toolbar rather than an inspector. One contextual Inspector item
-  and View-menu command operate the active Torrents, History, or Logs inspector and remain available for toolbar
-  customization.
+  reorderable items, torrent actions are contextual customizable items, and the active connection indicator is
+  permanently visible outside toolbar customization. Refresh is owned by the main navigation toolbar rather than an
+  inspector. One contextual Inspector item and View-menu command operate the active Torrents, History, or Logs
+  inspector and remain available for toolbar customization.
 
 ### Milestone 5: macOS Hardening And Limited Release
 
@@ -427,9 +428,12 @@ Stage 5A behavior:
 Stage 5B behavior completed so far:
 
 - Appearance is a device-local app preference with System, Light, and Dark choices. System remains the default.
-- The main operator scene is single-window so restored or inactive windows cannot compete for the shared feature
-  context. Peer and tracker diagnostics use the same global 5/10/15-second foreground refresh policy as the other live
-  operational views; Add Magnet categories and Service Settings remain one-time master-data loads.
+- The main operator scene is single-window. Live-data views own their structured refresh tasks and share the global
+  5/10/15-second preference without a session-owned polling loop, so presenting master data cannot cancel an unrelated
+  request. Peer and tracker diagnostics use the same policy as the other live operational views; Add Magnet categories,
+  Connection, and Service Settings remain independent one-time loads.
+- The title bar permanently shows the selected profile name, address, and textual connection state. Activating it
+  navigates to Connection; it is intentionally not removable through toolbar customization.
 - The service's existing `application/problem+json` error responses are described with that media type in OpenAPI, so
   the generated Swift client decodes the existing structured error body instead of reporting a content-type mismatch.
   This is contract-metadata correction only; the service runtime response and handwritten C# WebUI client behavior are

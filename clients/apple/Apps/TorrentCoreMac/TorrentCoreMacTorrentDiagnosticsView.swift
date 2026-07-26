@@ -8,7 +8,6 @@ struct TorrentCoreMacPeersSheet: View {
     let session: TorrentCoreFeatureSession
     let torrentID: UUID
     let torrentName: String
-    let restoreContext: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +20,7 @@ struct TorrentCoreMacPeersSheet: View {
                 }
                 Spacer()
                 Button {
-                    Task { await session.refresh() }
+                    Task { await session.refresh(.peers(torrentID)) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -80,10 +79,10 @@ struct TorrentCoreMacPeersSheet: View {
             }
         }
         .frame(minWidth: 840, minHeight: 500)
-        .task {
-            session.setContext(.peers(torrentID))
-        }
-        .onDisappear(perform: restoreContext)
+        .torrentCoreRefreshWhileVisible(
+            session: session,
+            context: .peers(torrentID)
+        )
     }
 }
 
@@ -93,7 +92,6 @@ struct TorrentCoreMacTrackersSheet: View {
     let session: TorrentCoreFeatureSession
     let torrentID: UUID
     let torrentName: String
-    let restoreContext: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -106,7 +104,7 @@ struct TorrentCoreMacTrackersSheet: View {
                 }
                 Spacer()
                 Button {
-                    Task { await session.refresh() }
+                    Task { await session.refresh(.trackers(torrentID)) }
                 } label: {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
@@ -166,10 +164,10 @@ struct TorrentCoreMacTrackersSheet: View {
             }
         }
         .frame(minWidth: 880, minHeight: 500)
-        .task {
-            session.setContext(.trackers(torrentID))
-        }
-        .onDisappear(perform: restoreContext)
+        .torrentCoreRefreshWhileVisible(
+            session: session,
+            context: .trackers(torrentID)
+        )
     }
 
     private func duration(_ seconds: Int64?) -> String {

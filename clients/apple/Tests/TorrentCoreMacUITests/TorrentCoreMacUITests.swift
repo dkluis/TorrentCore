@@ -22,7 +22,11 @@ final class TorrentCoreMacUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["toolbar.addMagnet"].exists
         )
-        XCTAssertFalse(
+        XCTAssertTrue(
+            app.descendants(matching: .any)["toolbar.connectionStatus"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
             app.descendants(matching: .any)["toolbar.connectionStatus"].isHittable
         )
 
@@ -227,6 +231,15 @@ final class TorrentCoreMacUITests: XCTestCase {
         let magnet = "magnet:?xt=urn:btih:keyboardfocus"
         app.typeText(magnet)
         XCTAssertEqual(magnetField.value as? String, magnet)
+
+        let categoryPicker = app.descendants(matching: .any)["addMagnet.category"]
+        XCTAssertTrue(categoryPicker.waitForExistence(timeout: 5))
+        categoryPicker.click()
+        XCTAssertTrue(app.menuItems["TV (Show)"].waitForExistence(timeout: 5))
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertFalse(
+            app.descendants(matching: .any)["addMagnet.categories.loading"].exists
+        )
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(magnetField.waitForNonExistence(timeout: 5))
 

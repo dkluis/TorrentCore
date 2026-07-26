@@ -18,10 +18,10 @@ public enum TorrentCoreFeatureContext: Equatable, Sendable {
 
     var refreshesPeriodically: Bool {
         switch self {
-        case .connection, .dashboard, .torrents, .torrentDetail, .torrentListAndDetail,
+        case .dashboard, .torrents, .torrentDetail, .torrentListAndDetail,
              .history, .logs, .peers, .trackers:
             true
-        case .none, .addMagnet, .serviceSettings:
+        case .none, .connection, .addMagnet, .serviceSettings:
             false
         }
     }
@@ -122,7 +122,6 @@ public final class TorrentCoreFeatureSession {
     public private(set) var runtimeSettings = TorrentCoreFeatureSnapshot<TorrentCoreRuntimeSettings>()
     public private(set) var activeMutation: TorrentCoreOperation?
     public private(set) var context: TorrentCoreFeatureContext = .none
-    public private(set) var isApplicationActive = false
 
     public var activeProfile: TorrentCoreConnectionProfile? {
         preferences.activeProfile
@@ -136,9 +135,6 @@ public final class TorrentCoreFeatureSession {
     @ObservationIgnored private var client: (any TorrentCoreServiceClientProtocol)?
     @ObservationIgnored private var clientProfileID: UUID?
     @ObservationIgnored private var generation = 0
-    @ObservationIgnored private var refreshLoopTask: Task<Void, Never>?
-    @ObservationIgnored private var refreshTask: Task<Void, Never>?
-    @ObservationIgnored private var refreshOperationID: UUID?
 
     public init(
         profileStore: any TorrentCoreProfilePersisting = UserDefaultsTorrentCoreProfileStore(),
@@ -154,16 +150,10 @@ public final class TorrentCoreFeatureSession {
         self.restartRecoveryDelay = restartRecoveryDelay
     }
 
-    deinit {
-        refreshLoopTask?.cancel()
-        refreshTask?.cancel()
-    }
-
     public func load() async throws {
         let loadedPreferences = try await profileStore.load()
         preferences = loadedPreferences
         resetRemoteState()
-        restartRefreshLoop()
     }
 
     @discardableResult
@@ -190,7 +180,6 @@ public final class TorrentCoreFeatureSession {
         if profileChanged {
             resetRemoteState()
         }
-        restartRefreshLoop()
         return profile
     }
 
@@ -224,7 +213,6 @@ public final class TorrentCoreFeatureSession {
 
         if preferences.activeProfileID == id {
             resetRemoteState()
-            restartRefreshLoop()
         }
         return updatedProfile
     }
@@ -246,7 +234,6 @@ public final class TorrentCoreFeatureSession {
         if removedActiveProfile {
             resetRemoteState()
         }
-        restartRefreshLoop()
     }
 
     public func selectProfile(id: UUID?) async throws {
@@ -262,7 +249,6 @@ public final class TorrentCoreFeatureSession {
         try await profileStore.save(updatedPreferences)
         preferences = updatedPreferences
         resetRemoteState()
-        restartRefreshLoop()
     }
 
     public func setRefreshInterval(_ interval: TorrentCoreRefreshInterval) async throws {
@@ -274,9 +260,6 @@ public final class TorrentCoreFeatureSession {
         updatedPreferences.refreshInterval = interval
         try await profileStore.save(updatedPreferences)
         preferences = updatedPreferences
-        if preferences.autoRefreshEnabled {
-            restartRefreshLoop()
-        }
     }
 
     public func setAutoRefreshEnabled(_ isEnabled: Bool) async throws {
@@ -288,12 +271,6 @@ public final class TorrentCoreFeatureSession {
         updatedPreferences.autoRefreshEnabled = isEnabled
         try await profileStore.save(updatedPreferences)
         preferences = updatedPreferences
-        if isEnabled {
-            restartRefreshLoop()
-        } else {
-            refreshLoopTask?.cancel()
-            refreshLoopTask = nil
-        }
     }
 
     public func testConnection(address: String) async throws -> TorrentCoreServiceHealth {
@@ -307,53 +284,38 @@ public final class TorrentCoreFeatureSession {
             return
         }
         self.context = context
-        cancelCurrentRefresh()
-        if activeProfile != nil {
-            beginLoading(context)
-        }
-        restartRefreshLoop()
-    }
-
-    public func setApplicationActive(_ isActive: Bool) {
-        guard isApplicationActive != isActive else {
-            return
-        }
-        isApplicationActive = isActive
-        if !isActive {
-            cancelCurrentRefresh()
-        }
-        restartRefreshLoop()
+        generation += 1
     }
 
     public func refresh() async {
-        guard activeProfile != nil, context != .none else {
+        let requestedContext = context
+        guard requestedContext != .none else {
             return
         }
-        if let refreshTask {
-            await refreshTask.value
+        await refresh(requestedContext, expectedGeneration: generation)
+    }
+
+    public func refresh(_ requestedContext: TorrentCoreFeatureContext) async {
+        await refresh(requestedContext, expectedGeneration: nil)
+    }
+
+    public func refreshWhileVisible(_ requestedContext: TorrentCoreFeatureContext) async {
+        await refresh(requestedContext)
+        guard preferences.autoRefreshEnabled, requestedContext.refreshesPeriodically else {
             return
         }
 
-        let operationID = UUID()
-        let requestGeneration = generation
-        let requestedContext = context
-        let requestedProfile = activeProfile
-        refreshOperationID = operationID
-        let operation = Task { [weak self] in
-            guard let self, let requestedProfile else {
+        let interval = preferences.refreshInterval.seconds
+        while !Task.isCancelled {
+            do {
+                try await sleeper.sleep(for: interval)
+            } catch {
                 return
             }
-            await self.performRefresh(
-                profile: requestedProfile,
-                context: requestedContext,
-                generation: requestGeneration
-            )
-        }
-        refreshTask = operation
-        await operation.value
-        if refreshOperationID == operationID {
-            refreshTask = nil
-            refreshOperationID = nil
+            guard !Task.isCancelled else {
+                return
+            }
+            await refresh(requestedContext)
         }
     }
 
@@ -657,48 +619,22 @@ public final class TorrentCoreFeatureSession {
         }
     }
 
-    private func restartRefreshLoop() {
-        refreshLoopTask?.cancel()
-        refreshLoopTask = nil
-
-        guard isApplicationActive, activeProfile != nil, context != .none else {
+    private func refresh(
+        _ requestedContext: TorrentCoreFeatureContext,
+        expectedGeneration: Int?
+    ) async {
+        guard let requestedProfile = activeProfile, requestedContext != .none else {
             return
         }
-
-        let interval = preferences.refreshInterval.seconds
-        let repeats = preferences.autoRefreshEnabled && context.refreshesPeriodically
-        refreshLoopTask = Task { [weak self, sleeper] in
-            guard let self else {
-                return
-            }
-            await self.refresh()
-            guard repeats else {
-                return
-            }
-
-            while !Task.isCancelled {
-                do {
-                    try await sleeper.sleep(for: interval)
-                } catch {
-                    return
-                }
-                guard !Task.isCancelled else {
-                    return
-                }
-                await self.refresh()
-            }
-        }
-    }
-
-    private func cancelCurrentRefresh() {
-        generation += 1
-        refreshTask?.cancel()
-        refreshTask = nil
-        refreshOperationID = nil
+        await performRefresh(
+            profile: requestedProfile,
+            context: requestedContext,
+            expectedGeneration: expectedGeneration
+        )
     }
 
     private func resetRemoteState() {
-        cancelCurrentRefresh()
+        generation += 1
         client = nil
         clientProfileID = nil
         health = nil
@@ -751,7 +687,7 @@ public final class TorrentCoreFeatureSession {
     private func performRefresh(
         profile: TorrentCoreConnectionProfile,
         context: TorrentCoreFeatureContext,
-        generation: Int
+        expectedGeneration: Int?
     ) async {
         beginLoading(context)
         do {
@@ -760,10 +696,14 @@ public final class TorrentCoreFeatureSession {
                 serviceClient,
                 profile: profile,
                 forceProbe: context == .connection,
-                generation: generation,
+                expectedGeneration: expectedGeneration,
                 context: context
             )
-            guard isCurrent(profile: profile, context: context, generation: generation) else {
+            guard isCurrent(
+                profile: profile,
+                context: context,
+                expectedGeneration: expectedGeneration
+            ) else {
                 return
             }
 
@@ -783,7 +723,11 @@ public final class TorrentCoreFeatureSession {
                     async let lifecycleRequest = serviceClient.dashboardLifecycle()
                     (status, lifecycle) = try await (statusRequest, lifecycleRequest)
                 }
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 let completedAt = now()
@@ -791,19 +735,31 @@ public final class TorrentCoreFeatureSession {
                 dashboardLifecycle.succeed(lifecycle, at: completedAt)
             case .torrents:
                 let summaries = try await serviceClient.torrents()
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 torrents.succeed(summaries, at: now())
             case let .torrentDetail(torrentID):
                 let detail = try await serviceClient.torrent(id: torrentID)
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 torrentDetail.succeed(detail, at: now())
             case let .torrentListAndDetail(torrentID):
                 let summaries = try await serviceClient.torrents()
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 torrents.succeed(summaries, at: now())
@@ -815,12 +771,20 @@ public final class TorrentCoreFeatureSession {
 
                 do {
                     let detail = try await serviceClient.torrent(id: torrentID)
-                    guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    guard isCurrent(
+                        profile: profile,
+                        context: context,
+                        expectedGeneration: expectedGeneration
+                    ) else {
                         return
                     }
                     torrentDetail.succeed(detail, at: now())
                 } catch {
-                    guard isCurrent(profile: profile, context: context, generation: generation),
+                    guard isCurrent(
+                        profile: profile,
+                        context: context,
+                        expectedGeneration: expectedGeneration
+                    ),
                           !(error is CancellationError)
                     else {
                         return
@@ -837,7 +801,11 @@ public final class TorrentCoreFeatureSession {
                 }
             case .addMagnet:
                 let availableCategories = try await serviceClient.categories()
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 categories.succeed(availableCategories, at: now())
@@ -850,7 +818,11 @@ public final class TorrentCoreFeatureSession {
                     historyRequest,
                     abandonedRequest
                 )
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 let completedAt = now()
@@ -859,7 +831,11 @@ public final class TorrentCoreFeatureSession {
 
                 if let selectedTorrentID {
                     let detail = try await serviceClient.historyDetail(torrentID: selectedTorrentID)
-                    guard isCurrent(profile: profile, context: context, generation: generation) else {
+                    guard isCurrent(
+                        profile: profile,
+                        context: context,
+                        expectedGeneration: expectedGeneration
+                    ) else {
                         return
                     }
                     historyDetail.succeed(detail, at: now())
@@ -868,19 +844,31 @@ public final class TorrentCoreFeatureSession {
                 }
             case let .logs(query):
                 let values = try await serviceClient.logs(query: query)
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 logs.succeed(values, at: now())
             case let .peers(torrentID):
                 let values = try await serviceClient.peers(torrentID: torrentID)
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 peers.succeed(values, at: now())
             case let .trackers(torrentID):
                 let values = try await serviceClient.trackers(torrentID: torrentID)
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 trackers.succeed(values, at: now())
@@ -891,7 +879,11 @@ public final class TorrentCoreFeatureSession {
                     settingsRequest,
                     categoriesRequest
                 )
-                guard isCurrent(profile: profile, context: context, generation: generation) else {
+                guard isCurrent(
+                    profile: profile,
+                    context: context,
+                    expectedGeneration: expectedGeneration
+                ) else {
                     return
                 }
                 let completedAt = now()
@@ -899,7 +891,11 @@ public final class TorrentCoreFeatureSession {
                 categories.succeed(availableCategories, at: completedAt)
             }
         } catch {
-            guard isCurrent(profile: profile, context: context, generation: generation),
+            guard isCurrent(
+                profile: profile,
+                context: context,
+                expectedGeneration: expectedGeneration
+            ),
                   !(error is CancellationError)
             else {
                 return
@@ -916,7 +912,7 @@ public final class TorrentCoreFeatureSession {
         _ serviceClient: any TorrentCoreServiceClientProtocol,
         profile: TorrentCoreConnectionProfile,
         forceProbe: Bool,
-        generation: Int,
+        expectedGeneration: Int?,
         context: TorrentCoreFeatureContext
     ) async throws -> TorrentCoreHostStatus? {
         if connectionState.isConnected && !forceProbe {
@@ -925,12 +921,20 @@ public final class TorrentCoreFeatureSession {
 
         connectionState = .connecting(profileID: profile.id)
         let serviceHealth = try await serviceClient.probe()
-        guard isCurrent(profile: profile, context: context, generation: generation) else {
+        guard isCurrent(
+            profile: profile,
+            context: context,
+            expectedGeneration: expectedGeneration
+        ) else {
             throw CancellationError()
         }
 
         let loadedHost = try await serviceClient.hostStatus()
-        guard isCurrent(profile: profile, context: context, generation: generation) else {
+        guard isCurrent(
+            profile: profile,
+            context: context,
+            expectedGeneration: expectedGeneration
+        ) else {
             throw CancellationError()
         }
 
@@ -1023,12 +1027,15 @@ public final class TorrentCoreFeatureSession {
     private func isCurrent(
         profile: TorrentCoreConnectionProfile,
         context: TorrentCoreFeatureContext,
-        generation: Int
+        expectedGeneration: Int?
     ) -> Bool {
-        self.generation == generation
-            && activeProfile?.id == profile.id
-            && self.context == context
-            && !Task.isCancelled
+        guard activeProfile?.id == profile.id, !Task.isCancelled else {
+            return false
+        }
+        guard let expectedGeneration else {
+            return true
+        }
+        return generation == expectedGeneration && self.context == context
     }
 
     private func isConnectivityFailure(_ error: any Error) -> Bool {

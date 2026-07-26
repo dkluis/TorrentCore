@@ -147,6 +147,10 @@ struct TorrentCoreMacLogsView: View {
                     .onTapGesture { self.actionMessage = nil }
             }
         }
+        .torrentCoreRefreshWhileVisible(
+            session: session,
+            context: .logs(query)
+        )
     }
 
     private var filterBar: some View {

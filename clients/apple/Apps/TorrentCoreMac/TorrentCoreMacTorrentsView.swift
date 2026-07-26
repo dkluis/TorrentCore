@@ -206,8 +206,7 @@ struct TorrentCoreMacTorrentsView: View {
                 TorrentCoreMacPeersSheet(
                     session: session,
                     torrentID: torrentID,
-                    torrentName: selectedItem.name,
-                    restoreContext: contextChanged
+                    torrentName: selectedItem.name
                 )
             }
         }
@@ -216,8 +215,7 @@ struct TorrentCoreMacTorrentsView: View {
                 TorrentCoreMacTrackersSheet(
                     session: session,
                     torrentID: torrentID,
-                    torrentName: selectedItem.name,
-                    restoreContext: contextChanged
+                    torrentName: selectedItem.name
                 )
             }
         }
@@ -320,6 +318,12 @@ struct TorrentCoreMacTorrentsView: View {
         } message: {
             Text(actionError ?? "TorrentCore could not complete the action.")
         }
+        .torrentCoreRefreshWhileVisible(
+            session: session,
+            context: refreshContext,
+            isEnabled: !isPeersPresented
+                && !isTrackersPresented
+        )
     }
 
     private var filterBar: some View {
@@ -562,9 +566,7 @@ struct TorrentCoreMacTorrentsView: View {
             }
             if session.activeProfile != nil {
                 Button("Refresh") {
-                    Task {
-                        await session.refresh()
-                    }
+                    Task { await session.refresh(refreshContext) }
                 }
             }
         }
@@ -573,6 +575,13 @@ struct TorrentCoreMacTorrentsView: View {
 
     private var allSummaries: [TorrentCoreTorrentSummary] {
         session.torrents.value ?? []
+    }
+
+    private var refreshContext: TorrentCoreFeatureContext {
+        if isInspectorPresented, let selectedTorrentID {
+            return .torrentListAndDetail(selectedTorrentID)
+        }
+        return .torrents
     }
 
     private var filteredAndSortedItems: [TorrentCoreTorrentListItem] {
@@ -1146,6 +1155,12 @@ struct TorrentCoreMacAddMagnetView: View {
         }
         .onChange(of: magnetURI) {
             errorMessage = nil
+        }
+        .task(id: session.activeProfile?.id) {
+            guard session.activeProfile != nil else {
+                return
+            }
+            await session.refresh(.addMagnet)
         }
     }
 

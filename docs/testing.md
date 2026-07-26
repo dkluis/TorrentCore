@@ -53,8 +53,8 @@ single-item mutation refresh, and rejection of late responses from a previous pr
 
 Milestone 3 adds shared tests for version 1-to-2 client-preference migration, Auto Refresh disablement, combined
 torrent-list and selected-detail refresh, WebUI-equivalent torrent filtering, and 25/50/100/250-row local pagination.
-Milestone 4 adds shared tests for open-context History, Logs, peers, trackers, and Service Settings reads; separate
-abandonment history; synchronous first-load presentation on context changes; and single-item operational mutations
+Milestone 4 adds shared tests for targeted History, Logs, peers, trackers, and Service Settings reads; separate
+abandonment history; independent feature snapshot state; and single-item operational mutations
 with authoritative refresh. Its signed fixture UI suite covers the existing torrent inspector and removal confirmation
 plus automatic History, Logs, and Service Settings loading without manual refresh. The post-parity refinement coverage
 also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
@@ -102,8 +102,9 @@ this media type is decoded into a structured operator-facing service error.
 Milestone 5B also compiles direct checks for the device-local System/Light/Dark appearance choices and intentionally
 narrow Add Magnet validation. The validation catches non-magnet text and missing or empty `xt` values without
 duplicating MonoTorrent's authoritative parsing.
-Refresh regression coverage drives more than one Peer and Tracker request through the shared global interval and
-separately proves that Add Magnet categories and Service Settings remain one-time master-data loads.
+Refresh regression coverage drives more than one Peer and Tracker request through the shared global interval, verifies
+that cancellation stops a visible view's task, and separately proves that Add Magnet categories and Service Settings
+remain independent one-time master-data loads.
 
 ## Testing Rules
 

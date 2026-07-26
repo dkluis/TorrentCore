@@ -141,6 +141,12 @@ struct TorrentCoreMacServiceSettingsView: View {
             registerLeaveActions(saveCurrentGroup, revertCurrentGroup)
             dirtyChanged(isDirty)
         }
+        .task(id: session.activeProfile?.id) {
+            guard session.activeProfile != nil else {
+                return
+            }
+            await session.refresh(.serviceSettings)
+        }
         .onChange(of: session.runtimeSettings.value) { _, _ in
             synchronizeDrafts(force: false)
         }

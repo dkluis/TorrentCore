@@ -82,13 +82,13 @@ HTTP or HTTPS hostnames and IP addresses with optional ports; missing schemes be
 fragments, and non-root paths are rejected. Duplicate normalized service addresses are not allowed.
 
 The selectable refresh intervals are 5, 10, and 15 seconds, with 15 seconds as the default. Auto Refresh defaults on
-and can be disabled without disabling manual Refresh. Initial screen loads and foreground reconnection remain one-shot
-loads; periodic refresh runs only while the application is active and only for the open feature context. Backgrounded
-and suspended applications do not poll. Dashboard, Torrents, History, Logs, Peers, and Trackers all use the selected
-global interval. Add Magnet categories and Service Settings are master-data loads performed once when presented and
-remain manually refreshable. When a torrent inspector is visible, the open context refreshes the list and selected
-detail together. Offline state retains last-known values in memory and marks them stale. Service actions are disabled
-until refresh reconnects, and mutations are never retried automatically.
+and can be disabled without disabling manual Refresh. Each visible live-data view owns its cancellable refresh task and
+uses the same global interval; changing tabs cancels only the view that disappeared. Backgrounded and suspended views
+do not poll. Dashboard, Torrents, History, Logs, Peers, and Trackers all use this policy. Add Magnet categories,
+Connection, and Service Settings issue independent one-time master-data loads when presented and remain manually
+refreshable. They do not replace or cancel another feature's refresh context. When a torrent inspector is visible, the
+Torrents view refreshes the list and selected detail together. Offline state retains last-known values in memory and
+marks them stale. Service actions are disabled until refresh reconnects, and mutations are never retried automatically.
 
 Reconnect also verifies the service instance identity. If the service has been replaced or restarted with a new
 identity, all cached remote snapshots are cleared while device profiles and preferences remain intact. Only the open
@@ -101,8 +101,9 @@ feature context reloads, and mutations stay disabled until its authoritative sta
 ## macOS Operator UI
 
 The macOS app has one main operator window and uses a native sidebar for Dashboard, Torrents, History, Logs, Service
-Settings, and Connection. A single window owns the one shared feature context and polling loop. The app remembers the
-last destination, but opens Connection when there is no active saved connection.
+Settings, and Connection. Each presented feature owns its own load or polling task while sharing connection and cached
+state through `TorrentCoreFeatureSession`. The app remembers the last destination, but opens Connection when there is
+no active saved connection.
 
 - Connection manages named installations and keeps Test Connection separate from Save & Connect. Unreachable
   installations can still be saved for later LAN or VPN use.
@@ -134,13 +135,15 @@ last destination, but opens Connection when there is no active saved connection.
   `TorrentCoreFeatures` for later iOS/iPadOS presentation, while the popover renderer remains macOS-specific.
 - Dashboard, Torrents, History, Logs, Peers, and Trackers follow the global foreground refresh policy only while their
   context is visible. Add Magnet categories and Service Settings load once when presented and support manual refresh.
+- The title-bar toolbar permanently identifies the selected installation by profile name and address, includes a
+  text-and-symbol connection state, and opens Connection when selected.
 - The Navigate menu maps Command-1 through Command-6 to the six sidebar destinations. Context menus and direct
   cross-navigation keep actions scoped to one torrent.
 - Opening a destination immediately loads its visible service data. First loads show progress, successful empty
   responses show an empty state, and failures show an unavailable state.
 - Standard macOS Settings and the customizable main toolbar share the same global Auto Refresh and interval
-  preferences. Inspector is a contextual customizable item, and Connection Status is available from toolbar
-  customization but is not included by default.
+  preferences. Inspector is a contextual customizable item. The active connection indicator is permanently visible
+  and is not part of toolbar customization.
 
 The app has no compiled live endpoint. `--torrentcore-ui-fixtures` and the large-collection variant
 `--torrentcore-ui-large-fixtures` are reserved for Xcode UI testing and start an in-memory fixture service; neither
