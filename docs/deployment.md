@@ -192,3 +192,150 @@ Basic checks:
 curl http://127.0.0.1:7033/api/health
 curl -I http://127.0.0.1:7053/
 ```
+
+## Native macOS App Release
+
+The native app is released separately from the Service and WebUI deployment. It is a direct-download,
+Developer ID-signed and Apple-notarized DMG for Apple Silicon Macs running macOS 26 or later. Building or installing
+the app does not deploy, restart, or modify the Service or WebUI.
+
+Current release identity:
+
+| Item | Value |
+|---|---|
+| App bundle identifier | `com.conadv.TorrentCore.mac` |
+| Apple Developer Team ID | `5GRR76N48V` |
+| Initial version | `0.1.0` |
+| Initial build | `1` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.1.0.dmg` |
+
+The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
+`adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
+
+### One-Time Developer ID Setup
+
+The release Mac needs a valid `Developer ID Application` identity for Team `5GRR76N48V`. An `Apple Development`
+identity is sufficient for Xcode development builds but cannot sign a direct-download release.
+
+Preferred Xcode setup:
+
+1. Open Xcode **Settings > Accounts**.
+2. Select `dkluis@icloud.com`, then the `Dick Kluis` team.
+3. Open **Manage Certificates**.
+4. Use the add button to create a **Developer ID Application** certificate.
+5. Confirm that it appears in Keychain Access under **My Certificates** with its private key.
+
+If Xcode cannot create it, use the Apple Developer
+[Developer ID certificate procedure](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/).
+Create a certificate signing request in Keychain Access, choose **Developer ID Application** in the developer portal,
+upload the request, download the certificate, and double-click it to install it in the login Keychain. A
+`Developer ID Installer` certificate is not needed because TorrentCore uses a drag-to-Applications DMG rather than an
+installer package.
+
+Verify the result:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+The output must contain a valid identity beginning with `Developer ID Application:` and ending with
+`(5GRR76N48V)`. The private key remains in the Keychain on the release Mac. It is never embedded in or copied with the
+app or DMG.
+
+### One-Time Notarization Setup
+
+Create an app-specific password for `dkluis@icloud.com` under **Sign-In and Security > App-Specific Passwords** at
+[account.apple.com](https://account.apple.com/). Then run this command interactively:
+
+```bash
+xcrun notarytool store-credentials "TorrentCore-notary" \
+  --apple-id "dkluis@icloud.com" \
+  --team-id "5GRR76N48V"
+```
+
+Enter the app-specific password only at the secure prompt. Do not place it in the command, a script, an environment
+file, or the repository. The command validates the credentials and saves them under the local Keychain profile
+`TorrentCore-notary`. Do not add `--sync`; release credentials should remain local to the release Mac.
+
+The profile is used only by `notarytool`. It is not embedded in the app, copied into the DMG, deployed to another Mac,
+or available to TorrentCore Service/WebUI.
+
+Validate both one-time prerequisites without building:
+
+```bash
+./Scripts/release-macos-app.zsh --check
+```
+
+### Construct A Release
+
+Before constructing a release, confirm the working tree contains the intended commit and run the relevant native tests
+from [testing.md](testing.md). Then run:
+
+```bash
+./Scripts/release-macos-app.zsh
+```
+
+The script:
+
+1. validates the Developer ID identity and local notary Keychain profile
+2. creates a Release archive with automatic signing
+3. exports and verifies the Developer ID-signed `TorrentCore.app`
+4. verifies version `0.1.0`, build `1`, and an Arm64-only executable
+5. creates a compressed DMG containing `TorrentCore.app` and an `Applications` shortcut
+6. signs the DMG, submits it with `notarytool --wait`, and staples the accepted ticket
+7. verifies the ticket, disk image, and Gatekeeper assessment
+8. copies the verified artifact to the configured deployment directory and prints its SHA-256 checksum
+
+Intermediate archive, export, and disk-image staging files use a dedicated `/private/tmp/TorrentCore-release.*`
+directory and are removed when the script exits. The script refuses to replace an existing same-version DMG. Use
+`--overwrite` only when replacing that exact artifact is intentional.
+
+For a later release, supply the new values explicitly:
+
+```bash
+./Scripts/release-macos-app.zsh --version 0.1.1 --build 2
+```
+
+The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
+command surface. A failed notarization produces no release in the deployment directory.
+
+### Install, Upgrade, And Verify
+
+On the destination Mac:
+
+1. Open `TorrentCore-macOS-App-<version>.dmg`.
+2. Drag `TorrentCore` onto the `Applications` shortcut.
+3. Eject the disk image.
+4. Launch TorrentCore from Applications.
+5. Allow local-network access when macOS asks, then create or select the TorrentCore connection profile.
+
+An upgrade uses the same steps and replaces `TorrentCore.app` in Applications. The stable bundle identifier preserves
+device-local connection profiles, refresh preferences, and appearance settings. There is no automatic updater in this
+release.
+
+Optional command-line checks:
+
+```bash
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.1.0.dmg"
+spctl --assess --type open --context context:primary-signature --verbose=4 \
+  "/path/to/TorrentCore-macOS-App-0.1.0.dmg"
+```
+
+### Uninstall And Recovery
+
+To uninstall the app, quit TorrentCore and move `/Applications/TorrentCore.app` to the Trash. That leaves device-local
+app settings available for a later reinstall.
+
+For a complete client-only reset, also use Finder **Go > Go to Folder** to open
+`~/Library/Containers/com.conadv.TorrentCore.mac` and move that exact container to the Trash. This removes native-client
+profiles and preferences. Never remove `~/TorrentCore`, the TorrentCore database, logs, download directories, Service,
+or WebUI as part of native-app uninstall or recovery.
+
+If the native app is unavailable:
+
+- use the existing WebUI at `http://<torrentcore-host>:7053`
+- inspect the Service API at `http://<torrentcore-host>:7033/swagger` inside the trusted LAN/VPN boundary
+- reinstall the current or previous notarized DMG without changing the Service deployment
+
+The Mac app contains no .NET runtime, Service executable, WebUI files, TorrentCore database, or downloaded torrent
+data.

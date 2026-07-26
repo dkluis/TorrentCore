@@ -5,7 +5,8 @@
 Milestones 0 through 4 are complete. Milestone 5 is in progress; its automated hardening stage passed shared, macOS
 build, iOS Simulator build, and signed fixture UI verification on July 25, 2026. The initial Milestone 5B visual,
 keyboard, app-local appearance, disposable mutation, and controlled service-outage/recovery checks passed on
-CA-Desktop. Separate-Mac Wi-Fi interruption, release packaging, and separate-Mac acceptance remain pending.
+CA-Desktop. Stage 5C produced the signed, notarized, and stapled 0.1.0 release DMG on July 26, 2026. Separate-Mac Wi-Fi
+interruption and Stage 5D acceptance remain pending.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -214,6 +215,8 @@ verification from replacing the normal signed Xcode product. The UI tests use on
 - mobile distribution: TestFlight
 
 Signing identities and provisioning profiles remain machine/account state and are not committed.
+The repeatable macOS release workflow, one-time Developer ID/notary setup, installation, upgrade, and client-only
+uninstall procedures are documented in [deployment.md](../../docs/deployment.md#native-macos-app-release).
 
 ## Network Boundary
 

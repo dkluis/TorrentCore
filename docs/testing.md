@@ -106,6 +106,24 @@ Refresh regression coverage drives more than one Peer and Tracker request throug
 that cancellation stops a visible view's task, and separately proves that Add Magnet categories and Service Settings
 remain independent one-time master-data loads.
 
+Milestone 5C adds a fail-fast release preflight and a repeatable Developer ID/notarization workflow. Its repository
+surfaces can be checked without release credentials:
+
+```bash
+zsh -n Scripts/release-macos-app.zsh
+plutil -lint clients/apple/ExportOptions-DeveloperID.plist
+./Scripts/release-macos-app.zsh --help
+```
+
+On the designated release Mac, `./Scripts/release-macos-app.zsh --check` additionally requires a valid
+`Developer ID Application` identity for Team `5GRR76N48V` and the local `TorrentCore-notary` Keychain profile. The full
+release command archives, exports, signs, notarizes, staples, and verifies the DMG. Separate-Mac installation and
+Gatekeeper acceptance belong to Stage 5D rather than routine fixture testing.
+
+The first complete release run passed on July 26, 2026. Apple accepted the 0.1.0/build 1 notarization submission, and
+the final copied DMG independently passed code-signature, stapler-ticket, disk-image checksum, and Gatekeeper
+assessment.
+
 ## Testing Rules
 
 - use real SQLite-backed tests for persistence behavior

@@ -376,7 +376,7 @@ Implementation notes:
 ### Milestone 5: macOS Hardening And Limited Release
 
 Status: in progress. Stage 5A automated hardening completed July 25, 2026. Stage 5B manual verification is in progress;
-release packaging and separate-Mac acceptance remain pending.
+Stage 5C release construction completed July 26, 2026. Separate-Mac acceptance remains pending.
 
 Turn feature parity into a supportable application.
 
@@ -408,8 +408,12 @@ Implementation stages:
   coherent and read-only, mutations were disabled, Refresh remained available, and the open context recovered without
   strange or stale cross-instance data after the service restarted. Wi-Fi interruption on a separate Mac remains
   pending because CA-Desktop must retain its active Ethernet connection.
-- **5C — release construction:** pending. Configure and verify release signing, Developer ID distribution,
-  notarization, DMG packaging, installation, and recovery instructions.
+- **5C — release construction:** complete July 26, 2026. Version 0.1.0/build 1, Team ID, Arm64/macOS 26 release
+  settings, automatic Developer ID export options, deterministic DMG naming, and the fail-fast
+  archive/export/sign/notarize/staple/verify script are configured. Installation, upgrade, client-only uninstall,
+  WebUI recovery, certificate, and Keychain credential procedures are documented. Apple accepted notarization
+  submission `09e87103-e918-471f-a6e3-daf16558b46e`; the copied deployment artifact passed signature, stapler,
+  disk-image, and Gatekeeper verification.
 - **5D — separate-Mac acceptance:** pending. Install the release candidate on an Apple Silicon macOS 26 laptop and
   perform a secondary compatibility check on the Apple Silicon macOS 27 beta laptop.
 
