@@ -139,6 +139,11 @@ downgraded 0.2.1 with the same persisted state. The stable-layout follow-up adds
 directly into a saved active connection at the 1000×650 minimum size, verifies that Connection maintenance actions
 remain above the global status bar, and verifies sidebar hiding without resizing the content. Its focused signed run
 passed on macOS 26; separate macOS 27 confirmation remains pending.
+The 0.3.1/build 5 stable-layout update completed the release workflow on July 27, 2026. Apple accepted submission
+`d0ee05c1-d3a0-4434-9314-94ba3f841cd5`; the copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and
+checksum verification. Its SHA-256 checksum is
+`b4c746f3fa62c0cf47af52e9b3bc324de6239754ef4e4d58ae74a19ce14bb87d`. Separate-Mac upgrade and saved-connection
+startup acceptance on macOS 27 remain pending.
 
 ## Testing Rules
 

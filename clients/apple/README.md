@@ -23,6 +23,10 @@ replaces the macOS root and nested maintenance split views with stable stack lay
 connection regression coverage; separate-Mac acceptance of that follow-up remains pending. Milestone 6 iPad
 Adaptation remains open but is deferred because no iPad test device is currently available.
 
+That stable-layout follow-up is released as signed, notarized, and stapled 0.3.1/build 5. The release DMG passed local
+signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.3.0
+acceptance, especially launch and saved-connection use on macOS 27, remains pending.
+
 `TorrentCore.WebUI` remains the supported operator UI.
 
 ## Targets

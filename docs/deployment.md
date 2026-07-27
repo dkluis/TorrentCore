@@ -205,9 +205,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.3.0` |
-| Current build | `4` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.3.0.dmg` |
+| Current version | `0.3.1` |
+| Current build | `5` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.3.1.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -226,6 +226,11 @@ saving a connection exposed a repeatable SwiftUI/AppKit split-view constraint ab
 to 0.2.1 because the saved profile and UI state were retained. Launching Dashboard while bypassing window restoration
 recovered the installation without deleting the saved connections. Acceptance of the subsequent stable-layout fix
 remains pending.
+The 0.3.1/build 5 stable-layout update was accepted and stapled on July 27, 2026 under notarization submission
+`d0ee05c1-d3a0-4434-9314-94ba3f841cd5`. Its SHA-256 checksum is
+`b4c746f3fa62c0cf47af52e9b3bc324de6239754ef4e4d58ae74a19ce14bb87d`. The copied DMG passed code-signature,
+stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.3.0 acceptance,
+especially saved-connection startup on macOS 27, remains pending.
 
 ### One-Time Developer ID Setup
 
@@ -308,7 +313,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.3.0 --build 4
+./Scripts/release-macos-app.zsh --version 0.3.1 --build 5
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
@@ -331,9 +336,9 @@ release.
 Optional command-line checks:
 
 ```bash
-xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.3.0.dmg"
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.3.1.dmg"
 spctl --assess --type open --context context:primary-signature --verbose=4 \
-  "/path/to/TorrentCore-macOS-App-0.3.0.dmg"
+  "/path/to/TorrentCore-macOS-App-0.3.1.dmg"
 ```
 
 ### Uninstall And Recovery

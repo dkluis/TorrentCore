@@ -427,6 +427,10 @@ Implementation stages:
   restoration bypassed recovered the installation without deleting saved profiles. The main-branch stable-layout
   follow-up removes root and nested maintenance split views and adds compact-window saved-connection regression
   coverage; separate macOS 27 acceptance remains pending.
+  The follow-up was released as 0.3.1/build 5 and accepted under notarization submission
+  `d0ee05c1-d3a0-4434-9314-94ba3f841cd5`; its copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and
+  checksum verification. Separate-Mac installation-over-0.3.0 and saved-connection startup acceptance on macOS 27
+  remain pending.
 - **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
   worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
   bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations
