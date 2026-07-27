@@ -128,6 +128,7 @@ struct TorrentCoreMacContentView: View {
     @State private var pendingDestination: TorrentCoreMacDestination?
     @State private var saveServiceSettings: (() async -> Bool)?
     @State private var discardServiceSettings: (() -> Void)?
+    @State private var isNavigationSidebarPresented = true
     @State private var isLoaded = false
     @State private var loadError: String?
     @State private var toolbarActionError: String?
@@ -206,40 +207,28 @@ struct TorrentCoreMacContentView: View {
             }
     }
 
+    // Stable stack layout avoids restored split constraints changing while a
+    // saved profile replaces the launch placeholder on macOS 27.
     private var mainWindow: some View {
-        NavigationSplitView {
-            List(TorrentCoreMacDestination.allCases, selection: destinationSelection) { item in
-                Label(item.title, systemImage: item.systemImage)
-                    .tag(item)
-                    .accessibilityIdentifier("navigation.\(item.rawValue)")
+        HStack(spacing: 0) {
+            if isNavigationSidebarPresented {
+                navigationSidebar
+                Divider()
             }
-            .navigationTitle("TorrentCore")
-            .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 260)
-        } detail: {
-            Group {
-                if !isLoaded {
-                    ContentUnavailableView {
-                        Label("Loading TorrentCore", systemImage: "arrow.trianglehead.2.clockwise")
-                    } description: {
-                        Text("Reading the saved connection settings.")
-                    } actions: {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                } else {
-                    selectedDestinationView
-                }
+
+            VStack(spacing: 0) {
+                mainContent
+
+                Divider()
+                connectionStatusBar
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
-                    Divider()
-                    connectionStatusBar
-                }
-            }
-            .navigationTitle(destination.title)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .toolbar(id: "TorrentCore.MainToolbar.v6") {
+        .toolbar(id: "TorrentCore.MainToolbar.v7") {
+            ToolbarItem(id: "navigationSidebar", placement: .navigation) {
+                navigationSidebarButton
+            }
+
             ToolbarItem(id: "addMagnet", placement: .navigation) {
                 addMagnetButton
             }
@@ -274,6 +263,58 @@ struct TorrentCoreMacContentView: View {
         .frame(minWidth: 1_000, minHeight: 650)
         .focusedSceneValue(\.torrentCoreDestination, destinationSelection)
         .focusedSceneValue(\.torrentCoreInspectorCommand, inspectorCommand)
+        .focusedSceneValue(\.torrentCoreSidebarCommand, sidebarCommand)
+    }
+
+    private var navigationSidebar: some View {
+        List(TorrentCoreMacDestination.allCases, selection: destinationSelection) { item in
+            Label(item.title, systemImage: item.systemImage)
+                .tag(item)
+                .accessibilityIdentifier("navigation.\(item.rawValue)")
+        }
+        .listStyle(.sidebar)
+        .frame(width: 220)
+        .accessibilityIdentifier("navigation.sidebar")
+    }
+
+    private var mainContent: some View {
+        Group {
+            if !isLoaded {
+                ContentUnavailableView {
+                    Label("Loading TorrentCore", systemImage: "arrow.trianglehead.2.clockwise")
+                } description: {
+                    Text("Reading the saved connection settings.")
+                } actions: {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            } else {
+                selectedDestinationView
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .navigationTitle(destination.title)
+    }
+
+    private var navigationSidebarButton: some View {
+        Button {
+            isNavigationSidebarPresented.toggle()
+        } label: {
+            Label(
+                isNavigationSidebarPresented ? "Hide Sidebar" : "Show Sidebar",
+                systemImage: "sidebar.left"
+            )
+        }
+        .keyboardShortcut("s", modifiers: [.command, .control])
+        .accessibilityIdentifier("toolbar.sidebar")
+        .help(isNavigationSidebarPresented ? "Hide Sidebar" : "Show Sidebar")
+    }
+
+    private var sidebarCommand: TorrentCoreMacSidebarCommand {
+        TorrentCoreMacSidebarCommand(
+            isPresented: isNavigationSidebarPresented,
+            toggle: { isNavigationSidebarPresented.toggle() }
+        )
     }
 
     @ViewBuilder
@@ -547,6 +588,7 @@ struct TorrentCoreMacContentView: View {
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.bar)
+        .accessibilityElement(children: .combine)
         .accessibilityLabel("\(connectionName), \(connectionAddress), \(connectionStateLabel)")
         .accessibilityIdentifier("status.connection")
     }
@@ -734,6 +776,37 @@ extension FocusedValues {
     var torrentCoreInspectorCommand: TorrentCoreMacInspectorCommand? {
         get { self[TorrentCoreMacInspectorFocusedValueKey.self] }
         set { self[TorrentCoreMacInspectorFocusedValueKey.self] = newValue }
+    }
+}
+
+struct TorrentCoreMacSidebarCommand {
+    let isPresented: Bool
+    let toggle: () -> Void
+}
+
+private struct TorrentCoreMacSidebarFocusedValueKey: FocusedValueKey {
+    typealias Value = TorrentCoreMacSidebarCommand
+}
+
+extension FocusedValues {
+    var torrentCoreSidebarCommand: TorrentCoreMacSidebarCommand? {
+        get { self[TorrentCoreMacSidebarFocusedValueKey.self] }
+        set { self[TorrentCoreMacSidebarFocusedValueKey.self] = newValue }
+    }
+}
+
+struct TorrentCoreMacSidebarCommands: Commands {
+    @FocusedValue(\.torrentCoreSidebarCommand)
+    private var sidebar
+
+    var body: some Commands {
+        CommandGroup(replacing: .sidebar) {
+            Button(sidebar?.isPresented == true ? "Hide Sidebar" : "Show Sidebar") {
+                sidebar?.toggle()
+            }
+            .keyboardShortcut("s", modifiers: [.command, .control])
+            .disabled(sidebar == nil)
+        }
     }
 }
 

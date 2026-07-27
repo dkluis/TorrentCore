@@ -374,6 +374,42 @@ final class TorrentCoreMacUITests: XCTestCase {
         )
     }
 
+    func testSavedConnectionStartsAtMinimumWindowSizeWithVisibleMaintenanceActions() {
+        let app = launchApp(additionalArguments: [
+            "--torrentcore-ui-connection-start",
+            "--torrentcore-ui-compact-window",
+        ])
+
+        let connectionList = app.descendants(matching: .any)["connection.list"]
+        XCTAssertTrue(connectionList.waitForExistence(timeout: 10))
+
+        let newConnection = app.descendants(matching: .any)["connection.new"]
+        let deleteConnection = app.descendants(matching: .any)["connection.delete"]
+        let statusBar = app.descendants(matching: .any)["status.connection"].firstMatch
+        XCTAssertTrue(newConnection.waitForExistence(timeout: 5))
+        XCTAssertTrue(deleteConnection.exists)
+        XCTAssertTrue(statusBar.waitForExistence(timeout: 5))
+        XCTAssertLessThanOrEqual(
+            newConnection.frame.maxY,
+            statusBar.frame.minY,
+            "Connection maintenance controls must remain above the global status bar."
+        )
+        XCTAssertLessThanOrEqual(
+            deleteConnection.frame.maxY,
+            statusBar.frame.minY,
+            "Connection maintenance controls must remain above the global status bar."
+        )
+
+        let sidebarToggle = app.descendants(matching: .any)["toolbar.sidebar"]
+        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 5))
+        sidebarToggle.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["navigation.sidebar"]
+                .waitForNonExistence(timeout: 5)
+        )
+        XCTAssertTrue(connectionList.exists)
+    }
+
     func testAgreedLargeCollectionsRenderAndPaginate() {
         let app = launchApp(largeCollections: true)
 
@@ -413,7 +449,8 @@ final class TorrentCoreMacUITests: XCTestCase {
     }
 
     private func launchApp(
-        largeCollections: Bool = false
+        largeCollections: Bool = false,
+        additionalArguments: [String] = []
     ) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
@@ -421,7 +458,7 @@ final class TorrentCoreMacUITests: XCTestCase {
             largeCollections
                 ? "--torrentcore-ui-large-fixtures"
                 : "--torrentcore-ui-fixtures",
-        ]
+        ] + additionalArguments
         app.launch()
         let dashboardNavigation = app.descendants(matching: .any)[
             "navigation.dashboard"

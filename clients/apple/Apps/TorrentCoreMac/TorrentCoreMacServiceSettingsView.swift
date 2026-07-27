@@ -90,12 +90,14 @@ struct TorrentCoreMacServiceSettingsView: View {
     }
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             List(SettingsGroup.allCases, selection: groupSelection) { group in
                 Label(group.title, systemImage: group.systemImage)
                     .tag(group)
             }
-            .frame(minWidth: 190, idealWidth: 210, maxWidth: 240)
+            .frame(width: 210)
+
+            Divider()
 
             VStack(spacing: 0) {
                 header

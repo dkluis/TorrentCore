@@ -11,13 +11,17 @@ normal Gatekeeper launch on CA-Dick-MBA, LAN connection to CA-Desktop, and add, 
 The signed, notarized, and stapled 0.2.0/build 2 app also passed installation-over-0.1.0 upgrade acceptance.
 Off-site routed-VPN verification remains environmentally deferred.
 
-The next active workstream is further macOS UI refinement. Its first operator-prioritized slice shipped in 0.2.0, and
-the signed, notarized, and stapled 0.2.1/build 3 compatibility hotfix avoided the direct split-view detail wrapper that
-triggered a SwiftUI/AppKit `NavigationSplitView` constraint-loop abort on the macOS 27 beta. The signed, notarized, and
-stapled 0.3.0/build 4 update adds the next UI-refinement slice, including WebUI-aligned operator presentation and
-right-side inspector overlays that do not resize the underlying tables. Separate-Mac upgrade acceptance for 0.3.0
-remains pending. Milestone 6 iPad Adaptation remains open but is deferred because no iPad test device is currently
-available.
+The next active workstream is further macOS UI refinement. Its first operator-prioritized slice shipped in 0.2.0. The
+signed, notarized, and stapled 0.2.1/build 3 compatibility hotfix avoided one direct split-view detail wrapper, but
+later macOS 27 testing proved that it did not eliminate the underlying SwiftUI/AppKit split-view constraint abort. The
+signed, notarized, and stapled 0.3.0/build 4 update adds WebUI-aligned operator presentation and right-side inspector
+overlays that do not resize the underlying tables. It installed and worked normally on a separate Apple Silicon
+macOS 26 system. On CA-Dick-MBA running macOS 27, saving a connection triggered the same split-view constraint abort;
+the persisted layout then reproduced the abort in both 0.3.0 and downgraded 0.2.1. Opening Dashboard while bypassing
+window restoration recovered the installation without deleting its saved connections. A main-branch follow-up
+replaces the macOS root and nested maintenance split views with stable stack layout and adds compact-window saved-
+connection regression coverage; separate-Mac acceptance of that follow-up remains pending. Milestone 6 iPad
+Adaptation remains open but is deferred because no iPad test device is currently available.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -118,7 +122,9 @@ state through `TorrentCoreFeatureSession`. The app remembers the last destinatio
 no active saved connection.
 
 - Connection manages named installations and keeps Test Connection separate from Save & Connect. Unreachable
-  installations can still be saved for later LAN or VPN use.
+  installations can still be saved for later LAN or VPN use. Its profile list and maintenance actions use stable
+  non-split layout, keeping New Connection and Delete above the global status bar at the minimum supported window
+  height.
 - Dashboard shows service and engine identity, transfer totals, torrent states, queue capacity, startup recovery, and
   recent lifecycle events.
 - Torrents uses a native sortable table with name, state, and category filters; local pagination matches the WebUI

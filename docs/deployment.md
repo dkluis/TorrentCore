@@ -221,7 +221,11 @@ The 0.2.1/build 3 macOS 27 compatibility hotfix was accepted and stapled under n
 The 0.3.0/build 4 UI-refinement update was accepted and stapled on July 27, 2026 under notarization submission
 `cea84cc3-1f89-49fa-9766-8c12dd6cd597`. Its SHA-256 checksum is
 `eec8762805329edbe626b425484e57ef20b0c8335836aa60ca7422dc611e3f27`.
-Separate-Mac installation-over-0.2.x acceptance remains pending.
+Installation over 0.2.x worked normally on a separate Apple Silicon macOS 26 system. On CA-Dick-MBA running macOS 27,
+saving a connection exposed a repeatable SwiftUI/AppKit split-view constraint abort that persisted after downgrading
+to 0.2.1 because the saved profile and UI state were retained. Launching Dashboard while bypassing window restoration
+recovered the installation without deleting the saved connections. Acceptance of the subsequent stable-layout fix
+remains pending.
 
 ### One-Time Developer ID Setup
 

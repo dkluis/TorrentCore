@@ -13,7 +13,7 @@ struct TorrentCoreMacConnectionView: View {
     @State private var profilePendingDeletion: TorrentCoreConnectionProfile?
 
     var body: some View {
-        HSplitView {
+        HStack(spacing: 0) {
             VStack(spacing: 0) {
                 List(session.preferences.profiles, selection: $selectedProfileID) { profile in
                     HStack {
@@ -57,8 +57,11 @@ struct TorrentCoreMacConnectionView: View {
                     .accessibilityIdentifier("connection.delete")
                 }
                 .padding(10)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(minWidth: 280, idealWidth: 330, maxWidth: 420)
+            .frame(width: 330)
+
+            Divider()
 
             Form {
                 Section {
@@ -131,7 +134,7 @@ struct TorrentCoreMacConnectionView: View {
                 }
             }
             .formStyle(.grouped)
-            .frame(minWidth: 520)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .onAppear {
             initializeSelectionIfNeeded()

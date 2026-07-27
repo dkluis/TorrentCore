@@ -128,13 +128,17 @@ The 0.2.0/build 2 upgrade candidate completed the same release workflow on July 
 checks. Installation over 0.1.0 subsequently passed operator upgrade acceptance.
 The 0.2.1/build 3 compatibility hotfix also completed the release workflow on July 26, 2026. Apple accepted submission
 `72257d2e-d315-40dc-a315-71530bfdd9af`; the copied DMG passed signature, stapler-ticket, disk-image, and Gatekeeper
-checks. Its focused signed UI test passed on macOS 26. Separate-Mac confirmation of the macOS 27 launch fix remains
-pending.
+checks. Its focused signed UI test passed on macOS 26. Subsequent separate-Mac testing on macOS 27 proved the same
+split-view constraint abort could still occur after saving a connection, so the compatibility fix was incomplete.
 The 0.3.0/build 4 UI-refinement update completed the release workflow on July 27, 2026. Apple accepted submission
 `cea84cc3-1f89-49fa-9766-8c12dd6cd597`; the copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and
 checksum verification. Its SHA-256 checksum is
-`eec8762805329edbe626b425484e57ef20b0c8335836aa60ca7422dc611e3f27`. Separate-Mac upgrade acceptance remains
-pending.
+`eec8762805329edbe626b425484e57ef20b0c8335836aa60ca7422dc611e3f27`. Separate-Mac upgrade acceptance passed on
+Apple Silicon macOS 26. On macOS 27, saving a connection reproduced the split-view abort in 0.3.0 and then in
+downgraded 0.2.1 with the same persisted state. The stable-layout follow-up adds a signed UI regression that launches
+directly into a saved active connection at the 1000×650 minimum size, verifies that Connection maintenance actions
+remain above the global status bar, and verifies sidebar hiding without resizing the content. Its focused signed run
+passed on macOS 26; separate macOS 27 confirmation remains pending.
 
 ## Testing Rules
 

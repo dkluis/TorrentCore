@@ -8,6 +8,7 @@ struct TorrentCoreMacApp: App {
     @AppStorage(TorrentCoreMacAppearance.storageKey)
     private var appearanceRawValue = TorrentCoreMacAppearance.system.rawValue
     private let usesFixtures: Bool
+    private let usesCompactWindowFixture: Bool
 
     init() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -17,6 +18,9 @@ struct TorrentCoreMacApp: App {
         let usesFixtures = usesLargeFixtures
             || arguments.contains("--torrentcore-ui-fixtures")
         self.usesFixtures = usesFixtures
+        usesCompactWindowFixture = arguments.contains(
+            "--torrentcore-ui-compact-window"
+        )
         if usesFixtures {
             [
                 "TorrentCore.Mac.Torrents.Columns.v1",
@@ -26,7 +30,9 @@ struct TorrentCoreMacApp: App {
                 "TorrentCore.Mac.Trackers.Columns.v1",
             ].forEach(UserDefaults.standard.removeObject(forKey:))
             UserDefaults.standard.set(
-                TorrentCoreMacDestination.dashboard.rawValue,
+                arguments.contains("--torrentcore-ui-connection-start")
+                    ? TorrentCoreMacDestination.connection.rawValue
+                    : TorrentCoreMacDestination.dashboard.rawValue,
                 forKey: "TorrentCore.Mac.SelectedDestination.v1"
             )
         }
@@ -62,11 +68,15 @@ struct TorrentCoreMacApp: App {
             TorrentCoreMacContentView(session: session)
                 .preferredColorScheme(appearance.colorScheme)
         }
-        .defaultSize(width: 1_580, height: 760)
+        .defaultSize(
+            width: usesCompactWindowFixture ? 1_000 : 1_580,
+            height: usesCompactWindowFixture ? 650 : 760
+        )
         .defaultPosition(.center)
         .restorationBehavior(usesFixtures ? .disabled : .automatic)
         .commands {
             TorrentCoreMacWindowCommands()
+            TorrentCoreMacSidebarCommands()
             TorrentCoreMacNavigationCommands()
             TorrentCoreMacInspectorCommands()
             ToolbarCommands()

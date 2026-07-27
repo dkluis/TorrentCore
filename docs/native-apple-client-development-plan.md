@@ -421,8 +421,12 @@ Implementation stages:
   passed installation-over-0.1.0 upgrade acceptance. The 0.2.1/build 3 macOS 27 compatibility hotfix was accepted under
   submission `72257d2e-d315-40dc-a315-71530bfdd9af` and passed the same release checks. The 0.3.0/build 4 UI-refinement
   update was accepted under submission `cea84cc3-1f89-49fa-9766-8c12dd6cd597`; its copied DMG passed signature,
-  stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac upgrade acceptance for 0.3.0 remains
-  pending.
+  stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac upgrade acceptance for 0.3.0 passed
+  on Apple Silicon macOS 26. On CA-Dick-MBA running macOS 27, saving a connection exposed the same SwiftUI/AppKit
+  split-view constraint abort in 0.3.0 and, after downgrade with persisted state, 0.2.1. Dashboard launch with window
+  restoration bypassed recovered the installation without deleting saved profiles. The main-branch stable-layout
+  follow-up removes root and nested maintenance split views and adds compact-window saved-connection regression
+  coverage; separate macOS 27 acceptance remains pending.
 - **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
   worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
   bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations
