@@ -49,17 +49,17 @@ struct TorrentCoreMacDashboardView: View {
                     )
                     TorrentCoreMacDetailRow(
                         label: "Version",
-                        value: status.serviceVersion ?? "—"
+                        value: status.serviceVersion ?? "--"
                     )
                 }
                 GridRow {
                     TorrentCoreMacDetailRow(
                         label: "Engine",
-                        value: status.engineRuntime ?? "—"
+                        value: status.engineRuntime ?? "--"
                     )
                     TorrentCoreMacDetailRow(
                         label: "Environment",
-                        value: status.environmentName ?? "—"
+                        value: status.environmentName ?? "--"
                     )
                 }
                 GridRow {
@@ -69,7 +69,7 @@ struct TorrentCoreMacDashboardView: View {
                     )
                     TorrentCoreMacDetailRow(
                         label: "Instance",
-                        value: status.serviceInstanceID?.uuidString ?? "—"
+                        value: status.serviceInstanceID?.uuidString ?? "--"
                     )
                 }
             }

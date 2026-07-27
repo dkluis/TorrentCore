@@ -166,7 +166,10 @@ struct TorrentCoreMacTorrentsView: View {
                 unavailableTorrentList
             }
         }
-        .inspector(isPresented: $isInspectorPresented) {
+        .torrentCoreTrailingOverlay(
+            isPresented: isInspectorPresented,
+            width: 390
+        ) {
             TorrentCoreMacTorrentInspector(
                 session: session,
                 selectedItem: selectedItem,
@@ -202,7 +205,6 @@ struct TorrentCoreMacTorrentsView: View {
                     )
                 }
             )
-            .inspectorColumnWidth(min: 320, ideal: 390, max: 520)
         }
         .sheet(isPresented: $isPeersPresented) {
             if let selectedItem, let torrentID = selectedItem.summary.torrentID {
@@ -1055,7 +1057,7 @@ private struct TorrentCoreMacTorrentInspector: View {
             )
             TorrentCoreMacDetailRow(
                 label: "Info Hash",
-                value: detail?.infoHash ?? "—"
+                value: detail?.infoHash ?? "--"
             )
             TorrentCoreMacCopyableDetailRow(
                 label: "Torrent ID",

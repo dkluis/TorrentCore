@@ -138,7 +138,7 @@ public struct TorrentCoreTorrentListItem: Identifiable, Hashable, Sendable {
 public enum TorrentCoreDisplayFormatter {
     public static func bytes(_ value: Int64?) -> String {
         guard let value else {
-            return "—"
+            return "--"
         }
         return ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
     }
@@ -153,9 +153,19 @@ public enum TorrentCoreDisplayFormatter {
 
     public static func timestamp(_ value: Date?) -> String {
         guard let value else {
-            return "—"
+            return "--"
         }
-        return value.formatted(date: .abbreviated, time: .shortened)
+        return value.formatted(
+            Date.FormatStyle()
+                .locale(Locale(identifier: "en_US_POSIX"))
+                .year()
+                .month(.defaultDigits)
+                .day(.defaultDigits)
+                .hour(.defaultDigits(amPM: .abbreviated))
+                .minute(.twoDigits)
+        )
+        .replacingOccurrences(of: ",", with: "")
+        .replacingOccurrences(of: "\u{202F}", with: " ")
     }
 
     public static func state(_ value: TorrentCoreTorrentState) -> String {
@@ -164,7 +174,7 @@ public enum TorrentCoreDisplayFormatter {
 
     public static func wait(_ value: TorrentCoreWaitReason?, queue: Int?) -> String {
         guard let value else {
-            return "—"
+            return "--"
         }
         let label = splitIdentifier(value.rawValue)
         if let queue {
@@ -180,7 +190,7 @@ public enum TorrentCoreDisplayFormatter {
 
     public static func splitIdentifier(_ value: String) -> String {
         guard !value.isEmpty else {
-            return "Unknown"
+            return "--"
         }
         var output = ""
         for character in value {
@@ -191,9 +201,36 @@ public enum TorrentCoreDisplayFormatter {
         }
         return output
     }
+
+    public static func operatorValue(_ value: String?) -> String {
+        guard let value else {
+            return "--"
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.caseInsensitiveCompare("Unknown") == .orderedSame
+            ? "--"
+            : value
+    }
 }
 
 public enum TorrentCoreCompletionCallbackPresentation {
+    public static func state(_ value: String?) -> String {
+        switch TorrentCoreDisplayFormatter.operatorValue(value) {
+        case "PendingFinalization":
+            return "Waiting For Final Payload"
+        case "WaitingForFeedback":
+            return "Waiting For TVMaze"
+        case "Invoked":
+            return "Final Feedback Received"
+        case "Failed":
+            return "Callback Failed"
+        case "TimedOut":
+            return "Callback Timed Out"
+        case let state:
+            return state
+        }
+    }
+
     public static func feedbackSummary(
         _ feedback: TorrentCoreCompletionCallbackFeedback?
     ) -> String? {

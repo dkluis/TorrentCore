@@ -88,6 +88,45 @@ struct TorrentCoreMacDetailRow: View {
     }
 }
 
+private struct TorrentCoreMacTrailingOverlayModifier<OverlayContent: View>: ViewModifier {
+    let isPresented: Bool
+    let width: CGFloat
+    let overlayContent: () -> OverlayContent
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .trailing) {
+            if isPresented {
+                overlayContent()
+                    .frame(width: width)
+                    .frame(maxHeight: .infinity)
+                    .background(.regularMaterial)
+                    .overlay(alignment: .leading) {
+                        Divider()
+                    }
+                    .shadow(color: .black.opacity(0.18), radius: 12, x: -4)
+                    .contentShape(Rectangle())
+                    .zIndex(1)
+            }
+        }
+    }
+}
+
+extension View {
+    func torrentCoreTrailingOverlay<OverlayContent: View>(
+        isPresented: Bool,
+        width: CGFloat,
+        @ViewBuilder content: @escaping () -> OverlayContent
+    ) -> some View {
+        modifier(
+            TorrentCoreMacTrailingOverlayModifier(
+                isPresented: isPresented,
+                width: width,
+                overlayContent: content
+            )
+        )
+    }
+}
+
 struct TorrentCoreMacCopyableDetailRow: View {
     let label: String
     let value: String?
@@ -125,7 +164,7 @@ struct TorrentCoreMacCopyableDetailRow: View {
     }
 
     private var displayValue: String {
-        copyValue ?? "—"
+        copyValue ?? "--"
     }
 
     private func copyToPasteboard() {

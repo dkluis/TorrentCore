@@ -8,10 +8,10 @@ private struct TorrentCoreMacLogTableItem: Identifiable {
 
     var id: Int64 { log.logEntryID }
     var occurredAt: Date { log.occurredAt }
-    var level: String { log.level ?? "—" }
-    var category: String { log.category ?? "—" }
-    var eventType: String { log.eventType ?? "—" }
-    var message: String { log.message ?? "—" }
+    var level: String { log.level ?? "--" }
+    var category: String { log.category ?? "--" }
+    var eventType: String { log.eventType ?? "--" }
+    var message: String { log.message ?? "--" }
 }
 
 private enum TorrentCoreMacLogSortField: String {
@@ -171,9 +171,11 @@ struct TorrentCoreMacLogsView: View {
                 paginationBar
             }
         }
-        .inspector(isPresented: $isInspectorPresented) {
+        .torrentCoreTrailingOverlay(
+            isPresented: isInspectorPresented,
+            width: 420
+        ) {
             logInspector
-                .inspectorColumnWidth(min: 330, ideal: 420, max: 580)
         }
         .onChange(of: selectedLogID) { _, value in
             if value != nil {
@@ -367,7 +369,7 @@ struct TorrentCoreMacLogsView: View {
             columnCustomization: $columnCustomization
         ) {
             TableColumn("When", value: \.occurredAt) {
-                Text($0.log.occurredAt.formatted(date: .numeric, time: .standard))
+                Text(TorrentCoreDisplayFormatter.timestamp($0.log.occurredAt))
                     .monospacedDigit()
             }
             .width(min: 155, ideal: 175)
@@ -468,10 +470,10 @@ struct TorrentCoreMacLogsView: View {
                     Divider()
                     TorrentCoreMacDetailRow(
                         label: "Occurred",
-                        value: log.occurredAt.formatted(date: .abbreviated, time: .standard)
+                        value: TorrentCoreDisplayFormatter.timestamp(log.occurredAt)
                     )
-                    TorrentCoreMacDetailRow(label: "Level", value: log.level ?? "—")
-                    TorrentCoreMacDetailRow(label: "Category", value: log.category ?? "—")
+                    TorrentCoreMacDetailRow(label: "Level", value: log.level ?? "--")
+                    TorrentCoreMacDetailRow(label: "Category", value: log.category ?? "--")
                     TorrentCoreMacCopyableDetailRow(
                         label: "Torrent ID",
                         value: log.torrentID?.uuidString,
@@ -482,7 +484,7 @@ struct TorrentCoreMacLogsView: View {
                         value: log.serviceInstanceID?.uuidString,
                         accessibilityIdentifier: "logs.copyServiceInstanceID"
                     )
-                    TorrentCoreMacDetailRow(label: "Trace ID", value: log.traceID ?? "—")
+                    TorrentCoreMacDetailRow(label: "Trace ID", value: log.traceID ?? "--")
                     if let torrentID = log.torrentID {
                         Divider()
                         HStack {

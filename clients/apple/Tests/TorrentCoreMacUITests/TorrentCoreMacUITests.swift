@@ -12,10 +12,9 @@ final class TorrentCoreMacUITests: XCTestCase {
 
         openFixtureTorrents(in: app)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["torrents.table"]
-                .waitForExistence(timeout: 10)
-        )
+        let torrentTable = app.descendants(matching: .any)["torrents.table"]
+        XCTAssertTrue(torrentTable.waitForExistence(timeout: 10))
+        let torrentTableFrameWithoutInspector = torrentTable.frame
         XCTAssertTrue(
             app.descendants(matching: .any)["toolbar.refresh"].exists
         )
@@ -34,6 +33,11 @@ final class TorrentCoreMacUITests: XCTestCase {
             "torrents.inspector.content"
         ]
         XCTAssertTrue(inspectorContent.waitForExistence(timeout: 5))
+        assertUnchanged(
+            torrentTable.frame,
+            from: torrentTableFrameWithoutInspector,
+            message: "The torrent inspector must overlay without resizing the table."
+        )
         let inspectorToggle = app.descendants(matching: .any)["toolbar.inspector"]
         XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
         let refreshButton = app.descendants(matching: .any)["toolbar.refresh"]
@@ -58,8 +62,18 @@ final class TorrentCoreMacUITests: XCTestCase {
 
         inspectorToggle.click()
         XCTAssertTrue(inspectorContent.waitForNonExistence(timeout: 5))
+        assertUnchanged(
+            torrentTable.frame,
+            from: torrentTableFrameWithoutInspector,
+            message: "Hiding the torrent inspector must not resize the table."
+        )
         inspectorToggle.click()
         XCTAssertTrue(inspectorContent.waitForExistence(timeout: 5))
+        assertUnchanged(
+            torrentTable.frame,
+            from: torrentTableFrameWithoutInspector,
+            message: "Reopening the torrent inspector must not resize the table."
+        )
     }
 
     func testRemoveRequiresConfirmationAndCanBeCancelled() {
@@ -83,6 +97,64 @@ final class TorrentCoreMacUITests: XCTestCase {
         cancelButton.click()
 
         XCTAssertTrue(app.staticTexts["Preview Torrent"].exists)
+    }
+
+    func testHistoryAndLogsInspectorsOverlayWithoutResizingTables() {
+        let app = launchApp()
+        let inspectorToggle = app.descendants(matching: .any)["toolbar.inspector"]
+
+        let historyNavigation = app.descendants(matching: .any)["navigation.history"]
+        XCTAssertTrue(historyNavigation.waitForExistence(timeout: 10))
+        historyNavigation.click()
+        let historyTable = app.descendants(matching: .any)["history.table"]
+        XCTAssertTrue(historyTable.waitForExistence(timeout: 10))
+        let historyFrame = historyTable.frame
+        let historyRow = app.descendants(matching: .any)["history.row"].firstMatch
+        XCTAssertTrue(historyRow.waitForExistence(timeout: 5))
+        historyRow.click()
+        let historyInspector = app.descendants(matching: .any)[
+            "history.inspector.content"
+        ]
+        XCTAssertTrue(historyInspector.waitForExistence(timeout: 5))
+        assertUnchanged(
+            historyTable.frame,
+            from: historyFrame,
+            message: "The history inspector must overlay without resizing the table."
+        )
+        XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
+        inspectorToggle.click()
+        XCTAssertTrue(historyInspector.waitForNonExistence(timeout: 5))
+        assertUnchanged(
+            historyTable.frame,
+            from: historyFrame,
+            message: "Hiding the history inspector must not resize the table."
+        )
+
+        let logsNavigation = app.descendants(matching: .any)["navigation.logs"]
+        logsNavigation.click()
+        let logsTable = app.descendants(matching: .any)["logs.table"]
+        XCTAssertTrue(logsTable.waitForExistence(timeout: 10))
+        let logsFrame = logsTable.frame
+        let logRow = app.descendants(matching: .any)["logs.row"].firstMatch
+        XCTAssertTrue(logRow.waitForExistence(timeout: 5))
+        logRow.click()
+        let logsInspector = app.descendants(matching: .any)[
+            "logs.inspector.content"
+        ]
+        XCTAssertTrue(logsInspector.waitForExistence(timeout: 5))
+        assertUnchanged(
+            logsTable.frame,
+            from: logsFrame,
+            message: "The logs inspector must overlay without resizing the table."
+        )
+        XCTAssertTrue(inspectorToggle.waitForExistence(timeout: 5))
+        inspectorToggle.click()
+        XCTAssertTrue(logsInspector.waitForNonExistence(timeout: 5))
+        assertUnchanged(
+            logsTable.frame,
+            from: logsFrame,
+            message: "Hiding the logs inspector must not resize the table."
+        )
     }
 
     func testOperationalDestinationsLoadFixtureContent() {
@@ -374,5 +446,17 @@ final class TorrentCoreMacUITests: XCTestCase {
             app.descendants(matching: .any)["torrents.table"]
                 .waitForExistence(timeout: 10)
         )
+    }
+
+    private func assertUnchanged(
+        _ frame: CGRect,
+        from expected: CGRect,
+        message: String,
+        accuracy: CGFloat = 1
+    ) {
+        XCTAssertEqual(frame.minX, expected.minX, accuracy: accuracy, message)
+        XCTAssertEqual(frame.minY, expected.minY, accuracy: accuracy, message)
+        XCTAssertEqual(frame.width, expected.width, accuracy: accuracy, message)
+        XCTAssertEqual(frame.height, expected.height, accuracy: accuracy, message)
     }
 }

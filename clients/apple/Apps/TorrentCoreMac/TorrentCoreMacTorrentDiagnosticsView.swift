@@ -6,16 +6,16 @@ private struct TorrentCoreMacPeerTableItem: Identifiable {
     let peer: TorrentCorePeer
 
     var id: String { peer.id }
-    var endpoint: String { peer.endpoint ?? "—" }
-    var client: String { peer.client ?? "—" }
-    var direction: String { peer.direction ?? "—" }
+    var endpoint: String { peer.endpoint ?? "--" }
+    var client: String { peer.client ?? "--" }
+    var direction: String { peer.direction ?? "--" }
     var connected: Int { peer.isConnected ? 1 : 0 }
     var seeder: Int { peer.isSeeder ? 1 : 0 }
     var downloadRate: Int64 { peer.downloadRateBytesPerSecond }
     var uploadRate: Int64 { peer.uploadRateBytesPerSecond }
     var downloaded: Int64 { peer.downloadedBytes }
     var uploaded: Int64 { peer.uploadedBytes }
-    var encryption: String { peer.encryption ?? "—" }
+    var encryption: String { peer.encryption ?? "--" }
 }
 
 private struct TorrentCoreMacTrackerTableItem: Identifiable {
@@ -25,7 +25,7 @@ private struct TorrentCoreMacTrackerTableItem: Identifiable {
     var tier: Int { tracker.tierNumber }
     var number: Int { tracker.trackerNumber }
     var active: Int { tracker.isActive ? 1 : 0 }
-    var status: String { tracker.status ?? "—" }
+    var status: String { tracker.status ?? "--" }
     var canAnnounce: Int { Self.optionalBooleanSortValue(tracker.canAnnounce) }
     var canScrape: Int { tracker.canScrape ? 1 : 0 }
     var sinceAnnounce: Int64 { tracker.timeSinceLastAnnounceSeconds ?? .max }
@@ -36,8 +36,8 @@ private struct TorrentCoreMacTrackerTableItem: Identifiable {
     var scrapeSucceeded: Int {
         Self.optionalBooleanSortValue(tracker.lastScrapeSucceeded)
     }
-    var failure: String { tracker.failureMessage ?? "—" }
-    var warning: String { tracker.warningMessage ?? "—" }
+    var failure: String { tracker.failureMessage ?? "--" }
+    var warning: String { tracker.warningMessage ?? "--" }
 
     private static func optionalBooleanSortValue(_ value: Bool?) -> Int {
         switch value {

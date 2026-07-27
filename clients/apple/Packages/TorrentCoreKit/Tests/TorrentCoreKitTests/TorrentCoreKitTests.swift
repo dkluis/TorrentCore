@@ -43,6 +43,52 @@ func callbackFeedbackSummaryUsesDisplayMessageThenFinalResult() {
 }
 
 @Test
+func operatorPresentationMatchesWebUITerms() {
+    #expect(
+        TorrentCoreCompletionCallbackPresentation.state("PendingFinalization")
+            == "Waiting For Final Payload"
+    )
+    #expect(
+        TorrentCoreCompletionCallbackPresentation.state("WaitingForFeedback")
+            == "Waiting For TVMaze"
+    )
+    #expect(
+        TorrentCoreCompletionCallbackPresentation.state("Invoked")
+            == "Final Feedback Received"
+    )
+    #expect(
+        TorrentCoreCompletionCallbackPresentation.state("Failed")
+            == "Callback Failed"
+    )
+    #expect(
+        TorrentCoreCompletionCallbackPresentation.state("TimedOut")
+            == "Callback Timed Out"
+    )
+    #expect(TorrentCoreCompletionCallbackPresentation.state("FutureState") == "FutureState")
+    #expect(TorrentCoreCompletionCallbackPresentation.state("Unknown") == "--")
+    #expect(TorrentCoreCompletionCallbackPresentation.state(nil) == "--")
+    #expect(TorrentCoreDisplayFormatter.operatorValue("Unknown") == "--")
+    #expect(TorrentCoreDisplayFormatter.operatorValue(" ") == "--")
+    #expect(TorrentCoreDisplayFormatter.operatorValue(nil) == "--")
+    #expect(TorrentCoreDisplayFormatter.operatorValue("Success") == "Success")
+}
+
+@Test
+func timestampPresentationMatchesWebUIFormat() throws {
+    var components = DateComponents()
+    components.calendar = Calendar.current
+    components.year = 2026
+    components.month = 7
+    components.day = 27
+    components.hour = 4
+    components.minute = 29
+
+    let date = try #require(components.date)
+    #expect(TorrentCoreDisplayFormatter.timestamp(date) == "7/27/2026 4:29 AM")
+    #expect(TorrentCoreDisplayFormatter.timestamp(nil) == "--")
+}
+
+@Test
 func initialSliceBuildsDeterministicRequestsAndDecodesFixtures() async throws {
     let recorder = RequestRecorder()
     let transport = FixtureTransport(recorder: recorder)

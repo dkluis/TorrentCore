@@ -39,14 +39,18 @@ private struct TorrentCoreMacHistoryTableItem: Identifiable {
     var submitted: Date { summary.submittedAt }
     var name: String { summary.name ?? "Unnamed Torrent" }
     var category: String { TorrentCoreDisplayFormatter.category(summary.categoryKey) }
-    var state: String { summary.latestTorrentState ?? "—" }
+    var state: String { TorrentCoreDisplayFormatter.operatorValue(summary.latestTorrentState) }
     var outcome: String { summary.outcome.rawValue }
     var progress: Double { summary.latestProgressPercent }
     var downloaded: Int64 { summary.latestDownloadedBytes }
     var total: Int64 { summary.latestTotalBytes ?? -1 }
-    var callback: String { summary.latestCallbackStatus ?? "—" }
+    var callback: String {
+        TorrentCoreCompletionCallbackPresentation.state(summary.latestCallbackStatus)
+    }
     var removed: Date { summary.removedAt ?? .distantPast }
-    var removalReason: String { summary.removalReason ?? "—" }
+    var removalReason: String {
+        TorrentCoreDisplayFormatter.operatorValue(summary.removalReason)
+    }
 }
 
 private enum TorrentCoreMacHistorySortField: String {
@@ -228,9 +232,11 @@ struct TorrentCoreMacHistoryView: View {
                 paginationBar
             }
         }
-        .inspector(isPresented: $isInspectorPresented) {
+        .torrentCoreTrailingOverlay(
+            isPresented: isInspectorPresented,
+            width: 400
+        ) {
             historyInspector
-                .inspectorColumnWidth(min: 330, ideal: 400, max: 540)
         }
         .onChange(of: selectedHistoryKey) { _, key in
             magnetCopyResetTask?.cancel()
@@ -519,7 +525,9 @@ struct TorrentCoreMacHistoryView: View {
                     TorrentCoreMacDetailRow(label: "Outcome", value: detail.outcome.rawValue)
                     TorrentCoreMacDetailRow(
                         label: "State",
-                        value: detail.latestTorrentState ?? "—"
+                        value: TorrentCoreDisplayFormatter.operatorValue(
+                            detail.latestTorrentState
+                        )
                     )
                     TorrentCoreMacDetailRow(
                         label: "Progress",
@@ -527,7 +535,10 @@ struct TorrentCoreMacHistoryView: View {
                             detail.latestProgressPercent
                         )
                     )
-                    TorrentCoreMacDetailRow(label: "Category", value: detail.categoryKey ?? "—")
+                    TorrentCoreMacDetailRow(
+                        label: "Category",
+                        value: TorrentCoreDisplayFormatter.operatorValue(detail.categoryKey)
+                    )
                     TorrentCoreMacDetailRow(
                         label: "Submitted",
                         value: TorrentCoreDisplayFormatter.timestamp(detail.submittedAt)
@@ -542,11 +553,13 @@ struct TorrentCoreMacHistoryView: View {
                     )
                     TorrentCoreMacDetailRow(
                         label: "Removal Kind",
-                        value: detail.removalKind?.rawValue ?? "—"
+                        value: TorrentCoreDisplayFormatter.operatorValue(
+                            detail.removalKind?.rawValue
+                        )
                     )
                     TorrentCoreMacDetailRow(
                         label: "Removal Reason",
-                        value: detail.removalReason ?? "—"
+                        value: TorrentCoreDisplayFormatter.operatorValue(detail.removalReason)
                     )
                     Divider()
                     Text("Callback Feedback")
@@ -555,7 +568,7 @@ struct TorrentCoreMacHistoryView: View {
                         label: "Summary",
                         value: TorrentCoreCompletionCallbackPresentation.feedbackSummary(
                             detail.completionCallbackFeedback
-                        ) ?? "—"
+                        ) ?? "--"
                     )
                     .accessibilityIdentifier("history.feedback.summary")
                     TorrentCoreMacDetailRow(
@@ -567,16 +580,23 @@ struct TorrentCoreMacHistoryView: View {
                     .accessibilityIdentifier("history.feedback.received")
                     TorrentCoreMacDetailRow(
                         label: "Final Result",
-                        value: detail.completionCallbackFeedback?.finalState ?? "—"
+                        value: TorrentCoreDisplayFormatter.operatorValue(
+                            detail.completionCallbackFeedback?.finalState
+                        )
                     )
                     .accessibilityIdentifier("history.feedback.finalResult")
                     TorrentCoreMacDetailRow(
                         label: "Reason",
-                        value: detail.completionCallbackFeedback?.reasonCode ?? "—"
+                        value: TorrentCoreDisplayFormatter.operatorValue(
+                            detail.completionCallbackFeedback?.reasonCode
+                        )
                     )
                     .accessibilityIdentifier("history.feedback.reason")
                     historyMagnetRow(detail.magnetURI)
-                    TorrentCoreMacDetailRow(label: "Info Hash", value: detail.infoHash ?? "—")
+                    TorrentCoreMacDetailRow(
+                        label: "Info Hash",
+                        value: TorrentCoreDisplayFormatter.operatorValue(detail.infoHash)
+                    )
                     TorrentCoreMacCopyableDetailRow(
                         label: "Torrent ID",
                         value: detail.torrentID?.uuidString,
@@ -612,7 +632,7 @@ struct TorrentCoreMacHistoryView: View {
     private func historyMagnetRow(_ magnetURI: String?) -> some View {
         LabeledContent("Magnet") {
             VStack(alignment: .trailing, spacing: 6) {
-                Text(copyableMagnetURI(magnetURI) ?? "—")
+                Text(copyableMagnetURI(magnetURI) ?? "--")
                     .multilineTextAlignment(.trailing)
                     .textSelection(.enabled)
 

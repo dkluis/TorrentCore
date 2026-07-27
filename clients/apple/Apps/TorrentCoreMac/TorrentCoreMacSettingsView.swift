@@ -102,7 +102,7 @@ struct TorrentCoreMacSettingsView: View {
                     Text(session.activeProfile?.name ?? "None")
                 }
                 LabeledContent("Service Address") {
-                    Text(session.activeProfile?.baseURL.absoluteString ?? "—")
+                    Text(session.activeProfile?.baseURL.absoluteString ?? "--")
                         .textSelection(.enabled)
                 }
                 Text("Create, edit, test, select, or delete connections from the Connection screen in the main window.")
