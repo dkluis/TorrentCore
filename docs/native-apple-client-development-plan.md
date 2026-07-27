@@ -419,8 +419,10 @@ Implementation stages:
   disk-image, and Gatekeeper verification. The subsequent 0.2.0/build 2 UI-refinement upgrade candidate was accepted
   under submission `f6dd6d0f-fa7e-4b5c-9260-2387f7cdecfd`; its copied DMG passed the same release checks and subsequently
   passed installation-over-0.1.0 upgrade acceptance. The 0.2.1/build 3 macOS 27 compatibility hotfix was accepted under
-  submission `72257d2e-d315-40dc-a315-71530bfdd9af` and passed the same release checks; separate-Mac confirmation of
-  the launch fix is pending.
+  submission `72257d2e-d315-40dc-a315-71530bfdd9af` and passed the same release checks. The 0.3.0/build 4 UI-refinement
+  update was accepted under submission `cea84cc3-1f89-49fa-9766-8c12dd6cd597`; its copied DMG passed signature,
+  stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac upgrade acceptance for 0.3.0 remains
+  pending.
 - **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
   worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
   bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations

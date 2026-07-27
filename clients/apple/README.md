@@ -11,12 +11,13 @@ normal Gatekeeper launch on CA-Dick-MBA, LAN connection to CA-Desktop, and add, 
 The signed, notarized, and stapled 0.2.0/build 2 app also passed installation-over-0.1.0 upgrade acceptance.
 Off-site routed-VPN verification remains environmentally deferred.
 
-The next active workstream is further macOS UI refinement. Its first operator-prioritized slice is implemented in the
-0.2.0 candidate. The signed, notarized, and stapled 0.2.1/build 3 compatibility hotfix is ready for separate-Mac
-verification after 0.2.0 exposed a SwiftUI/AppKit `NavigationSplitView` constraint-loop abort on the macOS 27 beta.
-The hotfix preserves the global bottom connection status while avoiding the direct split-view detail wrapper that
-triggered the failure. Milestone 6 iPad Adaptation remains open but is deferred because no iPad test device is
-currently available.
+The next active workstream is further macOS UI refinement. Its first operator-prioritized slice shipped in 0.2.0, and
+the signed, notarized, and stapled 0.2.1/build 3 compatibility hotfix avoided the direct split-view detail wrapper that
+triggered a SwiftUI/AppKit `NavigationSplitView` constraint-loop abort on the macOS 27 beta. The signed, notarized, and
+stapled 0.3.0/build 4 update adds the next UI-refinement slice, including WebUI-aligned operator presentation and
+right-side inspector overlays that do not resize the underlying tables. Separate-Mac upgrade acceptance for 0.3.0
+remains pending. Milestone 6 iPad Adaptation remains open but is deferred because no iPad test device is currently
+available.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 
@@ -122,9 +123,11 @@ no active saved connection.
   recent lifecycle events.
 - Torrents uses a native sortable table with name, state, and category filters; local pagination matches the WebUI
   choices of 25, 50, 100, and 250 rows.
-- Single selection drives resizable trailing inspectors for Torrents, History, and Logs. One standard toolbar and View
-  menu command shows or hides the inspector for the active destination. Torrent details expose pause, resume, remove,
-  remove-with-data, peer/tracker diagnostics, metadata recovery, callback retry, and cross-navigation.
+- Single selection drives fixed-width trailing overlay inspectors for Torrents, History, and Logs. The reusable
+  overlay does not participate in table layout, so showing or hiding a current or future right-side panel preserves
+  operator-resized columns. One standard toolbar and View menu command shows or hides the inspector for the active
+  destination. Torrent details expose pause, resume, remove, remove-with-data, peer/tracker diagnostics, metadata
+  recovery, callback retry, and cross-navigation.
 - Add Magnet uses enabled service categories in service sort order and permits Uncategorized.
 - Add Magnet and Refresh are permanent window-toolbar items. Add Magnet remains available from every destination while
   connected and returns to Torrents without selecting a row or opening the inspector after a successful add.

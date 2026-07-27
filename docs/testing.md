@@ -130,6 +130,11 @@ The 0.2.1/build 3 compatibility hotfix also completed the release workflow on Ju
 `72257d2e-d315-40dc-a315-71530bfdd9af`; the copied DMG passed signature, stapler-ticket, disk-image, and Gatekeeper
 checks. Its focused signed UI test passed on macOS 26. Separate-Mac confirmation of the macOS 27 launch fix remains
 pending.
+The 0.3.0/build 4 UI-refinement update completed the release workflow on July 27, 2026. Apple accepted submission
+`cea84cc3-1f89-49fa-9766-8c12dd6cd597`; the copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and
+checksum verification. Its SHA-256 checksum is
+`eec8762805329edbe626b425484e57ef20b0c8335836aa60ca7422dc611e3f27`. Separate-Mac upgrade acceptance remains
+pending.
 
 ## Testing Rules
 
