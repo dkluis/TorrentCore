@@ -314,6 +314,39 @@ final class TorrentCoreMacUITests: XCTestCase {
             app.descendants(matching: .any)["serviceSettings.category.tv.displayName"]
                 .waitForExistence(timeout: 5)
         )
+
+        app.staticTexts["Cleanup"].firstMatch.click()
+        XCTAssertTrue(
+            app.descendants(matching: .any)["serviceSettings.cleanup.logs.date"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["serviceSettings.cleanup.history.date"].exists
+        )
+        let deleteLogs = app.descendants(matching: .any)[
+            "serviceSettings.cleanup.logs.delete"
+        ]
+        let deleteHistory = app.descendants(matching: .any)[
+            "serviceSettings.cleanup.history.delete"
+        ]
+        let deleteOrphanedLogs = app.descendants(matching: .any)[
+            "serviceSettings.cleanup.orphanedLogs.delete"
+        ]
+        XCTAssertTrue(deleteLogs.exists)
+        XCTAssertTrue(deleteHistory.exists)
+        XCTAssertTrue(deleteOrphanedLogs.exists)
+
+        deleteLogs.click()
+        XCTAssertTrue(app.staticTexts["Delete Log Entries?"].waitForExistence(timeout: 5))
+        app.sheets.buttons["Cancel"].firstMatch.click()
+
+        deleteHistory.click()
+        XCTAssertTrue(app.staticTexts["Delete History Records?"].waitForExistence(timeout: 5))
+        app.sheets.buttons["Cancel"].firstMatch.click()
+
+        deleteOrphanedLogs.click()
+        XCTAssertTrue(app.staticTexts["Delete Orphan Logs?"].waitForExistence(timeout: 5))
+        app.sheets.buttons["Cancel"].firstMatch.click()
     }
 
     func testKeyboardCommandsAndAddMagnetInitialFocus() {

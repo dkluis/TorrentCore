@@ -160,6 +160,11 @@ no active saved connection.
   Numeric settings show their current values in editable fields. Categories use one full-width inline editable grid,
   falling back to horizontal scrolling only when the tab is genuinely too narrow. Save submits only changed category
   rows sequentially through the existing single-category API.
+- Service Settings includes a final Cleanup group. Log Entries defaults to seven days back, History Records defaults
+  to 30 days back, and both dates recalculate whenever the group opens. Each destructive action confirms separately,
+  rejects future dates, reports its deleted count, and preserves records tied to torrent ids still present in the live
+  torrent table. History eligibility uses Last Updated. The existing orphan-log operation remains available on Logs
+  and is also exposed in Cleanup.
 - Compact information buttons beside native fields open anchored help popovers. The help content is shared through
   `TorrentCoreFeatures` for later iOS/iPadOS presentation, while the popover renderer remains macOS-specific.
 - Dashboard, Torrents, History, Logs, Peers, and Trackers follow the global foreground refresh policy only while their

@@ -1,7 +1,10 @@
 using TorrentCore.Contracts.History;
+using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.History;
+using TorrentCore.Core.Torrents;
 using TorrentCore.Persistence.Sqlite.History;
 using TorrentCore.Persistence.Sqlite.Schema;
+using TorrentCore.Persistence.Sqlite.Torrents;
 
 namespace TorrentCore.Service.Tests;
 
@@ -52,13 +55,60 @@ public sealed class SqliteTorrentHistoryStoreTests
         }
     }
 
-    private static TorrentHistoryRecord CreateRecord()
+    [Fact]
+    public async Task DeleteInactiveBefore_UsesLastUpdatedExclusiveCutoff_AndProtectsLiveTorrents()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-history-cleanup-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            var migrator = new SqliteSchemaMigrator(databaseFilePath);
+            await migrator.ApplyMigrationsAsync(CancellationToken.None);
+
+            var cutoffUtc = new DateTimeOffset(2026, 6, 28, 4, 0, 0, TimeSpan.Zero);
+            var activeTorrentId = Guid.NewGuid();
+            var oldInactive = CreateRecord(Guid.NewGuid(), cutoffUtc.AddMinutes(-1));
+            var oldActive = CreateRecord(activeTorrentId, cutoffUtc.AddMinutes(-1));
+            var atCutoff = CreateRecord(Guid.NewGuid(), cutoffUtc);
+            var newerInactive = CreateRecord(Guid.NewGuid(), cutoffUtc.AddMinutes(1));
+
+            var store = new SqliteTorrentHistoryStore(databaseFilePath);
+            await store.InsertAsync(oldInactive, CancellationToken.None);
+            await store.InsertAsync(oldActive, CancellationToken.None);
+            await store.InsertAsync(atCutoff, CancellationToken.None);
+            await store.InsertAsync(newerInactive, CancellationToken.None);
+
+            var torrentStore = new SqliteTorrentStateStore(databaseFilePath);
+            await torrentStore.InsertAsync(CreateSnapshot(activeTorrentId), CancellationToken.None);
+
+            var deletedCount = await store.DeleteInactiveBeforeAsync(cutoffUtc, CancellationToken.None);
+            var remaining = await store.ListAsync(CancellationToken.None);
+
+            Assert.Equal(1, deletedCount);
+            Assert.DoesNotContain(remaining, record => record.TorrentId == oldInactive.TorrentId);
+            Assert.Contains(remaining, record => record.TorrentId == oldActive.TorrentId);
+            Assert.Contains(remaining, record => record.TorrentId == atCutoff.TorrentId);
+            Assert.Contains(remaining, record => record.TorrentId == newerInactive.TorrentId);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    private static TorrentHistoryRecord CreateRecord(Guid? torrentId = null,
+        DateTimeOffset? lastUpdatedAtUtc = null)
     {
         var now = DateTimeOffset.UtcNow;
 
         return new TorrentHistoryRecord
         {
-            TorrentId = Guid.NewGuid(),
+            TorrentId = torrentId ?? Guid.NewGuid(),
             Name = "History Regression Torrent",
             MagnetUri = "magnet:?xt=urn:btih:2222222222222222222222222222222222222222&dn=History%20Regression",
             InfoHash = "2222222222222222222222222222222222222222",
@@ -81,7 +131,7 @@ public sealed class SqliteTorrentHistoryStoreTests
             DownloadCompletedAtUtc = null,
             SeedingStartedAtUtc = null,
             LastActivityAtUtc = now,
-            LastUpdatedAtUtc = now,
+            LastUpdatedAtUtc = lastUpdatedAtUtc ?? now,
             RemovedAtUtc = null,
             InvokeCompletionCallback = true,
             CompletionCallbackLabel = "TV",
@@ -95,6 +145,31 @@ public sealed class SqliteTorrentHistoryStoreTests
             RemovedByCleanupPolicy = false,
             FinalPayloadPath = null,
             ServiceInstanceIdLastSeen = Guid.NewGuid(),
+        };
+    }
+
+    private static TorrentSnapshot CreateSnapshot(Guid torrentId)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return new TorrentSnapshot
+        {
+            TorrentId = torrentId,
+            Name = "Protected Live Torrent",
+            State = TorrentState.Downloading,
+            DesiredState = TorrentDesiredState.Runnable,
+            MagnetUri = "magnet:?xt=urn:btih:4444444444444444444444444444444444444444",
+            InfoHash = "4444444444444444444444444444444444444444",
+            SavePath = "/tmp/torrentcore-tests/protected-live-torrent",
+            ProgressPercent = 50,
+            DownloadedBytes = 512,
+            UploadedBytes = 0,
+            TotalBytes = 1_024,
+            DownloadRateBytesPerSecond = 0,
+            UploadRateBytesPerSecond = 0,
+            TrackerCount = 0,
+            ConnectedPeerCount = 0,
+            AddedAtUtc = now,
+            LastActivityAtUtc = now,
         };
     }
 }

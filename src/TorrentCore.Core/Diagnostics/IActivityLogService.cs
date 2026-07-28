@@ -8,4 +8,5 @@ public interface IActivityLogService
     Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken);
     Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken);
+    Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken);
 }

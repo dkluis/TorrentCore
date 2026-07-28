@@ -145,6 +145,13 @@ checksum verification. Its SHA-256 checksum is
 `b4c746f3fa62c0cf47af52e9b3bc324de6239754ef4e4d58ae74a19ce14bb87d`. Separate-Mac upgrade and saved-connection
 startup acceptance on macOS 27 remain pending.
 
+The July 28 Service Settings Cleanup refinement passed all 182 Service tests and all 33 shared Apple package tests.
+The signed macOS run passed five unit tests, including the seven-day/30-day defaults and future-date validation, plus
+the focused fixture UI test that opens the final Cleanup group and verifies its fields, actions, and three separate
+confirmation dialogs. The macOS target built for testing and the shared client also built successfully for the iOS
+Simulator. Persistence tests verify exclusive cutoffs and preservation of rows associated with live torrent ids;
+API tests cover Service-local cutoff conversion, audit events, and future-date rejection.
+
 ## Testing Rules
 
 - use real SQLite-backed tests for persistence behavior

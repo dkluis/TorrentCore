@@ -465,6 +465,56 @@ public struct TorrentCoreClient: Sendable {
         }
     }
 
+    public func cleanupLogs(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        try await perform(.cleanupLogs) {
+            let request = Components.Schemas.CleanupByDateRequest(upToDate: upToDate)
+            switch try await mutationClient.maintenanceCleanupLogs(body: .json(request)) {
+            case let .ok(response):
+                let value = try response.body.json
+                return TorrentCoreCleanupResult(
+                    upToDate: value.upToDate,
+                    cutoffUTC: value.cutoffUtc,
+                    deletedRecordCount: Int(value.deletedRecordCount)
+                )
+            case let .badRequest(response):
+                throw TorrentCoreClientError.service(
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
+                )
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
+                )
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
+    public func cleanupHistory(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        try await perform(.cleanupHistory) {
+            let request = Components.Schemas.CleanupByDateRequest(upToDate: upToDate)
+            switch try await mutationClient.maintenanceCleanupHistory(body: .json(request)) {
+            case let .ok(response):
+                let value = try response.body.json
+                return TorrentCoreCleanupResult(
+                    upToDate: value.upToDate,
+                    cutoffUTC: value.cutoffUtc,
+                    deletedRecordCount: Int(value.deletedRecordCount)
+                )
+            case let .badRequest(response):
+                throw TorrentCoreClientError.service(
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
+                )
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
+                )
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
     public func updateRuntimeSettings(
         _ update: TorrentCoreRuntimeSettingsUpdate
     ) async throws -> TorrentCoreRuntimeSettings {

@@ -145,5 +145,8 @@ public sealed class TorrentEngineSynchronizationServiceTests
 
         public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
             => Task.FromResult(0);
+
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc,
+            CancellationToken cancellationToken) => Task.FromResult(0);
     }
 }

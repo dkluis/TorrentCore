@@ -119,6 +119,7 @@ builder.Services.AddSingleton<ITorrentHistoryStore>(serviceProvider =>
 builder.Services.AddSingleton<IRuntimeSettingsService, RuntimeSettingsService>();
 builder.Services.AddSingleton<ITorrentCategoryService, TorrentCategoryService>();
 builder.Services.AddSingleton<ITorrentHistoryService, TorrentHistoryService>();
+builder.Services.AddSingleton<IMaintenanceCleanupService, MaintenanceCleanupService>();
 builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentCompletionFinalizationChecker>();
 builder.Services.AddSingleton<TorrentCompletionFinalizationProbeCoordinator>();
 builder.Services.AddSingleton<TorrentManagerStopCoordinator>();

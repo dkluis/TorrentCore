@@ -27,6 +27,8 @@ Current core tables:
 - persistent service-owned diagnostics
 - torrent-scoped and service-scoped entries
 - indexed by occurred time and torrent id
+- manual date cleanup uses an exclusive Service-local midnight cutoff
+- date cleanup removes old service-level rows and old torrent rows only when the torrent id is absent from `torrents`
 
 ### `torrents`
 
@@ -56,8 +58,8 @@ Current core tables:
 - `torrents` remains dedicated to live state and restart persistence
 - torrent history uses a separate table
 - history rows are inserted once and updated in place
-- history rows are not deleted by the current implementation
-- future retention policy is separate from the current design
+- manual date cleanup uses `last_updated_at_utc` and an exclusive Service-local midnight cutoff
+- history cleanup never deletes a row whose torrent id remains in the live `torrents` table
 - metadata resolution is recorded only after payload size becomes available; an info hash or a temporary queued state is not sufficient evidence
 - download completion is recorded only from a completed or seeding lifecycle state, not from a transient 100-percent progress value
 - migration 14 repairs an impossible stored completion that predates download start when a later valid seeding timestamp is available
@@ -91,4 +93,5 @@ This matters most for:
 - callback lifecycle fields
 - category routing persistence
 - history row shape
+- protected log and history cleanup
 - runtime-setting storage semantics

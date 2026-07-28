@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import TorrentCore
 
@@ -17,6 +18,44 @@ func macNavigationDestinationsExposeStableAccessibleMetadata() {
     #expect(TorrentCoreMacDestination.history.title == "History")
     #expect(TorrentCoreMacDestination.logs.systemImage.isEmpty == false)
     #expect(TorrentCoreMacDestination.serviceSettings.title == "Service Settings")
+}
+
+@Test
+func serviceSettingsExposeCleanupAfterCategories() {
+    let groups = TorrentCoreMacServiceSettingsView.SettingsGroup.allCases
+    #expect(groups.suffix(2).map(\.title) == ["Categories", "Cleanup"])
+    #expect(groups.last?.systemImage.isEmpty == false)
+}
+
+@Test
+func cleanupDatesUseSevenAndThirtyDayDefaultsAndRejectFutureDates() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+    let now = try #require(
+        DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: 2026,
+            month: 7,
+            day: 28,
+            hour: 17
+        ).date
+    )
+    let defaults = TorrentCoreMacCleanupDates.defaults(now: now, calendar: calendar)
+    let expectedLogs = calendar.date(byAdding: .day, value: -7, to: calendar.startOfDay(for: now))
+    let expectedHistory = calendar.date(byAdding: .day, value: -30, to: calendar.startOfDay(for: now))
+    let tomorrow = calendar.date(byAdding: .day, value: 1, to: now)
+
+    #expect(defaults.logs == expectedLogs)
+    #expect(defaults.history == expectedHistory)
+    #expect(TorrentCoreMacCleanupDates.isFuture(now, now: now, calendar: calendar) == false)
+    #expect(
+        TorrentCoreMacCleanupDates.isFuture(
+            try #require(tomorrow),
+            now: now,
+            calendar: calendar
+        )
+    )
 }
 
 @Test

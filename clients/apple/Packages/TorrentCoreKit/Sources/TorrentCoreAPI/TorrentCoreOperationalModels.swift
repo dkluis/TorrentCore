@@ -224,6 +224,18 @@ public struct TorrentCoreDeleteOrphanedLogsResult: Codable, Hashable, Sendable {
     }
 }
 
+public struct TorrentCoreCleanupResult: Codable, Hashable, Sendable {
+    public var upToDate: String
+    public var cutoffUTC: Date
+    public var deletedRecordCount: Int
+
+    public init(upToDate: String, cutoffUTC: Date, deletedRecordCount: Int) {
+        self.upToDate = upToDate
+        self.cutoffUTC = cutoffUTC
+        self.deletedRecordCount = deletedRecordCount
+    }
+}
+
 public struct TorrentCorePeer: Codable, Hashable, Sendable, Identifiable {
     public var client: String?
     public var direction: String?

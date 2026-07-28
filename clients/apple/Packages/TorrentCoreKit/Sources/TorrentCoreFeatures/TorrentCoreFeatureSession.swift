@@ -551,6 +551,38 @@ public final class TorrentCoreFeatureSession {
         }
     }
 
+    public func cleanupLogs(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        let serviceClient = try beginMutation(.cleanupLogs)
+        do {
+            let result = try await serviceClient.cleanupLogs(upToDate: upToDate)
+            activeMutation = nil
+            logs.reset()
+            activityLogFilterOptions.reset()
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
+    public func cleanupHistory(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        let serviceClient = try beginMutation(.cleanupHistory)
+        do {
+            let result = try await serviceClient.cleanupHistory(upToDate: upToDate)
+            activeMutation = nil
+            history.reset()
+            historyFilterOptions.reset()
+            historyDetail.reset()
+            abandonedHistory.reset()
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
     public func updateRuntimeSettings(
         _ update: TorrentCoreRuntimeSettingsUpdate
     ) async throws -> TorrentCoreRuntimeSettings {

@@ -24,6 +24,8 @@ public protocol TorrentCoreServiceClientProtocol: Sendable {
     func resetMetadataSession(id: UUID) async throws -> TorrentCoreActionResult
     func retryCompletionCallback(id: UUID) async throws -> TorrentCoreActionResult
     func deleteOrphanedLogs() async throws -> TorrentCoreDeleteOrphanedLogsResult
+    func cleanupLogs(upToDate: String) async throws -> TorrentCoreCleanupResult
+    func cleanupHistory(upToDate: String) async throws -> TorrentCoreCleanupResult
     func updateRuntimeSettings(
         _ update: TorrentCoreRuntimeSettingsUpdate
     ) async throws -> TorrentCoreRuntimeSettings

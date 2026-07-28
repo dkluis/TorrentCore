@@ -109,6 +109,42 @@
         ],
         "type": "object"
       },
+      "CleanupByDateRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "upToDate": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upToDate"
+        ],
+        "type": "object"
+      },
+      "CleanupByDateResultDto": {
+        "additionalProperties": false,
+        "properties": {
+          "cutoffUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deletedRecordCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "upToDate": {
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cutoffUtc",
+          "deletedRecordCount",
+          "upToDate"
+        ],
+        "type": "object"
+      },
       "CompletionCallbackFeedbackDto": {
         "additionalProperties": false,
         "properties": {
@@ -2689,6 +2725,124 @@
         ]
       }
     },
+    "/api/maintenance/history/cleanup": {
+      "post": {
+        "operationId": "Maintenance_CleanupHistory",
+        "requestBody": {
+          "content": {
+            "application/*\u002Bjson": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupByDateRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupByDateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupByDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupByDateResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Maintenance"
+        ]
+      }
+    },
+    "/api/maintenance/logs/cleanup": {
+      "post": {
+        "operationId": "Maintenance_CleanupLogs",
+        "requestBody": {
+          "content": {
+            "application/*\u002Bjson": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupByDateRequest"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupByDateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CleanupByDateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleanupByDateResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Maintenance"
+        ]
+      }
+    },
     "/api/torrents": {
       "get": {
         "operationId": "Torrents_GetAll",
@@ -3302,6 +3456,9 @@
     },
     {
       "name": "Logs"
+    },
+    {
+      "name": "Maintenance"
     },
     {
       "name": "Torrents"

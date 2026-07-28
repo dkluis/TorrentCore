@@ -365,6 +365,22 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         TorrentCoreDeleteOrphanedLogsResult(deletedLogEntryCount: 2)
     }
 
+    func cleanupLogs(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        TorrentCoreCleanupResult(
+            upToDate: upToDate,
+            cutoffUTC: Date(),
+            deletedRecordCount: 12
+        )
+    }
+
+    func cleanupHistory(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        TorrentCoreCleanupResult(
+            upToDate: upToDate,
+            cutoffUTC: Date(),
+            deletedRecordCount: 4
+        )
+    }
+
     func updateRuntimeSettings(
         _ update: TorrentCoreRuntimeSettingsUpdate
     ) async throws -> TorrentCoreRuntimeSettings {

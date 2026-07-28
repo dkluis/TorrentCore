@@ -8,6 +8,7 @@ using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.History;
+using TorrentCore.Contracts.Maintenance;
 using TorrentCore.Contracts.Torrents;
 
 #endregion
@@ -218,6 +219,26 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
         );
         return await ReadResponseAsync<DeleteOrphanedTorrentLogsResultDto>(response, cancellationToken) ??
                 throw new InvalidOperationException("TorrentCore service returned no log cleanup payload.");
+    }
+
+    public async Task<CleanupByDateResultDto> CleanupLogsAsync(CleanupByDateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            BuildRequestUri("api/maintenance/logs/cleanup"), request, JsonOptions, cancellationToken
+        );
+        return await ReadResponseAsync<CleanupByDateResultDto>(response, cancellationToken) ??
+                throw new InvalidOperationException("TorrentCore service returned no log cleanup payload.");
+    }
+
+    public async Task<CleanupByDateResultDto> CleanupHistoryAsync(CleanupByDateRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.PostAsJsonAsync(
+            BuildRequestUri("api/maintenance/history/cleanup"), request, JsonOptions, cancellationToken
+        );
+        return await ReadResponseAsync<CleanupByDateResultDto>(response, cancellationToken) ??
+                throw new InvalidOperationException("TorrentCore service returned no history cleanup payload.");
     }
 
     public async Task<TorrentDetailDto?> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default)

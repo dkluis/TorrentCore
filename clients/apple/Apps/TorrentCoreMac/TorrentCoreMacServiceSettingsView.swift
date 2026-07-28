@@ -2,7 +2,36 @@ import SwiftUI
 import TorrentCoreAPI
 import TorrentCoreFeatures
 
+enum TorrentCoreMacCleanupDates {
+    static func defaults(
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> (logs: Date, history: Date) {
+        let today = calendar.startOfDay(for: now)
+        return (
+            logs: calendar.date(byAdding: .day, value: -7, to: today) ?? today,
+            history: calendar.date(byAdding: .day, value: -30, to: today) ?? today
+        )
+    }
+
+    static func isFuture(
+        _ value: Date,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Bool {
+        calendar.startOfDay(for: value) > calendar.startOfDay(for: now)
+    }
+}
+
 struct TorrentCoreMacServiceSettingsView: View {
+    private enum CleanupAction: String, Identifiable {
+        case logEntries
+        case historyRecords
+        case orphanedTorrentLogs
+
+        var id: String { rawValue }
+    }
+
     private struct SettingChoice: Identifiable {
         let value: String
         let label: String
@@ -34,6 +63,7 @@ struct TorrentCoreMacServiceSettingsView: View {
         case engine
         case completionCallback
         case categories
+        case cleanup
 
         var id: String { rawValue }
 
@@ -45,6 +75,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             case .engine: "Engine"
             case .completionCallback: "Completion Callback"
             case .categories: "Categories"
+            case .cleanup: "Cleanup"
             }
         }
 
@@ -56,6 +87,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             case .engine: "gearshape.2"
             case .completionCallback: "terminal"
             case .categories: "folder"
+            case .cleanup: "trash"
             }
         }
     }
@@ -72,7 +104,11 @@ struct TorrentCoreMacServiceSettingsView: View {
     @State private var runtimeDraft: TorrentCoreRuntimeSettingsUpdate?
     @State private var categoryDrafts: [String: TorrentCoreCategoryUpdate] = [:]
     @State private var isSaving = false
+    @State private var isPerformingCleanup = false
     @State private var isRestartConfirmationPresented = false
+    @State private var pendingCleanup: CleanupAction?
+    @State private var logCleanupDate = Date()
+    @State private var historyCleanupDate = Date()
     @State private var actionMessage: String?
     @State private var actionError: String?
 
@@ -103,18 +139,24 @@ struct TorrentCoreMacServiceSettingsView: View {
                 header
                 Divider()
 
-                TorrentCoreMacPhaseBanner(
-                    phase: selectedGroup == .categories
-                        ? session.categories.phase
-                        : session.runtimeSettings.phase,
-                    lastSuccessfulAt: selectedGroup == .categories
-                        ? session.categories.lastSuccessfulAt
-                        : session.runtimeSettings.lastSuccessfulAt
-                )
-                .padding()
+                if selectedGroup != .cleanup {
+                    TorrentCoreMacPhaseBanner(
+                        phase: selectedGroup == .categories
+                            ? session.categories.phase
+                            : session.runtimeSettings.phase,
+                        lastSuccessfulAt: selectedGroup == .categories
+                            ? session.categories.lastSuccessfulAt
+                            : session.runtimeSettings.lastSuccessfulAt
+                    )
+                    .padding()
+                }
 
                 if hasLoadedSelectedGroup {
-                    if selectedGroup == .categories {
+                    if selectedGroup == .cleanup {
+                        ScrollView {
+                            cleanupEditor
+                        }
+                    } else if selectedGroup == .categories {
                         ScrollView {
                             categoryEditor
                         }
@@ -140,6 +182,9 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         .onAppear {
             synchronizeDrafts(force: true)
+            if selectedGroup == .cleanup {
+                resetCleanupDates()
+            }
             registerLeaveActions(saveCurrentGroup, revertCurrentGroup)
             dirtyChanged(isDirty)
         }
@@ -157,6 +202,11 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         .onChange(of: isDirty) { _, value in
             dirtyChanged(value)
+        }
+        .onChange(of: selectedGroup) { _, value in
+            if value == .cleanup {
+                resetCleanupDates()
+            }
         }
         .confirmationDialog(
             "Save Changes Before Switching Groups?",
@@ -197,6 +247,25 @@ struct TorrentCoreMacServiceSettingsView: View {
                 "TorrentCore will be briefly unavailable. The app will wait up to about 30 seconds for it to return."
             )
         }
+        .confirmationDialog(
+            cleanupConfirmationTitle,
+            isPresented: Binding(
+                get: { pendingCleanup != nil },
+                set: { if !$0 { pendingCleanup = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(cleanupConfirmationButtonTitle, role: .destructive) {
+                if let pendingCleanup {
+                    performCleanup(pendingCleanup)
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                pendingCleanup = nil
+            }
+        } message: {
+            Text(cleanupConfirmationMessage)
+        }
         .alert(
             "Service Settings Action Failed",
             isPresented: Binding(
@@ -220,28 +289,34 @@ struct TorrentCoreMacServiceSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 } else {
-                    Text("Changes are saved to the connected TorrentCore installation.")
+                    Text(
+                        selectedGroup == .cleanup
+                            ? "Cleanup actions permanently delete eligible records from the connected TorrentCore installation."
+                            : "Changes are saved to the connected TorrentCore installation."
+                    )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer()
-            if isSaving || session.activeMutation != nil {
+            if isSaving || isPerformingCleanup || session.activeMutation != nil {
                 ProgressView()
                     .controlSize(.small)
             }
-            Button("Revert", action: revertCurrentGroup)
-                .disabled(!isDirty || isSaving)
-            Button("Save") {
-                Task { _ = await saveCurrentGroup() }
+            if selectedGroup != .cleanup {
+                Button("Revert", action: revertCurrentGroup)
+                    .disabled(!isDirty || isSaving)
+                Button("Save") {
+                    Task { _ = await saveCurrentGroup() }
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(
+                    !isDirty
+                        || !isCurrentDraftValid
+                        || isSaving
+                        || !session.connectionState.isConnected
+                )
             }
-            .keyboardShortcut("s", modifiers: .command)
-            .disabled(
-                !isDirty
-                    || !isCurrentDraftValid
-                    || isSaving
-                    || !session.connectionState.isConnected
-            )
             Button(role: .destructive) {
                 isRestartConfirmationPresented = true
             } label: {
@@ -250,6 +325,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             .disabled(
                 isDirty
                     || isSaving
+                    || isPerformingCleanup
                     || !session.connectionState.isConnected
                     || session.activeMutation != nil
             )
@@ -504,7 +580,99 @@ struct TorrentCoreMacServiceSettingsView: View {
             }
         case .categories:
             EmptyView()
+        case .cleanup:
+            EmptyView()
         }
+    }
+
+    @ViewBuilder
+    private var cleanupEditor: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(
+                        "Delete log entries strictly before Service-local 00:00:00 on the selected date. Logs associated with torrents still in the live torrent table are protected."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                    DatePicker(
+                        "Up To Date",
+                        selection: $logCleanupDate,
+                        displayedComponents: .date
+                    )
+                    .accessibilityIdentifier("serviceSettings.cleanup.logs.date")
+
+                    Button("Delete Log Entries", role: .destructive) {
+                        requestCleanup(.logEntries)
+                    }
+                    .accessibilityIdentifier("serviceSettings.cleanup.logs.delete")
+                    .disabled(cleanupActionsDisabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+            } label: {
+                TorrentCoreMacHelpLabel(
+                    "Log Entries",
+                    content: TorrentCoreHelpCatalog.Settings.cleanupLogEntries
+                )
+            }
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(
+                        "Delete history records whose Last Updated value is strictly before Service-local 00:00:00 on the selected date. Records associated with torrents still in the live torrent table are protected."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                    DatePicker(
+                        "Up To Date",
+                        selection: $historyCleanupDate,
+                        displayedComponents: .date
+                    )
+                    .accessibilityIdentifier("serviceSettings.cleanup.history.date")
+
+                    Button("Delete History Records", role: .destructive) {
+                        requestCleanup(.historyRecords)
+                    }
+                    .accessibilityIdentifier("serviceSettings.cleanup.history.delete")
+                    .disabled(cleanupActionsDisabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+            } label: {
+                TorrentCoreMacHelpLabel(
+                    "History Records",
+                    content: TorrentCoreHelpCatalog.Settings.cleanupHistoryRecords
+                )
+            }
+
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(
+                        "Delete torrent-scoped logs whose Torrent ID is no longer present in the live torrent table."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                    Button("Delete Orphan Logs", role: .destructive) {
+                        requestCleanup(.orphanedTorrentLogs)
+                    }
+                    .accessibilityIdentifier("serviceSettings.cleanup.orphanedLogs.delete")
+                    .disabled(cleanupActionsDisabled)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+            } label: {
+                TorrentCoreMacHelpLabel(
+                    "Orphaned Torrent Logs",
+                    content: TorrentCoreHelpCatalog.Settings.cleanupOrphanedTorrentLogs
+                )
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -633,7 +801,9 @@ struct TorrentCoreMacServiceSettingsView: View {
                     pendingGroup = value
                 } else {
                     selectedGroup = value
-                    synchronizeDrafts(force: true)
+                    if value != .cleanup {
+                        synchronizeDrafts(force: true)
+                    }
                 }
             }
         )
@@ -658,6 +828,9 @@ struct TorrentCoreMacServiceSettingsView: View {
     }
 
     private var isDirty: Bool {
+        if selectedGroup == .cleanup {
+            return false
+        }
         if selectedGroup == .categories {
             return !changedCategoryDrafts.isEmpty
         }
@@ -682,9 +855,14 @@ struct TorrentCoreMacServiceSettingsView: View {
     }
 
     private var hasLoadedSelectedGroup: Bool {
-        selectedGroup == .categories
-            ? session.categories.value != nil
-            : session.runtimeSettings.value != nil
+        switch selectedGroup {
+        case .cleanup:
+            session.connectionState.isConnected
+        case .categories:
+            session.categories.value != nil
+        default:
+            session.runtimeSettings.value != nil
+        }
     }
 
     private var unavailableMessage: String {
@@ -706,6 +884,9 @@ struct TorrentCoreMacServiceSettingsView: View {
     }
 
     private var isLoadingSelectedGroup: Bool {
+        if selectedGroup == .cleanup {
+            return false
+        }
         let phase = selectedGroup == .categories
             ? session.categories.phase
             : session.runtimeSettings.phase
@@ -742,6 +923,9 @@ struct TorrentCoreMacServiceSettingsView: View {
     }
 
     private var validationError: String? {
+        if selectedGroup == .cleanup {
+            return nil
+        }
         if selectedGroup == .categories {
             for category in session.categories.value ?? [] {
                 guard let key = category.key else {
@@ -967,6 +1151,9 @@ struct TorrentCoreMacServiceSettingsView: View {
 
     @MainActor
     private func saveCurrentGroup() async -> Bool {
+        if selectedGroup == .cleanup {
+            return true
+        }
         guard isDirty, isCurrentDraftValid, !isSaving else { return !isDirty }
         isSaving = true
         actionError = nil
@@ -1005,7 +1192,9 @@ struct TorrentCoreMacServiceSettingsView: View {
 
     @MainActor
     private func revertCurrentGroup() {
-        if selectedGroup == .categories {
+        if selectedGroup == .cleanup {
+            return
+        } else if selectedGroup == .categories {
             loadCategoryDrafts()
         } else if let settings = session.runtimeSettings.value {
             runtimeDraft = TorrentCoreRuntimeSettingsUpdate(settings: settings)
@@ -1018,9 +1207,125 @@ struct TorrentCoreMacServiceSettingsView: View {
         if let pendingGroup {
             selectedGroup = pendingGroup
             self.pendingGroup = nil
-            synchronizeDrafts(force: true)
+            if pendingGroup != .cleanup {
+                synchronizeDrafts(force: true)
+            }
         }
     }
+
+    private var cleanupActionsDisabled: Bool {
+        !session.connectionState.isConnected
+            || isPerformingCleanup
+            || session.activeMutation != nil
+    }
+
+    private var cleanupConfirmationTitle: String {
+        switch pendingCleanup {
+        case .logEntries:
+            "Delete Log Entries?"
+        case .historyRecords:
+            "Delete History Records?"
+        case .orphanedTorrentLogs:
+            "Delete Orphan Logs?"
+        case nil:
+            "Confirm Cleanup"
+        }
+    }
+
+    private var cleanupConfirmationButtonTitle: String {
+        switch pendingCleanup {
+        case .logEntries:
+            "Delete Log Entries"
+        case .historyRecords:
+            "Delete History Records"
+        case .orphanedTorrentLogs:
+            "Delete Orphan Logs"
+        case nil:
+            "Delete"
+        }
+    }
+
+    private var cleanupConfirmationMessage: String {
+        switch pendingCleanup {
+        case .logEntries:
+            "Permanently delete eligible log entries before \(Self.cleanupDateFormatter.string(from: logCleanupDate)) at Service-local 00:00:00? Logs for torrents still in the live torrent table are protected."
+        case .historyRecords:
+            "Permanently delete eligible history records last updated before \(Self.cleanupDateFormatter.string(from: historyCleanupDate)) at Service-local 00:00:00? History for torrents still in the live torrent table is protected."
+        case .orphanedTorrentLogs:
+            "Permanently delete torrent-scoped logs whose Torrent ID is no longer present in the live torrent table?"
+        case nil:
+            "The selected cleanup permanently deletes eligible records."
+        }
+    }
+
+    private func resetCleanupDates() {
+        let defaults = TorrentCoreMacCleanupDates.defaults()
+        logCleanupDate = defaults.logs
+        historyCleanupDate = defaults.history
+        pendingCleanup = nil
+        actionMessage = nil
+    }
+
+    private func requestCleanup(_ action: CleanupAction) {
+        if action == .logEntries, isFutureCleanupDate(logCleanupDate) {
+            actionError = "Log Entries Up To Date cannot be in the future."
+            return
+        }
+        if action == .historyRecords, isFutureCleanupDate(historyCleanupDate) {
+            actionError = "History Records Up To Date cannot be in the future."
+            return
+        }
+        pendingCleanup = action
+    }
+
+    private func isFutureCleanupDate(_ value: Date) -> Bool {
+        TorrentCoreMacCleanupDates.isFuture(value)
+    }
+
+    private func performCleanup(_ action: CleanupAction) {
+        pendingCleanup = nil
+        Task {
+            isPerformingCleanup = true
+            actionError = nil
+            actionMessage = nil
+            defer { isPerformingCleanup = false }
+
+            do {
+                switch action {
+                case .logEntries:
+                    let result = try await session.cleanupLogs(
+                        upToDate: Self.cleanupDateFormatter.string(from: logCleanupDate)
+                    )
+                    actionMessage = result.deletedRecordCount == 1
+                        ? "Deleted 1 log entry."
+                        : "Deleted \(result.deletedRecordCount) log entries."
+                case .historyRecords:
+                    let result = try await session.cleanupHistory(
+                        upToDate: Self.cleanupDateFormatter.string(from: historyCleanupDate)
+                    )
+                    actionMessage = result.deletedRecordCount == 1
+                        ? "Deleted 1 history record."
+                        : "Deleted \(result.deletedRecordCount) history records."
+                case .orphanedTorrentLogs:
+                    let result = try await session.deleteOrphanedLogs()
+                    actionMessage = result.deletedLogEntryCount == 1
+                        ? "Deleted 1 orphaned torrent log entry."
+                        : "Deleted \(result.deletedLogEntryCount) orphaned torrent log entries."
+                }
+            } catch {
+                actionError = TorrentCoreMacErrorPresenter.message(error)
+            }
+        }
+    }
+
+    private static let cleanupDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 
     private func restartService() {
         Task {

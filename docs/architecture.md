@@ -72,6 +72,12 @@ History and log filter choices come from dedicated database-backed filter-option
 values independently of the current grid query and row limit. Operator clients load these choices when a grid opens;
 normal grid filtering and periodic row refreshes do not reload them.
 
+The maintenance boundary exposes explicit date-based log and history cleanup operations. Each selected date is
+interpreted as Service-local midnight and used as an exclusive cutoff; future dates are rejected. Both operations
+protect rows associated with torrent ids still present in the live `torrents` table. Log cleanup can also remove old
+service-level rows, while history eligibility is based on the row's last-updated timestamp. Successful operations
+write a service audit log after deletion.
+
 The WebUI stays a thin client over service contracts. It must not:
 
 - call MonoTorrent directly

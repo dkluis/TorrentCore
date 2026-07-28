@@ -22,6 +22,8 @@ public enum TorrentCoreOperation: String, Sendable {
     case resetMetadata
     case retryCompletionCallback
     case deleteOrphanedLogs
+    case cleanupLogs
+    case cleanupHistory
     case updateRuntimeSettings
     case updateCategory
     case restartService
@@ -36,6 +38,8 @@ public enum TorrentCoreOperation: String, Sendable {
              .resetMetadata,
              .retryCompletionCallback,
              .deleteOrphanedLogs,
+             .cleanupLogs,
+             .cleanupHistory,
              .updateRuntimeSettings,
              .updateCategory,
              .restartService:

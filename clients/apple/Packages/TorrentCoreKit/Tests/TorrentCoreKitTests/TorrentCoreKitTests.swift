@@ -15,7 +15,7 @@ func sharedTargetsExposeTheSameProductIdentity() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 35)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 38)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count

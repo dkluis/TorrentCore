@@ -231,6 +231,9 @@ public sealed class TorrentCompletionCallbackProcessorTests
 
         public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
             => Task.FromResult(0);
+
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc,
+            CancellationToken cancellationToken) => Task.FromResult(0);
     }
 
     private sealed class ThrowingActivityLogService(Exception writeFailure) : IActivityLogService
@@ -253,5 +256,8 @@ public sealed class TorrentCompletionCallbackProcessorTests
 
         public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken)
             => Task.FromResult(0);
+
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc,
+            CancellationToken cancellationToken) => Task.FromResult(0);
     }
 }

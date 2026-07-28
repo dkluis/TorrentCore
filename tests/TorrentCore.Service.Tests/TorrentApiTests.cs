@@ -13,6 +13,7 @@ using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
+using TorrentCore.Contracts.Maintenance;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Core.Torrents;
@@ -2963,6 +2964,73 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MaintenanceCleanup_AcceptsToday_AndWritesAuditLogs()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        var localMidnight = DateTime.SpecifyKind(
+            today.ToDateTime(TimeOnly.MinValue),
+            DateTimeKind.Unspecified
+        );
+        var expectedCutoffUtc = new DateTimeOffset(
+            TimeZoneInfo.ConvertTimeToUtc(localMidnight, TimeZoneInfo.Local),
+            TimeSpan.Zero
+        );
+
+        var logResponse = await httpClient.PostAsJsonAsync(
+            "api/maintenance/logs/cleanup",
+            new CleanupByDateRequest { UpToDate = today }
+        );
+        var historyResponse = await httpClient.PostAsJsonAsync(
+            "api/maintenance/history/cleanup",
+            new CleanupByDateRequest { UpToDate = today }
+        );
+
+        logResponse.EnsureSuccessStatusCode();
+        historyResponse.EnsureSuccessStatusCode();
+
+        var logResult = await logResponse.Content.ReadFromJsonAsync<CleanupByDateResultDto>();
+        var historyResult = await historyResponse.Content.ReadFromJsonAsync<CleanupByDateResultDto>();
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=100");
+
+        Assert.NotNull(logResult);
+        Assert.NotNull(historyResult);
+        Assert.Equal(today, logResult.UpToDate);
+        Assert.Equal(today, historyResult.UpToDate);
+        Assert.Equal(expectedCutoffUtc, logResult.CutoffUtc);
+        Assert.Equal(expectedCutoffUtc, historyResult.CutoffUtc);
+        Assert.Equal(0, logResult.DeletedRecordCount);
+        Assert.Equal(0, historyResult.DeletedRecordCount);
+        Assert.NotNull(logs);
+        Assert.Contains(logs, log => log.EventType == "service.logs.cleanup_completed");
+        Assert.Contains(logs, log => log.EventType == "service.history.cleanup_completed");
+    }
+
+    [Theory]
+    [InlineData("api/maintenance/logs/cleanup")]
+    [InlineData("api/maintenance/history/cleanup")]
+    public async Task MaintenanceCleanup_RejectsFutureDate(string endpoint)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PostAsJsonAsync(
+            endpoint,
+            new CleanupByDateRequest
+            {
+                UpToDate = DateOnly.FromDateTime(DateTime.Now).AddDays(1),
+            }
+        );
+        var problem = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Equal("invalid_cleanup_date", problem.Code);
+        Assert.Equal(nameof(CleanupByDateRequest.UpToDate), problem.Target);
+    }
+
+    [Fact]
     public async Task FakeRuntime_UsesSingleActiveDownloadQueue_ByDefault()
     {
         await using var factory = CreateFactory(
@@ -3704,6 +3772,12 @@ public sealed class TorrentApiTests
         {
             return inner.DeleteOrphanedTorrentLogsAsync(cancellationToken);
         }
+
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc,
+            CancellationToken cancellationToken)
+        {
+            return inner.DeleteInactiveBeforeAsync(cutoffUtc, cancellationToken);
+        }
     }
 
     private sealed class FailingRestartScheduler : ILaunchAgentServiceRestartScheduler
@@ -3724,6 +3798,8 @@ public sealed class TorrentApiTests
             => Task.FromResult(new ActivityLogFilterOptions { Categories = [], EventTypes = [] });
         public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken) => Task.FromResult(0);
         public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken)
+            => Task.FromResult(0);
     }
 
     private sealed class ThrowingActivityLogService(Exception? getRecentFailure = null, Exception? deleteOrphanedFailure = null)
@@ -3749,6 +3825,12 @@ public sealed class TorrentApiTests
             return deleteOrphanedFailure is null
                 ? Task.FromResult(0)
                 : Task.FromException<int>(deleteOrphanedFailure);
+        }
+
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
         }
     }
 

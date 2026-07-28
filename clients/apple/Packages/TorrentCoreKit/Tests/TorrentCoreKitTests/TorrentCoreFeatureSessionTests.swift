@@ -338,6 +338,10 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     session.setContext(.logs(.init()))
     await session.refresh()
     _ = try await session.deleteOrphanedLogs()
+    let logCleanup = try await session.cleanupLogs(upToDate: "2026-07-21")
+    let historyCleanup = try await session.cleanupHistory(upToDate: "2026-06-28")
+    #expect(logCleanup.deletedRecordCount == 3)
+    #expect(historyCleanup.deletedRecordCount == 2)
 
     session.setContext(.serviceSettings)
     await session.refresh()
@@ -360,6 +364,8 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     #expect(calls.resetMetadataSession == 1)
     #expect(calls.retryCompletionCallback == 1)
     #expect(calls.deleteOrphanedLogs == 1)
+    #expect(calls.cleanupLogs == 1)
+    #expect(calls.cleanupHistory == 1)
     #expect(calls.updateRuntimeSettings == 1)
     #expect(calls.updateCategory == 1)
     #expect(calls.restartService == 1)
@@ -868,6 +874,8 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         var resetMetadataSession = 0
         var retryCompletionCallback = 0
         var deleteOrphanedLogs = 0
+        var cleanupLogs = 0
+        var cleanupHistory = 0
         var updateRuntimeSettings = 0
         var updateCategory = 0
         var restartService = 0
@@ -1102,6 +1110,26 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         calls.deleteOrphanedLogs += 1
         try checkConnection()
         return .init(deletedLogEntryCount: 1)
+    }
+
+    func cleanupLogs(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        calls.cleanupLogs += 1
+        try checkConnection()
+        return .init(
+            upToDate: upToDate,
+            cutoffUTC: Date(),
+            deletedRecordCount: 3
+        )
+    }
+
+    func cleanupHistory(upToDate: String) async throws -> TorrentCoreCleanupResult {
+        calls.cleanupHistory += 1
+        try checkConnection()
+        return .init(
+            upToDate: upToDate,
+            cutoffUTC: Date(),
+            deletedRecordCount: 2
+        )
     }
 
     func updateRuntimeSettings(

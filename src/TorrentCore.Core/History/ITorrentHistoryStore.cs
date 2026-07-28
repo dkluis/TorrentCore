@@ -9,4 +9,5 @@ public interface ITorrentHistoryStore
     Task<bool>            TryInsertAsync(TorrentHistoryRecord record, CancellationToken cancellationToken);
     Task                  InsertAsync(TorrentHistoryRecord record, CancellationToken cancellationToken);
     Task                  UpdateAsync(TorrentHistoryRecord record, CancellationToken cancellationToken);
+    Task<int>             DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken);
 }

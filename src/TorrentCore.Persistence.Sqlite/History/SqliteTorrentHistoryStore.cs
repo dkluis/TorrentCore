@@ -383,6 +383,31 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc,
+        CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              DELETE FROM torrent_history
+                              WHERE last_updated_at_utc < $cutoff_utc
+                                AND NOT EXISTS (
+                                    SELECT 1
+                                    FROM torrents
+                                    WHERE torrents.torrent_id = torrent_history.torrent_id
+                                );
+                              """;
+        command.Parameters.AddWithValue(
+            "$cutoff_utc", cutoffUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)
+        );
+
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static async Task<TorrentHistoryRecord?> ReadSingleAsync(SqliteCommand command,
         CancellationToken                                                                    cancellationToken)
     {

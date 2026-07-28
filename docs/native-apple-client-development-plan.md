@@ -431,6 +431,11 @@ Implementation stages:
   `d0ee05c1-d3a0-4434-9314-94ba3f841cd5`; its copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and
   checksum verification. Separate-Mac installation-over-0.3.0 and saved-connection startup acceptance on macOS 27
   remain pending.
+  The next main-branch refinement adds a final Service Settings Cleanup group backed by additive Service maintenance
+  contracts. Log cleanup defaults to seven days, history cleanup defaults to 30 days and uses Last Updated, and both
+  use an exclusive Service-local midnight cutoff while protecting rows whose torrent id is still live. The group also
+  exposes the existing orphan-log cleanup. Each action confirms independently, reports its deleted count, and writes
+  an audit log; future dates are rejected. WebUI presentation remains unchanged.
 - **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
   worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
   bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations

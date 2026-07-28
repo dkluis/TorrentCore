@@ -189,6 +189,21 @@ public enum TorrentCoreHelpCatalog {
             "Controls category order in operator-facing lists.",
             "Lower values appear earlier. This does not change the stable category key or routing behavior."
         )
+        public static let cleanupLogEntries = help(
+            "Log Entries",
+            "Deletes eligible log entries older than the selected date.",
+            "The Service uses local midnight at the start of the selected date as an exclusive cutoff. Logs tied to torrent ids still present in the live torrent table are protected."
+        )
+        public static let cleanupHistoryRecords = help(
+            "History Records",
+            "Deletes eligible history records older than the selected date.",
+            "Eligibility uses Last Updated and the Service's local midnight at the start of the selected date. History tied to torrent ids still present in the live torrent table is protected."
+        )
+        public static let cleanupOrphanedTorrentLogs = help(
+            "Orphaned Torrent Logs",
+            "Deletes torrent-scoped logs whose torrent id is no longer live.",
+            "This is the same guarded orphan-log maintenance operation available on the Logs screen. Service-level logs and logs for still-tracked torrents are kept."
+        )
 
         public static let all: [TorrentCoreHelpContent] = [
             seedingStopMode, seedingStopRatio, seedingStopMinutes,
@@ -207,6 +222,7 @@ public enum TorrentCoreHelpCatalog {
             completionCallbackAPIBaseURLOverride, completionCallbackAPIKeyOverride,
             categoryEnabled, categoryInvokeCompletionCallback, categoryDisplayName,
             categoryCallbackLabel, categoryDownloadRootPath, categorySortOrder,
+            cleanupLogEntries, cleanupHistoryRecords, cleanupOrphanedTorrentLogs,
         ]
     }
 
