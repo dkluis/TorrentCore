@@ -9,6 +9,7 @@ public sealed class TorrentCoreServiceOptions
     public int EngineDhtPort { get; init; } = 55_124;
     public bool EngineAllowPortForwarding { get; init; } = true;
     public bool EngineAllowLocalPeerDiscovery { get; init; } = true;
+    public bool EngineAllowPeerExchange { get; init; }
     public int EngineMaximumConnections { get; init; } = 150;
     public int EngineMaximumHalfOpenConnections { get; init; } = 8;
     public int EngineMaximumDownloadRateBytesPerSecond { get; init; } = 0;

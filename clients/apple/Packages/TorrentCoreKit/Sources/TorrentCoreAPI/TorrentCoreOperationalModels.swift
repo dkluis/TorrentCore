@@ -240,6 +240,7 @@ public struct TorrentCoreTracker: Codable, Hashable, Sendable, Identifiable {
 }
 
 public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
+    public var appliedEngineAllowPeerExchange: Bool
     public var appliedEngineEncryptionMode: String?
     public var appliedEngineMaximumConnections: Int
     public var appliedEngineMaximumDownloadRateBytesPerSecond: Int
@@ -261,6 +262,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var deleteLogsForCompletedTorrents: Bool
     public var engineConnectionFailureLogBurstLimit: Int
     public var engineConnectionFailureLogWindowSeconds: Int
+    public var engineAllowPeerExchange: Bool
     public var engineEncryptionMode: String?
     public var engineMaximumConnections: Int
     public var engineMaximumDownloadRateBytesPerSecond: Int
@@ -300,6 +302,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var deleteLogsForCompletedTorrents: Bool
     public var engineConnectionFailureLogBurstLimit: Int
     public var engineConnectionFailureLogWindowSeconds: Int
+    public var engineAllowPeerExchange: Bool
     public var engineEncryptionMode: String
     public var engineMaximumConnections: Int
     public var engineMaximumDownloadRateBytesPerSecond: Int
@@ -314,6 +317,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var seedingStopRatio: Double
 
     public init(settings: TorrentCoreRuntimeSettings) {
+        engineAllowPeerExchange = settings.engineAllowPeerExchange
         coldDownloadAbandonAfterHours = settings.coldDownloadAbandonAfterHours
         coldDownloadRecoveryIntervalMinutes = settings.coldDownloadRecoveryIntervalMinutes
         coldDownloadRecoveryThresholdMinutes = settings.coldDownloadRecoveryThresholdMinutes

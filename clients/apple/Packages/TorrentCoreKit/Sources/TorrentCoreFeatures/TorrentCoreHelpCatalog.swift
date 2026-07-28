@@ -89,6 +89,11 @@ public enum TorrentCoreHelpCatalog {
             "Retained for settings compatibility.",
             "Connection failures now appear in aggregate minute summaries, so this value no longer affects persistent logging."
         )
+        public static let engineAllowPeerExchange = help(
+            "Allow Peer Exchange (PEX)",
+            "Allows connected peers to supply additional peers for the same swarm.",
+            "PEX supplements trackers, DHT, and local peer discovery. It is disabled by default because MonoTorrent 3.0.2 PEX processing caused the observed unhandled Queue exception. A service restart is required."
+        )
         public static let engineMaximumConnections = help(
             "Saved Max Connections",
             "Sets the host-wide cap on established peer connections.",
@@ -193,7 +198,7 @@ public enum TorrentCoreHelpCatalog {
             metadataRefreshRestartDelaySeconds, coldDownloadRecoveryThresholdMinutes,
             coldDownloadRecoveryIntervalMinutes, coldDownloadAbandonAfterHours,
             engineConnectionFailureLogBurstLimit, engineConnectionFailureLogWindowSeconds,
-            engineMaximumConnections, engineEncryptionMode,
+            engineAllowPeerExchange, engineMaximumConnections, engineEncryptionMode,
             engineMaximumHalfOpenConnections, engineMaximumDownloadRateBytesPerSecond,
             engineMaximumUploadRateBytesPerSecond, completionCallbackEnabled,
             completionCallbackCommandPath, completionCallbackArguments,

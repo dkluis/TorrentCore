@@ -348,8 +348,8 @@
 
                                 <div class="dashboard-panel-header">
                                     <div>
-                                        <h2>Engine Throttles</h2>
-                                        <p class="dashboard-panel-copy">Saved engine host limits. These values apply after TorrentCore.Service restarts.</p>
+                                        <h2>Engine &amp; Peer Discovery</h2>
+                                        <p class="dashboard-panel-copy">Saved engine host and peer-discovery settings. These values apply after TorrentCore.Service restarts.</p>
                                     </div>
                                     <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
                                         <span class="@GetGroupStateClass(SettingsGroupKey.Engine)">@GetGroupStateText(SettingsGroupKey.Engine)</span>
@@ -371,6 +371,10 @@
                                 </div>
 
                                 <div class="settings-readonly-grid">
+                                    <div class="settings-readonly-item">
+                                        <span class="settings-readonly-label">Applied peer exchange</span>
+                                        <strong>@(_runtimeSnapshot.AppliedEngineAllowPeerExchange ? "Enabled" : "Disabled")</strong>
+                                    </div>
                                     <div class="settings-readonly-item">
                                         <span class="settings-readonly-label">Applied encryption</span>
                                         <strong>@_runtimeSnapshot.AppliedEngineEncryptionMode</strong>
@@ -394,6 +398,15 @@
                                 </div>
 
                                 <div class="settings-field-grid">
+                                    <div class="settings-field-block settings-field-block--toggle">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineAllowPeerExchange" />
+                                        <MudCheckBox T="bool"
+                                                     Value="_engine.EngineAllowPeerExchange"
+                                                     ValueChanged="value => UpdateEngine(value, (group, next) => group.EngineAllowPeerExchange = next)"
+                                                     Dense="true"
+                                                     Color="Color.Primary" />
+                                    </div>
+
                                     <div class="settings-field-block">
                                         <SettingHelpTrigger Content="@SettingsHelpCatalog.EngineEncryptionMode" />
                                         <MudSelect T="string"
@@ -459,7 +472,7 @@
                                 </div>
 
                                 <p class="dashboard-panel-copy">
-                                    Use <strong>0</strong> for unlimited download or upload rate. Restart-required values are shown separately from the engine's currently applied limits.
+                                    Peer exchange supplements tracker and DHT discovery but is disabled by default because of the observed MonoTorrent 3.0.2 failure. Use <strong>0</strong> for unlimited download or upload rate. Restart-required values are shown separately from the engine's currently applied settings.
                                 </p>
                             </div>
                         </OperatorCard>
@@ -838,7 +851,7 @@
 
         Feedback.Success(
             key == SettingsGroupKey.Engine && result.Value.EngineSettingsRequireRestart ?
-                "Engine throttles saved. Restart TorrentCore.Service to apply them." :
+                "Engine settings saved. Restart TorrentCore.Service to apply them." :
                 $"{GetGroupTitle(key)} saved."
         );
     }
@@ -1057,6 +1070,7 @@
 
         _engine.EngineMaximumConnections = _runtimeSnapshot.EngineMaximumConnections;
         _engine.EngineMaximumHalfOpenConnections = _runtimeSnapshot.EngineMaximumHalfOpenConnections;
+        _engine.EngineAllowPeerExchange = _runtimeSnapshot.EngineAllowPeerExchange;
         _engine.EngineEncryptionMode = _runtimeSnapshot.EngineEncryptionMode;
         _engine.EngineMaximumDownloadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond;
         _engine.EngineMaximumUploadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond;
@@ -1091,6 +1105,7 @@
             DeleteLogsForCompletedTorrents = _lifecycle.DeleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit = _queue.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = _queue.EngineConnectionFailureLogWindowSeconds,
+            EngineAllowPeerExchange = _engine.EngineAllowPeerExchange,
             EngineEncryptionMode = _engine.EngineEncryptionMode,
             EngineMaximumConnections = _engine.EngineMaximumConnections,
             EngineMaximumHalfOpenConnections = _engine.EngineMaximumHalfOpenConnections,
@@ -1209,7 +1224,8 @@
     private bool IsEngineDirty()
     {
         return _runtimeSnapshot is not null &&
-               (_engine.EngineEncryptionMode != _runtimeSnapshot.EngineEncryptionMode ||
+               (_engine.EngineAllowPeerExchange != _runtimeSnapshot.EngineAllowPeerExchange ||
+                _engine.EngineEncryptionMode != _runtimeSnapshot.EngineEncryptionMode ||
                 _engine.EngineMaximumConnections != _runtimeSnapshot.EngineMaximumConnections ||
                 _engine.EngineMaximumHalfOpenConnections != _runtimeSnapshot.EngineMaximumHalfOpenConnections ||
                 _engine.EngineMaximumDownloadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond ||
@@ -1335,6 +1351,7 @@
 
     private sealed class EngineThrottleSettingsGroup
     {
+        public bool EngineAllowPeerExchange { get; set; }
         public string EngineEncryptionMode { get; set; } = "EncryptedPreferred";
         public int EngineMaximumConnections { get; set; } = 150;
         public int EngineMaximumHalfOpenConnections { get; set; } = 8;

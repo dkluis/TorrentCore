@@ -480,7 +480,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             "engine_add_magnet",
             null,
             string.IsNullOrWhiteSpace(magnet.Name) ? null : magnet.Name,
-            async () => await _engine!.AddAsync(magnet, categorySelection.DownloadRootPath)
+            async () => await _engine!.AddAsync(
+                magnet,
+                categorySelection.DownloadRootPath,
+                CreateTorrentSettings(appliedEngineSettingsState.EngineAllowPeerExchange)
+            )
         );
         var torrentId = Guid.NewGuid();
         RegisterManager(torrentId, manager);
@@ -784,7 +788,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 Array.Empty<string>();
         var downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
 
-        await RemoveManagedTorrentAsync(torrentId, manager, request.DeleteData, cancellationToken);
+        await RemoveManagedTorrentAsync(torrentId, manager, cancellationToken);
         await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
         await torrentHistoryService.MarkRemovedAsync(
             snapshot,
@@ -871,8 +875,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         paths.Add(Path.GetFullPath(path));
     }
 
-    private async Task RemoveManagedTorrentAsync(Guid torrentId, TorrentManager manager, bool deleteData,
-        CancellationToken                              cancellationToken)
+    private async Task RemoveManagedTorrentAsync(Guid torrentId, TorrentManager manager,
+        CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -884,9 +888,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 "engine_remove_manager",
                 torrentId,
                 manager.Name,
-                async () => await _engine!.RemoveAsync(
-                    manager, deleteData ? RemoveMode.CacheDataAndDownloadedData : RemoveMode.CacheDataOnly
-                )
+                async () => await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly)
             );
 
             _managers.Remove(torrentId);
@@ -954,6 +956,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
             _engine = new ClientEngine(engineSettingsBuilder.ToSettings());
             appliedEngineSettingsState.Set(
+                runtimeSettings.EngineAllowPeerExchange,
                 runtimeSettings.EngineEncryptionMode, runtimeSettings.EngineMaximumConnections,
                 runtimeSettings.EngineMaximumHalfOpenConnections,
                 runtimeSettings.EngineMaximumDownloadRateBytesPerSecond,
@@ -981,6 +984,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                             _serviceOptions.EngineDhtPort,
                             _serviceOptions.EngineAllowPortForwarding,
                             _serviceOptions.EngineAllowLocalPeerDiscovery,
+                            runtimeSettings.EngineAllowPeerExchange,
                             runtimeSettings.EngineEncryptionMode,
                             AllowedEncryption = engineSettingsBuilder.AllowedEncryption.Select(item => item.ToString()).ToArray(),
                             ListenEndPoints = engineSettingsBuilder.ListenEndPoints.ToDictionary(
@@ -1022,7 +1026,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             "engine_add_recovered_magnet",
             snapshot.TorrentId,
             snapshot.Name,
-            async () => await _engine!.AddAsync(magnet, recoveryDownloadRootPath)
+            async () => await _engine!.AddAsync(
+                magnet,
+                recoveryDownloadRootPath,
+                CreateTorrentSettings(appliedEngineSettingsState.EngineAllowPeerExchange)
+            )
         );
         RegisterManager(snapshot.TorrentId, manager);
         _managers[snapshot.TorrentId] = manager;
@@ -2487,7 +2495,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 "engine_recreate_metadata_session",
                 snapshot.TorrentId,
                 snapshot.Name,
-                async () => await _engine!.AddAsync(magnet, downloadRootPath)
+                async () => await _engine!.AddAsync(
+                    magnet,
+                    downloadRootPath,
+                    CreateTorrentSettings(appliedEngineSettingsState.EngineAllowPeerExchange)
+                )
             );
             RegisterManager(snapshot.TorrentId, recreatedManager);
             _managers[snapshot.TorrentId] = recreatedManager;
@@ -2503,6 +2515,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         _metadataRecoveryStates.GetOrAdd(torrentId, _ => new TorrentMetadataRecoveryState())
                                .NoteDiscoveryActivity(now);
+    }
+
+    internal static TorrentSettings CreateTorrentSettings(bool allowPeerExchange)
+    {
+        return new TorrentSettingsBuilder
+        {
+            AllowPeerExchange = allowPeerExchange,
+        }.ToSettings();
     }
 
     private void ResetMetadataRecoveryState(Guid torrentId)

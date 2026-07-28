@@ -20,6 +20,7 @@ using TorrentCore.Persistence.Sqlite.Configuration;
 using TorrentCore.Persistence.Sqlite.Logging;
 using TorrentCore.Service.Application;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
 
 namespace TorrentCore.Service.Tests;
@@ -36,10 +37,12 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal(ServiceApiContract.CurrentVersion, hostStatus.ApiVersion);
+        Assert.Equal("0.3.2", hostStatus.ServiceVersion);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);
         Assert.Equal(55_124, hostStatus.EngineDhtPort);
+        Assert.False(hostStatus.EngineAllowPeerExchange);
         Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), hostStatus.EngineEncryptionMode);
         Assert.Equal(150, hostStatus.EngineMaximumConnections);
         Assert.Equal(8, hostStatus.EngineMaximumHalfOpenConnections);
@@ -434,6 +437,7 @@ public sealed class TorrentApiTests
         Assert.False(settings.DeleteLogsForCompletedTorrents);
         Assert.Equal(5, settings.EngineConnectionFailureLogBurstLimit);
         Assert.Equal(60, settings.EngineConnectionFailureLogWindowSeconds);
+        Assert.False(settings.EngineAllowPeerExchange);
         Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), settings.EngineEncryptionMode);
         Assert.Equal(150, settings.EngineMaximumConnections);
         Assert.Equal(8, settings.EngineMaximumHalfOpenConnections);
@@ -456,6 +460,7 @@ public sealed class TorrentApiTests
         Assert.Null(settings.CompletionCallbackApiKeyOverride);
         Assert.Equal(150, settings.AppliedEngineMaximumConnections);
         Assert.Equal(8, settings.AppliedEngineMaximumHalfOpenConnections);
+        Assert.False(settings.AppliedEngineAllowPeerExchange);
         Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), settings.AppliedEngineEncryptionMode);
         Assert.Equal(0, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
         Assert.Equal(0, settings.AppliedEngineMaximumUploadRateBytesPerSecond);
@@ -482,10 +487,11 @@ public sealed class TorrentApiTests
             CompletedTorrentCleanupMinutes = 15,
             DeleteLogsForCompletedTorrents = true,
             EngineConnectionFailureLogBurstLimit = 2,
-                EngineConnectionFailureLogWindowSeconds = 180,
-                EngineEncryptionMode = TorrentEncryptionMode.EncryptedRequired.ToString(),
-                EngineMaximumConnections = 70,
-                EngineMaximumHalfOpenConnections = 6,
+            EngineConnectionFailureLogWindowSeconds = 180,
+            EngineAllowPeerExchange = true,
+            EngineEncryptionMode = TorrentEncryptionMode.EncryptedRequired.ToString(),
+            EngineMaximumConnections = 70,
+            EngineMaximumHalfOpenConnections = 6,
                 EngineMaximumDownloadRateBytesPerSecond = 4_000_000,
                 EngineMaximumUploadRateBytesPerSecond = 1_500_000,
                 MaxActiveMetadataResolutions = 3,
@@ -519,6 +525,8 @@ public sealed class TorrentApiTests
             Assert.True(settings.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+            Assert.True(settings.EngineAllowPeerExchange);
+            Assert.False(settings.AppliedEngineAllowPeerExchange);
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.EngineMaximumConnections);
             Assert.Equal(6, settings.EngineMaximumHalfOpenConnections);
@@ -551,6 +559,7 @@ public sealed class TorrentApiTests
             Assert.True(hostStatus.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+            Assert.False(hostStatus.EngineAllowPeerExchange);
             Assert.Equal(TorrentEncryptionMode.EncryptedPreferred.ToString(), hostStatus.EngineEncryptionMode);
             Assert.Equal(150, hostStatus.EngineMaximumConnections);
             Assert.Equal(8, hostStatus.EngineMaximumHalfOpenConnections);
@@ -578,6 +587,7 @@ public sealed class TorrentApiTests
             Assert.True(settings.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, settings.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, settings.EngineConnectionFailureLogWindowSeconds);
+            Assert.True(settings.EngineAllowPeerExchange);
             Assert.Equal(70, settings.EngineMaximumConnections);
             Assert.Equal(6, settings.EngineMaximumHalfOpenConnections);
             Assert.Equal(4_000_000, settings.EngineMaximumDownloadRateBytesPerSecond);
@@ -600,6 +610,7 @@ public sealed class TorrentApiTests
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
             Assert.Equal(6, settings.AppliedEngineMaximumHalfOpenConnections);
+            Assert.True(settings.AppliedEngineAllowPeerExchange);
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.AppliedEngineEncryptionMode);
             Assert.Equal(4_000_000, settings.AppliedEngineMaximumDownloadRateBytesPerSecond);
             Assert.Equal(1_500_000, settings.AppliedEngineMaximumUploadRateBytesPerSecond);
@@ -611,6 +622,7 @@ public sealed class TorrentApiTests
             Assert.True(hostStatus.DeleteLogsForCompletedTorrents);
             Assert.Equal(2, hostStatus.EngineConnectionFailureLogBurstLimit);
             Assert.Equal(180, hostStatus.EngineConnectionFailureLogWindowSeconds);
+            Assert.True(hostStatus.EngineAllowPeerExchange);
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), hostStatus.EngineEncryptionMode);
             Assert.Equal(70, hostStatus.EngineMaximumConnections);
             Assert.Equal(6, hostStatus.EngineMaximumHalfOpenConnections);
@@ -622,6 +634,31 @@ public sealed class TorrentApiTests
             Assert.NotNull(logs);
             Assert.Contains(logs, log => log.EventType == "service.runtime_settings.updated");
         }
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeSettings_OmittedPeerExchange_PreservesCurrentValue()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var enableResponse = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(engineAllowPeerExchange: true)
+        );
+        enableResponse.EnsureSuccessStatusCode();
+
+        var legacyResponse = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(engineAllowPeerExchange: null)
+        );
+        legacyResponse.EnsureSuccessStatusCode();
+
+        var settings = await legacyResponse.Content.ReadFromJsonAsync<RuntimeSettingsDto>();
+        Assert.NotNull(settings);
+        Assert.True(settings.EngineAllowPeerExchange);
+        Assert.False(settings.AppliedEngineAllowPeerExchange);
+        Assert.True(settings.EngineSettingsRequireRestart);
     }
 
     [Theory]
@@ -912,6 +949,16 @@ public sealed class TorrentApiTests
         Assert.True(hostStatus.StartupRecoveryCompleted);
         Assert.Equal("9999999999999999999999999999999999999999", torrent.InfoHash);
         Assert.DoesNotContain(torrent.State, new[] { TorrentState.Error, TorrentState.Removed });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MonoTorrentTorrentSettings_RespectPeerExchangePreference(bool allowPeerExchange)
+    {
+        var settings = MonoTorrentEngineAdapter.CreateTorrentSettings(allowPeerExchange);
+
+        Assert.Equal(allowPeerExchange, settings.AllowPeerExchange);
     }
 
     [Fact]
@@ -3502,7 +3549,8 @@ public sealed class TorrentApiTests
     private static UpdateRuntimeSettingsRequest CreateDefaultRuntimeSettingsUpdateRequest(
         int coldDownloadRecoveryThresholdMinutes = 240,
         int coldDownloadRecoveryIntervalMinutes = 60,
-        int coldDownloadAbandonAfterHours = 72)
+        int coldDownloadAbandonAfterHours = 72,
+        bool? engineAllowPeerExchange = false)
     {
         return new UpdateRuntimeSettingsRequest
         {
@@ -3514,6 +3562,7 @@ public sealed class TorrentApiTests
             DeleteLogsForCompletedTorrents = false,
             EngineConnectionFailureLogBurstLimit = 5,
             EngineConnectionFailureLogWindowSeconds = 60,
+            EngineAllowPeerExchange = engineAllowPeerExchange,
             EngineEncryptionMode = TorrentEncryptionMode.EncryptedPreferred.ToString(),
             EngineMaximumConnections = 150,
             EngineMaximumHalfOpenConnections = 8,
@@ -3548,6 +3597,7 @@ public sealed class TorrentApiTests
         var store = new SqliteRuntimeSettingsStore(Path.Combine(blockedParentPath, "torrentcore.db"));
         var appliedEngineSettingsState = new AppliedEngineSettingsState();
         appliedEngineSettingsState.Set(
+            false,
             TorrentEncryptionMode.EncryptedPreferred,
             150,
             8,

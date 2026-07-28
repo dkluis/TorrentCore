@@ -80,6 +80,7 @@ public struct TorrentCoreHostStatus: Codable, Hashable, Sendable {
     public var engineDHTPort: Int
     public var enginePortForwardingEnabled: Bool
     public var engineLocalPeerDiscoveryEnabled: Bool
+    public var engineAllowPeerExchange: Bool
     public var engineEncryptionMode: String?
     public var engineMaximumConnections: Int
     public var engineMaximumHalfOpenConnections: Int

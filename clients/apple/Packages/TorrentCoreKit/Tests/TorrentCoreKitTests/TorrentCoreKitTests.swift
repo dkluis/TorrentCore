@@ -15,7 +15,7 @@ func sharedTargetsExposeTheSameProductIdentity() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 34)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 35)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
@@ -696,6 +696,7 @@ private enum FixturePayloads {
       "engineDhtPort": 55123,
       "enginePortForwardingEnabled": true,
       "engineLocalPeerDiscoveryEnabled": true,
+      "engineAllowPeerExchange": false,
       "engineEncryptionMode": "EncryptedPreferred",
       "engineMaximumConnections": 200,
       "engineMaximumHalfOpenConnections": 20,

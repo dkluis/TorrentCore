@@ -10,6 +10,7 @@ public static class RuntimeSettingsKeys
     public const string DeleteLogsForCompletedTorrents          = "delete_logs_for_completed_torrents";
     public const string EngineConnectionFailureLogBurstLimit    = "engine_connection_failure_log_burst_limit";
     public const string EngineConnectionFailureLogWindowSeconds = "engine_connection_failure_log_window_seconds";
+    public const string EngineAllowPeerExchange                  = "engine_allow_peer_exchange";
     public const string EngineEncryptionMode                    = "engine_encryption_mode";
     public const string EngineMaximumConnections                = "engine_maximum_connections";
     public const string EngineMaximumHalfOpenConnections        = "engine_maximum_half_open_connections";

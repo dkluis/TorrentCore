@@ -94,6 +94,12 @@ public static class SettingsHelpCatalog
         "Connection failures now appear only in aggregate minute summaries, so this value no longer affects persistent logging."
     );
 
+    public static readonly SettingHelpContent EngineAllowPeerExchange = new(
+        "Allow Peer Exchange (PEX)",
+        "Allows peers to tell TorrentCore about additional peers in the same swarm.",
+        "PEX supplements trackers, DHT, and local peer discovery; disabling it does not disable those other discovery sources. It is disabled by default because MonoTorrent 3.0.2 peer-exchange processing caused the observed unhandled Queue exception. This setting is saved immediately but requires a TorrentCore.Service restart."
+    );
+
     public static readonly SettingHelpContent EngineMaximumConnections = new(
         "Saved Max Connections",
         "Sets the global cap on fully established peer connections across the engine host.",

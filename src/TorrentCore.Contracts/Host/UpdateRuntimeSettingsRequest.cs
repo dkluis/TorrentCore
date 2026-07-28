@@ -10,6 +10,7 @@ public sealed class UpdateRuntimeSettingsRequest
     public required bool    DeleteLogsForCompletedTorrents               { get; init; }
     public required int     EngineConnectionFailureLogBurstLimit         { get; init; }
     public required int     EngineConnectionFailureLogWindowSeconds      { get; init; }
+    public          bool?   EngineAllowPeerExchange                       { get; init; }
     public string           EngineEncryptionMode                         { get; init; } = "EncryptedPreferred";
     public required int     EngineMaximumConnections                     { get; init; }
     public required int     EngineMaximumHalfOpenConnections             { get; init; }

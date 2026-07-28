@@ -9,6 +9,9 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
+Current Service release version: `0.3.2`. The Service/WebUI release version and native-app marketing version advance
+together. The native build number remains a separate monotonically increasing Apple bundle value.
+
 Launch agent labels:
 
 - `com.torrentcore.service`
@@ -160,17 +163,6 @@ http://<torrentcore-host>:7033/swagger/v1/swagger.json
 Swagger exposes existing mutation operations through an interactive UI. It does not provide authentication or TLS.
 Keep the service bound to the trusted LAN/VPN boundary and do not expose it directly to the public internet.
 
-## MonoTorrent Refactor Cutover
-
-Before deploying the refactored MonoTorrent integration:
-
-- confirm TorrentCore reports zero active torrents
-- confirm no downloads are active on the host
-- inventory any remaining `.!mt` artifacts for manual disposition
-- back up the TorrentCore database and MonoTorrent cache
-
-The cutover does not migrate active torrents or partially downloaded payloads. Existing history may remain.
-
 ## Logs And Status
 
 Runtime logs:
@@ -179,6 +171,16 @@ Runtime logs:
 - `~/TorrentCore/Logs/TorrentCore.Service.launchd.err.log`
 - `~/TorrentCore/Logs/TorrentCore.WebUI.launchd.out.log`
 - `~/TorrentCore/Logs/TorrentCore.WebUI.launchd.err.log`
+
+Production console logging uses a `Warning` baseline for both hosts, so routine Service information and WebUI HTTP
+client request traces do not flood the launchd files. Development retains an `Information` baseline. Framework console
+entries include UTC timestamps. The Service also writes a timestamped stderr marker before an unhandled process
+exception terminates it; launchd may append the runtime's untimestamped stack trace immediately afterward.
+These thresholds do not change the Service's persistent SQLite activity-log levels.
+
+Launchd appends to the configured files and does not truncate existing content when a new build is installed. Archive
+an oversized historical file only while its agent is stopped; changing its path while the process is running leaves
+the process writing through its existing open file handle.
 
 Script logs:
 
@@ -205,9 +207,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.3.1` |
-| Current build | `5` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.3.1.dmg` |
+| Current version | `0.3.2` |
+| Current build | `6` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.3.2.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -313,7 +315,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.3.1 --build 5
+./Scripts/release-macos-app.zsh --version 0.3.2 --build 6
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
@@ -336,9 +338,9 @@ release.
 Optional command-line checks:
 
 ```bash
-xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.3.1.dmg"
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.3.2.dmg"
 spctl --assess --type open --context context:primary-signature --verbose=4 \
-  "/path/to/TorrentCore-macOS-App-0.3.1.dmg"
+  "/path/to/TorrentCore-macOS-App-0.3.2.dmg"
 ```
 
 ### Uninstall And Recovery

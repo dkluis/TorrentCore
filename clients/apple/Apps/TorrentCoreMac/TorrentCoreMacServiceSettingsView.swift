@@ -377,6 +377,12 @@ struct TorrentCoreMacServiceSettingsView: View {
         case .engine:
             if let draft = runtimeBinding {
                 Section("MonoTorrent Engine") {
+                    Toggle(isOn: draft.engineAllowPeerExchange) {
+                        TorrentCoreMacHelpLabel(
+                            "Allow Peer Exchange (PEX)",
+                            content: TorrentCoreHelpCatalog.Settings.engineAllowPeerExchange
+                        )
+                    }
                     choiceField(
                         selection: draft.engineEncryptionMode,
                         choices: Self.engineEncryptionModes,
@@ -427,6 +433,12 @@ struct TorrentCoreMacServiceSettingsView: View {
                     )
                     .foregroundStyle(.orange)
                 }
+                LabeledContent(
+                    "Applied peer exchange",
+                    value: session.runtimeSettings.value?.appliedEngineAllowPeerExchange == true
+                        ? "Enabled"
+                        : "Disabled"
+                )
                 validationMessage
             }
         case .completionCallback:

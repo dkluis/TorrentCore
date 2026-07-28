@@ -36,6 +36,55 @@ public sealed class TorrentRemovalCleanupServiceTests
         Assert.True(Directory.Exists(downloadRootPath));
     }
 
+    [Fact]
+    public async Task TryDeleteDataWithRetryAsync_RetriesTransientIoFailures()
+    {
+        var attempts = 0;
+        var observedDelays = new List<TimeSpan>();
+
+        var exception = await TorrentRemovalCleanupService.TryDeleteDataWithRetryAsync(
+            "/downloads",
+            ["/downloads/payload.bin"],
+            (_, _) =>
+            {
+                attempts++;
+                if (attempts < 3)
+                {
+                    throw new IOException("Resource busy.");
+                }
+            },
+            delay =>
+            {
+                observedDelays.Add(delay);
+                return Task.CompletedTask;
+            }
+        );
+
+        Assert.Null(exception);
+        Assert.Equal(3, attempts);
+        Assert.Equal(TorrentRemovalCleanupService.RetryDelays.Take(2), observedDelays);
+    }
+
+    [Fact]
+    public async Task TryDeleteDataWithRetryAsync_DoesNotRetryNonIoFailure()
+    {
+        var attempts = 0;
+
+        var exception = await TorrentRemovalCleanupService.TryDeleteDataWithRetryAsync(
+            "/downloads",
+            ["/downloads/payload.bin"],
+            (_, _) =>
+            {
+                attempts++;
+                throw new InvalidOperationException("Invalid cleanup request.");
+            },
+            _ => Task.CompletedTask
+        );
+
+        Assert.IsType<InvalidOperationException>(exception);
+        Assert.Equal(1, attempts);
+    }
+
     private static async Task<T> WaitForAsync<T>(
         Func<Task<T>> action,
         Func<T, bool> predicate,

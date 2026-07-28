@@ -22,6 +22,7 @@ public enum TorrentCorePreviewFixtures {
         engineDHTPort: 55_124,
         enginePortForwardingEnabled: true,
         engineLocalPeerDiscoveryEnabled: true,
+        engineAllowPeerExchange: false,
         engineEncryptionMode: "EncryptedPreferred",
         engineMaximumConnections: 150,
         engineMaximumHalfOpenConnections: 8,
@@ -457,6 +458,7 @@ public enum TorrentCorePreviewFixtures {
     ]
 
     public static let runtimeSettings = TorrentCoreRuntimeSettings(
+        appliedEngineAllowPeerExchange: false,
         appliedEngineEncryptionMode: "EncryptedPreferred",
         appliedEngineMaximumConnections: 150,
         appliedEngineMaximumDownloadRateBytesPerSecond: 0,
@@ -478,6 +480,7 @@ public enum TorrentCorePreviewFixtures {
         deleteLogsForCompletedTorrents: false,
         engineConnectionFailureLogBurstLimit: 5,
         engineConnectionFailureLogWindowSeconds: 60,
+        engineAllowPeerExchange: false,
         engineEncryptionMode: "EncryptedPreferred",
         engineMaximumConnections: 150,
         engineMaximumDownloadRateBytesPerSecond: 0,

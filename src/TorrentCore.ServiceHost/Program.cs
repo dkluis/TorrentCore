@@ -20,6 +20,8 @@ using TorrentCore.Service.Infrastructure;
 
 #endregion
 
+ProcessFatalExceptionDiagnostics.Register();
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
@@ -68,6 +70,7 @@ builder.Services.AddSingleton(serviceProvider =>
         var options = serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value;
         var state   = new AppliedEngineSettingsState();
         state.Set(
+            options.EngineAllowPeerExchange,
             options.EngineEncryptionMode,
             options.EngineMaximumConnections, options.EngineMaximumHalfOpenConnections,
             options.EngineMaximumDownloadRateBytesPerSecond, options.EngineMaximumUploadRateBytesPerSecond

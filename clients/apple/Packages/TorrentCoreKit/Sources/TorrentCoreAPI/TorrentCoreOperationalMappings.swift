@@ -131,6 +131,7 @@ extension TorrentCoreTracker {
 
 extension TorrentCoreRuntimeSettings {
     init(_ value: Components.Schemas.RuntimeSettingsDto) {
+        appliedEngineAllowPeerExchange = value.appliedEngineAllowPeerExchange
         appliedEngineEncryptionMode = value.appliedEngineEncryptionMode
         appliedEngineMaximumConnections = Int(value.appliedEngineMaximumConnections)
         appliedEngineMaximumDownloadRateBytesPerSecond = Int(
@@ -158,6 +159,7 @@ extension TorrentCoreRuntimeSettings {
         deleteLogsForCompletedTorrents = value.deleteLogsForCompletedTorrents
         engineConnectionFailureLogBurstLimit = Int(value.engineConnectionFailureLogBurstLimit)
         engineConnectionFailureLogWindowSeconds = Int(value.engineConnectionFailureLogWindowSeconds)
+        engineAllowPeerExchange = value.engineAllowPeerExchange
         engineEncryptionMode = value.engineEncryptionMode
         engineMaximumConnections = Int(value.engineMaximumConnections)
         engineMaximumDownloadRateBytesPerSecond = Int(value.engineMaximumDownloadRateBytesPerSecond)
@@ -208,6 +210,7 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             completionCallbackTimeoutSeconds: Int32(value.completionCallbackTimeoutSeconds),
             completionCallbackWorkingDirectory: value.completionCallbackWorkingDirectory,
             deleteLogsForCompletedTorrents: value.deleteLogsForCompletedTorrents,
+            engineAllowPeerExchange: value.engineAllowPeerExchange,
             engineConnectionFailureLogBurstLimit: Int32(value.engineConnectionFailureLogBurstLimit),
             engineConnectionFailureLogWindowSeconds: Int32(value.engineConnectionFailureLogWindowSeconds),
             engineEncryptionMode: value.engineEncryptionMode,

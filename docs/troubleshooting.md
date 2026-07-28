@@ -101,6 +101,30 @@ for an active-download slot is suspended and does not advance the long-cold thre
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete
 them because cached metadata can accelerate a later re-add of the same torrent.
 
+## Unexpected Service Exit
+
+Inspect `~/TorrentCore/Logs/TorrentCore.Service.launchd.err.log` for a timestamped
+`TorrentCore.Service unhandled process exception` marker. The marker records the UTC occurrence time, process id,
+termination flag, exception type, and message. The runtime may append a second untimestamped copy of the stack trace.
+Compare the marker with `service.startup.ready` in the persistent activity logs to identify the replacement service
+instance started by launchd.
+
+If the stack trace ends in `MonoTorrent.Client.PeerExchangeManager.OnAdd`, confirm that `Allow Peer Exchange (PEX)` is
+disabled in Service Settings. Saving a different PEX value sets `Restart Required`; restart TorrentCore.Service so all
+recovered and newly added torrent managers receive the saved value. With PEX disabled, tracker, DHT, and local peer
+discovery remain available.
+
+## Remove And Delete Data Fails
+
+TorrentCore unregisters a torrent from MonoTorrent before deleting payload files. This keeps a transient macOS
+`Resource busy` file-system error from failing the remove request while the torrent is still registered. Payload
+cleanup is confined to the configured download root and retries transient I/O failures five times over approximately
+21 seconds.
+
+If all attempts fail, inspect the persistent activity log for `torrent.data_cleanup.failed`. The entry records the
+torrent id, candidate paths, and final error. TorrentCore has already removed the torrent from active tracking at that
+point, so resolve the external file-system condition and remove the remaining payload manually.
+
 ## Deployment And Runtime Checks
 
 Useful runtime checks on the host:

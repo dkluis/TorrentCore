@@ -408,6 +408,9 @@
             "format": "int32",
             "type": "integer"
           },
+          "engineAllowPeerExchange": {
+            "type": "boolean"
+          },
           "engineConnectionFailureLogBurstLimit": {
             "format": "int32",
             "type": "integer"
@@ -573,6 +576,7 @@
           "downloadingCount",
           "downloadQueueCount",
           "downloadRootPath",
+          "engineAllowPeerExchange",
           "engineConnectionFailureLogBurstLimit",
           "engineConnectionFailureLogWindowSeconds",
           "engineDhtPort",
@@ -717,6 +721,9 @@
       "RuntimeSettingsDto": {
         "additionalProperties": false,
         "properties": {
+          "appliedEngineAllowPeerExchange": {
+            "type": "boolean"
+          },
           "appliedEngineEncryptionMode": {
             "nullable": true,
             "type": "string"
@@ -789,6 +796,9 @@
             "type": "string"
           },
           "deleteLogsForCompletedTorrents": {
+            "type": "boolean"
+          },
+          "engineAllowPeerExchange": {
             "type": "boolean"
           },
           "engineConnectionFailureLogBurstLimit": {
@@ -878,6 +888,7 @@
           }
         },
         "required": [
+          "appliedEngineAllowPeerExchange",
           "appliedEngineMaximumConnections",
           "appliedEngineMaximumDownloadRateBytesPerSecond",
           "appliedEngineMaximumHalfOpenConnections",
@@ -890,6 +901,7 @@
           "completionCallbackFinalizationTimeoutSeconds",
           "completionCallbackTimeoutSeconds",
           "deleteLogsForCompletedTorrents",
+          "engineAllowPeerExchange",
           "engineConnectionFailureLogBurstLimit",
           "engineConnectionFailureLogWindowSeconds",
           "engineMaximumConnections",
@@ -1918,6 +1930,10 @@
             "type": "string"
           },
           "deleteLogsForCompletedTorrents": {
+            "type": "boolean"
+          },
+          "engineAllowPeerExchange": {
+            "nullable": true,
             "type": "boolean"
           },
           "engineConnectionFailureLogBurstLimit": {

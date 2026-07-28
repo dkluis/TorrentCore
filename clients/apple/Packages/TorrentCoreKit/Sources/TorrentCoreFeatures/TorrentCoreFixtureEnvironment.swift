@@ -370,6 +370,7 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         runtimeSettingsValue.deleteLogsForCompletedTorrents = update.deleteLogsForCompletedTorrents
         runtimeSettingsValue.engineConnectionFailureLogBurstLimit = update.engineConnectionFailureLogBurstLimit
         runtimeSettingsValue.engineConnectionFailureLogWindowSeconds = update.engineConnectionFailureLogWindowSeconds
+        runtimeSettingsValue.engineAllowPeerExchange = update.engineAllowPeerExchange
         runtimeSettingsValue.engineEncryptionMode = update.engineEncryptionMode
         runtimeSettingsValue.engineMaximumConnections = update.engineMaximumConnections
         runtimeSettingsValue.engineMaximumDownloadRateBytesPerSecond = update.engineMaximumDownloadRateBytesPerSecond

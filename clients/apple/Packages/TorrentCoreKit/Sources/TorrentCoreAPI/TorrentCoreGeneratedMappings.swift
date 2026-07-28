@@ -23,6 +23,7 @@ extension TorrentCoreHostStatus {
         engineDHTPort = Int(value.engineDhtPort)
         enginePortForwardingEnabled = value.enginePortForwardingEnabled
         engineLocalPeerDiscoveryEnabled = value.engineLocalPeerDiscoveryEnabled
+        engineAllowPeerExchange = value.engineAllowPeerExchange
         engineEncryptionMode = value.engineEncryptionMode
         engineMaximumConnections = Int(value.engineMaximumConnections)
         engineMaximumHalfOpenConnections = Int(value.engineMaximumHalfOpenConnections)

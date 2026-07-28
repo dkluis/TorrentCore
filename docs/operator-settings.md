@@ -63,6 +63,13 @@ Queue diagnostics currently expose:
 
 ## Engine Settings
 
+### Allow Peer Exchange (PEX)
+
+- permits connected peers to advertise additional peers in the same swarm
+- supplements tracker, DHT, and local peer discovery; disabling PEX does not disable those sources
+- defaults to disabled because MonoTorrent 3.0.2 PEX processing produced the observed unhandled queue exception
+- requires service restart so every active and recovered torrent manager uses one consistent value
+
 ### Engine Encryption Mode
 
 - controls plaintext-versus-encrypted peer preference
@@ -210,6 +217,7 @@ Payload-readiness rules:
 
 Restart-required settings currently include:
 
+- peer exchange
 - engine encryption mode
 - engine max connections
 - engine max half-open connections

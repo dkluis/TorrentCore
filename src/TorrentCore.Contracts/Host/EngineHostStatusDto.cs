@@ -11,6 +11,7 @@ public sealed class EngineHostStatusDto
     public required int              EngineDhtPort                           { get; init; }
     public required bool             EnginePortForwardingEnabled             { get; init; }
     public required bool             EngineLocalPeerDiscoveryEnabled         { get; init; }
+    public required bool             EngineAllowPeerExchange                 { get; init; }
     public string                    EngineEncryptionMode                    { get; init; } = "EncryptedPreferred";
     public required int              EngineMaximumConnections                { get; init; }
     public required int              EngineMaximumHalfOpenConnections        { get; init; }
