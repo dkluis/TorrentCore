@@ -233,6 +233,10 @@ The 0.3.1/build 5 stable-layout update was accepted and stapled on July 27, 2026
 `b4c746f3fa62c0cf47af52e9b3bc324de6239754ef4e4d58ae74a19ce14bb87d`. The copied DMG passed code-signature,
 stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.3.0 acceptance,
 especially saved-connection startup on macOS 27, remains pending.
+The 0.4.0/build 7 maintenance and filtering update was accepted and stapled on July 28, 2026 under notarization
+submission `b55e898b-b73d-4ff0-b3ad-0b3a1563d373`. Its SHA-256 checksum is
+`74e8325562a90bafa9a1a982b881c6d75a92c34166dc88acfb2e0c43e74459c8`. The copied DMG passed code-signature,
+stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 
 ### One-Time Developer ID Setup
 

@@ -27,6 +27,10 @@ That stable-layout follow-up is released as signed, notarized, and stapled 0.3.1
 signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.3.0
 acceptance, especially launch and saved-connection use on macOS 27, remains pending.
 
+The maintenance and filtering refinements are released as signed, notarized, and stapled 0.4.0/build 7. The updated
+Service and macOS client passed live CA-Desktop testing through Xcode, and the copied release DMG passed signature,
+stapler-ticket, disk-image, Gatekeeper, and checksum verification.
+
 `TorrentCore.WebUI` remains the supported operator UI.
 
 ## Targets

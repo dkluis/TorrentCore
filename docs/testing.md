@@ -151,6 +151,11 @@ the focused fixture UI test that opens the final Cleanup group and verifies its 
 confirmation dialogs. The macOS target built for testing and the shared client also built successfully for the iOS
 Simulator. Persistence tests verify exclusive cutoffs and preservation of rows associated with live torrent ids;
 API tests cover Service-local cutoff conversion, audit events, and future-date rejection.
+The operator then deployed the updated Service to CA-Desktop and successfully exercised the macOS client through
+Xcode against that live installation. The signed, notarized, and stapled 0.4.0/build 7 DMG completed the release
+workflow under submission `b55e898b-b73d-4ff0-b3ad-0b3a1563d373`; the copied deployment artifact passed signature,
+stapler-ticket, disk-image, Gatekeeper, and checksum verification. Its SHA-256 checksum is
+`74e8325562a90bafa9a1a982b881c6d75a92c34166dc88acfb2e0c43e74459c8`.
 
 ## Testing Rules
 
