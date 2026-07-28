@@ -139,6 +139,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
                 Array.Empty<TorrentHistorySummaryDto>();
     }
 
+    public async Task<TorrentHistoryFilterOptionsDto?> GetHistoryFilterOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/history/filter-options"), cancellationToken);
+        return await ReadResponseAsync<TorrentHistoryFilterOptionsDto>(response, cancellationToken);
+    }
+
     public async Task<TorrentHistoryDetailDto?> GetHistoryByTorrentIdAsync(Guid torrentId,
         CancellationToken cancellationToken = default)
     {
@@ -194,6 +201,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
         );
         return await ReadResponseAsync<IReadOnlyList<ActivityLogEntryDto>>(response, cancellationToken) ??
                 Array.Empty<ActivityLogEntryDto>();
+    }
+
+    public async Task<ActivityLogFilterOptionsDto?> GetActivityLogFilterOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/logs/filter-options"), cancellationToken);
+        return await ReadResponseAsync<ActivityLogFilterOptionsDto>(response, cancellationToken);
     }
 
     public async Task<DeleteOrphanedTorrentLogsResultDto> DeleteOrphanedTorrentLogsAsync(

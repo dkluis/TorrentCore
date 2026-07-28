@@ -70,7 +70,7 @@ struct TorrentCoreMacLogsView: View {
         TableColumnCustomization<TorrentCoreMacLogTableItem>()
 
     @State private var searchText = ""
-    @State private var levelFilter: Int32?
+    @State private var levelFilter: TorrentCoreActivityLogLevel?
     @State private var categoryFilter: String
     @State private var eventTypeFilter: String
     @State private var torrentIDFilter: String
@@ -102,7 +102,7 @@ struct TorrentCoreMacLogsView: View {
         self.showTorrent = showTorrent
         self.showHistory = showHistory
         let initial = query.wrappedValue
-        _levelFilter = State(initialValue: initial.level?.rawValue)
+        _levelFilter = State(initialValue: initial.level)
         _categoryFilter = State(initialValue: initial.category ?? "")
         _eventTypeFilter = State(initialValue: initial.eventType ?? "")
         _torrentIDFilter = State(initialValue: initial.torrentID?.uuidString ?? "")
@@ -232,6 +232,9 @@ struct TorrentCoreMacLogsView: View {
                     .onTapGesture { self.actionMessage = nil }
             }
         }
+        .task(id: session.activeProfile?.id) {
+            await session.refreshActivityLogFilterOptions()
+        }
         .torrentCoreRefreshWhileVisible(
             session: session,
             context: .logs(query)
@@ -253,13 +256,12 @@ struct TorrentCoreMacLogsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.level)
                     Picker("Level", selection: $levelFilter) {
-                        Text("All Levels").tag(Int32?.none)
-                        Text("Trace").tag(Int32?.some(0))
-                        Text("Debug").tag(Int32?.some(1))
-                        Text("Information").tag(Int32?.some(2))
-                        Text("Warning").tag(Int32?.some(3))
-                        Text("Error").tag(Int32?.some(4))
-                        Text("Critical").tag(Int32?.some(5))
+                        Text("All Levels").tag(TorrentCoreActivityLogLevel?.none)
+                        Text("Debug").tag(TorrentCoreActivityLogLevel?.some(.debug))
+                        Text("Information").tag(TorrentCoreActivityLogLevel?.some(.information))
+                        Text("Warning").tag(TorrentCoreActivityLogLevel?.some(.warning))
+                        Text("Error").tag(TorrentCoreActivityLogLevel?.some(.error))
+                        Text("Critical").tag(TorrentCoreActivityLogLevel?.some(.critical))
                     }
                     .labelsHidden()
                     .frame(width: 150)
@@ -581,14 +583,16 @@ struct TorrentCoreMacLogsView: View {
 
     private var logCategoryOptions: [String] {
         uniqueLogOptions(
-            (session.logs.value ?? []).compactMap(\.category),
+            (session.activityLogFilterOptions.value?.categories ?? [])
+                + (session.logs.value ?? []).compactMap(\.category),
             preserving: categoryFilter
         )
     }
 
     private var logEventTypeOptions: [String] {
         uniqueLogOptions(
-            (session.logs.value ?? []).compactMap(\.eventType),
+            (session.activityLogFilterOptions.value?.eventTypes ?? [])
+                + (session.logs.value ?? []).compactMap(\.eventType),
             preserving: eventTypeFilter
         )
     }
@@ -649,7 +653,7 @@ struct TorrentCoreMacLogsView: View {
     private func applyFilters() {
         query = TorrentCoreLogQuery(
             take: query.take,
-            level: levelFilter.map(TorrentCoreActivityLogLevel.init(rawValue:)),
+            level: levelFilter,
             category: normalized(categoryFilter),
             eventType: normalized(eventTypeFilter),
             torrentID: UUID(uuidString: torrentIDFilter.trimmingCharacters(

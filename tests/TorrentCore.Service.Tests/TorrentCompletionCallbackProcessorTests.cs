@@ -223,6 +223,9 @@ public sealed class TorrentCompletionCallbackProcessorTests
             CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<ActivityLogEntry>>([]);
 
+        public Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+            => Task.FromResult(new ActivityLogFilterOptions { Categories = [], EventTypes = [] });
+
         public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
             => Task.FromResult(0);
 
@@ -241,6 +244,9 @@ public sealed class TorrentCompletionCallbackProcessorTests
             ActivityLogQuery query,
             CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<ActivityLogEntry>>([]);
+
+        public Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+            => Task.FromResult(new ActivityLogFilterOptions { Categories = [], EventTypes = [] });
 
         public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
             => Task.FromResult(0);

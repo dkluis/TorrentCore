@@ -68,6 +68,10 @@ The service reports its additive native-client contract version through `apiVers
 responses. Version `1` is the current contract. Clients may tolerate a missing value while older private installations
 are being updated, but must reject a future version they do not understand.
 
+History and log filter choices come from dedicated database-backed filter-options endpoints. They return distinct
+values independently of the current grid query and row limit. Operator clients load these choices when a grid opens;
+normal grid filtering and periodic row refreshes do not reload them.
+
 The WebUI stays a thin client over service contracts. It must not:
 
 - call MonoTorrent directly

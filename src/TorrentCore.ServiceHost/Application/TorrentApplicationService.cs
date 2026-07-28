@@ -259,6 +259,11 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         return torrentHistoryService.GetHistoryAsync(request, cancellationToken);
     }
 
+    public Task<TorrentHistoryFilterOptionsDto> GetHistoryFilterOptionsAsync(CancellationToken cancellationToken)
+    {
+        return torrentHistoryService.GetFilterOptionsAsync(cancellationToken);
+    }
+
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         try

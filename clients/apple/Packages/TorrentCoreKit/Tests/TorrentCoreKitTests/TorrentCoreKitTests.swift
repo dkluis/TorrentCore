@@ -151,6 +151,72 @@ func initialSliceBuildsDeterministicRequestsAndDecodesFixtures() async throws {
 }
 
 @Test
+func logLevelQueriesMatchServiceContract() async throws {
+    let recorder = RequestRecorder()
+    let transport = FixtureTransport(recorder: recorder)
+    let client = try TorrentCoreClient(
+        baseURL: #require(URL(string: "http://torrentcore.test:7033")),
+        healthTransport: transport,
+        readTransport: transport,
+        mutationTransport: transport
+    )
+    let levels: [(TorrentCoreActivityLogLevel, String)] = [
+        (.debug, "0"),
+        (.information, "1"),
+        (.warning, "2"),
+        (.error, "3"),
+        (.critical, "4"),
+    ]
+
+    for (level, _) in levels {
+        _ = try await client.logs(query: .init(take: 100, level: level))
+    }
+
+    let requests = await recorder.entries
+    #expect(requests.map(\.operationID) == Array(repeating: "Logs_GetRecent", count: levels.count))
+    let sentLevels: [String] = requests.compactMap { request -> String? in
+        guard let path = request.path,
+              let components = URLComponents(string: "http://torrentcore.test\(path)"),
+              let value = components.queryItems?.first(where: { $0.name == "level" })?.value
+        else {
+            return nil
+        }
+        return value
+    }
+    #expect(sentLevels == levels.map { $0.1 })
+}
+
+@Test
+func filterOptionsUseDedicatedUnfilteredEndpoints() async throws {
+    let recorder = RequestRecorder()
+    let transport = FixtureTransport(recorder: recorder)
+    let client = try TorrentCoreClient(
+        baseURL: #require(URL(string: "http://torrentcore.test:7033")),
+        healthTransport: transport,
+        readTransport: transport,
+        mutationTransport: transport
+    )
+
+    let historyOptions = try await client.historyFilterOptions()
+    let logOptions = try await client.activityLogFilterOptions()
+
+    #expect(historyOptions.categoryKeys == ["Movies", "TV"])
+    #expect(historyOptions.states == ["Completed", "Downloading"])
+    #expect(logOptions.categories == ["runtime", "torrent"])
+    #expect(logOptions.eventTypes == ["runtime.operation.slow", "torrent.added"])
+
+    let requests = await recorder.entries
+    #expect(requests.map(\.operationID) == [
+        "History_GetFilterOptions",
+        "Logs_GetFilterOptions",
+    ])
+    #expect(requests.map(\.path) == [
+        "/api/history/filter-options",
+        "/api/logs/filter-options",
+    ])
+}
+
+@Test
 func problemDetailsAndNetworkFailuresKeepTheirMeaning() async throws {
     let serviceClient = try TorrentCoreClient(
         baseURL: #require(URL(string: "http://torrentcore.test:7033")),
@@ -662,6 +728,12 @@ private enum FixturePayloads {
             (200, detail)
         case "Categories_GetAll":
             (200, "[\(category)]")
+        case "Logs_GetRecent":
+            (200, "[]")
+        case "History_GetFilterOptions":
+            (200, historyFilterOptions)
+        case "Logs_GetFilterOptions":
+            (200, activityLogFilterOptions)
         case "Torrents_Add":
             (201, detail)
         case "Torrents_Pause":
@@ -682,6 +754,20 @@ private enum FixturePayloads {
       "status": "ok",
       "environmentName": "Integration",
       "checkedAtUtc": "2026-07-23T12:00:00Z"
+    }
+    """
+
+    static let historyFilterOptions = """
+    {
+      "categoryKeys": ["Movies", "TV"],
+      "states": ["Completed", "Downloading"]
+    }
+    """
+
+    static let activityLogFilterOptions = """
+    {
+      "categories": ["runtime", "torrent"],
+      "eventTypes": ["runtime.operation.slow", "torrent.added"]
     }
     """
 

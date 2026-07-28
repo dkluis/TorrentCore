@@ -114,9 +114,13 @@ public final class TorrentCoreFeatureSession {
     public private(set) var torrentDetail = TorrentCoreFeatureSnapshot<TorrentCoreTorrentDetail>()
     public private(set) var categories = TorrentCoreFeatureSnapshot<[TorrentCoreCategory]>()
     public private(set) var history = TorrentCoreFeatureSnapshot<[TorrentCoreHistorySummary]>()
+    public private(set) var historyFilterOptions =
+        TorrentCoreFeatureSnapshot<TorrentCoreHistoryFilterOptions>()
     public private(set) var historyDetail = TorrentCoreFeatureSnapshot<TorrentCoreHistoryDetail>()
     public private(set) var abandonedHistory = TorrentCoreFeatureSnapshot<[TorrentCoreHistorySummary]>()
     public private(set) var logs = TorrentCoreFeatureSnapshot<[TorrentCoreActivityLogEntry]>()
+    public private(set) var activityLogFilterOptions =
+        TorrentCoreFeatureSnapshot<TorrentCoreActivityLogFilterOptions>()
     public private(set) var peers = TorrentCoreFeatureSnapshot<[TorrentCorePeer]>()
     public private(set) var trackers = TorrentCoreFeatureSnapshot<[TorrentCoreTracker]>()
     public private(set) var runtimeSettings = TorrentCoreFeatureSnapshot<TorrentCoreRuntimeSettings>()
@@ -297,6 +301,60 @@ public final class TorrentCoreFeatureSession {
 
     public func refresh(_ requestedContext: TorrentCoreFeatureContext) async {
         await refresh(requestedContext, expectedGeneration: nil)
+    }
+
+    public func refreshHistoryFilterOptions() async {
+        guard let requestedProfile = activeProfile else {
+            return
+        }
+        let requestedGeneration = generation
+        historyFilterOptions.beginLoading()
+        do {
+            let serviceClient = try serviceClient(for: requestedProfile)
+            let options = try await serviceClient.historyFilterOptions()
+            guard activeProfile?.id == requestedProfile.id,
+                  generation == requestedGeneration,
+                  !Task.isCancelled
+            else {
+                return
+            }
+            historyFilterOptions.succeed(options, at: now())
+        } catch {
+            guard activeProfile?.id == requestedProfile.id,
+                  generation == requestedGeneration,
+                  !(error is CancellationError)
+            else {
+                return
+            }
+            historyFilterOptions.fail(message: errorMessage(error))
+        }
+    }
+
+    public func refreshActivityLogFilterOptions() async {
+        guard let requestedProfile = activeProfile else {
+            return
+        }
+        let requestedGeneration = generation
+        activityLogFilterOptions.beginLoading()
+        do {
+            let serviceClient = try serviceClient(for: requestedProfile)
+            let options = try await serviceClient.activityLogFilterOptions()
+            guard activeProfile?.id == requestedProfile.id,
+                  generation == requestedGeneration,
+                  !Task.isCancelled
+            else {
+                return
+            }
+            activityLogFilterOptions.succeed(options, at: now())
+        } catch {
+            guard activeProfile?.id == requestedProfile.id,
+                  generation == requestedGeneration,
+                  !(error is CancellationError)
+            else {
+                return
+            }
+            activityLogFilterOptions.fail(message: errorMessage(error))
+        }
     }
 
     public func refreshWhileVisible(_ requestedContext: TorrentCoreFeatureContext) async {
@@ -655,9 +713,11 @@ public final class TorrentCoreFeatureSession {
         torrentDetail.reset()
         categories.reset()
         history.reset()
+        historyFilterOptions.reset()
         historyDetail.reset()
         abandonedHistory.reset()
         logs.reset()
+        activityLogFilterOptions.reset()
         peers.reset()
         trackers.reset()
         runtimeSettings.reset()

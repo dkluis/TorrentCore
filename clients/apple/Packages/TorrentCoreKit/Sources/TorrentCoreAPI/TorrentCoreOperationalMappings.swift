@@ -1,5 +1,12 @@
 import Foundation
 
+extension TorrentCoreHistoryFilterOptions {
+    init(_ value: Components.Schemas.TorrentHistoryFilterOptionsDto) {
+        categoryKeys = value.categoryKeys ?? []
+        states = value.states ?? []
+    }
+}
+
 extension TorrentCoreHistorySummary {
     init(_ value: Components.Schemas.TorrentHistorySummaryDto) {
         categoryKey = value.categoryKey
@@ -94,6 +101,13 @@ extension TorrentCoreActivityLogEntry {
         serviceInstanceID = value.serviceInstanceId.flatMap(UUID.init(uuidString:))
         torrentID = value.torrentId.flatMap(UUID.init(uuidString:))
         traceID = value.traceId
+    }
+}
+
+extension TorrentCoreActivityLogFilterOptions {
+    init(_ value: Components.Schemas.ActivityLogFilterOptionsDto) {
+        categories = value.categories ?? []
+        eventTypes = value.eventTypes ?? []
     }
 }
 

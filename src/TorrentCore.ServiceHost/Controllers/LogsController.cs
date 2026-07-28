@@ -68,6 +68,31 @@ public sealed class LogsController(IActivityLogService activityLogService, Servi
         );
     }
 
+    [HttpGet("filter-options")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(ActivityLogFilterOptionsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
+    public async Task<ActionResult<ActivityLogFilterOptionsDto>> GetFilterOptions(
+        CancellationToken cancellationToken)
+    {
+        ActivityLogFilterOptions options;
+        try
+        {
+            options = await activityLogService.GetFilterOptionsAsync(cancellationToken);
+        }
+        catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
+        {
+            throw ServiceBoundaryExceptionMapper.CreateStorageUnavailable("TorrentCore activity log storage is unavailable.");
+        }
+
+        return Ok(
+            new ActivityLogFilterOptionsDto
+            {
+                Categories = options.Categories,
+                EventTypes = options.EventTypes,
+            }
+        );
+    }
+
     [HttpPost("delete-orphaned-torrent-logs")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DeleteOrphanedTorrentLogsResultDto))]
     [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]

@@ -170,6 +170,13 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         return values
     }
 
+    func historyFilterOptions() async throws -> TorrentCoreHistoryFilterOptions {
+        .init(
+            categoryKeys: distinctValues(historyValues.compactMap(\.categoryKey)),
+            states: distinctValues(historyValues.compactMap(\.latestTorrentState))
+        )
+    }
+
     func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
         guard let history = historyValues.first(where: {
             $0.torrentID == torrentID
@@ -214,6 +221,13 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
             values = values.filter { $0.occurredAt <= toUTC }
         }
         return Array(values.prefix(max(0, query.take)))
+    }
+
+    func activityLogFilterOptions() async throws -> TorrentCoreActivityLogFilterOptions {
+        .init(
+            categories: distinctValues(logValues.compactMap(\.category)),
+            eventTypes: distinctValues(logValues.compactMap(\.eventType))
+        )
     }
 
     func peers(torrentID: UUID) async throws -> [TorrentCorePeer] {
@@ -419,7 +433,6 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
 
     private func logLevel(_ level: String?) -> TorrentCoreActivityLogLevel? {
         switch level?.lowercased() {
-        case "trace": .trace
         case "debug": .debug
         case "information": .information
         case "warning": .warning
@@ -427,6 +440,20 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         case "critical": .critical
         default: nil
         }
+    }
+
+    private func distinctValues(_ values: [String]) -> [String] {
+        values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .reduce(into: [String]()) { result, value in
+                if !result.contains(where: {
+                    $0.localizedCaseInsensitiveCompare(value) == .orderedSame
+                }) {
+                    result.append(value)
+                }
+            }
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     private static func makeTorrents(

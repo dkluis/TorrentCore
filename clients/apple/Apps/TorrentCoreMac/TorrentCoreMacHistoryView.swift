@@ -264,6 +264,9 @@ struct TorrentCoreMacHistoryView: View {
         .onDisappear {
             magnetCopyResetTask?.cancel()
         }
+        .task(id: session.activeProfile?.id) {
+            await session.refreshHistoryFilterOptions()
+        }
         .torrentCoreRefreshWhileVisible(
             session: session,
             context: refreshContext
@@ -696,14 +699,15 @@ struct TorrentCoreMacHistoryView: View {
 
     private var historyCategoryOptions: [String] {
         uniqueOptions(
-            (session.history.value ?? []).compactMap(\.categoryKey),
+            (session.historyFilterOptions.value?.categoryKeys ?? [])
+                + (session.history.value ?? []).compactMap(\.categoryKey),
             preserving: categoryFilter
         )
     }
 
     private var historyStateOptions: [String] {
         uniqueOptions(
-            TorrentCoreKnownTorrentState.allCases.map(\.rawValue)
+            (session.historyFilterOptions.value?.states ?? [])
                 + (session.history.value ?? []).compactMap(\.latestTorrentState),
             preserving: stateFilter
         )

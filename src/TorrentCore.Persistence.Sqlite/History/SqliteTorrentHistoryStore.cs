@@ -120,6 +120,19 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         return results;
     }
 
+    public async Task<TorrentHistoryFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+
+        return new TorrentHistoryFilterOptions
+        {
+            CategoryKeys = await ReadDistinctTextValuesAsync(connection, "category_key", cancellationToken),
+            States = await ReadDistinctTextValuesAsync(connection, "latest_torrent_state", cancellationToken),
+        };
+    }
+
     public async Task InsertAsync(TorrentHistoryRecord record, CancellationToken cancellationToken)
     {
         await EnsureInitializedAsync(cancellationToken);
@@ -380,6 +393,25 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
         }
 
         return ReadRecord(reader);
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadDistinctTextValuesAsync(SqliteConnection connection,
+        string columnName, CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+                $"SELECT DISTINCT {columnName} FROM torrent_history " +
+                $"WHERE {columnName} IS NOT NULL AND TRIM({columnName}) <> '' " +
+                $"ORDER BY {columnName} COLLATE NOCASE;";
+
+        var results = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(reader.GetString(0));
+        }
+
+        return results;
     }
 
     private static TorrentHistoryRecord ReadRecord(SqliteDataReader reader)

@@ -182,6 +182,17 @@ public struct TorrentCoreClient: Sendable {
         }
     }
 
+    public func historyFilterOptions() async throws -> TorrentCoreHistoryFilterOptions {
+        try await perform(.history) {
+            switch try await readClient.historyGetFilterOptions() {
+            case let .ok(response):
+                return TorrentCoreHistoryFilterOptions(try response.body.json)
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
     public func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
         try await perform(.historyDetail) {
             switch try await readClient.historyGetByTorrentId(
@@ -216,6 +227,21 @@ public struct TorrentCoreClient: Sendable {
             switch try await readClient.logsGetRecent(query: generatedQuery) {
             case let .ok(response):
                 return try response.body.json.map(TorrentCoreActivityLogEntry.init)
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(
+                    TorrentCoreServiceProblem(try response.body.applicationProblemJson)
+                )
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
+    public func activityLogFilterOptions() async throws -> TorrentCoreActivityLogFilterOptions {
+        try await perform(.logs) {
+            switch try await readClient.logsGetFilterOptions() {
+            case let .ok(response):
+                return TorrentCoreActivityLogFilterOptions(try response.body.json)
             case let .serviceUnavailable(response):
                 throw TorrentCoreClientError.service(
                     TorrentCoreServiceProblem(try response.body.applicationProblemJson)

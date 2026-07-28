@@ -326,13 +326,13 @@ public enum TorrentCoreHelpCatalog {
         )
         public static let state = help(
             "State",
-            "Filters history by lifecycle state text.",
-            "Matching is case-insensitive and accepts partial values such as seed, down, or pause."
+            "Filters history by its last recorded torrent lifecycle state.",
+            "States such as Downloading, Completed, or Seeding describe what the torrent was doing. Use Outcome to find records that were removed or abandoned."
         )
         public static let outcome = help(
             "Outcome",
             "Filters active, removed, or abandoned history.",
-            "Abandoned identifies cold downloads removed by automatic abandonment and ignores submitted-date bounds."
+            "Use Removed for manually removed history regardless of its last lifecycle state. Abandoned identifies cold downloads removed automatically and ignores submitted-date bounds."
         )
         public static let results = help(
             "History Results",
@@ -349,8 +349,8 @@ public enum TorrentCoreHelpCatalog {
     public enum Logs {
         public static let filters = help(
             "Filters",
-            "Narrows the locally loaded log set.",
-            "Search text, level, category, torrent, and date filters apply locally after logs are loaded."
+            "Narrows the displayed log set.",
+            "Level, category, event, torrent, service-instance, and date filters are sent to TorrentCore.Service. Search text applies locally to the returned rows."
         )
         public static let searchMessage = help(
             "Search Message",
@@ -360,7 +360,7 @@ public enum TorrentCoreHelpCatalog {
         public static let level = help(
             "Level",
             "Filters logs to one severity.",
-            "Choose a severity such as Information, Warning, or Error, or use All to include every level."
+            "Choose Debug, Information, Warning, Error, or Critical, or use All to include every level."
         )
         public static let category = help(
             "Category",

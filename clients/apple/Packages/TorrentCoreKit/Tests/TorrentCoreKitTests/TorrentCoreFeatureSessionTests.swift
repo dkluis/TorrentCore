@@ -271,20 +271,27 @@ func operationalContextsLoadOnlyTheirVisibleData() async throws {
         query: .init(outcome: .active, take: 100),
         selectedTorrentID: TorrentCorePreviewFixtures.torrentID
     ))
+    await session.refreshHistoryFilterOptions()
     await session.refresh()
     var calls = await client.calls
     #expect(calls.history == 2)
+    #expect(calls.historyFilterOptions == 1)
     #expect(calls.historyDetail == 1)
     #expect(calls.logs == 0)
     #expect(session.history.value?.isEmpty == false)
     #expect(session.abandonedHistory.value?.isEmpty == false)
+    #expect(session.historyFilterOptions.value?.categoryKeys == ["Movies", "TV"])
 
     session.setContext(.logs(.init(take: 500, level: .warning)))
+    await session.refreshActivityLogFilterOptions()
+    await session.refresh()
     await session.refresh()
     calls = await client.calls
-    #expect(calls.logs == 1)
+    #expect(calls.logs == 2)
+    #expect(calls.activityLogFilterOptions == 1)
     #expect(calls.history == 2)
     #expect(session.logs.value?.count == TorrentCorePreviewFixtures.activityLogs.count)
+    #expect(session.activityLogFilterOptions.value?.categories == ["runtime", "torrent"])
 
     session.setContext(.peers(TorrentCorePreviewFixtures.torrentID))
     await session.refresh()
@@ -846,8 +853,10 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         var torrentDetail = 0
         var categories = 0
         var history = 0
+        var historyFilterOptions = 0
         var historyDetail = 0
         var logs = 0
+        var activityLogFilterOptions = 0
         var peers = 0
         var trackers = 0
         var runtimeSettings = 0
@@ -981,6 +990,15 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         return values
     }
 
+    func historyFilterOptions() async throws -> TorrentCoreHistoryFilterOptions {
+        calls.historyFilterOptions += 1
+        try checkConnection()
+        return .init(
+            categoryKeys: ["Movies", "TV"],
+            states: ["Completed", "Downloading"]
+        )
+    }
+
     func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
         calls.historyDetail += 1
         try checkConnection()
@@ -993,6 +1011,15 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         calls.logs += 1
         try checkConnection()
         return Array(logValues.prefix(query.take))
+    }
+
+    func activityLogFilterOptions() async throws -> TorrentCoreActivityLogFilterOptions {
+        calls.activityLogFilterOptions += 1
+        try checkConnection()
+        return .init(
+            categories: ["runtime", "torrent"],
+            eventTypes: ["runtime.operation.slow", "torrent.added"]
+        )
     }
 
     func peers(torrentID: UUID) async throws -> [TorrentCorePeer] {

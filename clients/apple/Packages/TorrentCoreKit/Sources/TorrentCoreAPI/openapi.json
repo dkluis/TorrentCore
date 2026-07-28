@@ -57,6 +57,30 @@
         ],
         "type": "object"
       },
+      "ActivityLogFilterOptionsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "eventTypes": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories",
+          "eventTypes"
+        ],
+        "type": "object"
+      },
       "ActivityLogLevel": {
         "enum": [
           0,
@@ -1436,6 +1460,30 @@
         ],
         "type": "object"
       },
+      "TorrentHistoryFilterOptionsDto": {
+        "additionalProperties": false,
+        "properties": {
+          "categoryKeys": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "states": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          }
+        },
+        "required": [
+          "categoryKeys",
+          "states"
+        ],
+        "type": "object"
+      },
       "TorrentHistoryOutcome": {
         "enum": [
           "Active",
@@ -2307,6 +2355,26 @@
         ]
       }
     },
+    "/api/history/filter-options": {
+      "get": {
+        "operationId": "History_GetFilterOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentHistoryFilterOptionsDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "History"
+        ]
+      }
+    },
     "/api/host/dashboard-lifecycle": {
       "get": {
         "operationId": "Host_GetDashboardLifecycle",
@@ -2570,6 +2638,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DeleteOrphanedTorrentLogsResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Logs"
+        ]
+      }
+    },
+    "/api/logs/filter-options": {
+      "get": {
+        "operationId": "Logs_GetFilterOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityLogFilterOptionsDto"
                 }
               }
             },

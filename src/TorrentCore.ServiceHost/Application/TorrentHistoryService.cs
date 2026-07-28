@@ -58,6 +58,16 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
             .ToArray();
     }
 
+    public async Task<TorrentHistoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken cancellationToken)
+    {
+        var options = await torrentHistoryStore.GetFilterOptionsAsync(cancellationToken);
+        return new TorrentHistoryFilterOptionsDto
+        {
+            CategoryKeys = options.CategoryKeys,
+            States = options.States,
+        };
+    }
+
     public async Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         var record = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);

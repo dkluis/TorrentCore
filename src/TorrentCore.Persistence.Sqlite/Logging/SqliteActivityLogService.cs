@@ -209,6 +209,20 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
         return results;
     }
 
+    public async Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+    {
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+        await EnforceRetentionAsync(connection, cancellationToken);
+
+        return new ActivityLogFilterOptions
+        {
+            Categories = await ReadDistinctTextValuesAsync(connection, "category", cancellationToken),
+            EventTypes = await ReadDistinctTextValuesAsync(connection, "event_type", cancellationToken),
+        };
+    }
+
     public async Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         await EnsureInitializedAsync(cancellationToken);
@@ -271,6 +285,25 @@ public sealed class SqliteActivityLogService(string databaseFilePath, int maxEnt
                               """;
         command.Parameters.AddWithValue("$retain_count", boundedMaxEntryCount);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<string>> ReadDistinctTextValuesAsync(SqliteConnection connection,
+        string columnName, CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+                $"SELECT DISTINCT {columnName} FROM activity_logs " +
+                $"WHERE {columnName} IS NOT NULL AND TRIM({columnName}) <> '' " +
+                $"ORDER BY {columnName} COLLATE NOCASE;";
+
+        var results = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            results.Add(reader.GetString(0));
+        }
+
+        return results;
     }
 
 }

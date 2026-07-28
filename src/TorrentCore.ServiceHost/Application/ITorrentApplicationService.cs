@@ -27,6 +27,7 @@ public interface ITorrentApplicationService
     Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
         CancellationToken cancellationToken);
+    Task<TorrentHistoryFilterOptionsDto> GetHistoryFilterOptionsAsync(CancellationToken cancellationToken);
     Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId, CancellationToken cancellationToken);

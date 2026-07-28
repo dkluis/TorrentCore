@@ -37,7 +37,7 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal(ServiceApiContract.CurrentVersion, hostStatus.ApiVersion);
-        Assert.Equal("0.3.2", hostStatus.ServiceVersion);
+        Assert.Equal("0.4.0", hostStatus.ServiceVersion);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);
@@ -374,6 +374,13 @@ public sealed class TorrentApiTests
         Assert.NotNull(limited);
         Assert.Single(limited);
         Assert.Equal(thirdTorrent.TorrentId, limited[0].TorrentId);
+
+        var filterOptions =
+                await httpClient.GetFromJsonAsync<TorrentHistoryFilterOptionsDto>("api/history/filter-options");
+
+        Assert.NotNull(filterOptions);
+        Assert.Equal(["Movie", "TV"], filterOptions.CategoryKeys);
+        Assert.Equal(["Completed", "Downloading", "Seeding"], filterOptions.States);
     }
 
     [Fact]
@@ -3183,6 +3190,23 @@ public sealed class TorrentApiTests
             Assert.Equal("torrent", log.Category);
             Assert.Equal("torrent.added", log.EventType);
         });
+
+        var filterOptions =
+                await httpClient.GetFromJsonAsync<ActivityLogFilterOptionsDto>("api/logs/filter-options");
+
+        Assert.NotNull(filterOptions);
+        Assert.Contains("startup", filterOptions.Categories);
+        Assert.Contains("torrent", filterOptions.Categories);
+        Assert.Contains("service.startup.ready", filterOptions.EventTypes);
+        Assert.Contains("torrent.added", filterOptions.EventTypes);
+        Assert.Equal(
+            filterOptions.Categories.OrderBy(value => value, StringComparer.OrdinalIgnoreCase),
+            filterOptions.Categories
+        );
+        Assert.Equal(
+            filterOptions.EventTypes.OrderBy(value => value, StringComparer.OrdinalIgnoreCase),
+            filterOptions.EventTypes
+        );
     }
 
     [Fact]
@@ -3666,6 +3690,11 @@ public sealed class TorrentApiTests
             return inner.GetRecentAsync(query, cancellationToken);
         }
 
+        public Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+        {
+            return inner.GetFilterOptionsAsync(cancellationToken);
+        }
+
         public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
         {
             return inner.DeleteByTorrentIdAsync(torrentId, cancellationToken);
@@ -3691,6 +3720,8 @@ public sealed class TorrentApiTests
         public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(ActivityLogQuery query, CancellationToken cancellationToken)
             => Task.FromResult<IReadOnlyList<ActivityLogEntry>>(Array.Empty<ActivityLogEntry>());
+        public Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+            => Task.FromResult(new ActivityLogFilterOptions { Categories = [], EventTypes = [] });
         public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken) => Task.FromResult(0);
         public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken) => Task.FromResult(0);
     }
@@ -3707,6 +3738,9 @@ public sealed class TorrentApiTests
                 ? Task.FromResult<IReadOnlyList<ActivityLogEntry>>(Array.Empty<ActivityLogEntry>())
                 : Task.FromException<IReadOnlyList<ActivityLogEntry>>(getRecentFailure);
         }
+
+        public Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken)
+            => Task.FromResult(new ActivityLogFilterOptions { Categories = [], EventTypes = [] });
 
         public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken) => Task.FromResult(0);
 

@@ -9,7 +9,7 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
-Current Service release version: `0.3.2`. The Service/WebUI release version and native-app marketing version advance
+Current Service release version: `0.4.0`. The Service/WebUI release version and native-app marketing version advance
 together. The native build number remains a separate monotonically increasing Apple bundle value.
 
 Launch agent labels:
@@ -207,9 +207,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.3.2` |
-| Current build | `6` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.3.2.dmg` |
+| Current version | `0.4.0` |
+| Current build | `7` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.4.0.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -315,7 +315,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.3.2 --build 6
+./Scripts/release-macos-app.zsh --version 0.4.0 --build 7
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
@@ -338,9 +338,9 @@ release.
 Optional command-line checks:
 
 ```bash
-xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.3.2.dmg"
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.4.0.dmg"
 spctl --assess --type open --context context:primary-signature --verbose=4 \
-  "/path/to/TorrentCore-macOS-App-0.3.2.dmg"
+  "/path/to/TorrentCore-macOS-App-0.4.0.dmg"
 ```
 
 ### Uninstall And Recovery

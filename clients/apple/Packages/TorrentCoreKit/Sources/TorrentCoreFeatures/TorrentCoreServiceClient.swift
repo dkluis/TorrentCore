@@ -9,8 +9,10 @@ public protocol TorrentCoreServiceClientProtocol: Sendable {
     func torrent(id: UUID) async throws -> TorrentCoreTorrentDetail
     func categories() async throws -> [TorrentCoreCategory]
     func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary]
+    func historyFilterOptions() async throws -> TorrentCoreHistoryFilterOptions
     func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail
     func logs(query: TorrentCoreLogQuery) async throws -> [TorrentCoreActivityLogEntry]
+    func activityLogFilterOptions() async throws -> TorrentCoreActivityLogFilterOptions
     func peers(torrentID: UUID) async throws -> [TorrentCorePeer]
     func trackers(torrentID: UUID) async throws -> [TorrentCoreTracker]
     func runtimeSettings() async throws -> TorrentCoreRuntimeSettings

@@ -24,6 +24,15 @@ public sealed class HistoryController(ITorrentApplicationService torrentApplicat
         return Ok(history);
     }
 
+    [HttpGet("filter-options")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentHistoryFilterOptionsDto))]
+    public async Task<ActionResult<TorrentHistoryFilterOptionsDto>> GetFilterOptions(
+        CancellationToken cancellationToken)
+    {
+        var options = await torrentApplicationService.GetHistoryFilterOptionsAsync(cancellationToken);
+        return Ok(options);
+    }
+
     [HttpGet("by-torrent/{torrentId:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentHistoryDetailDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]

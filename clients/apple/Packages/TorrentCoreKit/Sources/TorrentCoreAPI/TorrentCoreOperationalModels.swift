@@ -56,6 +56,16 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
     }
 }
 
+public struct TorrentCoreHistoryFilterOptions: Codable, Hashable, Sendable {
+    public var categoryKeys: [String]
+    public var states: [String]
+
+    public init(categoryKeys: [String], states: [String]) {
+        self.categoryKeys = categoryKeys
+        self.states = states
+    }
+}
+
 public struct TorrentCoreHistorySummary: Codable, Hashable, Sendable, Identifiable {
     public var categoryKey: String?
     public var completionCallbackFinalResult: String?
@@ -143,12 +153,21 @@ public struct TorrentCoreActivityLogLevel: RawRepresentable, Codable, Hashable, 
         self.rawValue = rawValue
     }
 
-    public static let trace = Self(rawValue: 0)
-    public static let debug = Self(rawValue: 1)
-    public static let information = Self(rawValue: 2)
-    public static let warning = Self(rawValue: 3)
-    public static let error = Self(rawValue: 4)
-    public static let critical = Self(rawValue: 5)
+    public static let debug = Self(rawValue: 0)
+    public static let information = Self(rawValue: 1)
+    public static let warning = Self(rawValue: 2)
+    public static let error = Self(rawValue: 3)
+    public static let critical = Self(rawValue: 4)
+}
+
+public struct TorrentCoreActivityLogFilterOptions: Codable, Hashable, Sendable {
+    public var categories: [String]
+    public var eventTypes: [String]
+
+    public init(categories: [String], eventTypes: [String]) {
+        self.categories = categories
+        self.eventTypes = eventTypes
+    }
 }
 
 public struct TorrentCoreLogQuery: Hashable, Sendable {
