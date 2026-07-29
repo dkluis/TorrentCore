@@ -31,6 +31,10 @@ The maintenance and filtering refinements are released as signed, notarized, and
 Service and macOS client passed live CA-Desktop testing through Xcode, and the copied release DMG passed signature,
 stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 
+The native app-icon update is released as signed, notarized, and stapled 0.4.1/build 8. The copied release DMG passed
+signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.4.0
+acceptance remains pending.
+
 `TorrentCore.WebUI` remains the supported operator UI.
 
 ## Targets

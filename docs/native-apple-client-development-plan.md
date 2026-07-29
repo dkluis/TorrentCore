@@ -440,6 +440,9 @@ Implementation stages:
   released as 0.4.0/build 7 and accepted under notarization submission
   `b55e898b-b73d-4ff0-b3ad-0b3a1563d373`; its copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and
   checksum verification.
+  The shared macOS and mobile app-icon catalogs were then released for macOS as 0.4.1/build 8 and accepted under
+  notarization submission `a53db386-2133-4910-be77-4354fea77089`; its copied DMG passed signature, stapler-ticket,
+  disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.4.0 acceptance remains pending.
 - **5D — separate-Mac acceptance:** complete July 26, 2026. The signed, notarized, and stapled 0.1.0 DMG installed and
   worked normally on an Apple Silicon macOS 26 system. It also installed and launched normally without Gatekeeper
   bypass on CA-Dick-MBA running macOS 27; LAN connection to CA-Desktop and add, pause, and remove-with-data mutations

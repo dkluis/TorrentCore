@@ -156,6 +156,11 @@ Xcode against that live installation. The signed, notarized, and stapled 0.4.0/b
 workflow under submission `b55e898b-b73d-4ff0-b3ad-0b3a1563d373`; the copied deployment artifact passed signature,
 stapler-ticket, disk-image, Gatekeeper, and checksum verification. Its SHA-256 checksum is
 `74e8325562a90bafa9a1a982b881c6d75a92c34166dc88acfb2e0c43e74459c8`.
+The 0.4.1/build 8 app-icon update completed the same release workflow on July 29, 2026 under submission
+`a53db386-2133-4910-be77-4354fea77089`; the copied deployment artifact passed signature, stapler-ticket, disk-image,
+Gatekeeper, and checksum verification. Its SHA-256 checksum is
+`acb507af743172642d0440a59e61a46dd5c95bccb1606279ace35e7e57c7f835`. Separate-Mac installation-over-0.4.0
+acceptance remains pending.
 
 ## Testing Rules
 

@@ -9,8 +9,8 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
-Current Service release version: `0.4.0`. The Service/WebUI release version and native-app marketing version advance
-together. The native build number remains a separate monotonically increasing Apple bundle value.
+Current Service release version: `0.4.0`. Native-app-only updates may advance the Apple marketing version without a
+Service/WebUI deployment. The native build number remains a separate monotonically increasing Apple bundle value.
 
 Launch agent labels:
 
@@ -207,9 +207,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.4.0` |
-| Current build | `7` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.4.0.dmg` |
+| Current version | `0.4.1` |
+| Current build | `8` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.4.1.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -236,6 +236,10 @@ especially saved-connection startup on macOS 27, remains pending.
 The 0.4.0/build 7 maintenance and filtering update was accepted and stapled on July 28, 2026 under notarization
 submission `b55e898b-b73d-4ff0-b3ad-0b3a1563d373`. Its SHA-256 checksum is
 `74e8325562a90bafa9a1a982b881c6d75a92c34166dc88acfb2e0c43e74459c8`. The copied DMG passed code-signature,
+stapler-ticket, disk-image, Gatekeeper, and checksum verification.
+The 0.4.1/build 8 native app-icon update was accepted and stapled on July 29, 2026 under notarization submission
+`a53db386-2133-4910-be77-4354fea77089`. Its SHA-256 checksum is
+`acb507af743172642d0440a59e61a46dd5c95bccb1606279ace35e7e57c7f835`. The copied DMG passed code-signature,
 stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 
 ### One-Time Developer ID Setup
@@ -319,7 +323,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.4.0 --build 7
+./Scripts/release-macos-app.zsh --version 0.4.1 --build 8
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
@@ -342,9 +346,9 @@ release.
 Optional command-line checks:
 
 ```bash
-xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.4.0.dmg"
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.4.1.dmg"
 spctl --assess --type open --context context:primary-signature --verbose=4 \
-  "/path/to/TorrentCore-macOS-App-0.4.0.dmg"
+  "/path/to/TorrentCore-macOS-App-0.4.1.dmg"
 ```
 
 ### Uninstall And Recovery
