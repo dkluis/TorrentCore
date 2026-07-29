@@ -43,6 +43,10 @@ stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 Both application targets use the local `TorrentCoreKit` Swift package. macOS is implemented first; the mobile target
 exists at the baseline so shared code is continuously buildable for iOS.
 
+Both targets use the same approved TorrentCore app-icon artwork: an orange segmented transfer ring ending in a
+download arrow around a dark central core. The macOS asset catalog supplies the complete native size set, while the
+mobile catalog keeps one 1024-point source for future iOS/iPadOS adaptation.
+
 ## Development Model
 
 A deployed TorrentCore runtime may coexist on the development Mac, but routine development, tests, and SwiftUI
