@@ -80,6 +80,17 @@ load Microsoft's separately signed shared .NET runtime. Native Mach-O dependenci
 signed separately before the final DMG is signed, notarized, stapled, and verified. This does not make the deployment
 self-contained and does not change the target directory layout or LaunchAgent commands.
 
+The signed deployment payload keeps `Service/TorrentCoreService` and `WebUI/TorrentCore.WebUI` as the public
+LaunchAgent paths. Each path now contains a component-specific native supervisor launcher with a unique Mach-O UUID;
+the original framework-dependent apphost remains beside it with an `.apphost` suffix and retains the required .NET
+entitlements. The launchers forward termination signals and return the helpers' exit status without changing working
+directories or configuration lookup.
+
+The Dick `torrentcore.2026.08.05.Dick.MetadataAdmissionRecovery` Intel deployment DMG was accepted and stapled on
+August 5, 2026 under notarization submission `b4404683-2c07-4939-abe7-63c627ac886f`. Its SHA-256 checksum is
+`a8c8b6be577efa5ab3c2dbc3f0972cc97686f77b7638206121d2463a6704e5f1`. The final copied artifact passed code-signature,
+stapler-ticket, disk-image, Gatekeeper, full internal-checksum, distinct-main-UUID, and helper-entitlement verification.
+
 The direct-email acceptance path must retain macOS quarantine. On the target Mac, mount the attachment and complete the
 normal Terminal-based `plan`, `dry-run`, `apply`, and `verify` sequence without clearing extended attributes. The Tom
 manifest keeps the former xattr compatibility policy disabled while this release workflow is proven.
@@ -253,6 +264,10 @@ stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 The 0.4.1/build 8 native app-icon update was accepted and stapled on July 29, 2026 under notarization submission
 `a53db386-2133-4910-be77-4354fea77089`. Its SHA-256 checksum is
 `acb507af743172642d0440a59e61a46dd5c95bccb1606279ace35e7e57c7f835`. The copied DMG passed code-signature,
+stapler-ticket, disk-image, Gatekeeper, and checksum verification.
+The 0.5.0/build 9 metadata-admission and recovery update was accepted and stapled on August 5, 2026 under notarization
+submission `d6626a01-99ce-4569-8814-951caecda675`. Its SHA-256 checksum is
+`c4e85a26bf349146d69f6764d88e3f68e3f2d03569ce002993459c3dddbc09b3`. The copied DMG passed code-signature,
 stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 
 ### One-Time Developer ID Setup

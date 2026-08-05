@@ -35,6 +35,10 @@ The native app-icon update is released as signed, notarized, and stapled 0.4.1/b
 signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification. Separate-Mac installation-over-0.4.0
 acceptance remains pending.
 
+The metadata-admission and recovery update is released as signed, notarized, and stapled 0.5.0/build 9. It adds the
+metadata resolution time-slice and automatic-reset stuck-threshold controls to native Service Settings. The copied
+release DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification.
+
 `TorrentCore.WebUI` remains the supported operator UI.
 
 ## Targets

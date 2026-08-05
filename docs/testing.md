@@ -132,6 +132,13 @@ must verify Developer ID signatures plus JIT and shared-runtime library-validati
 dependent apphosts, the signature on every native Mach-O dependency, an accepted and stapled DMG, and a direct-email
 install on the target Mac without any xattr clearing.
 
+The August 5 Dick Intel deployment release added distinct native supervisor launchers at the established Service and
+WebUI executable paths while retaining the framework-dependent apphosts as sibling `.apphost` helpers. Release
+verification proved distinct launcher UUIDs, valid signatures on all five Mach-O payload files, both required .NET
+entitlements on each helper, and every internal package checksum. Apple accepted submission
+`b4404683-2c07-4939-abe7-63c627ac886f`; the final DMG checksum is
+`a8c8b6be577efa5ab3c2dbc3f0972cc97686f77b7638206121d2463a6704e5f1`.
+
 The first complete release run passed on July 26, 2026. Apple accepted the 0.1.0/build 1 notarization submission, and
 the final copied DMG independently passed code-signature, stapler-ticket, disk-image checksum, and Gatekeeper
 assessment.
@@ -173,6 +180,10 @@ The 0.4.1/build 8 app-icon update completed the same release workflow on July 29
 Gatekeeper, and checksum verification. Its SHA-256 checksum is
 `acb507af743172642d0440a59e61a46dd5c95bccb1606279ace35e7e57c7f835`. Separate-Mac installation-over-0.4.0
 acceptance remains pending.
+The 0.5.0/build 9 metadata-admission and recovery update completed the release workflow on August 5, 2026 under
+submission `d6626a01-99ce-4569-8814-951caecda675`; the copied artifact passed signature, stapler-ticket, disk-image,
+Gatekeeper, and checksum verification. Its SHA-256 checksum is
+`c4e85a26bf349146d69f6764d88e3f68e3f2d03569ce002993459c3dddbc09b3`.
 
 ## Testing Rules
 
