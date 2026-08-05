@@ -142,6 +142,12 @@ entitlements on each helper, and every internal package checksum. Apple accepted
 `b4404683-2c07-4939-abe7-63c627ac886f`; the final DMG checksum is
 `a8c8b6be577efa5ab3c2dbc3f0972cc97686f77b7638206121d2463a6704e5f1`.
 
+The 0.5.1 connection-leak hotfix passed all 206 .NET tests, including launch-agent restart-label regression coverage.
+Its Dick Intel Service/WebUI deployment DMG was accepted and stapled under Apple submission
+`ca9d691f-dcf4-40ff-b573-2577f35ace86`; the final checksum is
+`cf4d0d59a9e9a48b7234cd3213942837b2dae49f8694f7a25f42c45d45fe0502`. The copied artifact passed code-signature,
+stapler-ticket, disk-image, Gatekeeper, internal-checksum, distinct-main-UUID, and helper-entitlement verification.
+
 The first complete release run passed on July 26, 2026. Apple accepted the 0.1.0/build 1 notarization submission, and
 the final copied DMG independently passed code-signature, stapler-ticket, disk-image checksum, and Gatekeeper
 assessment.

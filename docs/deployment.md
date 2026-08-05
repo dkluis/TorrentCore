@@ -96,6 +96,11 @@ August 5, 2026 under notarization submission `b4404683-2c07-4939-abe7-63c627ac88
 `a8c8b6be577efa5ab3c2dbc3f0972cc97686f77b7638206121d2463a6704e5f1`. The final copied artifact passed code-signature,
 stapler-ticket, disk-image, Gatekeeper, full internal-checksum, distinct-main-UUID, and helper-entitlement verification.
 
+The 0.5.1 Dick `torrentcore.2026.08.05.Dick.ConnectionLeakHotfix` Intel deployment DMG was accepted and stapled on
+August 5, 2026 under notarization submission `ca9d691f-dcf4-40ff-b573-2577f35ace86`. Its SHA-256 checksum is
+`cf4d0d59a9e9a48b7234cd3213942837b2dae49f8694f7a25f42c45d45fe0502`. The final copied artifact passed the same
+signature, stapler-ticket, disk-image, Gatekeeper, internal-checksum, distinct-main-UUID, and entitlement verification.
+
 The direct-email acceptance path must retain macOS quarantine. On the target Mac, mount the attachment and complete the
 normal Terminal-based `plan`, `dry-run`, `apply`, and `verify` sequence without clearing extended attributes. The Tom
 manifest keeps the former xattr compatibility policy disabled while this release workflow is proven.
