@@ -90,6 +90,14 @@ The WebUI stays a thin client over service contracts. It must not:
 - bypass service APIs for operator workflows
 - embed engine or recovery policy that belongs in the service host
 
+## Engine Dependency
+
+- TorrentCore pins MonoTorrent `3.0.2` as the production baseline.
+- Do not use `3.0.3-alpha.unstable.rev0049`; its outgoing-connection retry path can leak the host-wide open-connection
+  count after encryption or handshake failures and eventually suppress every new connection attempt.
+- Evaluate later MonoTorrent prereleases as isolated upgrades with a sustained peer-churn test before changing the
+  production baseline.
+
 ## Queueing And Lifecycle Rules
 
 - TorrentCore accepts and persists incoming magnets even when runtime capacity is full.

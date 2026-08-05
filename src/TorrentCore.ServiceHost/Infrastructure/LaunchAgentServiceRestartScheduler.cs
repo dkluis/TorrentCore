@@ -7,18 +7,15 @@ public sealed class LaunchAgentServiceRestartScheduler(
 ) : ILaunchAgentServiceRestartScheduler
 {
     private const int RestartDelaySeconds = 2;
+    internal const string ServiceLaunchAgentLabel = "com.torrentcore.service";
 
     public Task<ServiceRestartScheduleResult> ScheduleRestartAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var serviceLabel = Environment.GetEnvironmentVariable("XPC_SERVICE_NAME");
-        if (string.IsNullOrWhiteSpace(serviceLabel))
-        {
-            throw new InvalidOperationException(
-                "Service restart is only supported when TorrentCore.Service is running under launchd."
-            );
-        }
+        var serviceLabel = ResolveServiceLaunchAgentLabel(
+            Environment.GetEnvironmentVariable("XPC_SERVICE_NAME")
+        );
 
         var currentUserId = GetCurrentUserId();
         var launchDomain = $"gui/{currentUserId}";
@@ -52,6 +49,18 @@ public sealed class LaunchAgentServiceRestartScheduler(
                     $"Restart requested for {serviceLabel}. The service will restart shortly and may be unavailable briefly.",
             }
         );
+    }
+
+    internal static string ResolveServiceLaunchAgentLabel(string? launchdContextName)
+    {
+        if (string.IsNullOrWhiteSpace(launchdContextName))
+        {
+            throw new InvalidOperationException(
+                "Service restart is only supported when TorrentCore.Service is running under launchd."
+            );
+        }
+
+        return ServiceLaunchAgentLabel;
     }
 
     private static string GetCurrentUserId()

@@ -5,11 +5,11 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <AssemblyName>TorrentCoreService</AssemblyName>
-        <Version>0.5.0</Version>
+        <Version>0.5.1</Version>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MonoTorrent" Version="3.0.3-alpha.unstable.rev0049"/>
+        <PackageReference Include="MonoTorrent" Version="3.0.2"/>
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3"/>
     </ItemGroup>
 

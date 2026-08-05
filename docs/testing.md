@@ -14,6 +14,7 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 Representative coverage areas:
 
 - API behavior, including Service semantic-version and Git-build identity reporting
+- launch-agent restart-label resolution, including the native supervisor helper's `XPC_SERVICE_NAME=0` context
 - SQLite schema migration and persistence
 - torrent state persistence and restart recovery
 - history-store and history-service behavior

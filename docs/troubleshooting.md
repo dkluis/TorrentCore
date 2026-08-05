@@ -50,6 +50,11 @@ Useful checks:
 - whether TorrentCore logs `torrent.download.restart_requested`
 - whether another client succeeds over IPv4 on the same host while IPv6 route failures appear in TorrentCore logs
 
+If connection summaries continue reporting `NewPeersFound` but later report no connection, disconnection, or failure
+events after `TooManyOpenConnections`, verify the deployed MonoTorrent package. TorrentCore pins `3.0.2` because
+`3.0.3-alpha.unstable.rev0049` can leak its host-wide open-connection count on failed encryption or handshake paths.
+Per-torrent stop/start recovery does not reset that host-wide counter; a complete Service process restart does.
+
 ## Completion Callback Problems
 
 Remember:

@@ -9,11 +9,9 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
-Current source Service/WebUI release version: `0.5.0`. The Dick metadata-admission deployment built before this
-identity correction still reports Service version `0.4.0`; it does contain Git commit `f3a312e74e43` and does not need
-to be redeployed solely to change its displayed version. Native-app-only updates may advance the Apple marketing
-version without a Service/WebUI deployment. The native build number remains a separate monotonically increasing Apple
-bundle value.
+Current source Service/WebUI release version: `0.5.1`. This hotfix restores the MonoTorrent `3.0.2` production baseline
+and corrects launch-agent restart targeting. Native-app-only updates may advance the Apple marketing version without a
+Service/WebUI deployment. The native build number remains a separate monotonically increasing Apple bundle value.
 
 Launch agent labels:
 
@@ -176,6 +174,8 @@ Rules:
 
 - the browser does not call `launchctl` directly
 - the service schedules its own restart
+- the scheduler targets the supported `com.torrentcore.service` label; `XPC_SERVICE_NAME` is used only to verify that
+  the managed helper is running under launchd because the native supervisor arrangement reports the helper name as `0`
 - a short outage window is expected
 - manual browser refresh may still be needed if reconnect does not settle cleanly
 
