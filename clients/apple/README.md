@@ -39,8 +39,10 @@ The metadata-admission and recovery update is released as signed, notarized, and
 metadata resolution time-slice and automatic-reset stuck-threshold controls to native Service Settings. The copied
 release DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 
-Current source also displays the optional Service Git build identity on the macOS dashboard. Older Service versions
-that omit the additive field continue to display `--` and remain connectable.
+The 0.5.1/build 10 native compatibility update recognizes the optional Service Git build identity introduced after
+build 9. Build 9's generated decoder rejects that otherwise additive `serviceBuild` response property, so it can pass
+the health-only connection test but cannot load host status from Service 0.5.1. Older Service versions that omit the
+field continue to display `--` and remain connectable.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 

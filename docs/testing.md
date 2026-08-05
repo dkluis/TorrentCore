@@ -193,6 +193,8 @@ The 0.5.0/build 9 metadata-admission and recovery update completed the release w
 submission `d6626a01-99ce-4569-8814-951caecda675`; the copied artifact passed signature, stapler-ticket, disk-image,
 Gatekeeper, and checksum verification. Its SHA-256 checksum is
 `c4e85a26bf349146d69f6764d88e3f68e3f2d03569ce002993459c3dddbc09b3`.
+The 0.5.1/build 10 native compatibility release retains direct decoding coverage for the optional `serviceBuild`
+property because build 9's strict generated schema predates and rejects that added host-status key.
 
 ## Testing Rules
 

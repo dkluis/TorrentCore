@@ -8,8 +8,8 @@ readonly EXPORT_OPTIONS_RELATIVE_PATH="clients/apple/ExportOptions-DeveloperID.p
 readonly SCHEME="TorrentCoreMac"
 readonly PRODUCT_NAME="TorrentCore"
 
-VERSION="0.5.0"
-BUILD_NUMBER="9"
+VERSION="0.5.1"
+BUILD_NUMBER="10"
 OUTPUT_DIR="/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs"
 NOTARY_PROFILE="TorrentCore-notary"
 SIGNING_IDENTITY=""
@@ -24,8 +24,8 @@ Usage: ./Scripts/release-macos-app.zsh [options]
 Build, Developer ID sign, notarize, staple, and verify the TorrentCore macOS DMG.
 
 Options:
-  --version <version>              Marketing version (default: 0.5.0)
-  --build <number>                 Positive integer build number (default: 9)
+  --version <version>              Marketing version (default: 0.5.1)
+  --build <number>                 Positive integer build number (default: 10)
   --output-dir <absolute-path>     DMG destination directory
   --notary-profile <name>          notarytool Keychain profile
                                    (default: TorrentCore-notary)
@@ -37,7 +37,7 @@ Options:
 
 The default output is:
   /Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/
-  TorrentCore-macOS-App-0.5.0.dmg
+  TorrentCore-macOS-App-0.5.1.dmg
 EOF
 }
 

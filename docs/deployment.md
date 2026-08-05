@@ -105,6 +105,12 @@ The direct-email acceptance path must retain macOS quarantine. On the target Mac
 normal Terminal-based `plan`, `dry-run`, `apply`, and `verify` sequence without clearing extended attributes. The Tom
 manifest keeps the former xattr compatibility policy disabled while this release workflow is proven.
 
+Do not build or deploy another Tom Service/WebUI package until the WebUI connection-configuration packaging defect is
+fixed. `dotnet publish` currently includes the Git-ignored `WebUI/Config/service-connection.json`, and full WebUI
+directory replacement then overwrites Tom's saved endpoint with the release machine's value. The fix must exclude the
+machine-local file from payloads and preserve the target's existing WebUI connection setting, with package and apply
+verification for both behaviors.
+
 ## Launch-Agent Management
 
 Install both agents:
@@ -243,9 +249,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.5.0` |
-| Current build | `9` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.5.0.dmg` |
+| Current version | `0.5.1` |
+| Current build | `10` |
+| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.5.1.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -281,6 +287,8 @@ The 0.5.0/build 9 metadata-admission and recovery update was accepted and staple
 submission `d6626a01-99ce-4569-8814-951caecda675`. Its SHA-256 checksum is
 `c4e85a26bf349146d69f6764d88e3f68e3f2d03569ce002993459c3dddbc09b3`. The copied DMG passed code-signature,
 stapler-ticket, disk-image, Gatekeeper, and checksum verification.
+The 0.5.1/build 10 native compatibility update recognizes the Service `serviceBuild` response property added after
+build 9. The older app's strict generated decoder rejects that unknown property after its health-only test succeeds.
 
 ### One-Time Developer ID Setup
 
@@ -363,7 +371,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.5.0 --build 9
+./Scripts/release-macos-app.zsh --version 0.5.1 --build 10
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
@@ -386,9 +394,9 @@ release.
 Optional command-line checks:
 
 ```bash
-xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.5.0.dmg"
+xcrun stapler validate "/path/to/TorrentCore-macOS-App-0.5.1.dmg"
 spctl --assess --type open --context context:primary-signature --verbose=4 \
-  "/path/to/TorrentCore-macOS-App-0.5.0.dmg"
+  "/path/to/TorrentCore-macOS-App-0.5.1.dmg"
 ```
 
 ### Uninstall And Recovery

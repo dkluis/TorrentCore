@@ -45,6 +45,9 @@ Do not treat `docs/archive/` as active requirements unless the current code or a
 - Run macOS DMG security validation outside the filesystem sandbox. Sandboxed `codesign`, `xcrun stapler`, and
   `spctl` checks can falsely report an invalid signature, unavailable signing authority, or a nonexistent DMG even
   when the same artifact passes outside the sandbox. Treat the outside-sandbox release verification as authoritative.
+- Do not create or deploy another Tom Service/WebUI package until machine-local
+  `WebUI/Config/service-connection.json` is excluded from release payloads and the target WebUI connection setting is
+  preserved across directory replacement. Existing packages overwrite Tom's endpoint with Dick's saved endpoint.
 - When `functions.exec` is available, batch independent read-only or diagnostic tool calls within the same bounded
   stage into one `functions.exec` call. Use `await Promise.allSettled([...])` when individual calls may fail or their
   partial results remain useful, and inspect every settled result. Use `await Promise.all([...])` only when every result
