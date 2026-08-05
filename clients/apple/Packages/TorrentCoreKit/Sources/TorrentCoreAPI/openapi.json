@@ -568,6 +568,10 @@
             "format": "double",
             "type": "number"
           },
+          "serviceBuild": {
+            "nullable": true,
+            "type": "string"
+          },
           "serviceInstanceId": {
             "format": "uuid",
             "type": "string"

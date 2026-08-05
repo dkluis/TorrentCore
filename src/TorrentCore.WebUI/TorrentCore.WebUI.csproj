@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <LangVersion>14</LangVersion>
+    <Version>0.5.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

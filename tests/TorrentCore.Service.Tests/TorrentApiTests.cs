@@ -38,7 +38,8 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal(ServiceApiContract.CurrentVersion, hostStatus.ApiVersion);
-        Assert.Equal("0.4.0", hostStatus.ServiceVersion);
+        Assert.Equal("0.5.0", hostStatus.ServiceVersion);
+        Assert.Matches("^[0-9a-f]{40}$", hostStatus.ServiceBuild);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
         Assert.Equal(55_123, hostStatus.EngineListenPort);

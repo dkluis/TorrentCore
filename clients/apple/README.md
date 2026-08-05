@@ -39,6 +39,9 @@ The metadata-admission and recovery update is released as signed, notarized, and
 metadata resolution time-slice and automatic-reset stuck-threshold controls to native Service Settings. The copied
 release DMG passed signature, stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 
+Current source also displays the optional Service Git build identity on the macOS dashboard. Older Service versions
+that omit the additive field continue to display `--` and remain connectable.
+
 `TorrentCore.WebUI` remains the supported operator UI.
 
 ## Targets

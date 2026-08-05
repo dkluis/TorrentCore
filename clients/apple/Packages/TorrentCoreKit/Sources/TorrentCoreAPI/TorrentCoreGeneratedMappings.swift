@@ -17,6 +17,7 @@ extension TorrentCoreHostStatus {
         apiVersion = value.apiVersion.map(Int.init)
         serviceName = value.serviceName
         serviceVersion = value.serviceVersion
+        serviceBuild = value.serviceBuild
         serviceInstanceID = UUID(uuidString: value.serviceInstanceId)
         engineRuntime = value.engineRuntime
         engineListenPort = Int(value.engineListenPort)

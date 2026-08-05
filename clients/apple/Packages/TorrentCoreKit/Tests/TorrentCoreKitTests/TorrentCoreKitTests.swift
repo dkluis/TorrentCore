@@ -132,6 +132,7 @@ func initialSliceBuildsDeterministicRequestsAndDecodesFixtures() async throws {
 
     #expect(health.apiVersion == 1)
     #expect(host.serviceInstanceID?.uuidString == FixturePayloads.serviceInstanceID.uppercased())
+    #expect(host.serviceBuild == "0123456789abcdef0123456789abcdef01234567")
     #expect(lifecycle.recentEvents.count == 1)
     #expect(torrents.first?.state.rawValue == "FutureTorrentState")
     #expect(detail.torrentID == torrentID)
@@ -795,6 +796,7 @@ private enum FixturePayloads {
       "apiVersion": 1,
       "serviceName": "TorrentCore.Service",
       "serviceVersion": "1.0.0",
+      "serviceBuild": "0123456789abcdef0123456789abcdef01234567",
       "serviceInstanceId": "\(serviceInstanceID)",
       "engineRuntime": "MonoTorrent",
       "engineListenPort": 55123,

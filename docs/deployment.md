@@ -9,8 +9,11 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
-Current Service release version: `0.4.0`. Native-app-only updates may advance the Apple marketing version without a
-Service/WebUI deployment. The native build number remains a separate monotonically increasing Apple bundle value.
+Current source Service/WebUI release version: `0.5.0`. The Dick metadata-admission deployment built before this
+identity correction still reports Service version `0.4.0`; it does contain Git commit `f3a312e74e43` and does not need
+to be redeployed solely to change its displayed version. Native-app-only updates may advance the Apple marketing
+version without a Service/WebUI deployment. The native build number remains a separate monotonically increasing Apple
+bundle value.
 
 Launch agent labels:
 
@@ -85,6 +88,10 @@ LaunchAgent paths. Each path now contains a component-specific native supervisor
 the original framework-dependent apphost remains beside it with an `.apphost` suffix and retains the required .NET
 entitlements. The launchers forward termination signals and return the helpers' exit status without changing working
 directories or configuration lookup.
+
+`api/host/status` identifies a Service build with both `serviceVersion` and optional `serviceBuild`. The build value is
+the full Git commit embedded in the Service assembly. The WebUI and native macOS dashboard show its first 12 characters
+so an operator can correlate the active process with the deployment snapshot's `release.gitSha`.
 
 The Dick `torrentcore.2026.08.05.Dick.MetadataAdmissionRecovery` Intel deployment DMG was accepted and stapled on
 August 5, 2026 under notarization submission `b4404683-2c07-4939-abe7-63c627ac886f`. Its SHA-256 checksum is

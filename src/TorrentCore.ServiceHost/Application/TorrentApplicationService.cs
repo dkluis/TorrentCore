@@ -82,6 +82,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             ApiVersion                       = ServiceApiContract.CurrentVersion,
             ServiceName                      = "TorrentCore.Service",
             ServiceVersion                   = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0",
+            ServiceBuild                     = GetServiceBuild(),
             ServiceInstanceId                = serviceInstanceContext.ServiceInstanceId,
             EngineRuntime                    = serviceOptions.Value.EngineMode.ToString(),
             EngineListenPort                 = serviceOptions.Value.EngineListenPort,
@@ -136,6 +137,18 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             StartupRecoveryCompletedAtUtc = startupRecoveryState.CompletedAtUtc,
             CheckedAtUtc = DateTimeOffset.UtcNow,
         };
+    }
+
+    private static string? GetServiceBuild()
+    {
+        var informationalVersion = typeof(TorrentApplicationService).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        var separatorIndex = informationalVersion?.LastIndexOf('+') ?? -1;
+
+        return separatorIndex >= 0 && separatorIndex < informationalVersion!.Length - 1
+            ? informationalVersion[(separatorIndex + 1)..]
+            : null;
     }
 
     public async Task<DashboardLifecycleSummaryDto> GetDashboardLifecycleAsync(CancellationToken cancellationToken)

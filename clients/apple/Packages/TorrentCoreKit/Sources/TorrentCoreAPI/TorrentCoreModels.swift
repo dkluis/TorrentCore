@@ -74,6 +74,7 @@ public struct TorrentCoreHostStatus: Codable, Hashable, Sendable {
     public var apiVersion: Int?
     public var serviceName: String?
     public var serviceVersion: String?
+    public var serviceBuild: String?
     public var serviceInstanceID: UUID?
     public var engineRuntime: String?
     public var engineListenPort: Int

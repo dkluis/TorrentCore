@@ -162,9 +162,15 @@ Useful runtime checks on the host:
 ```bash
 cd ~/TorrentCore/Scripts
 ./agentstatus.zsh
-curl http://127.0.0.1:7033/health
+curl http://127.0.0.1:7033/api/health
+curl http://127.0.0.1:7033/api/host/status
 curl -I http://127.0.0.1:7053/
 ```
+
+Use `serviceVersion` plus `serviceBuild` from host status to identify the active Service. The version is the semantic
+release identity; the optional build is the full Git commit and should match the prefix stored in
+`~/TorrentCore/.deploy/installed.json`. A signed deployment uses a public supervisor process and a sibling `.apphost`
+helper, so the helper—not the supervisor—normally owns ports `7033` and `7053`.
 
 If the WebUI cannot reach the backend:
 

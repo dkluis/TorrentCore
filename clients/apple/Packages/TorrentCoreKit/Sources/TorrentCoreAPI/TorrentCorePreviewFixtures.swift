@@ -16,6 +16,7 @@ public enum TorrentCorePreviewFixtures {
         apiVersion: 1,
         serviceName: "TorrentCore.Service",
         serviceVersion: "1.0.0",
+        serviceBuild: "0123456789abcdef0123456789abcdef01234567",
         serviceInstanceID: UUID(uuidString: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         engineRuntime: "MonoTorrent",
         engineListenPort: 55_123,

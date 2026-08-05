@@ -34,7 +34,7 @@
                             <div class="dashboard-summary-chip">
                                 <span class="dashboard-summary-label">Service</span>
                                 <strong>@(_health?.Status ?? _hostStatus.Status.ToString())</strong>
-                                <span class="dashboard-summary-meta">@(_health?.EnvironmentName ?? _hostStatus.EnvironmentName) | @(_health?.ServiceName ?? _hostStatus.ServiceName) v@_hostStatus.ServiceVersion</span>
+                                <span class="dashboard-summary-meta">@(_health?.EnvironmentName ?? _hostStatus.EnvironmentName) | @(_health?.ServiceName ?? _hostStatus.ServiceName) v@_hostStatus.ServiceVersion | Build @FormatBuild(_hostStatus.ServiceBuild)</span>
                             </div>
 
                             <div class="dashboard-summary-chip">
@@ -502,6 +502,11 @@
     {
         var startedAt = GetServiceStartedAtUtc();
         return startedAt is null ? "Current instance" : $"Up {FormatAge(DateTimeOffset.UtcNow - startedAt.Value)}";
+    }
+
+    private static string FormatBuild(string? build)
+    {
+        return string.IsNullOrWhiteSpace(build) ? "--" : build[..Math.Min(12, build.Length)];
     }
 
     private string BuildCallbackWatchlistSummary()

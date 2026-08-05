@@ -68,6 +68,11 @@ The service reports its additive native-client contract version through `apiVers
 responses. Version `1` is the current contract. Clients may tolerate a missing value while older private installations
 are being updated, but must reject a future version they do not understand.
 
+Host status reports the Service semantic version separately from its build identity. `serviceVersion` comes from the
+Service assembly version; optional `serviceBuild` is the full Git commit embedded by the .NET SDK in the assembly
+informational version. Operator clients shorten the commit for display but retain the full value in the HTTP contract.
+Keeping the build field optional lets updated clients continue to inspect older private Service installations.
+
 History and log filter choices come from dedicated database-backed filter-options endpoints. They return distinct
 values independently of the current grid query and row limit. Operator clients load these choices when a grid opens;
 normal grid filtering and periodic row refreshes do not reload them.

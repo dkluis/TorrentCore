@@ -64,17 +64,34 @@ struct TorrentCoreMacDashboardView: View {
                 }
                 GridRow {
                     TorrentCoreMacDetailRow(
-                        label: "Status",
-                        value: TorrentCoreDisplayFormatter.splitIdentifier(status.status.rawValue)
+                        label: "Build",
+                        value: shortBuild(status.serviceBuild)
                     )
                     TorrentCoreMacDetailRow(
                         label: "Instance",
                         value: status.serviceInstanceID?.uuidString ?? "--"
                     )
                 }
+                GridRow {
+                    TorrentCoreMacDetailRow(
+                        label: "Status",
+                        value: TorrentCoreDisplayFormatter.splitIdentifier(status.status.rawValue)
+                    )
+                    TorrentCoreMacDetailRow(
+                        label: "Checked",
+                        value: TorrentCoreDisplayFormatter.timestamp(status.checkedAt)
+                    )
+                }
             }
             .padding(.top, 4)
         }
+    }
+
+    private func shortBuild(_ build: String?) -> String {
+        guard let build, !build.isEmpty else {
+            return "--"
+        }
+        return String(build.prefix(12))
     }
 
     private func transferMetrics(status: TorrentCoreHostStatus) -> some View {

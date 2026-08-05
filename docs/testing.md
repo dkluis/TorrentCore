@@ -13,7 +13,7 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 
 Representative coverage areas:
 
-- API behavior
+- API behavior, including Service semantic-version and Git-build identity reporting
 - SQLite schema migration and persistence
 - torrent state persistence and restart recovery
 - history-store and history-service behavior
@@ -67,6 +67,8 @@ show/hide behavior for the Torrents, History, and Logs inspectors. Service Setti
 Downloads values and the inline category grid. Runtime-settings mapping coverage verifies that the metadata-resolution
 time slice and automatic-reset stuck threshold survive draft creation, request encoding, save, and returned-value
 reconciliation.
+Native contract coverage also verifies that the optional full Service build commit maps through the generated client;
+older Service responses that omit it remain supported.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail
 when corresponding records exist.
 
