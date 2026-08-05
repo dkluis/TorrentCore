@@ -194,7 +194,11 @@ submission `d6626a01-99ce-4569-8814-951caecda675`; the copied artifact passed si
 Gatekeeper, and checksum verification. Its SHA-256 checksum is
 `c4e85a26bf349146d69f6764d88e3f68e3f2d03569ce002993459c3dddbc09b3`.
 The 0.5.1/build 10 native compatibility release retains direct decoding coverage for the optional `serviceBuild`
-property because build 9's strict generated schema predates and rejects that added host-status key.
+property because build 9's strict generated schema predates and rejects that added host-status key. All 34 Swift
+package tests, the unsigned macOS build, the .NET build, and all 206 .NET tests passed before release. Apple accepted
+notarization submission `baffb509-1e96-4d8e-a56e-59a630de1bfe`; the signed and stapled release DMG passed the release
+workflow's app and DMG signature, stapler-ticket, disk-image, and Gatekeeper checks. Its SHA-256 checksum is
+`51f8704b3a1769b51f29d7f3b611384e888cf02c43a135d488c9458b92965458`.
 
 ## Testing Rules
 

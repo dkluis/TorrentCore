@@ -43,6 +43,8 @@ The 0.5.1/build 10 native compatibility update recognizes the optional Service G
 build 9. Build 9's generated decoder rejects that otherwise additive `serviceBuild` response property, so it can pass
 the health-only connection test but cannot load host status from Service 0.5.1. Older Service versions that omit the
 field continue to display `--` and remain connectable.
+The signed, notarized, and stapled build 10 DMG was accepted by Apple on August 5, 2026 and passed the release
+workflow's app and DMG signature, stapler-ticket, disk-image, Gatekeeper, and checksum checks.
 
 `TorrentCore.WebUI` remains the supported operator UI.
 

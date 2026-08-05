@@ -289,6 +289,10 @@ submission `d6626a01-99ce-4569-8814-951caecda675`. Its SHA-256 checksum is
 stapler-ticket, disk-image, Gatekeeper, and checksum verification.
 The 0.5.1/build 10 native compatibility update recognizes the Service `serviceBuild` response property added after
 build 9. The older app's strict generated decoder rejects that unknown property after its health-only test succeeds.
+Apple accepted and the release workflow stapled build 10 on August 5, 2026 under notarization submission
+`baffb509-1e96-4d8e-a56e-59a630de1bfe`. Its SHA-256 checksum is
+`51f8704b3a1769b51f29d7f3b611384e888cf02c43a135d488c9458b92965458`. The release artifact passed app and DMG
+code-signature checks, stapler-ticket validation, disk-image verification, and Gatekeeper assessment.
 
 ### One-Time Developer ID Setup
 
