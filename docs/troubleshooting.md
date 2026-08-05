@@ -73,6 +73,9 @@ Inspect persistent activity logs for:
 - `runtime.operation.slow`
 - `runtime.tick.duration_summary`
 - `runtime.recovery.action_completed`
+- `runtime.metadata.reset_completed`
+- `runtime.metadata.reset_failed`
+- `runtime.metadata.reset_recreate_retry`
 - `runtime.callback.dispatch_completed`
 - `runtime.connection.activity_summary`
 - `runtime.monotorrent.cache_audit`
@@ -81,6 +84,9 @@ Inspect persistent activity logs for:
 Use the logged subsystem and operation fields to distinguish synchronization-gate waits, MonoTorrent lifecycle work,
 callback execution, and storage phases before restarting the service. Recovery and connection summaries retain torrent
 context after torrent-scoped activity logs are pruned.
+Torrent list and detail reads do not wait for the MonoTorrent lifecycle gate. During a manager transition they may
+briefly show persisted state instead of a live projection; repeated read timeouts therefore indicate pressure outside
+that lifecycle gate or an older deployment.
 For broad snapshot-phase delays, compare `torrent_snapshot_read`, `torrent_snapshot_projection`,
 `torrent_finalization_visibility_probe`, `torrent_snapshot_write`, and `torrent_history_write` before attributing the
 whole phase to SQLite.
@@ -91,6 +97,20 @@ Completion-time manager stops are also deduplicated background work. A slow `com
 torrent's callback handoff; callback dispatch remains blocked until MonoTorrent has stopped accessing the payload.
 Inspect `runtime.completion.manager_stop_completed` for duration and outcome. Failures also appear as
 `runtime.completion.manager_stop_failed` and retry after a short cooldown.
+`torrent.seeding.stopped_policy` records the first durable application of the configured seeding stop policy. Its
+details may show `EngineStopReady: false` while the background manager stop is still finishing; use the runtime stop
+events for the eventual stop outcome. Repeated policy events for one torrent indicate a deployment older than schema
+migration 19 or a persistence failure.
+Automatic metadata reset is single-flight across the host and runs outside serialized engine synchronization. Inspect
+`runtime.metadata.reset_completed` for duration and outcome. `runtime.metadata.reset_failed` means the old manager
+could not complete its reset and was restored when possible. `runtime.metadata.reset_recreate_retry` means removal
+succeeded but creating the replacement failed; TorrentCore retries every five seconds while other torrents continue.
+`runtime.metadata.reset_timed_out` means the configured stuck threshold elapsed; the affected manager remains
+quarantined because MonoTorrent stop work cannot be forcibly cancelled. `runtime.metadata.reset_circuit_opened` marks
+the fixed five-minute breaker window, and `runtime.metadata.reset_suppressed` records automatic resets withheld by an
+active reset, retry cooldown, or open breaker. After cooldown, `runtime.metadata.reset_half_open` marks the one allowed
+probe. `runtime.metadata.reset_late_completion` confirms the quarantined operation finally ended, while
+`runtime.metadata.reset_circuit_closed` confirms a successful half-open probe restored normal scheduling.
 Forced recovery announces do not hold serialized synchronization. Tracker announces are limited to ten seconds and
 duplicate recovery announces for the same torrent are suppressed while one remains active.
 Recovery action details include the recovery cycle, backoff multiplier, and effective timing windows. A high attempt
@@ -98,6 +118,16 @@ count with `LongColdMode=true` indicates a persistently cold torrent on the slow
 engine-wide synchronization stall.
 Runnable downloads retain their accumulated cold duration across automatic stop/start transitions. Time spent queued
 for an active-download slot is suspended and does not advance the long-cold threshold.
+During a large magnet burst, `MaxActiveDownloads` is also the combined ceiling for active metadata resolutions and
+downloads. A metadata resolution consumes a future download reservation because MonoTorrent automatically starts the
+same manager after metadata arrives. Seeing fewer active metadata resolutions than `MaxActiveMetadataResolutions` is
+therefore expected when resolved downloads already claim capacity; the remaining magnets should report a metadata-slot
+wait reason. Available metadata and download slot diagnostics already include these reservations.
+If unresolved magnets remain queued behind long-running resolvers, check `torrent.metadata.resolution_yielded`. Each
+event means the configured metadata-resolution time slice expired and the resolver moved behind waiting work. Rotation
+occurs only when another runnable unresolved magnet is waiting, so a single difficult magnet continues discovery.
+Repeated yields across a full queue are expected for very cold swarms; changing the live time-slice setting affects
+current attempts without resetting their persisted start times.
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete
 them because cached metadata can accelerate a later re-add of the same torrent.
 

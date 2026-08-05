@@ -26,6 +26,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     ITorrentCompletionFinalizationChecker finalizationChecker, ResolvedTorrentCoreServicePaths servicePaths,
     TorrentCompletionFinalizationProbeCoordinator finalizationProbeCoordinator,
     TorrentManagerStopCoordinator managerStopCoordinator,
+    TorrentMetadataResetCoordinator metadataResetCoordinator,
     IOptions<TorrentCoreServiceOptions> serviceOptions, IRuntimeSettingsService runtimeSettingsService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
     ITorrentRemovalCleanupScheduler torrentRemovalCleanupScheduler,
@@ -33,13 +34,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IHostedService, IAsyncDisposable
 {
     private static readonly TimeSpan ConnectionActivitySummaryInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan MetadataResetRecreateRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan RecoveryTrackerAnnounceTimeout = TimeSpan.FromSeconds(10);
     private readonly CancellationTokenSource                                  _backgroundOperationCts = new();
     private readonly ConnectionActivitySummaryTracker                          _connectionActivitySummaries = new();
     private readonly ConcurrentDictionary<Guid, int>                          _downloadRecoveryAttemptCounts = new();
     private readonly ConcurrentDictionary<Guid, TorrentDownloadRecoveryState> _downloadRecoveryStates = new();
     private readonly SemaphoreSlim                                            _gate = new(1, 1);
-    private readonly Dictionary<Guid, TorrentManager>                         _managers = new();
+    private readonly ConcurrentDictionary<Guid, TorrentManager>               _managers = new();
     private readonly ConcurrentDictionary<Guid, int>                          _metadataRecoveryAttemptCounts = new();
     private readonly ConcurrentDictionary<Guid, TorrentMetadataRecoveryState> _metadataRecoveryStates = new();
     private readonly ConcurrentDictionary<Guid, Task>                         _peerDiscoveryAnnounceTasks = new();
@@ -129,6 +131,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             {
                 finalizationProbeCoordinator.Remove(torrentId);
                 managerStopCoordinator.Remove(torrentId);
+                metadataResetCoordinator.Remove(torrentId);
             }
             _managers.Clear();
             _observedTorrentIds.Clear();
@@ -357,7 +360,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var torrent          = torrents.SingleOrDefault(snapshot => snapshot.TorrentId == torrentId);
         var runtimeSettings  = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         var queueDiagnostics = TorrentQueueDiagnostics.Create(torrents, runtimeSettings);
-        var manager          = await TryGetManagerAsync(torrentId, cancellationToken);
+        var manager          = TryGetManager(torrentId);
 
         return torrent is null ?
                 throw new ServiceOperationException(
@@ -540,24 +543,14 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         try
         {
             var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
-            var snapshots       = await torrentStateStore.ListAsync(cancellationToken);
-            var activeMetadataResolutions = snapshots.Count(existing =>
-                existing.TorrentId != snapshot.TorrentId &&
-                existing.DesiredState == TorrentDesiredState.Runnable &&
-                existing.State == ContractTorrentState.ResolvingMetadata
-            );
-
-            if (!manager.HasMetadata && !manager.Complete &&
-                activeMetadataResolutions < runtimeSettings.MaxActiveMetadataResolutions)
-            {
-                await EnsureManagerStartedAsync(manager, cancellationToken);
-
-                var dispatchedSnapshot = CreateUpdatedSnapshot(snapshot, manager, DateTimeOffset.UtcNow);
-                dispatchedSnapshot.State             = ContractTorrentState.ResolvingMetadata;
-                dispatchedSnapshot.ErrorMessage      = null;
-                dispatchedSnapshot.LastActivityAtUtc ??= DateTimeOffset.UtcNow;
-                await torrentStateStore.UpdateAsync(dispatchedSnapshot, cancellationToken);
-            }
+            var managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
+            await ReconcileMetadataResolutionQueueAsync(
+                managedTorrents,
+                runtimeSettings.MaxActiveMetadataResolutions,
+                runtimeSettings.MaxActiveDownloads,
+                runtimeSettings.MetadataResolutionTimeSliceMinutes,
+                DateTimeOffset.UtcNow,
+                cancellationToken);
         }
         finally
         {
@@ -583,10 +576,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfAutomaticMetadataResetRunning(torrentId);
             finalizationProbeCoordinator.Remove(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             var updatedSnapshot = CreatePausedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            updatedSnapshot.MetadataResolutionAttemptStartedAtUtc = null;
             await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
 
@@ -622,6 +617,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfAutomaticMetadataResetRunning(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             var queuedSnapshot  = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
@@ -664,6 +660,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfAutomaticMetadataResetRunning(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             await RequestMetadataDiscoveryRefreshAsync(currentSnapshot, manager, now, "manual", cancellationToken);
@@ -702,6 +699,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfAutomaticMetadataResetRunning(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
             var recreatedManager = await ResetMetadataSessionCoreAsync(
@@ -745,6 +743,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            ThrowIfAutomaticMetadataResetRunning(torrentId);
             finalizationProbeCoordinator.Remove(torrentId);
             var currentSnapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken) ?? snapshot;
             var now             = DateTimeOffset.UtcNow;
@@ -778,28 +777,41 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     public async Task<TorrentActionResultDto> RemoveAsync(Guid torrentId, RemoveTorrentRequest request,
         CancellationToken                                      cancellationToken)
     {
-        var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+        await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
         var removedAtUtc = DateTimeOffset.UtcNow;
-        var cleanupCandidatePaths = request.DeleteData ?
-                GetCleanupCandidatePaths(manager)
-                    .Concat(string.IsNullOrWhiteSpace(snapshot.SavePath) ? [] : [Path.GetFullPath(snapshot.SavePath)])
-                    .Distinct(StringComparer.Ordinal)
-                    .ToArray() :
-                Array.Empty<string>();
-        var downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
+        IReadOnlyList<string> cleanupCandidatePaths;
+        string downloadRootPath;
 
-        await RemoveManagedTorrentAsync(torrentId, manager, cancellationToken);
-        await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
-        await torrentHistoryService.MarkRemovedAsync(
-            snapshot,
-            dataDeleted: request.DeleteData,
-            removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
-            removalKind: request.DeleteData
-                ? TorrentRemovalKind.ManualRemovalWithData
-                : TorrentRemovalKind.ManualRemoval,
-            removedByCleanupPolicy: false,
-            removedAtUtc,
-            cancellationToken);
+        await _synchronizationGate.WaitAsync(cancellationToken);
+        try
+        {
+            ThrowIfAutomaticMetadataResetRunning(torrentId);
+            var (snapshot, manager) = await GetRequiredManagedTorrentAsync(torrentId, cancellationToken);
+            cleanupCandidatePaths = request.DeleteData ?
+                    GetCleanupCandidatePaths(manager)
+                        .Concat(string.IsNullOrWhiteSpace(snapshot.SavePath) ? [] : [Path.GetFullPath(snapshot.SavePath)])
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray() :
+                    Array.Empty<string>();
+            downloadRootPath = snapshot.DownloadRootPath ?? servicePaths.DownloadRootPath;
+
+            await RemoveManagedTorrentAsync(torrentId, manager, cancellationToken);
+            await torrentStateStore.DeleteAsync(torrentId, cancellationToken);
+            await torrentHistoryService.MarkRemovedAsync(
+                snapshot,
+                dataDeleted: request.DeleteData,
+                removalReason: request.DeleteData ? "manual_remove_delete_data" : "manual_remove",
+                removalKind: request.DeleteData
+                    ? TorrentRemovalKind.ManualRemovalWithData
+                    : TorrentRemovalKind.ManualRemoval,
+                removedByCleanupPolicy: false,
+                removedAtUtc,
+                cancellationToken);
+        }
+        finally
+        {
+            _synchronizationGate.Release();
+        }
 
         if (request.DeleteData)
         {
@@ -828,16 +840,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             return persistedSnapshots;
         }
 
-        Dictionary<Guid, TorrentManager> managers;
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            managers = _managers.ToDictionary();
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        var managers = _managers.ToDictionary();
 
         if (managers.Count == 0)
         {
@@ -882,7 +885,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         try
         {
             await managerStopCoordinator.WaitForPendingAsync(torrentId, cancellationToken);
-            await EnsureManagerStoppedAsync(manager, cancellationToken);
+            await EnsureManagerStoppedAsync(manager, cancellationToken, torrentId);
 
             await MeasureMonoTorrentOperationAsync(
                 "engine_remove_manager",
@@ -891,12 +894,13 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 async () => await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly)
             );
 
-            _managers.Remove(torrentId);
+            _managers.TryRemove(torrentId, out _);
             _torrentIdsByManager.TryRemove(manager, out _);
             _observedTorrentIds.Remove(torrentId);
             _observedUploadedSessionBytes.TryRemove(torrentId, out _);
             finalizationProbeCoordinator.Remove(torrentId);
             managerStopCoordinator.Remove(torrentId);
+            metadataResetCoordinator.Remove(torrentId);
             _downloadRecoveryStates.TryRemove(torrentId, out _);
             _downloadRecoveryAttemptCounts.TryRemove(torrentId, out _);
             _metadataRecoveryStates.TryRemove(torrentId, out _);
@@ -1060,6 +1064,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         var snapshot = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+        ThrowIfAutomaticMetadataResetRunning(torrentId);
         if (snapshot is null || manager is null)
         {
             throw new ServiceOperationException(
@@ -1071,18 +1076,36 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return (snapshot, manager);
     }
 
+    private void ThrowIfAutomaticMetadataResetRunning(Guid torrentId)
+    {
+        if (!metadataResetCoordinator.IsRunning(torrentId))
+        {
+            return;
+        }
+
+        throw new ServiceOperationException(
+            "metadata_reset_in_progress",
+            $"Torrent '{torrentId}' is currently recreating its metadata discovery session.",
+            StatusCodes.Status409Conflict,
+            nameof(torrentId));
+    }
+
     private async Task ReconcileRuntimeQueueAsync(CancellationToken cancellationToken)
     {
         var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         var now             = DateTimeOffset.UtcNow;
 
         var managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
-        await ReconcileMetadataResolutionQueueAsync(
-            managedTorrents, runtimeSettings.MaxActiveMetadataResolutions, now, cancellationToken
-        );
+        await ReconcileSeedingQueueAsync(managedTorrents, runtimeSettings, now, cancellationToken);
 
         managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
-        await ReconcileSeedingQueueAsync(managedTorrents, runtimeSettings, now, cancellationToken);
+        await ReconcileMetadataResolutionQueueAsync(
+            managedTorrents,
+            runtimeSettings.MaxActiveMetadataResolutions,
+            runtimeSettings.MaxActiveDownloads,
+            runtimeSettings.MetadataResolutionTimeSliceMinutes,
+            now,
+            cancellationToken);
 
         managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
         await ReconcileDownloadQueueAsync(managedTorrents, runtimeSettings.MaxActiveDownloads, now, cancellationToken);
@@ -1437,16 +1460,90 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     private async Task ReconcileMetadataResolutionQueueAsync(
         IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents,
-        int maxActiveMetadataResolutions, DateTimeOffset now, CancellationToken cancellationToken)
+        int maxActiveMetadataResolutions, int maxActiveDownloads, int metadataResolutionTimeSliceMinutes,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
+        var resolvedDownloadDemand = managedTorrents.Count(entry =>
+            entry.Snapshot.DesiredState == TorrentDesiredState.Runnable &&
+            entry.Snapshot.State is not ContractTorrentState.Completed and
+                not ContractTorrentState.Error and not ContractTorrentState.Removed &&
+            entry.Manager.HasMetadata && !entry.Manager.Complete);
+        var effectiveMetadataResolutionLimit = TorrentDownloadAdmissionPolicy.CalculateMetadataResolutionLimit(
+            maxActiveMetadataResolutions,
+            maxActiveDownloads,
+            resolvedDownloadDemand);
+
         var candidates = managedTorrents.Where(entry => entry.Snapshot.DesiredState == TorrentDesiredState.Runnable)
                                         .Where(entry => entry.Snapshot.State is not ContractTorrentState.Completed and
                                                  not ContractTorrentState.Error and not ContractTorrentState.Removed
                                          )
                                         .Where(entry => !entry.Manager.HasMetadata && !entry.Manager.Complete)
-                                        .OrderBy(entry => entry.Snapshot.AddedAtUtc)
-                                        .ThenBy(entry => entry.Snapshot.TorrentId)
                                         .ToList();
+
+        var waitingCandidates = candidates.Where(entry => !IsManagerRunning(entry.Manager)).ToList();
+        var expiredActiveCandidates = candidates
+                                     .Where(entry => IsManagerRunning(entry.Manager))
+                                     .Where(entry => entry.Snapshot.MetadataResolutionAttemptStartedAtUtc is { } startedAt &&
+                                              now - startedAt >= TimeSpan.FromMinutes(metadataResolutionTimeSliceMinutes))
+                                     .OrderBy(entry => entry.Snapshot.MetadataResolutionAttemptStartedAtUtc)
+                                     .ThenBy(entry => entry.Snapshot.AddedAtUtc)
+                                     .ThenBy(entry => entry.Snapshot.TorrentId)
+                                     .Take(waitingCandidates.Count)
+                                     .ToList();
+
+        foreach (var (snapshot, manager) in expiredActiveCandidates)
+        {
+            var currentSnapshot = await torrentStateStore.GetAsync(snapshot.TorrentId, cancellationToken);
+            if (currentSnapshot is null || currentSnapshot.DesiredState != TorrentDesiredState.Runnable ||
+                currentSnapshot.MetadataResolutionAttemptStartedAtUtc is not { } startedAt ||
+                now - startedAt < TimeSpan.FromMinutes(metadataResolutionTimeSliceMinutes) ||
+                manager.HasMetadata || manager.Complete || !IsManagerRunning(manager))
+            {
+                continue;
+            }
+
+            await EnsureManagerStoppedAsync(manager, cancellationToken);
+            var queuedSnapshot = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            queuedSnapshot.MetadataResolutionAttemptStartedAtUtc = null;
+            queuedSnapshot.MetadataResolutionLastYieldedAtUtc = now;
+            await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(queuedSnapshot, cancellationToken);
+
+            snapshot.State = ContractTorrentState.Queued;
+            snapshot.MetadataResolutionAttemptStartedAtUtc = null;
+            snapshot.MetadataResolutionLastYieldedAtUtc = now;
+
+            await activityLogService.TryWriteActivityLogAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level = ActivityLogLevel.Information,
+                    Category = "engine",
+                    EventType = "torrent.metadata.resolution_yielded",
+                    Message = $"Metadata resolution for torrent '{snapshot.Name}' yielded its slot to queued work.",
+                    TorrentId = snapshot.TorrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(new
+                    {
+                        snapshot.TorrentId,
+                        TorrentName = snapshot.Name,
+                        AttemptStartedAtUtc = startedAt,
+                        YieldedAtUtc = now,
+                        TimeSliceMinutes = metadataResolutionTimeSliceMinutes,
+                    }),
+                },
+                cancellationToken);
+        }
+
+        candidates = candidates
+                    .OrderBy(entry => IsManagerRunning(entry.Manager) ? 0 :
+                        entry.Snapshot.MetadataResolutionLastYieldedAtUtc is null ? 1 : 2)
+                    .ThenBy(entry => IsManagerRunning(entry.Manager) ?
+                        entry.Snapshot.MetadataResolutionAttemptStartedAtUtc ?? entry.Snapshot.AddedAtUtc :
+                        entry.Snapshot.MetadataResolutionLastYieldedAtUtc ?? entry.Snapshot.AddedAtUtc)
+                    .ThenBy(entry => entry.Snapshot.AddedAtUtc)
+                    .ThenBy(entry => entry.Snapshot.TorrentId)
+                    .ToList();
 
         for (var index = 0; index < candidates.Count; index++)
         {
@@ -1459,7 +1556,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 continue;
             }
 
-            if (index < maxActiveMetadataResolutions)
+            if (index < effectiveMetadataResolutionLimit)
             {
                 await EnsureManagerStartedAsync(manager, cancellationToken);
 
@@ -1467,6 +1564,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 updatedSnapshot.State             =   ContractTorrentState.ResolvingMetadata;
                 updatedSnapshot.ErrorMessage      =   null;
                 updatedSnapshot.LastActivityAtUtc ??= now;
+                updatedSnapshot.MetadataResolutionAttemptStartedAtUtc ??= now;
                 await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken);
                 await torrentHistoryService.ObserveSnapshotAsync(updatedSnapshot, cancellationToken);
                 continue;
@@ -1478,6 +1576,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             }
 
             var queuedSnapshot = CreateQueuedSnapshot(CreateUpdatedSnapshot(currentSnapshot, manager, now), now);
+            queuedSnapshot.MetadataResolutionAttemptStartedAtUtc = null;
             await torrentStateStore.UpdateAsync(queuedSnapshot, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(queuedSnapshot, cancellationToken);
         }
@@ -1659,7 +1758,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 existing.CompletedAtUtc, state, now
             ),
             SeedingStartedAtUtc = ResolveSeedingStartedAtUtc(existing.SeedingStartedAtUtc, state, now),
+            SeedingPolicyAppliedAtUtc = existing.SeedingPolicyAppliedAtUtc,
             DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
+            MetadataResolutionAttemptStartedAtUtc = manager.HasMetadata ? null :
+                    existing.MetadataResolutionAttemptStartedAtUtc,
+            MetadataResolutionLastYieldedAtUtc = manager.HasMetadata ? null :
+                    existing.MetadataResolutionLastYieldedAtUtc,
             LastActivityAtUtc   = now,
             ErrorMessage        = manager.Error?.Reason.ToString() ?? existing.ErrorMessage,
         };
@@ -1723,7 +1827,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             AddedAtUtc = existing.AddedAtUtc,
             CompletedAtUtc = existing.CompletedAtUtc,
             SeedingStartedAtUtc = existing.SeedingStartedAtUtc,
+            SeedingPolicyAppliedAtUtc = existing.SeedingPolicyAppliedAtUtc,
             DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
+            MetadataResolutionAttemptStartedAtUtc = existing.MetadataResolutionAttemptStartedAtUtc,
+            MetadataResolutionLastYieldedAtUtc = existing.MetadataResolutionLastYieldedAtUtc,
             LastActivityAtUtc = existing.LastActivityAtUtc,
             ErrorMessage = state == ContractTorrentState.Error ?
                     manager.Error?.Reason.ToString() ?? existing.ErrorMessage : null,
@@ -1873,6 +1980,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 continue;
             }
 
+            metadataResetCoordinator.TryTakeCompleted(currentSnapshot.TorrentId, out _);
+
             if (currentSnapshot.DesiredState != TorrentDesiredState.Runnable)
             {
                 ResetMetadataRecoveryState(currentSnapshot.TorrentId);
@@ -1921,13 +2030,25 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                     );
                 break;
                 case MetadataRecoveryAction.Reset:
-                    await ExecuteRecoveryActionAsync(
-                        "metadata", decision.Action.ToString(), currentSnapshot, _metadataRecoveryAttemptCounts,
-                        async () => await ResetMetadataResolutionAsync(
-                            currentSnapshot, manager, now, runtimeSettings, cancellationToken,
-                            decision
-                        ),
-                        decision
+                    metadataResetCoordinator.TryTakeCompletedOrSchedule(
+                        currentSnapshot.TorrentId,
+                        currentSnapshot.Name,
+                        TimeSpan.FromSeconds(runtimeSettings.AutomaticMetadataResetStuckThresholdSeconds),
+                        async backgroundCancellationToken => await ExecuteRecoveryActionAsync(
+                            "metadata",
+                            decision.Action.ToString(),
+                            currentSnapshot,
+                            _metadataRecoveryAttemptCounts,
+                            async () => await ResetMetadataResolutionAsync(
+                                currentSnapshot,
+                                manager,
+                                now,
+                                runtimeSettings,
+                                backgroundCancellationToken,
+                                decision),
+                            decision),
+                        _backgroundOperationCts.Token,
+                        out _
                     );
                 break;
             }
@@ -2165,6 +2286,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             logger.LogDebug("Background completion manager stops did not all finish before shutdown continued");
         }
+        if (!await metadataResetCoordinator.DrainAsync(TimeSpan.FromSeconds(2)))
+        {
+            logger.LogDebug("Background metadata resets did not all finish before shutdown continued");
+        }
         var backgroundTasks = _peerDiscoveryAnnounceTasks.Values.ToArray();
         if (backgroundTasks.Length == 0)
         {
@@ -2389,8 +2514,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         DateTimeOffset now, RuntimeSettingsSnapshot runtimeSettings, CancellationToken cancellationToken,
         TorrentMetadataRecoveryDecision decision)
     {
-        var recreatedManager = await ResetMetadataSessionCoreAsync(
-            snapshot, manager, now, "automatic_stale_reset", cancellationToken,
+        var recreatedManager = await ResetAutomaticMetadataSessionCoreAsync(
+            snapshot,
+            manager,
+            now,
+            cancellationToken,
             decision
         );
         await RequestMetadataDiscoveryRefreshAsync(
@@ -2433,6 +2561,228 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         DateTimeOffset now, string origin, CancellationToken cancellationToken,
         TorrentMetadataRecoveryDecision? decision = null)
     {
+        await RecordMetadataResetRequestedAsync(
+            snapshot,
+            manager,
+            now,
+            origin,
+            cancellationToken,
+            decision);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            await EnsureManagerStoppedAsync(manager, cancellationToken);
+            await MeasureMonoTorrentOperationAsync(
+                "engine_remove_metadata_session",
+                snapshot.TorrentId,
+                snapshot.Name,
+                async () => await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly)
+            );
+
+            _managers.TryRemove(snapshot.TorrentId, out _);
+            _torrentIdsByManager.TryRemove(manager, out _);
+            _observedTorrentIds.Remove(snapshot.TorrentId);
+            _observedUploadedSessionBytes.TryRemove(snapshot.TorrentId, out _);
+
+            var magnet = MagnetLink.Parse(snapshot.MagnetUri);
+            var downloadRootPath =
+                    MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
+            var recreatedManager = await MeasureMonoTorrentOperationAsync(
+                "engine_recreate_metadata_session",
+                snapshot.TorrentId,
+                snapshot.Name,
+                async () => await _engine!.AddAsync(
+                    magnet,
+                    downloadRootPath,
+                    CreateTorrentSettings(appliedEngineSettingsState.EngineAllowPeerExchange)
+                )
+            );
+            RegisterManager(snapshot.TorrentId, recreatedManager);
+            _managers[snapshot.TorrentId] = recreatedManager;
+            return recreatedManager;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<TorrentManager> ResetAutomaticMetadataSessionCoreAsync(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        DateTimeOffset now,
+        CancellationToken cancellationToken,
+        TorrentMetadataRecoveryDecision decision)
+    {
+        await RecordMetadataResetRequestedAsync(
+            snapshot,
+            manager,
+            now,
+            "automatic_stale_reset",
+            cancellationToken,
+            decision);
+
+        var magnet = MagnetLink.Parse(snapshot.MagnetUri);
+        var downloadRootPath =
+                MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (!_managers.TryGetValue(snapshot.TorrentId, out var registeredManager) ||
+                !ReferenceEquals(registeredManager, manager))
+            {
+                throw new InvalidOperationException(
+                    $"Torrent '{snapshot.TorrentId}' changed managers before its automatic metadata reset began.");
+            }
+
+            _managers.TryRemove(snapshot.TorrentId, out _);
+            _torrentIdsByManager.TryRemove(manager, out _);
+            _observedTorrentIds.Remove(snapshot.TorrentId);
+            _observedUploadedSessionBytes.TryRemove(snapshot.TorrentId, out _);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
+        var removedFromEngine = false;
+        try
+        {
+            await EnsureManagerStoppedAsync(manager, cancellationToken, snapshot.TorrentId);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                await MeasureMonoTorrentOperationAsync(
+                    "engine_remove_metadata_session",
+                    snapshot.TorrentId,
+                    snapshot.Name,
+                    async () => await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly));
+                removedFromEngine = true;
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                if (_engine!.Contains(manager))
+                {
+                    throw;
+                }
+
+                removedFromEngine = true;
+                await activityLogService.TryWriteActivityLogAsync(
+                    new ActivityLogWriteRequest
+                    {
+                        Level = ActivityLogLevel.Warning,
+                        Category = "runtime",
+                        EventType = "runtime.metadata.reset_remove_cleanup_failed",
+                        Message = $"Metadata reset removed torrent '{snapshot.Name}' but cache cleanup failed; recreation will continue.",
+                        TorrentId = snapshot.TorrentId,
+                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                        DetailsJson = JsonSerializer.Serialize(
+                            new
+                            {
+                                snapshot.TorrentId,
+                                TorrentName = snapshot.Name,
+                                Error = exception.Message,
+                            })
+                    },
+                    CancellationToken.None);
+            }
+
+            var recreatedManager = await RecreateAutomaticMetadataManagerWithRetryAsync(
+                snapshot,
+                magnet,
+                downloadRootPath,
+                cancellationToken);
+
+            await _gate.WaitAsync(cancellationToken);
+            try
+            {
+                RegisterManager(snapshot.TorrentId, recreatedManager);
+                _managers[snapshot.TorrentId] = recreatedManager;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+
+            return recreatedManager;
+        }
+        catch
+        {
+            if (!removedFromEngine && !cancellationToken.IsCancellationRequested)
+            {
+                await _gate.WaitAsync(CancellationToken.None);
+                try
+                {
+                    _torrentIdsByManager[manager] = snapshot.TorrentId;
+                    _managers[snapshot.TorrentId] = manager;
+                }
+                finally
+                {
+                    _gate.Release();
+                }
+            }
+
+            throw;
+        }
+    }
+
+    private async Task<TorrentManager> RecreateAutomaticMetadataManagerWithRetryAsync(
+        TorrentSnapshot snapshot,
+        MagnetLink magnet,
+        string downloadRootPath,
+        CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return await MeasureMonoTorrentOperationAsync(
+                    "engine_recreate_metadata_session",
+                    snapshot.TorrentId,
+                    snapshot.Name,
+                    async () => await _engine!.AddAsync(
+                        magnet,
+                        downloadRootPath,
+                        CreateTorrentSettings(appliedEngineSettingsState.EngineAllowPeerExchange)));
+            }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                await activityLogService.TryWriteActivityLogAsync(
+                    new ActivityLogWriteRequest
+                    {
+                        Level = ActivityLogLevel.Warning,
+                        Category = "runtime",
+                        EventType = "runtime.metadata.reset_recreate_retry",
+                        Message = $"Metadata reset could not recreate torrent '{snapshot.Name}'; retrying after cooldown.",
+                        TorrentId = snapshot.TorrentId,
+                        ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                        DetailsJson = JsonSerializer.Serialize(
+                            new
+                            {
+                                snapshot.TorrentId,
+                                TorrentName = snapshot.Name,
+                                Error = exception.Message,
+                                RetryDelaySeconds = MetadataResetRecreateRetryDelay.TotalSeconds,
+                            })
+                    },
+                    CancellationToken.None);
+                await Task.Delay(MetadataResetRecreateRetryDelay, cancellationToken);
+            }
+        }
+    }
+
+    private async Task RecordMetadataResetRequestedAsync(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        DateTimeOffset now,
+        string origin,
+        CancellationToken cancellationToken,
+        TorrentMetadataRecoveryDecision? decision = null)
+    {
         var recoveryState = _metadataRecoveryStates.GetOrAdd(
             snapshot.TorrentId, _ => new TorrentMetadataRecoveryState()
         );
@@ -2471,44 +2821,6 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 ),
             }, cancellationToken
         );
-
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            await EnsureManagerStoppedAsync(manager, cancellationToken);
-            await MeasureMonoTorrentOperationAsync(
-                "engine_remove_metadata_session",
-                snapshot.TorrentId,
-                snapshot.Name,
-                async () => await _engine!.RemoveAsync(manager, RemoveMode.CacheDataOnly)
-            );
-
-            _managers.Remove(snapshot.TorrentId);
-            _torrentIdsByManager.TryRemove(manager, out _);
-            _observedTorrentIds.Remove(snapshot.TorrentId);
-            _observedUploadedSessionBytes.TryRemove(snapshot.TorrentId, out _);
-
-            var magnet = MagnetLink.Parse(snapshot.MagnetUri);
-            var downloadRootPath =
-                    MonoTorrentRecoveryPathResolver.ResolveDownloadRootPath(snapshot, servicePaths.DownloadRootPath);
-            var recreatedManager = await MeasureMonoTorrentOperationAsync(
-                "engine_recreate_metadata_session",
-                snapshot.TorrentId,
-                snapshot.Name,
-                async () => await _engine!.AddAsync(
-                    magnet,
-                    downloadRootPath,
-                    CreateTorrentSettings(appliedEngineSettingsState.EngineAllowPeerExchange)
-                )
-            );
-            RegisterManager(snapshot.TorrentId, recreatedManager);
-            _managers[snapshot.TorrentId] = recreatedManager;
-            return recreatedManager;
-        }
-        finally
-        {
-            _gate.Release();
-        }
     }
 
     private void NoteMetadataDiscoveryActivity(Guid torrentId, DateTimeOffset now)
@@ -2712,38 +3024,40 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             AddedAtUtc                        = snapshot.AddedAtUtc,
             CompletedAtUtc                    = snapshot.CompletedAtUtc,
             SeedingStartedAtUtc               = snapshot.SeedingStartedAtUtc,
+            SeedingPolicyAppliedAtUtc         = snapshot.SeedingPolicyAppliedAtUtc ?? now,
             LastActivityAtUtc                 = now,
             ErrorMessage                      = snapshot.ErrorMessage,
         };
 
-        if (!engineStopReady)
+        if (snapshot.SeedingPolicyAppliedAtUtc is null)
         {
-            return new SeedingPolicyApplicationResult(completedSnapshot, EngineStopReady: false);
+            await torrentStateStore.UpdateAsync(completedSnapshot, cancellationToken);
+            await activityLogService.TryWriteActivityLogAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level     = ActivityLogLevel.Information,
+                    Category  = "torrent",
+                    EventType = "torrent.seeding.stopped_policy",
+                    Message =
+                            $"Applied the '{seedingDecision.Reason}' seeding stop policy to torrent '{snapshot.Name}'.",
+                    TorrentId         = snapshot.TorrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(
+                        new
+                        {
+                            seedingDecision.Reason,
+                            seedingDecision.CurrentRatio,
+                            seedingDecision.CurrentSeedingMinutes, runtimeSettings.SeedingStopMode,
+                            runtimeSettings.SeedingStopRatio, runtimeSettings.SeedingStopMinutes,
+                            EngineStopReady = engineStopReady,
+                            completedSnapshot.SeedingPolicyAppliedAtUtc,
+                        }
+                    ),
+                }, cancellationToken
+            );
         }
 
-        await activityLogService.TryWriteActivityLogAsync(
-            new ActivityLogWriteRequest
-            {
-                Level     = ActivityLogLevel.Information,
-                Category  = "torrent",
-                EventType = "torrent.seeding.stopped_policy",
-                Message =
-                        $"Stopped seeding for torrent '{snapshot.Name}' because the '{seedingDecision.Reason}' policy was reached.",
-                TorrentId         = snapshot.TorrentId,
-                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
-                DetailsJson = JsonSerializer.Serialize(
-                    new
-                    {
-                        seedingDecision.Reason,
-                        seedingDecision.CurrentRatio,
-                        seedingDecision.CurrentSeedingMinutes, runtimeSettings.SeedingStopMode,
-                        runtimeSettings.SeedingStopRatio, runtimeSettings.SeedingStopMinutes,
-                    }
-                ),
-            }, cancellationToken
-        );
-
-        return new SeedingPolicyApplicationResult(completedSnapshot, EngineStopReady: true);
+        return new SeedingPolicyApplicationResult(completedSnapshot, engineStopReady);
     }
 
     private static TorrentSnapshot ApplyFileCompletionVisibilityIfNeeded(
@@ -2904,7 +3218,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return manager.State is MonoTorrent.Client.TorrentState.Stopped or MonoTorrent.Client.TorrentState.Paused;
     }
 
-    private async Task EnsureManagerStoppedAsync(TorrentManager manager, CancellationToken cancellationToken)
+    private async Task EnsureManagerStoppedAsync(
+        TorrentManager manager,
+        CancellationToken cancellationToken,
+        Guid? torrentId = null)
     {
         if (manager.State is MonoTorrent.Client.TorrentState.Stopped or MonoTorrent.Client.TorrentState.Stopping)
         {
@@ -2914,7 +3231,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         cancellationToken.ThrowIfCancellationRequested();
         await MeasureMonoTorrentOperationAsync(
             "manager_stop",
-            GetTorrentId(manager),
+            torrentId ?? GetTorrentId(manager),
             manager.Name,
             async () => await manager.StopAsync(TimeSpan.FromSeconds(2))
         );
@@ -3220,17 +3537,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         };
     }
 
-    private async Task<TorrentManager?> TryGetManagerAsync(Guid torrentId, CancellationToken cancellationToken)
+    private TorrentManager? TryGetManager(Guid torrentId)
     {
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            return _managers.GetValueOrDefault(torrentId);
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        return _managers.GetValueOrDefault(torrentId);
     }
 
     private async Task MeasureStorageOperationAsync(

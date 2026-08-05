@@ -19,8 +19,13 @@ Representative coverage areas:
 - history-store and history-service behavior
 - callback finalization and callback lifecycle processing
 - category routing
-- seeding policy
-- metadata recovery and connection policy behavior
+- seeding policy, including durable single-event application across reevaluation and restart
+- metadata recovery, host-wide background-reset single flight, stuck quarantine, circuit breaking, and connection
+  policy behavior
+- strict metadata-to-download admission, including a deterministic 20-magnet transition simulation and a real
+  MonoTorrent 20-magnet queue burst
+- durable metadata-resolution time slicing, never-tried-first rotation, oldest-yielded retry order, and one yield log
+  per rotation
 - data-path cleanup
 - client options and path defaults
 - normalized OpenAPI contract generation for native clients
@@ -59,7 +64,9 @@ with authoritative refresh. Its signed fixture UI suite covers the existing torr
 plus automatic History, Logs, and Service Settings loading without manual refresh. The post-parity refinement coverage
 also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
 show/hide behavior for the Torrents, History, and Logs inspectors. Service Settings UI coverage also verifies populated
-Downloads values and the inline category grid.
+Downloads values and the inline category grid. Runtime-settings mapping coverage verifies that the metadata-resolution
+time slice and automatic-reset stuck threshold survive draft creation, request encoding, save, and returned-value
+reconciliation.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail
 when corresponding records exist.
 
@@ -119,6 +126,11 @@ On the designated release Mac, `./Scripts/release-macos-app.zsh --check` additio
 `Developer ID Application` identity for Team `5GRR76N48V` and the local `TorrentCore-notary` Keychain profile. The full
 release command archives, exports, signs, notarizes, staples, and verifies the DMG. Separate-Mac installation and
 Gatekeeper acceptance belong to Stage 5D rather than routine fixture testing.
+
+The Service/WebUI deployment DMG has a separate acceptance boundary from the native app DMG. Its release smoke test
+must verify Developer ID signatures plus JIT and shared-runtime library-validation entitlements on both framework-
+dependent apphosts, the signature on every native Mach-O dependency, an accepted and stapled DMG, and a direct-email
+install on the target Mac without any xattr clearing.
 
 The first complete release run passed on July 26, 2026. Apple accepted the 0.1.0/build 1 notarization submission, and
 the final copied DMG independently passed code-signature, stapler-ticket, disk-image checksum, and Gatekeeper

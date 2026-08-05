@@ -71,6 +71,19 @@ Platform defaults:
 | Intel Mac | `osx-x64` | framework-dependent |
 | Arm Mac | `osx-arm64` | framework-dependent |
 
+## Direct-Distribution Service DMG
+
+The Service/WebUI deployment DMG remains framework-dependent and preserves the current per-user layout. Release
+construction Developer ID-signs both .NET apphosts with Hardened Runtime, a secure timestamp, and the required JIT
+entitlement. The apphosts also receive the library-validation exception required for Developer ID-signed executables to
+load Microsoft's separately signed shared .NET runtime. Native Mach-O dependencies such as `libe_sqlite3.dylib` are
+signed separately before the final DMG is signed, notarized, stapled, and verified. This does not make the deployment
+self-contained and does not change the target directory layout or LaunchAgent commands.
+
+The direct-email acceptance path must retain macOS quarantine. On the target Mac, mount the attachment and complete the
+normal Terminal-based `plan`, `dry-run`, `apply`, and `verify` sequence without clearing extended attributes. The Tom
+manifest keeps the former xattr compatibility policy disabled while this release workflow is proven.
+
 ## Launch-Agent Management
 
 Install both agents:

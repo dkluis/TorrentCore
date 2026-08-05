@@ -9,7 +9,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MonoTorrent" Version="3.0.2"/>
+        <PackageReference Include="MonoTorrent" Version="3.0.3-alpha.unstable.rev0049"/>
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3"/>
     </ItemGroup>
 

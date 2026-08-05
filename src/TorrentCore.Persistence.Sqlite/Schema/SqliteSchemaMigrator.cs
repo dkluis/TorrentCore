@@ -707,6 +707,41 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     await backfillCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
+            new SqliteMigrationDefinition(
+                18, "persist_metadata_resolution_rotation", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "metadata_resolution_attempt_started_at_utc", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN metadata_resolution_attempt_started_at_utc TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "metadata_resolution_last_yielded_at_utc", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN metadata_resolution_last_yielded_at_utc TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
+            new SqliteMigrationDefinition(
+                19, "persist_seeding_policy_application", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "seeding_policy_applied_at_utc", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN seeding_policy_applied_at_utc TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
         ];
     }
 

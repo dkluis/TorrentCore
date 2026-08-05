@@ -64,6 +64,16 @@ public enum TorrentCoreHelpCatalog {
             "Sets the delay before stale recovery escalates to restart.",
             "TorrentCore first performs a non-destructive discovery refresh, then uses a stop/start recovery path if the torrent remains cold for this additional delay."
         )
+        public static let metadataResolutionTimeSliceMinutes = help(
+            "Metadata Resolution Time Slice Minutes",
+            "Limits one unresolved magnet's turn when another magnet is waiting.",
+            "After this many minutes, TorrentCore yields the metadata slot to a waiting unresolved magnet. A lone resolver keeps running, never-tried magnets run first, and yielded magnets retry oldest first. Changes apply live."
+        )
+        public static let automaticMetadataResetStuckThresholdSeconds = help(
+            "Automatic Reset Stuck Threshold Seconds",
+            "Limits how long an automatic metadata reset may run before isolation.",
+            "TorrentCore quarantines a reset that exceeds this threshold so it cannot hold normal synchronization, then applies its reset circuit-breaker rules. Changes apply live."
+        )
         public static let coldDownloadRecoveryThresholdMinutes = help(
             "Long-Cold Threshold Minutes",
             "Sets when an inactive download enters long-cold recovery.",
@@ -210,7 +220,8 @@ public enum TorrentCoreHelpCatalog {
             completedTorrentCleanupMode, completedTorrentCleanupMinutes,
             deleteLogsForCompletedTorrents, maxActiveMetadataResolutions,
             maxActiveDownloads, metadataRefreshStaleSeconds,
-            metadataRefreshRestartDelaySeconds, coldDownloadRecoveryThresholdMinutes,
+            metadataRefreshRestartDelaySeconds, metadataResolutionTimeSliceMinutes,
+            automaticMetadataResetStuckThresholdSeconds, coldDownloadRecoveryThresholdMinutes,
             coldDownloadRecoveryIntervalMinutes, coldDownloadAbandonAfterHours,
             engineConnectionFailureLogBurstLimit, engineConnectionFailureLogWindowSeconds,
             engineAllowPeerExchange, engineMaximumConnections, engineEncryptionMode,

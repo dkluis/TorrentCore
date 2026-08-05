@@ -109,7 +109,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_started_at_utc,
                                   download_cold_since_utc,
                                   last_activity_at_utc,
-                                  error_message
+                                  error_message,
+                                  metadata_resolution_attempt_started_at_utc,
+                                  metadata_resolution_last_yielded_at_utc,
+                                  seeding_policy_applied_at_utc
                               FROM torrents
                               ORDER BY added_at_utc DESC, torrent_id DESC;
                               """;
@@ -156,7 +159,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_started_at_utc,
                                   download_cold_since_utc,
                                   last_activity_at_utc,
-                                  error_message
+                                  error_message,
+                                  metadata_resolution_attempt_started_at_utc,
+                                  metadata_resolution_last_yielded_at_utc,
+                                  seeding_policy_applied_at_utc
                               FROM torrents
                               WHERE torrent_id = $torrent_id
                               LIMIT 1;
@@ -260,6 +266,15 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                         reader.GetString(29), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
                     ),
                     ErrorMessage = reader.IsDBNull(30) ? null : reader.GetString(30),
+                    MetadataResolutionAttemptStartedAtUtc = reader.IsDBNull(31) ? null : DateTimeOffset.Parse(
+                        reader.GetString(31), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    MetadataResolutionLastYieldedAtUtc = reader.IsDBNull(32) ? null : DateTimeOffset.Parse(
+                        reader.GetString(32), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    SeedingPolicyAppliedAtUtc = reader.IsDBNull(33) ? null : DateTimeOffset.Parse(
+                        reader.GetString(33), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
                 }
             );
         }
@@ -302,7 +317,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_started_at_utc,
                                   download_cold_since_utc,
                                   last_activity_at_utc,
-                                  error_message
+                                  error_message,
+                                  metadata_resolution_attempt_started_at_utc,
+                                  metadata_resolution_last_yielded_at_utc,
+                                  seeding_policy_applied_at_utc
                               )
                               VALUES (
                                   $torrent_id,
@@ -335,7 +353,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   $seeding_started_at_utc,
                                   $download_cold_since_utc,
                                   $last_activity_at_utc,
-                                  $error_message
+                                  $error_message,
+                                  $metadata_resolution_attempt_started_at_utc,
+                                  $metadata_resolution_last_yielded_at_utc,
+                                  $seeding_policy_applied_at_utc
                               );
                               """;
 
@@ -426,7 +447,13 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_started_at_utc = $seeding_started_at_utc,
                                   download_cold_since_utc = $download_cold_since_utc,
                                   last_activity_at_utc = $last_activity_at_utc,
-                                  error_message = $error_message
+                                  error_message = $error_message,
+                                  metadata_resolution_attempt_started_at_utc = $metadata_resolution_attempt_started_at_utc,
+                                  metadata_resolution_last_yielded_at_utc = $metadata_resolution_last_yielded_at_utc,
+                                  seeding_policy_applied_at_utc = COALESCE(
+                                      seeding_policy_applied_at_utc,
+                                      $seeding_policy_applied_at_utc
+                                  )
                               WHERE torrent_id = $torrent_id;
                               """;
 
@@ -501,6 +528,21 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             torrent.LastActivityAtUtc?.ToString("O", CultureInfo.InvariantCulture) ?? (object) DBNull.Value
         );
         command.Parameters.AddWithValue("$error_message", torrent.ErrorMessage ?? (object) DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$metadata_resolution_attempt_started_at_utc",
+            torrent.MetadataResolutionAttemptStartedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ??
+            (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$metadata_resolution_last_yielded_at_utc",
+            torrent.MetadataResolutionLastYieldedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ??
+            (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$seeding_policy_applied_at_utc",
+            torrent.SeedingPolicyAppliedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ??
+            (object) DBNull.Value
+        );
     }
 
 }

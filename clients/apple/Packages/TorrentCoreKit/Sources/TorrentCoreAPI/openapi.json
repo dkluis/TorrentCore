@@ -804,6 +804,10 @@
             "format": "int32",
             "type": "integer"
           },
+          "automaticMetadataResetStuckThresholdSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
           "coldDownloadAbandonAfterHours": {
             "format": "int32",
             "type": "integer"
@@ -909,6 +913,10 @@
             "type": "integer"
           },
           "metadataRefreshStaleSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "metadataResolutionTimeSliceMinutes": {
             "format": "int32",
             "type": "integer"
           },
@@ -1959,6 +1967,11 @@
       "UpdateRuntimeSettingsRequest": {
         "additionalProperties": false,
         "properties": {
+          "automaticMetadataResetStuckThresholdSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
           "coldDownloadAbandonAfterHours": {
             "format": "int32",
             "type": "integer"
@@ -2062,6 +2075,11 @@
           },
           "metadataRefreshStaleSeconds": {
             "format": "int32",
+            "type": "integer"
+          },
+          "metadataResolutionTimeSliceMinutes": {
+            "format": "int32",
+            "nullable": true,
             "type": "integer"
           },
           "seedingStopMinutes": {

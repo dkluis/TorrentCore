@@ -35,6 +35,7 @@ Current core tables:
 - live runtime state
 - restart and recovery persistence
 - persisted continuous-cold timestamp used by long-running download abandonment
+- persisted metadata-attempt start and last-yield timestamps used for fair unresolved-magnet rotation
 - current category routing and callback state for active torrents
 
 ### `runtime_settings`
@@ -66,6 +67,9 @@ Current core tables:
 - migration 15 clears premature metadata-resolution timestamps for live magnets that are still unresolved and have no download milestones
 - migration 16 adds the live download cold timestamp used to preserve recovery and abandonment timing across service restarts
 - migration 17 adds and backfills the structured history `removal_kind` used for reliable outcome filtering
+- migration 18 adds nullable metadata-resolution attempt-start and last-yield timestamps to the live `torrents` table
+- migration 19 adds the nullable live-torrent seeding-policy application timestamp used to keep policy events
+  idempotent across synchronization ticks and service restarts
 
 Important history fields include:
 

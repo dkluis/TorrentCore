@@ -137,6 +137,24 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (options.MetadataResolutionTimeSliceMinutes is
+            < TorrentCoreServiceOptions.MinimumMetadataResolutionTimeSliceMinutes or
+            > TorrentCoreServiceOptions.MaximumMetadataResolutionTimeSliceMinutes)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionTimeSliceMinutes must be between {TorrentCoreServiceOptions.MinimumMetadataResolutionTimeSliceMinutes} and {TorrentCoreServiceOptions.MaximumMetadataResolutionTimeSliceMinutes}."
+            );
+        }
+
+        if (options.AutomaticMetadataResetStuckThresholdSeconds is
+            < TorrentCoreServiceOptions.MinimumAutomaticMetadataResetStuckThresholdSeconds or
+            > TorrentCoreServiceOptions.MaximumAutomaticMetadataResetStuckThresholdSeconds)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:AutomaticMetadataResetStuckThresholdSeconds must be between {TorrentCoreServiceOptions.MinimumAutomaticMetadataResetStuckThresholdSeconds} and {TorrentCoreServiceOptions.MaximumAutomaticMetadataResetStuckThresholdSeconds}."
+            );
+        }
+
         if (options.ColdDownloadRecoveryThresholdMinutes < 1)
         {
             failures.Add(

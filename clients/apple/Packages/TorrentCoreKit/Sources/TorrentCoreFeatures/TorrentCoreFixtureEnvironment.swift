@@ -384,6 +384,7 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
     func updateRuntimeSettings(
         _ update: TorrentCoreRuntimeSettingsUpdate
     ) async throws -> TorrentCoreRuntimeSettings {
+        runtimeSettingsValue.automaticMetadataResetStuckThresholdSeconds = update.automaticMetadataResetStuckThresholdSeconds
         runtimeSettingsValue.coldDownloadAbandonAfterHours = update.coldDownloadAbandonAfterHours
         runtimeSettingsValue.coldDownloadRecoveryIntervalMinutes = update.coldDownloadRecoveryIntervalMinutes
         runtimeSettingsValue.coldDownloadRecoveryThresholdMinutes = update.coldDownloadRecoveryThresholdMinutes
@@ -410,6 +411,7 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         runtimeSettingsValue.maxActiveMetadataResolutions = update.maxActiveMetadataResolutions
         runtimeSettingsValue.metadataRefreshRestartDelaySeconds = update.metadataRefreshRestartDelaySeconds
         runtimeSettingsValue.metadataRefreshStaleSeconds = update.metadataRefreshStaleSeconds
+        runtimeSettingsValue.metadataResolutionTimeSliceMinutes = update.metadataResolutionTimeSliceMinutes
         runtimeSettingsValue.seedingStopMinutes = update.seedingStopMinutes
         runtimeSettingsValue.seedingStopMode = update.seedingStopMode
         runtimeSettingsValue.seedingStopRatio = update.seedingStopRatio

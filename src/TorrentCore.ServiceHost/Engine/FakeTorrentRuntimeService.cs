@@ -120,14 +120,64 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
         RuntimeSettingsSnapshot runtimeSettings, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var activeResolutions = 0;
+        var resolvedDownloadDemand = torrents.Count(torrent =>
+            torrent.DesiredState == TorrentDesiredState.Runnable &&
+            torrent.TotalBytes is not null &&
+            torrent.State is not TorrentState.Completed and not TorrentState.Error and not TorrentState.Removed);
+        var effectiveMetadataResolutionLimit = TorrentDownloadAdmissionPolicy.CalculateMetadataResolutionLimit(
+            runtimeSettings.MaxActiveMetadataResolutions,
+            runtimeSettings.MaxActiveDownloads,
+            resolvedDownloadDemand);
         var unresolvedTorrents = torrents.Where(torrent => torrent.DesiredState == TorrentDesiredState.Runnable)
                                          .Where(torrent
                                                   => torrent.TotalBytes is null &&
                                                   torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued
                                           )
-                                         .OrderBy(torrent => torrent.AddedAtUtc)
-                                         .ThenBy(torrent => torrent.TorrentId)
                                          .ToList();
+
+        var waitingCount = unresolvedTorrents.Count(torrent => torrent.State == TorrentState.Queued);
+        var expiredActiveTorrents = unresolvedTorrents
+                                   .Where(torrent => torrent.State == TorrentState.ResolvingMetadata)
+                                   .Where(torrent => torrent.MetadataResolutionAttemptStartedAtUtc is { } startedAt &&
+                                            now - startedAt >= TimeSpan.FromMinutes(
+                                                runtimeSettings.MetadataResolutionTimeSliceMinutes))
+                                   .OrderBy(torrent => torrent.MetadataResolutionAttemptStartedAtUtc)
+                                   .ThenBy(torrent => torrent.AddedAtUtc)
+                                   .ThenBy(torrent => torrent.TorrentId)
+                                   .Take(waitingCount)
+                                   .ToList();
+
+        foreach (var torrent in expiredActiveTorrents)
+        {
+            var startedAt = torrent.MetadataResolutionAttemptStartedAtUtc!.Value;
+            torrent.State = TorrentState.Queued;
+            torrent.MetadataResolutionAttemptStartedAtUtc = null;
+            torrent.MetadataResolutionLastYieldedAtUtc = now;
+            torrent.LastActivityAtUtc = now;
+            await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
+            await LogTorrentEventAsync(
+                "torrent.metadata.resolution_yielded",
+                $"Metadata resolution for torrent '{torrent.Name}' yielded its slot to queued work.",
+                torrent,
+                new
+                {
+                    AttemptStartedAtUtc = startedAt,
+                    YieldedAtUtc = now,
+                    TimeSliceMinutes = runtimeSettings.MetadataResolutionTimeSliceMinutes,
+                },
+                cancellationToken);
+        }
+
+        unresolvedTorrents = unresolvedTorrents
+                            .OrderBy(torrent => torrent.State == TorrentState.ResolvingMetadata ? 0 :
+                                torrent.MetadataResolutionLastYieldedAtUtc is null ? 1 : 2)
+                            .ThenBy(torrent => torrent.State == TorrentState.ResolvingMetadata ?
+                                torrent.MetadataResolutionAttemptStartedAtUtc ?? torrent.AddedAtUtc :
+                                torrent.MetadataResolutionLastYieldedAtUtc ?? torrent.AddedAtUtc)
+                            .ThenBy(torrent => torrent.AddedAtUtc)
+                            .ThenBy(torrent => torrent.TorrentId)
+                            .ToList();
 
         foreach (var torrent in unresolvedTorrents)
         {
@@ -136,12 +186,17 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 continue;
             }
 
-            if (activeResolutions < runtimeSettings.MaxActiveMetadataResolutions)
+            if (activeResolutions < effectiveMetadataResolutionLimit)
             {
                 activeResolutions++;
 
                 if (torrent.State == TorrentState.ResolvingMetadata)
                 {
+                    if (torrent.MetadataResolutionAttemptStartedAtUtc is null)
+                    {
+                        torrent.MetadataResolutionAttemptStartedAtUtc = now;
+                        await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+                    }
                     continue;
                 }
 
@@ -151,6 +206,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 torrent.UploadRateBytesPerSecond   = 0;
                 torrent.LastActivityAtUtc          = now;
                 torrent.ErrorMessage               = null;
+                torrent.MetadataResolutionAttemptStartedAtUtc ??= now;
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
                 await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
                 continue;
@@ -166,6 +222,7 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.DownloadRateBytesPerSecond = 0;
             torrent.UploadRateBytesPerSecond   = 0;
             torrent.LastActivityAtUtc          = now;
+            torrent.MetadataResolutionAttemptStartedAtUtc = null;
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
         }
@@ -192,6 +249,8 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.State                      =   TorrentState.Queued;
             torrent.LastActivityAtUtc          =   now;
             torrent.ErrorMessage               =   null;
+            torrent.MetadataResolutionAttemptStartedAtUtc = null;
+            torrent.MetadataResolutionLastYieldedAtUtc = null;
 
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
             await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
@@ -290,10 +349,12 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
 
                 if (seedingDecision.ShouldStop)
                 {
+                    var shouldRecordPolicyApplication = torrent.SeedingPolicyAppliedAtUtc is null;
                     torrent.State                      = TorrentState.Completed;
                     torrent.ConnectedPeerCount         = 0;
                     torrent.DownloadRateBytesPerSecond = 0;
                     torrent.UploadRateBytesPerSecond   = 0;
+                    torrent.SeedingPolicyAppliedAtUtc ??= now;
                     await completionCallbackProcessor.MarkPendingIfTriggeredAsync(
                         previousCompletedAtUtc, torrent, runtimeSettings, now, cancellationToken
                     );
@@ -308,16 +369,20 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                         }, cancellationToken
                     );
 
-                    await LogTorrentEventAsync(
-                        "torrent.seeding.stopped_policy",
-                        $"Stopped seeding for torrent '{torrent.Name}' because the '{seedingDecision.Reason}' policy was reached.",
-                        torrent, new
-                        {
-                            seedingDecision.Reason,
-                            seedingDecision.CurrentRatio,
-                            seedingDecision.CurrentSeedingMinutes,
-                        }, cancellationToken
-                    );
+                    if (shouldRecordPolicyApplication)
+                    {
+                        await LogTorrentEventAsync(
+                            "torrent.seeding.stopped_policy",
+                            $"Applied the '{seedingDecision.Reason}' seeding stop policy to torrent '{torrent.Name}'.",
+                            torrent, new
+                            {
+                                seedingDecision.Reason,
+                                seedingDecision.CurrentRatio,
+                                seedingDecision.CurrentSeedingMinutes,
+                                torrent.SeedingPolicyAppliedAtUtc,
+                            }, cancellationToken
+                        );
+                    }
                     continue;
                 }
 
@@ -410,22 +475,28 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
 
             if (seedingDecision.ShouldStop)
             {
+                var shouldRecordPolicyApplication = torrent.SeedingPolicyAppliedAtUtc is null;
                 torrent.State                    = TorrentState.Completed;
                 torrent.ConnectedPeerCount       = 0;
                 torrent.UploadRateBytesPerSecond = 0;
+                torrent.SeedingPolicyAppliedAtUtc ??= now;
 
                 await torrentStateStore.UpdateAsync(torrent, cancellationToken);
                 await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
-                await LogTorrentEventAsync(
-                    "torrent.seeding.stopped_policy",
-                    $"Stopped seeding for torrent '{torrent.Name}' because the '{seedingDecision.Reason}' policy was reached.",
-                    torrent, new
-                    {
-                        seedingDecision.Reason,
-                        seedingDecision.CurrentRatio,
-                        seedingDecision.CurrentSeedingMinutes,
-                    }, cancellationToken
-                );
+                if (shouldRecordPolicyApplication)
+                {
+                    await LogTorrentEventAsync(
+                        "torrent.seeding.stopped_policy",
+                        $"Applied the '{seedingDecision.Reason}' seeding stop policy to torrent '{torrent.Name}'.",
+                        torrent, new
+                        {
+                            seedingDecision.Reason,
+                            seedingDecision.CurrentRatio,
+                            seedingDecision.CurrentSeedingMinutes,
+                            torrent.SeedingPolicyAppliedAtUtc,
+                        }, cancellationToken
+                    );
+                }
 
                 continue;
             }

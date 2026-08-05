@@ -89,8 +89,21 @@ The WebUI stays a thin client over service contracts. It must not:
 
 - TorrentCore accepts and persists incoming magnets even when runtime capacity is full.
 - Active metadata-resolution and active-download limits control execution, not admission.
+- Every active metadata resolution reserves one future download slot. The effective metadata-resolution limit is the
+  lower of the configured metadata limit and the download capacity not already claimed by resolved runnable torrents.
+  This prevents MonoTorrent's automatic metadata-to-download transition from oversubscribing the download limit.
+- Queue reconciliation releases excess metadata reservations before starting resolved queued downloads. The combined
+  active metadata-resolution and download count is therefore not increased beyond `MaxActiveDownloads` by
+  metadata-to-download handoffs, live setting reconciliation, or pause/resume queue reshuffling. When an operator
+  lowers the limit below current activity, reconciliation stops the existing excess before admitting replacement work.
 - Queued torrents wait inside TorrentCore until slots open.
 - Queue order is oldest added first, with torrent id as a stable tie-breaker.
+- An unresolved magnet may occupy a metadata reservation for at most the configured metadata-resolution time slice
+  while another unresolved magnet is waiting. Expired resolvers yield only enough slots to dispatch waiting work.
+  Active non-expired attempts stay in place, never-tried magnets run before previously yielded magnets, and yielded
+  magnets retry in oldest-yielded order. A lone unresolved magnet is not rotated.
+- Metadata attempt and last-yield timestamps are durable. Recovery refresh, restart, and reset actions do not extend
+  the active time slice; an operator pause releases the attempt clock.
 - Automatic recovery applies only to torrents occupying active metadata-resolution or download slots; queued and
   terminal torrents do not run recovery actions.
 - Repeated cold recovery cycles use bounded progressive backoff (`1x`, `2x`, `4x`, then `8x`) from the configured
@@ -105,6 +118,14 @@ The WebUI stays a thin client over service contracts. It must not:
 - History stores a structured cold-abandonment removal kind. The operator UI surfaces retained abandonments through a
   dedicated outcome filter and summary that do not depend on the original submission date.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
+- Torrent list and detail reads do not wait behind serialized MonoTorrent lifecycle work. They project from a
+  concurrency-safe manager snapshot and use persisted state when a manager is temporarily absent during a transition.
+- Automatic metadata-session resets run as single-flight host-wide background work. The affected manager is detached
+  with a brief registry mutation, while stop, remove, and recreation run outside both global engine gates. Other
+  torrents continue synchronizing. A reset exceeding the configured stuck threshold remains quarantined until the
+  underlying MonoTorrent operation actually finishes and opens a fixed five-minute circuit breaker. After cooldown,
+  one half-open reset probe may run. Failed recreation retries every five seconds until success or service shutdown.
+- Manual metadata-session reset remains a synchronous operator action.
 - Forced recovery announces run outside serialized synchronization, are deduplicated per torrent, and use a bounded tracker-announce window.
 
 ## Category Routing And Callback Rules
@@ -129,6 +150,9 @@ Completion callback rules:
 - Final-payload filesystem visibility probes run as deduplicated per-torrent background work and never hold serialized engine synchronization.
 - Completion-time MonoTorrent stops run as deduplicated per-torrent background work when the seeding policy has been
   reached. Callback dispatch remains gated until both payload visibility and the manager stop succeed.
+- Applying a seeding stop policy is a durable per-torrent transition. The service records
+  `torrent.seeding.stopped_policy` only when that transition is first applied, not on later synchronization ticks or
+  after restart.
 - Serialized synchronization consumes completed probe and stop results and remains the sole owner of persisted
   callback-state mutations.
 - Completed, stopped torrents leave the per-tick synchronization path after callback dispatch or terminal callback state.

@@ -32,6 +32,7 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.Equal(torrent.CompletionCallbackInvokedAtUtc, reloaded.CompletionCallbackInvokedAtUtc);
             Assert.Equal("The callback exited with code 1.", reloaded.CompletionCallbackLastError);
             Assert.Equal(torrent.DownloadColdSinceUtc, reloaded.DownloadColdSinceUtc);
+            Assert.Equal(torrent.SeedingPolicyAppliedAtUtc, reloaded.SeedingPolicyAppliedAtUtc);
         }
         finally
         {
@@ -110,6 +111,7 @@ public sealed class SqliteTorrentStateStoreTests
             stale.CompletionCallbackLastError = null;
             stale.CompletionCallbackFeedbackReceivedAtUtc = null;
             stale.CompletionCallbackFeedbackJson = null;
+            stale.SeedingPolicyAppliedAtUtc = null;
             stale.State = TorrentState.Completed;
             stale.ProgressPercent = 100;
             stale.DownloadedBytes = stored.TotalBytes ?? 0;
@@ -123,6 +125,7 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.Equal(TorrentCompletionCallbackState.Invoked, reloaded.CompletionCallbackState);
             Assert.Equal(stored.CompletionCallbackFeedbackReceivedAtUtc, reloaded.CompletionCallbackFeedbackReceivedAtUtc);
             Assert.Equal(stored.CompletionCallbackFeedbackJson, reloaded.CompletionCallbackFeedbackJson);
+            Assert.Equal(stored.SeedingPolicyAppliedAtUtc, reloaded.SeedingPolicyAppliedAtUtc);
         }
         finally
         {
@@ -166,6 +169,7 @@ public sealed class SqliteTorrentStateStoreTests
             ConnectedPeerCount = 0,
             AddedAtUtc = now,
             DownloadColdSinceUtc = now.AddHours(-2),
+            SeedingPolicyAppliedAtUtc = now.AddMinutes(-1),
             LastActivityAtUtc = now,
         };
     }

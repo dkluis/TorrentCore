@@ -155,6 +155,9 @@ extension TorrentCoreRuntimeSettings {
         appliedEngineMaximumUploadRateBytesPerSecond = Int(
             value.appliedEngineMaximumUploadRateBytesPerSecond
         )
+        automaticMetadataResetStuckThresholdSeconds = Int(
+            value.automaticMetadataResetStuckThresholdSeconds ?? 30
+        )
         coldDownloadAbandonAfterHours = Int(value.coldDownloadAbandonAfterHours ?? 72)
         coldDownloadRecoveryIntervalMinutes = Int(value.coldDownloadRecoveryIntervalMinutes)
         coldDownloadRecoveryThresholdMinutes = Int(value.coldDownloadRecoveryThresholdMinutes)
@@ -185,6 +188,7 @@ extension TorrentCoreRuntimeSettings {
         maxActiveMetadataResolutions = Int(value.maxActiveMetadataResolutions)
         metadataRefreshRestartDelaySeconds = Int(value.metadataRefreshRestartDelaySeconds)
         metadataRefreshStaleSeconds = Int(value.metadataRefreshStaleSeconds)
+        metadataResolutionTimeSliceMinutes = Int(value.metadataResolutionTimeSliceMinutes ?? 15)
         partialFileSuffix = value.partialFileSuffix
         partialFilesEnabled = value.partialFilesEnabled
         retrievedAt = value.retrievedAtUtc
@@ -208,6 +212,9 @@ extension TorrentCoreServiceRestartResult {
 extension Components.Schemas.UpdateRuntimeSettingsRequest {
     init(_ value: TorrentCoreRuntimeSettingsUpdate) {
         self.init(
+            automaticMetadataResetStuckThresholdSeconds: Int32(
+                value.automaticMetadataResetStuckThresholdSeconds
+            ),
             coldDownloadAbandonAfterHours: Int32(value.coldDownloadAbandonAfterHours),
             coldDownloadRecoveryIntervalMinutes: Int32(value.coldDownloadRecoveryIntervalMinutes),
             coldDownloadRecoveryThresholdMinutes: Int32(value.coldDownloadRecoveryThresholdMinutes),
@@ -236,6 +243,7 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             maxActiveMetadataResolutions: Int32(value.maxActiveMetadataResolutions),
             metadataRefreshRestartDelaySeconds: Int32(value.metadataRefreshRestartDelaySeconds),
             metadataRefreshStaleSeconds: Int32(value.metadataRefreshStaleSeconds),
+            metadataResolutionTimeSliceMinutes: Int32(value.metadataResolutionTimeSliceMinutes),
             seedingStopMinutes: Int32(value.seedingStopMinutes),
             seedingStopMode: value.seedingStopMode,
             seedingStopRatio: value.seedingStopRatio

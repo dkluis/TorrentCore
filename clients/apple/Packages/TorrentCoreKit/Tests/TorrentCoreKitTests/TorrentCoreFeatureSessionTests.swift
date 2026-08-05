@@ -350,8 +350,12 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     )
     update.maxActiveDownloads = 8
     update.engineAllowPeerExchange = true
+    update.metadataResolutionTimeSliceMinutes = 20
+    update.automaticMetadataResetStuckThresholdSeconds = 60
     let updatedSettings = try await session.updateRuntimeSettings(update)
     #expect(updatedSettings.engineAllowPeerExchange)
+    #expect(updatedSettings.metadataResolutionTimeSliceMinutes == 20)
+    #expect(updatedSettings.automaticMetadataResetStuckThresholdSeconds == 60)
     let category = try #require(TorrentCorePreviewFixtures.categories.first)
     _ = try await session.updateCategory(
         key: try #require(category.key),
@@ -1140,6 +1144,8 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         var settings = TorrentCorePreviewFixtures.runtimeSettings
         settings.engineAllowPeerExchange = update.engineAllowPeerExchange
         settings.maxActiveDownloads = update.maxActiveDownloads
+        settings.metadataResolutionTimeSliceMinutes = update.metadataResolutionTimeSliceMinutes
+        settings.automaticMetadataResetStuckThresholdSeconds = update.automaticMetadataResetStuckThresholdSeconds
         return settings
     }
 

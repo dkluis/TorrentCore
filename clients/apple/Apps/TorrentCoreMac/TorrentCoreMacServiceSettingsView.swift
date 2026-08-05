@@ -431,6 +431,20 @@ struct TorrentCoreMacServiceSettingsView: View {
                         content: TorrentCoreHelpCatalog.Settings.metadataRefreshRestartDelaySeconds
                     )
                 }
+                Section("Metadata Resolution") {
+                    integerField(
+                        "Time slice minutes",
+                        value: draft.metadataResolutionTimeSliceMinutes,
+                        content: TorrentCoreHelpCatalog.Settings.metadataResolutionTimeSliceMinutes,
+                        identifier: "serviceSettings.metadataResolutionTimeSliceMinutes"
+                    )
+                    integerField(
+                        "Reset stuck threshold seconds",
+                        value: draft.automaticMetadataResetStuckThresholdSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.automaticMetadataResetStuckThresholdSeconds,
+                        identifier: "serviceSettings.automaticMetadataResetStuckThresholdSeconds"
+                    )
+                }
                 Section("Cold Download Recovery") {
                     integerField(
                         "Recovery threshold minutes",
@@ -993,6 +1007,12 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         if draft.metadataRefreshRestartDelaySeconds < 1 {
             return "Metadata refresh restart delay must be 1 or greater."
+        }
+        if !(1...1_440).contains(draft.metadataResolutionTimeSliceMinutes) {
+            return "Metadata resolution time slice must be between 1 and 1,440 minutes."
+        }
+        if !(15...300).contains(draft.automaticMetadataResetStuckThresholdSeconds) {
+            return "Automatic metadata reset stuck threshold must be between 15 and 300 seconds."
         }
         if draft.coldDownloadRecoveryThresholdMinutes < 1 {
             return "Cold-download recovery threshold must be 1 or greater."

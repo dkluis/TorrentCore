@@ -455,6 +455,8 @@ public sealed class TorrentApiTests
         Assert.Equal(4, settings.MaxActiveDownloads);
         Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
         Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+        Assert.Equal(15, settings.MetadataResolutionTimeSliceMinutes);
+        Assert.Equal(30, settings.AutomaticMetadataResetStuckThresholdSeconds);
         Assert.Equal(120, settings.ColdDownloadRecoveryThresholdMinutes);
         Assert.Equal(60, settings.ColdDownloadRecoveryIntervalMinutes);
         Assert.Equal(72, settings.ColdDownloadAbandonAfterHours);
@@ -506,6 +508,7 @@ public sealed class TorrentApiTests
                 MaxActiveDownloads = 2,
                 MetadataRefreshStaleSeconds = 90,
                 MetadataRefreshRestartDelaySeconds = 30,
+                AutomaticMetadataResetStuckThresholdSeconds = 45,
                 ColdDownloadRecoveryThresholdMinutes = 180,
                 ColdDownloadRecoveryIntervalMinutes = 45,
                 ColdDownloadAbandonAfterHours = 48,
@@ -544,6 +547,7 @@ public sealed class TorrentApiTests
             Assert.Equal(2, settings.MaxActiveDownloads);
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+            Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
             Assert.Equal(48, settings.ColdDownloadAbandonAfterHours);
@@ -604,6 +608,7 @@ public sealed class TorrentApiTests
             Assert.Equal(2, settings.MaxActiveDownloads);
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+            Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
             Assert.Equal(48, settings.ColdDownloadAbandonAfterHours);
@@ -652,7 +657,9 @@ public sealed class TorrentApiTests
 
         var enableResponse = await httpClient.PutAsJsonAsync(
             "api/host/runtime-settings",
-            CreateDefaultRuntimeSettingsUpdateRequest(engineAllowPeerExchange: true)
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                engineAllowPeerExchange: true,
+                automaticMetadataResetStuckThresholdSeconds: 45)
         );
         enableResponse.EnsureSuccessStatusCode();
 
@@ -665,6 +672,7 @@ public sealed class TorrentApiTests
         var settings = await legacyResponse.Content.ReadFromJsonAsync<RuntimeSettingsDto>();
         Assert.NotNull(settings);
         Assert.True(settings.EngineAllowPeerExchange);
+        Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
         Assert.False(settings.AppliedEngineAllowPeerExchange);
         Assert.True(settings.EngineSettingsRequireRestart);
     }
@@ -696,6 +704,38 @@ public sealed class TorrentApiTests
             "api/host/runtime-settings",
             CreateDefaultRuntimeSettingsUpdateRequest(coldDownloadAbandonAfterHours: -1)
         );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(14)]
+    [InlineData(301)]
+    public async Task UpdateRuntimeSettings_RejectsInvalidAutomaticMetadataResetStuckThreshold(int thresholdSeconds)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                automaticMetadataResetStuckThresholdSeconds: thresholdSeconds)
+        );
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1441)]
+    public async Task UpdateRuntimeSettings_RejectsInvalidMetadataResolutionTimeSlice(int minutes)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(metadataResolutionTimeSliceMinutes: minutes));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -1226,6 +1266,59 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task MonoTorrentEngine_GetEndpoints_DoNotWaitForLifecycleGate()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-monotorrent-read-lifecycle-separation");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            downloadPath: downloadPath,
+            storagePath: storagePath);
+        using var httpClient = factory.CreateClient();
+
+        var addResponse = await AddMagnetAsync(
+            httpClient,
+            "7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C7C",
+            "MonoTorrent Read Lifecycle Separation");
+        addResponse.EnsureSuccessStatusCode();
+        var addedTorrent = await addResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(addedTorrent);
+
+        var adapter = factory.Services.GetRequiredService<MonoTorrentEngineAdapter>();
+        var gateField = typeof(MonoTorrentEngineAdapter).GetField(
+            "_gate",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        var lifecycleGate = Assert.IsType<SemaphoreSlim>(gateField?.GetValue(adapter));
+
+        await lifecycleGate.WaitAsync();
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            var listTask = httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>(
+                "api/torrents",
+                timeout.Token);
+            var detailTask = httpClient.GetFromJsonAsync<TorrentDetailDto>(
+                $"api/torrents/{addedTorrent.TorrentId}",
+                timeout.Token);
+
+            await Task.WhenAll(listTask, detailTask);
+
+            var torrents = await listTask;
+            var detail = await detailTask;
+            Assert.NotNull(torrents);
+            Assert.NotNull(detail);
+            Assert.Contains(torrents, torrent => torrent.TorrentId == addedTorrent.TorrentId);
+            Assert.Equal(addedTorrent.TorrentId, detail.TorrentId);
+        }
+        finally
+        {
+            lifecycleGate.Release();
+        }
+    }
+
+    [Fact]
     public async Task MonoTorrentEngine_StartupRecovery_DoesNotRequeuePersistedFinishedTorrent_WhenCacheIsMissing()
     {
         var rootPath = CreateTempRootPath("torrentcore-monotorrent-finished-recovery");
@@ -1353,6 +1446,44 @@ public sealed class TorrentApiTests
                        torrent.State == TorrentState.Queued &&
                        torrent.WaitReason == TorrentWaitReason.WaitingForMetadataSlot &&
                        torrent.QueuePosition == 1);
+    }
+
+    [Fact]
+    public async Task MonoTorrentEngine_BurstAdmission_ReservesDownloadSlotsBeforeMetadataResolution()
+    {
+        const int burstSize = 20;
+        const int downloadLimit = 4;
+
+        await using var factory = CreateFactory(
+            engineMode: TorrentEngineMode.MonoTorrent,
+            maxActiveMetadataResolutions: 10,
+            maxActiveDownloads: downloadLimit);
+        using var httpClient = factory.CreateClient();
+
+        for (var index = 0; index < burstSize; index++)
+        {
+            var infoHash = (index + 1).ToString("X40");
+            var response = await AddMagnetAsync(httpClient, infoHash, $"Burst Admission {index + 1}");
+            response.EnsureSuccessStatusCode();
+        }
+
+        var torrents = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            items => items is not null &&
+                     items.Count == burstSize &&
+                     items.Count(torrent => torrent.State == TorrentState.ResolvingMetadata) == downloadLimit &&
+                     items.Count(torrent => torrent.State == TorrentState.Queued) == burstSize - downloadLimit,
+            timeout: TimeSpan.FromSeconds(10));
+        var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
+
+        Assert.NotNull(torrents);
+        Assert.Equal(downloadLimit, torrents.Count(torrent => torrent.State == TorrentState.ResolvingMetadata));
+        Assert.Equal(burstSize - downloadLimit, torrents.Count(torrent => torrent.State == TorrentState.Queued));
+        Assert.NotNull(hostStatus);
+        Assert.Equal(0, hostStatus.AvailableMetadataResolutionSlots);
+        Assert.Equal(0, hostStatus.AvailableDownloadSlots);
+        Assert.Equal(downloadLimit, hostStatus.ResolvingMetadataCount);
+        Assert.Equal(burstSize - downloadLimit, hostStatus.MetadataQueueCount);
     }
 
     [Fact]
@@ -1961,7 +2092,12 @@ public sealed class TorrentApiTests
                                           log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_reset\"", StringComparison.Ordinal) == true) &&
                        entries.Any(log => log.EventType == "torrent.metadata.refresh_requested" &&
                                           log.Category == "engine" &&
-                                          log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_reset\"", StringComparison.Ordinal) == true),
+                                          log.DetailsJson?.Contains("\"Origin\":\"automatic_stale_reset\"", StringComparison.Ordinal) == true) &&
+                       entries.Any(log => log.EventType == "torrent.metadata.reset_applied" &&
+                                          log.Category == "engine") &&
+                       entries.Any(log => log.EventType == "runtime.metadata.reset_completed" &&
+                                          log.Category == "runtime" &&
+                                          log.DetailsJson?.Contains("\"Outcome\":\"succeeded\"", StringComparison.Ordinal) == true),
             timeout: TimeSpan.FromSeconds(15));
 
         Assert.NotNull(logs);
@@ -2731,6 +2867,72 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_SeedingPolicyApplication_IsLoggedOnceAcrossReevaluationAndRestart()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-seeding-policy-idempotence");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        const string torrentName = "Policy Idempotence Torrent";
+        Directory.CreateDirectory(downloadPath);
+        await File.WriteAllTextAsync(Path.Combine(downloadPath, torrentName), "complete");
+
+        Guid torrentId;
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         seedingStopMode: SeedingStopMode.StopImmediately,
+                         runtimeTickIntervalMilliseconds: 50,
+                         metadataResolutionDelayMilliseconds: 0,
+                         downloadProgressPercentPerTick: 100))
+        {
+            using var httpClient = factory.CreateClient();
+            var response = await AddMagnetAsync(
+                httpClient,
+                "7575757575757575757575757575757575757575",
+                torrentName);
+            var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+            Assert.NotNull(torrent);
+            torrentId = torrent.TorrentId;
+
+            await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                current => current?.State == TorrentState.Completed,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var logs = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+                    $"api/logs?eventType=torrent.seeding.stopped_policy&torrentId={torrentId}&take=20"),
+                entries => entries is { Count: 1 },
+                timeout: TimeSpan.FromSeconds(5));
+            Assert.Single(logs!);
+        }
+
+        await ForceSeedingPolicyReevaluationAsync(storagePath, torrentId);
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         seedingStopMode: SeedingStopMode.StopImmediately,
+                         runtimeTickIntervalMilliseconds: 50,
+                         metadataResolutionDelayMilliseconds: 0,
+                         downloadProgressPercentPerTick: 100))
+        {
+            using var httpClient = factory.CreateClient();
+
+            await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{torrentId}"),
+                current => current?.State == TorrentState.Completed,
+                timeout: TimeSpan.FromSeconds(5));
+            await Task.Delay(250);
+
+            var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+                $"api/logs?eventType=torrent.seeding.stopped_policy&torrentId={torrentId}&take=20");
+            Assert.NotNull(logs);
+            Assert.Single(logs);
+        }
+    }
+
+    [Fact]
     public async Task FakeRuntime_AutoCleanup_RemovesCompletedTorrentWithoutDeletingData()
     {
         var rootPath = CreateTempRootPath("torrentcore-auto-cleanup");
@@ -3088,6 +3290,103 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_MetadataTimeSlice_RotatesWaitingMagnetsThenRetriesOldestYielded()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-metadata-time-slice");
+        var storagePath = Path.Combine(rootPath, "storage");
+        await using var factory = CreateFactory(
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 300_000,
+            maxActiveMetadataResolutions: 1,
+            metadataResolutionTimeSliceMinutes: 1);
+        using var httpClient = factory.CreateClient();
+
+        var first = await (await AddMagnetAsync(
+            httpClient, "7171717171717171717171717171717171717171", "Rotation One"))
+            .Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var second = await (await AddMagnetAsync(
+            httpClient, "7272727272727272727272727272727272727272", "Rotation Two"))
+            .Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var third = await (await AddMagnetAsync(
+            httpClient, "7373737373737373737373737373737373737373", "Rotation Three"))
+            .Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        await WaitForResolvingTorrentAsync(first!.TorrentId);
+        await ForceMetadataAttemptStartedAsync(storagePath, first.TorrentId, DateTimeOffset.UtcNow.AddMinutes(-2));
+        await WaitForResolvingTorrentAsync(second!.TorrentId);
+
+        await ForceMetadataAttemptStartedAsync(storagePath, second.TorrentId, DateTimeOffset.UtcNow.AddMinutes(-2));
+        await WaitForResolvingTorrentAsync(third!.TorrentId);
+
+        await ForceMetadataAttemptStartedAsync(storagePath, third.TorrentId, DateTimeOffset.UtcNow.AddMinutes(-2));
+        await WaitForResolvingTorrentAsync(first.TorrentId);
+
+        var logs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+                "api/logs?eventType=torrent.metadata.resolution_yielded&take=20"),
+            entries => entries is not null && entries.Count == 3,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(logs);
+        Assert.Equal(3, logs.Count);
+        Assert.Equal(3, logs.Select(log => log.TorrentId).Distinct().Count());
+
+        async Task WaitForResolvingTorrentAsync(Guid torrentId)
+        {
+            var torrents = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+                items => items is not null &&
+                         items.Count(item => item.State == TorrentState.ResolvingMetadata) == 1 &&
+                         items.Any(item => item.TorrentId == torrentId &&
+                                           item.State == TorrentState.ResolvingMetadata),
+                timeout: TimeSpan.FromSeconds(5));
+            Assert.NotNull(torrents);
+        }
+    }
+
+    [Fact]
+    public async Task FakeRuntime_MetadataTimeSlice_DoesNotYieldWhenNoMagnetIsWaiting()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-metadata-time-slice-no-waiter");
+        var storagePath = Path.Combine(rootPath, "storage");
+        await using var factory = CreateFactory(
+            storagePath: storagePath,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 300_000,
+            maxActiveMetadataResolutions: 1,
+            metadataResolutionTimeSliceMinutes: 1);
+        using var httpClient = factory.CreateClient();
+
+        var torrent = await (await AddMagnetAsync(
+            httpClient, "7474747474747474747474747474747474747474", "Lone Resolver"))
+            .Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(torrent);
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            items => items is not null &&
+                     items.Any(item => item.TorrentId == torrent.TorrentId &&
+                                       item.State == TorrentState.ResolvingMetadata),
+            timeout: TimeSpan.FromSeconds(5));
+
+        await ForceMetadataAttemptStartedAsync(
+            storagePath,
+            torrent.TorrentId,
+            DateTimeOffset.UtcNow.AddMinutes(-2));
+        await Task.Delay(300);
+
+        var torrents = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+        var current = Assert.Single(torrents!);
+        Assert.Equal(TorrentState.ResolvingMetadata, current.State);
+
+        var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+            "api/logs?eventType=torrent.metadata.resolution_yielded&take=20");
+        Assert.NotNull(logs);
+        Assert.Empty(logs);
+    }
+
+    [Fact]
     public async Task GetHostStatus_ReportsQueueAndRuntimeStateBreakdown()
     {
         await using var factory = CreateFactory(
@@ -3112,7 +3411,7 @@ public sealed class TorrentApiTests
         Assert.NotNull(hostStatus);
         Assert.Equal(2, hostStatus.TorrentCount);
         Assert.Equal(0, hostStatus.AvailableMetadataResolutionSlots);
-        Assert.Equal(4, hostStatus.AvailableDownloadSlots);
+        Assert.Equal(3, hostStatus.AvailableDownloadSlots);
         Assert.Equal(1, hostStatus.ResolvingMetadataCount);
         Assert.Equal(1, hostStatus.MetadataQueueCount);
         Assert.Equal(0, hostStatus.DownloadingCount);
@@ -3133,11 +3432,33 @@ public sealed class TorrentApiTests
             runtimeTickIntervalMilliseconds: 50,
             metadataResolutionDelayMilliseconds: 0,
             downloadProgressPercentPerTick: 5,
-            maxActiveDownloads: 1);
+            maxActiveDownloads: 2);
         using var httpClient = factory.CreateClient();
 
-        await AddMagnetAsync(httpClient, "5151515151515151515151515151515151515151", "Download Slot One");
-        await AddMagnetAsync(httpClient, "6161616161616161616161616161616161616161", "Download Slot Two");
+        var firstResponse = await AddMagnetAsync(
+            httpClient,
+            "5151515151515151515151515151515151515151",
+            "Download Slot One");
+        var secondResponse = await AddMagnetAsync(
+            httpClient,
+            "6161616161616161616161616161616161616161",
+            "Download Slot Two");
+        var firstTorrent = await firstResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        var secondTorrent = await secondResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+            items => items is not null && items.Count(torrent => torrent.State == TorrentState.Downloading) == 2,
+            timeout: TimeSpan.FromSeconds(5));
+
+        (await httpClient.PostAsync($"api/torrents/{secondTorrent!.TorrentId}/pause", content: null))
+            .EnsureSuccessStatusCode();
+        var settingsResponse = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(maxActiveDownloads: 1));
+        settingsResponse.EnsureSuccessStatusCode();
+        (await httpClient.PostAsync($"api/torrents/{secondTorrent.TorrentId}/resume", content: null))
+            .EnsureSuccessStatusCode();
 
         var torrents = await WaitForAsync(
             async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
@@ -3149,7 +3470,14 @@ public sealed class TorrentApiTests
             timeout: TimeSpan.FromSeconds(5));
 
         Assert.NotNull(torrents);
-        Assert.Contains(torrents, torrent => torrent.WaitReason == TorrentWaitReason.WaitingForDownloadSlot && torrent.QueuePosition == 1);
+        Assert.Contains(
+            torrents,
+            torrent => torrent.TorrentId == firstTorrent!.TorrentId && torrent.State == TorrentState.Downloading);
+        Assert.Contains(
+            torrents,
+            torrent => torrent.TorrentId == secondTorrent.TorrentId &&
+                       torrent.WaitReason == TorrentWaitReason.WaitingForDownloadSlot &&
+                       torrent.QueuePosition == 1);
     }
 
     [Fact]
@@ -3502,6 +3830,7 @@ public sealed class TorrentApiTests
         int? completedTorrentCleanupMinutes = null,
         int? maxActiveMetadataResolutions = null,
         int? maxActiveDownloads = null,
+        int? metadataResolutionTimeSliceMinutes = null,
         int? runtimeTickIntervalMilliseconds = null,
         int? metadataResolutionDelayMilliseconds = null,
         double? downloadProgressPercentPerTick = null,
@@ -3613,6 +3942,12 @@ public sealed class TorrentApiTests
                         settings[$"{TorrentCoreServiceOptions.SectionName}:MaxActiveDownloads"] = maxActiveDownloads.Value.ToString();
                     }
 
+                    if (metadataResolutionTimeSliceMinutes is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionTimeSliceMinutes"] =
+                                metadataResolutionTimeSliceMinutes.Value.ToString();
+                    }
+
                     if (runtimeTickIntervalMilliseconds is not null)
                     {
                         settings[$"{TorrentCoreServiceOptions.SectionName}:RuntimeTickIntervalMilliseconds"] = runtimeTickIntervalMilliseconds.Value.ToString();
@@ -3642,7 +3977,10 @@ public sealed class TorrentApiTests
         int coldDownloadRecoveryThresholdMinutes = 240,
         int coldDownloadRecoveryIntervalMinutes = 60,
         int coldDownloadAbandonAfterHours = 72,
-        bool? engineAllowPeerExchange = false)
+        bool? engineAllowPeerExchange = false,
+        int? automaticMetadataResetStuckThresholdSeconds = null,
+        int? metadataResolutionTimeSliceMinutes = null,
+        int maxActiveDownloads = 4)
     {
         return new UpdateRuntimeSettingsRequest
         {
@@ -3661,9 +3999,11 @@ public sealed class TorrentApiTests
             EngineMaximumDownloadRateBytesPerSecond = 0,
             EngineMaximumUploadRateBytesPerSecond = 0,
             MaxActiveMetadataResolutions = 4,
-            MaxActiveDownloads = 4,
+            MaxActiveDownloads = maxActiveDownloads,
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
+            MetadataResolutionTimeSliceMinutes = metadataResolutionTimeSliceMinutes,
+            AutomaticMetadataResetStuckThresholdSeconds = automaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes = coldDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = coldDownloadRecoveryIntervalMinutes,
             ColdDownloadAbandonAfterHours = coldDownloadAbandonAfterHours,
@@ -3984,6 +4324,26 @@ public sealed class TorrentApiTests
         await command.ExecuteNonQueryAsync();
     }
 
+    private static async Task ForceMetadataAttemptStartedAsync(
+        string storagePath,
+        Guid torrentId,
+        DateTimeOffset startedAtUtc)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              UPDATE torrents
+                              SET metadata_resolution_attempt_started_at_utc = $started_at_utc
+                              WHERE torrent_id = $torrent_id;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$started_at_utc", startedAtUtc.ToString("O"));
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     private static async Task UpdateHistoryRowAsync(
         string databaseFilePath,
         Guid torrentId,
@@ -4020,6 +4380,27 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue(
             "$removed_by_cleanup_policy",
             removalKind is TorrentRemovalKind.CompletedTorrentCleanup or TorrentRemovalKind.ColdDownloadAbandonment ? 1 : 0);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ForceSeedingPolicyReevaluationAsync(string storagePath, Guid torrentId)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              UPDATE torrents
+                              SET state = 'Seeding',
+                                  desired_state = 'Runnable',
+                                  progress_percent = 100,
+                                  downloaded_bytes = COALESCE(total_bytes, downloaded_bytes),
+                                  download_rate_bytes_per_second = 0,
+                                  error_message = NULL
+                              WHERE torrent_id = $torrent_id;
+                              """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
         await command.ExecuteNonQueryAsync();
     }
 

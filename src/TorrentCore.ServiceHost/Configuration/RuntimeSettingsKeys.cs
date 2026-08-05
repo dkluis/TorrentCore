@@ -20,6 +20,9 @@ public static class RuntimeSettingsKeys
     public const string MaxActiveDownloads                      = "max_active_downloads";
     public const string MetadataRefreshStaleSeconds             = "metadata_refresh_stale_seconds";
     public const string MetadataRefreshRestartDelaySeconds      = "metadata_refresh_restart_delay_seconds";
+    public const string MetadataResolutionTimeSliceMinutes      = "metadata_resolution_time_slice_minutes";
+    public const string AutomaticMetadataResetStuckThresholdSeconds =
+            "automatic_metadata_reset_stuck_threshold_seconds";
     public const string ColdDownloadRecoveryThresholdMinutes    = "cold_download_recovery_threshold_minutes";
     public const string ColdDownloadRecoveryIntervalMinutes     = "cold_download_recovery_interval_minutes";
     public const string ColdDownloadAbandonAfterHours           = "cold_download_abandon_after_hours";

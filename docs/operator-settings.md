@@ -6,17 +6,33 @@
 
 - maximum number of torrents actively resolving magnet metadata
 - extra unresolved magnets stay queued
+- each active resolution reserves a future active-download slot, so the effective limit can be lower when resolved
+  downloads are running or queued
 - applies live
 
 ### Max Active Downloads
 
 - maximum number of torrents actively downloading
 - resolved torrents above the limit stay queued
+- also acts as the hard ceiling for active downloads plus metadata resolutions; this prevents a burst of completed
+  magnet resolutions from entering download state all at once
 - applies live
+
+### Metadata Resolution Time Slice Minutes
+
+- maximum continuous time an unresolved magnet keeps a metadata/download reservation while another unresolved magnet
+  is waiting
+- defaults to `15`; accepted range is `1` through `1440`
+- on expiry, the active resolver stops and moves behind never-tried magnets; yielded magnets later retry in
+  oldest-yielded order
+- a lone unresolved magnet continues resolving instead of being stopped and immediately restarted
+- metadata refresh, restart, and automatic reset actions do not restart the time-slice clock
+- applies live; configurable through the runtime-settings API/Swagger and native macOS Service Settings, with no
+  WebUI control
 
 Queue diagnostics currently expose:
 
-- open metadata and download slots
+- open metadata and download slots after metadata-to-download reservations are applied
 - counts for resolving, metadata-queued, downloading, download-queued, seeding, paused, completed, and errored torrents
 - per-torrent wait reason and queue position when applicable
 
@@ -33,6 +49,21 @@ Queue diagnostics currently expose:
 - additional delay before TorrentCore escalates stale recovery to stop/start
 - used for both metadata stalls and zero-peer download stalls
 - applies live
+
+When refresh and restart do not recover an active metadata session, TorrentCore schedules at most one automatic
+background reset across the host. Other torrents continue synchronizing while MonoTorrent stops, removes, and
+recreates the affected manager. If removal succeeds but recreation fails, TorrentCore retries recreation every five
+seconds until it succeeds or the service shuts down. Manual metadata reset remains synchronous.
+
+### Automatic Metadata Reset Stuck Threshold Seconds
+
+- elapsed reset time before TorrentCore reports the operation as stuck and opens the automatic-reset circuit breaker
+- defaults to `30`; accepted range is `15` through `300`
+- applies live to newly scheduled automatic resets
+- configurable through the runtime-settings API/Swagger and native macOS Service Settings; no WebUI control is
+  provided yet
+- a timed-out manager remains quarantined until the underlying MonoTorrent operation actually finishes
+- the circuit breaker remains open for a fixed five minutes, then permits one half-open probe
 
 ### Long-Cold Threshold Minutes
 

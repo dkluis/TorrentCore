@@ -192,6 +192,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         torrent.DownloadRateBytesPerSecond = 0;
         torrent.UploadRateBytesPerSecond   = 0;
         torrent.LastActivityAtUtc          = DateTimeOffset.UtcNow;
+        torrent.MetadataResolutionAttemptStartedAtUtc = null;
 
         await torrentStateStore.UpdateAsync(torrent, cancellationToken);
         await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);

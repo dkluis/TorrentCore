@@ -23,6 +23,8 @@ public sealed class RuntimeSettingsSnapshot
     public required int                         MaxActiveDownloads                           { get; init; }
     public required int                         MetadataRefreshStaleSeconds                  { get; init; }
     public required int                         MetadataRefreshRestartDelaySeconds           { get; init; }
+    public int                                  MetadataResolutionTimeSliceMinutes           { get; init; } = 15;
+    public int                                  AutomaticMetadataResetStuckThresholdSeconds  { get; init; } = 30;
     public int                                  ColdDownloadRecoveryThresholdMinutes         { get; init; } = 120;
     public int                                  ColdDownloadRecoveryIntervalMinutes          { get; init; } = 60;
     public int                                  ColdDownloadAbandonAfterHours                { get; init; } = 72;

@@ -277,6 +277,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var appliedEngineMaximumDownloadRateBytesPerSecond: Int
     public var appliedEngineMaximumHalfOpenConnections: Int
     public var appliedEngineMaximumUploadRateBytesPerSecond: Int
+    public var automaticMetadataResetStuckThresholdSeconds: Int
     public var coldDownloadAbandonAfterHours: Int
     public var coldDownloadRecoveryIntervalMinutes: Int
     public var coldDownloadRecoveryThresholdMinutes: Int
@@ -305,6 +306,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var maxActiveMetadataResolutions: Int
     public var metadataRefreshRestartDelaySeconds: Int
     public var metadataRefreshStaleSeconds: Int
+    public var metadataResolutionTimeSliceMinutes: Int
     public var partialFileSuffix: String?
     public var partialFilesEnabled: Bool
     public var retrievedAt: Date
@@ -317,6 +319,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
 }
 
 public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
+    public var automaticMetadataResetStuckThresholdSeconds: Int
     public var coldDownloadAbandonAfterHours: Int
     public var coldDownloadRecoveryIntervalMinutes: Int
     public var coldDownloadRecoveryThresholdMinutes: Int
@@ -343,11 +346,13 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var maxActiveMetadataResolutions: Int
     public var metadataRefreshRestartDelaySeconds: Int
     public var metadataRefreshStaleSeconds: Int
+    public var metadataResolutionTimeSliceMinutes: Int
     public var seedingStopMinutes: Int
     public var seedingStopMode: String
     public var seedingStopRatio: Double
 
     public init(settings: TorrentCoreRuntimeSettings) {
+        automaticMetadataResetStuckThresholdSeconds = settings.automaticMetadataResetStuckThresholdSeconds
         engineAllowPeerExchange = settings.engineAllowPeerExchange
         coldDownloadAbandonAfterHours = settings.coldDownloadAbandonAfterHours
         coldDownloadRecoveryIntervalMinutes = settings.coldDownloadRecoveryIntervalMinutes
@@ -374,6 +379,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         maxActiveMetadataResolutions = settings.maxActiveMetadataResolutions
         metadataRefreshRestartDelaySeconds = settings.metadataRefreshRestartDelaySeconds
         metadataRefreshStaleSeconds = settings.metadataRefreshStaleSeconds
+        metadataResolutionTimeSliceMinutes = settings.metadataResolutionTimeSliceMinutes
         seedingStopMinutes = settings.seedingStopMinutes
         seedingStopMode = settings.seedingStopMode ?? ""
         seedingStopRatio = settings.seedingStopRatio

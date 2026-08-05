@@ -20,8 +20,17 @@ internal static class TorrentQueueDiagnostics
         var resolvingMetadataCount = snapshots.Count(snapshot => snapshot.State == TorrentState.ResolvingMetadata);
         var downloadingCount       = snapshots.Count(snapshot => snapshot.State == TorrentState.Downloading);
 
-        var availableMetadataSlots = Math.Max(0, runtimeSettings.MaxActiveMetadataResolutions - resolvingMetadataCount);
-        var availableDownloadSlots = Math.Max(0, runtimeSettings.MaxActiveDownloads           - downloadingCount);
+        var resolvedDownloadDemand = snapshots.Count(snapshot =>
+            snapshot.State == TorrentState.Downloading ||
+            snapshot.State == TorrentState.Queued && snapshot.TotalBytes is not null);
+        var availableMetadataSlots = TorrentDownloadAdmissionPolicy.CalculateAvailableMetadataResolutionSlots(
+            runtimeSettings.MaxActiveMetadataResolutions,
+            runtimeSettings.MaxActiveDownloads,
+            resolvedDownloadDemand,
+            resolvingMetadataCount);
+        var availableDownloadSlots = Math.Max(
+            0,
+            runtimeSettings.MaxActiveDownloads - downloadingCount - resolvingMetadataCount);
 
         var metadataQueue = snapshots
                            .Where(snapshot => snapshot.State == TorrentState.Queued && snapshot.TotalBytes is null)

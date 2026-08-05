@@ -65,8 +65,14 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         var pausedCount = torrents.Count(torrent => torrent.State == TorrentState.Paused);
         var completedCount = torrents.Count(torrent => torrent.State == TorrentState.Completed);
         var errorCount = torrents.Count(torrent => torrent.State == TorrentState.Error);
-        var availableMetadataSlots = Math.Max(0, runtimeSettings.MaxActiveMetadataResolutions - resolvingMetadataCount);
-        var availableDownloadSlots = Math.Max(0, runtimeSettings.MaxActiveDownloads - downloadingCount);
+        var availableMetadataSlots = TorrentDownloadAdmissionPolicy.CalculateAvailableMetadataResolutionSlots(
+            runtimeSettings.MaxActiveMetadataResolutions,
+            runtimeSettings.MaxActiveDownloads,
+            downloadingCount + downloadQueueCount,
+            resolvingMetadataCount);
+        var availableDownloadSlots = Math.Max(
+            0,
+            runtimeSettings.MaxActiveDownloads - downloadingCount - resolvingMetadataCount);
         var currentConnectedPeerCount = torrents.Sum(torrent => torrent.ConnectedPeerCount);
         var currentDownloadRateBytesPerSecond = torrents.Sum(torrent => torrent.DownloadRateBytesPerSecond);
         var currentUploadRateBytesPerSecond = torrents.Sum(torrent => torrent.UploadRateBytesPerSecond);

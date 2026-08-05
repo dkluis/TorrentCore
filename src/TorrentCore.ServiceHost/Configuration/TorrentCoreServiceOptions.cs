@@ -3,6 +3,10 @@ namespace TorrentCore.Service.Configuration;
 public sealed class TorrentCoreServiceOptions
 {
     public const string SectionName = "TorrentCore";
+    public const int MinimumAutomaticMetadataResetStuckThresholdSeconds = 15;
+    public const int MaximumAutomaticMetadataResetStuckThresholdSeconds = 300;
+    public const int MinimumMetadataResolutionTimeSliceMinutes = 1;
+    public const int MaximumMetadataResolutionTimeSliceMinutes = 1_440;
     public TorrentEngineMode EngineMode { get; init; } = TorrentEngineMode.MonoTorrent;
     public TorrentEncryptionMode EngineEncryptionMode { get; init; } = TorrentEncryptionMode.EncryptedPreferred;
     public int EngineListenPort { get; init; } = 55_123;
@@ -29,6 +33,8 @@ public sealed class TorrentCoreServiceOptions
     public int MaxActiveDownloads { get; init; } = 4;
     public int MetadataRefreshStaleSeconds { get; init; } = 90;
     public int MetadataRefreshRestartDelaySeconds { get; init; } = 30;
+    public int MetadataResolutionTimeSliceMinutes { get; init; } = 15;
+    public int AutomaticMetadataResetStuckThresholdSeconds { get; init; } = 30;
     public int ColdDownloadRecoveryThresholdMinutes { get; init; } = 120;
     public int ColdDownloadRecoveryIntervalMinutes { get; init; } = 60;
     public int ColdDownloadAbandonAfterHours { get; init; } = 72;

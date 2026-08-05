@@ -123,6 +123,7 @@ builder.Services.AddSingleton<IMaintenanceCleanupService, MaintenanceCleanupServ
 builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentCompletionFinalizationChecker>();
 builder.Services.AddSingleton<TorrentCompletionFinalizationProbeCoordinator>();
 builder.Services.AddSingleton<TorrentManagerStopCoordinator>();
+builder.Services.AddSingleton<TorrentMetadataResetCoordinator>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackInvoker, TorrentCompletionCallbackInvoker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackProcessor, TorrentCompletionCallbackProcessor>();
 builder.Services.AddSingleton<TorrentRemovalCleanupService>();

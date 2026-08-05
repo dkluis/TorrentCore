@@ -15,14 +15,33 @@ func sharedTargetsExposeTheSameProductIdentity() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 38)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 40)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
     )
     #expect(TorrentCoreHelpCatalog.Settings.seedingStopMode.detail.contains("live"))
     #expect(TorrentCoreHelpCatalog.Settings.engineEncryptionMode.detail.contains("restart"))
+    #expect(TorrentCoreHelpCatalog.Settings.metadataResolutionTimeSliceMinutes.detail.contains("lone resolver"))
+    #expect(TorrentCoreHelpCatalog.Settings.automaticMetadataResetStuckThresholdSeconds.detail.contains("quarantines"))
     #expect(TorrentCoreHelpCatalog.Settings.categoryDownloadRootPath.detail.contains("Existing"))
+}
+
+@Test
+func runtimeSettingsDraftAndRequestPreserveMetadataSafetySettings() throws {
+    var settings = TorrentCorePreviewFixtures.runtimeSettings
+    settings.metadataResolutionTimeSliceMinutes = 21
+    settings.automaticMetadataResetStuckThresholdSeconds = 45
+
+    let update = TorrentCoreRuntimeSettingsUpdate(settings: settings)
+    #expect(update.metadataResolutionTimeSliceMinutes == 21)
+    #expect(update.automaticMetadataResetStuckThresholdSeconds == 45)
+
+    let request = Components.Schemas.UpdateRuntimeSettingsRequest(update)
+    let data = try JSONEncoder().encode(request)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(body["metadataResolutionTimeSliceMinutes"] as? Int == 21)
+    #expect(body["automaticMetadataResetStuckThresholdSeconds"] as? Int == 45)
 }
 
 @Test

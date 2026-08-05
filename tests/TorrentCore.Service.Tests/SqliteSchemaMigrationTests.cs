@@ -264,7 +264,21 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], versions);
+
+        var torrentColumnsCommand = connection.CreateCommand();
+        torrentColumnsCommand.CommandText = "PRAGMA table_info(torrents);";
+        var torrentColumns = new List<string>();
+        await using (var torrentColumnsReader = await torrentColumnsCommand.ExecuteReaderAsync())
+        {
+            while (await torrentColumnsReader.ReadAsync())
+            {
+                torrentColumns.Add(torrentColumnsReader.GetString(1));
+            }
+        }
+        Assert.Contains("metadata_resolution_attempt_started_at_utc", torrentColumns);
+        Assert.Contains("metadata_resolution_last_yielded_at_utc", torrentColumns);
+        Assert.Contains("seeding_policy_applied_at_utc", torrentColumns);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";

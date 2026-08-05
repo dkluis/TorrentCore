@@ -169,6 +169,8 @@ no active saved connection.
 - Service Settings edits one group at a time with Save/Revert and guarded navigation. Closed server values use readable
   selectors for seeding stop mode, completed-torrent cleanup mode, and engine encryption mode. Dependent controls are
   disabled when their selected policy does not use them, and service validation rules are enforced before Save.
+  Metadata Recovery includes the live metadata-resolution time slice and automatic-reset stuck threshold with the
+  same ranges and defaults as the Service contract.
   Numeric settings show their current values in editable fields. Categories use one full-width inline editable grid,
   falling back to horizontal scrolling only when the tab is genuinely too narrow. Save submits only changed category
   rows sequentially through the existing single-category API.
