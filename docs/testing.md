@@ -13,6 +13,9 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 
 Representative coverage areas:
 
+- deterministic VPN-egress scaffolding for controllable time, scripted HTTP outcomes, engine-instance lifecycle
+  observation, and a sanitized CA-Desktop deployment layout; these fixtures require neither Internet access nor
+  ExpressVPN
 - API behavior, including Service semantic-version and Git-build identity reporting
 - launch-agent restart-label resolution, including the native supervisor helper's `XPC_SERVICE_NAME=0` context
 - SQLite schema migration and persistence

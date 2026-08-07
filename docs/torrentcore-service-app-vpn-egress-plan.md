@@ -231,7 +231,7 @@ the decision.
 
 ### Slice 0: Baseline And Safety Fixtures
 
-Status: pending.
+Status: completed on August 6, 2026.
 
 #### Work
 
@@ -246,6 +246,63 @@ Status: pending.
 - Normal tests remain deterministic and require neither Internet access nor ExpressVPN.
 - Test fixtures can represent VPN success, direct ISP, IPv6, malformed JSON, timeout, cancellation, and endpoint failure.
 - No production behavior changes.
+
+#### Recorded Baseline
+
+- Baseline Git commit: `348f2dc` (`Plan TorrentCore VPN-gated service app`).
+- Service version: `0.5.1`.
+- Public API contract version: `1`.
+- Committed normalized OpenAPI SHA-256:
+  `ba2fe9554cb98a1dffd96c4f143fdff8b54d4cb713b31f05704f02abdfb5a629`.
+- `dotnet build TorrentCore.sln --no-restore`: succeeded with zero warnings and zero errors.
+- `dotnet test TorrentCore.sln --no-build --no-restore`: all 206 pre-slice tests passed.
+- The test baseline required the normal unsandboxed VSTest host because its local coordination socket is denied by the
+  filesystem/network sandbox. The suite itself did not contact the Internet or ExpressVPN.
+
+Reusable fixtures now provide a manual `TimeProvider`, scripted HTTP responses, and engine-instance lifecycle
+observation. The sanitized CA-Desktop fixture records only known paths, architecture, and LAN bindings; it deliberately
+omits host-local environment values, saved WebUI endpoint values, live database/cache contents, and external-volume
+category paths.
+
+#### Persistent Activity Event Inventory
+
+VPN activity uses category `vpn` and these stable event types:
+
+| Event type | Persistence rule | Required detail fields when implemented |
+|---|---|---|
+| `vpn.egress.validation_completed` | One result for each completed validation attempt, subject to the existing activity-log retention limit | trigger, outcome, sanitized endpoint authority, duration, and observed IP when parseable |
+| `vpn.egress.state_changed` | One row only when public VPN/engine state changes | previous state, new state, transition reason, validation outcome, and engine disposition |
+| `vpn.egress.engine_transition_failed` | One row for each failed serialized engine start, stop, or dispose attempt | operation, instance identity when available, error, and retry disposition |
+
+Cancellation caused by normal Service shutdown is represented by the validation outcome but must not manufacture a
+degraded transition. Repeated unchanged validation failures may be summarized later, but the event names and core
+detail meanings above remain stable.
+
+#### App Bundle And DMG Verification Inventory
+
+Every proof release must verify all of the following before live installation:
+
+- the DMG contains the Arm64 Service payload and Service deployment scripts only, with no WebUI payload or saved
+  machine-local configuration;
+- the install target is `~/Applications/TorrentCore/TorrentCoreService.app` and the bundle identifier is
+  `com.conadv.torrentcore.service`;
+- `Info.plist` is valid, the display and executable names are `TorrentCoreService`, the app is background-only, and the
+  approved local-network usage text is present;
+- the main launcher and .NET helper are Arm64 Mach-O files with distinct expected roles, every native dependency is
+  signed, and the framework-dependent helper retains its required JIT and library-validation entitlements;
+- the sealed runtime contains the required Service executable, assemblies, dependency/runtime metadata, generated
+  static-asset endpoint metadata, default appsettings files, deployment resources, and `version.json`;
+- the app contains no database, MonoTorrent cache, logs, downloads, `torrentcore.env`, WebUI connection file, or
+  category/per-torrent mutable paths;
+- the Service launcher sets the content root to `Contents/Resources/Runtime` while storage and default downloads still
+  resolve to their established external paths;
+- the installed LaunchAgent uses the bundled executable, keeps label `com.torrentcore.service`, declares
+  `AssociatedBundleIdentifiers` for `com.conadv.torrentcore.service`, preserves LAN binding, and does not replace or
+  restart the WebUI agent;
+- package checksums and release Git/build identity are internally consistent;
+- Developer ID verification, notarization acceptance, stapler validation, Gatekeeper assessment, and disk-image
+  verification all pass outside the filesystem sandbox;
+- a mounted-DMG plan/dry-run proves existing mutable state would be preserved before any apply step is authorized.
 
 ### Slice 1: Persisted VPN Settings
 

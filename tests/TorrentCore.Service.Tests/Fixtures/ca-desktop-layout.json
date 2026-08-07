@@ -1,0 +1,30 @@
+{
+  "fixtureVersion": 1,
+  "machineRole": "CA-Desktop",
+  "architecture": "arm64",
+  "currentLayout": {
+    "serviceExecutable": "~/TorrentCore/Service/TorrentCoreService",
+    "webUiExecutable": "~/TorrentCore/WebUI/TorrentCore.WebUI",
+    "serviceLaunchAgent": "~/Library/LaunchAgents/com.torrentcore.service.plist",
+    "webUiLaunchAgent": "~/Library/LaunchAgents/com.torrentcore.webui.plist",
+    "environmentFile": "~/TorrentCore/Scripts/torrentcore.env",
+    "webUiConnectionFile": "~/TorrentCore/WebUI/Config/service-connection.json",
+    "logsDirectory": "~/TorrentCore/Logs",
+    "storageDirectory": "~/Library/Application Support/TorrentCore/storage",
+    "databaseFile": "~/Library/Application Support/TorrentCore/storage/torrentcore.db",
+    "monoTorrentCacheDirectory": "~/Library/Application Support/TorrentCore/storage/monotorrent-cache",
+    "defaultDownloadDirectory": "~/TorrentCore/downloads"
+  },
+  "network": {
+    "serviceLanBinding": "http://0.0.0.0:7033",
+    "serviceLocalHealthUrl": "http://127.0.0.1:7033/api/health",
+    "webUiLanBinding": "http://0.0.0.0:7053"
+  },
+  "excludedMachineLocalContent": [
+    "torrentcore.env values",
+    "service-connection.json values",
+    "database contents",
+    "MonoTorrent cache contents",
+    "category and per-torrent external-volume paths"
+  ]
+}
