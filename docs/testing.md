@@ -16,6 +16,9 @@ Representative coverage areas:
 - deterministic VPN-egress coverage for controllable time, scripted HTTP outcomes, typed/bounded IPv4 response
   parsing, multiple direct-ISP CIDRs, timeout and cancellation behavior, stable endpoint-failure reasons, and
   change-suppressed DB logging; these tests require neither Internet access nor ExpressVPN
+- default-open execution-gate drain behavior; closed-gate persistence-only magnet admission, normal acceptance errors,
+  constrained save paths, structured unavailable actions, readable diagnostics, and full-restart durability without
+  initializing MonoTorrent
 - engine-instance lifecycle observation and a sanitized CA-Desktop deployment layout for later VPN-gating and app
   packaging slices
 - VPN-setting defaults, SQLite/API round trips and restart persistence, IPv4 CIDR canonicalization, additive-client

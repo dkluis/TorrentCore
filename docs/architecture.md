@@ -108,6 +108,13 @@ scheduling and engine-state transitions.
 
 - TorrentCore accepts and persists incoming magnets even when runtime capacity is full.
 - Active metadata-resolution and active-download limits control execution, not admission.
+- A host-level execution gate separates durable magnet admission from MonoTorrent execution. Closing it immediately
+  prevents new engine operations and drains work already admitted before closure. Magnet validation, category/root
+  checks, SQLite persistence, and history creation remain available without creating a MonoTorrent manager.
+- While the execution gate is closed, accepted magnets persist as queued runnable intent. Torrent list/detail and
+  history reads remain available, while engine-dependent reads and torrent mutations return
+  `503 vpn_egress_not_validated`. VPN degradation is not represented by rewriting each torrent's queue position,
+  desired state, or wait reason.
 - Every active metadata resolution reserves one future download slot. The effective metadata-resolution limit is the
   lower of the configured metadata limit and the download capacity not already claimed by resolved runnable torrents.
   This prevents MonoTorrent's automatic metadata-to-download transition from oversubscribing the download limit.
@@ -152,6 +159,7 @@ scheduling and engine-state transitions.
 - Category keys are stable API identifiers such as `TV`, `Movie`, `Audiobook`, and `Music`.
 - Clients submit category keys, not raw filesystem paths.
 - TorrentCore resolves the effective download root and callback routing at add time.
+- Both the host default and category-specific download roots must be accessible before a magnet is accepted.
 - Category edits affect future torrents only. Existing torrents keep their persisted routing values.
 - If `CategoryKey` is omitted, TorrentCore currently falls back to the host-global `DownloadRootPath`.
 

@@ -216,13 +216,12 @@ check interval.
 These do not block documenting or scaffolding earlier independent slices, but the owning slice cannot complete without
 the decision.
 
-1. Confirm degraded mutation semantics beyond magnet admission. Recommended behavior:
-   - list, detail, history, logs, settings, and category operations remain available;
-   - add magnet persists a queued runnable torrent without creating a manager;
-   - pause/resume update durable desired state without creating a manager;
-   - removal operates from persistence/filesystem state without starting MonoTorrent;
-   - explicitly engine-dependent metadata refresh/reset and tracker actions return a structured unavailable response.
-2. Approve the final `NSLocalNetworkUsageDescription` text for the Service bundle.
+1. Approve the final `NSLocalNetworkUsageDescription` text for the Service bundle.
+
+Degraded API and UI semantics are resolved: list, detail, history, logs, settings, and category reads remain available;
+magnet submission retains its normal acceptance checks and persists a queued runnable torrent without creating a
+manager; other torrent actions plus peer/tracker reads return structured `503 vpn_egress_not_validated`; and the native
+macOS Torrents and History pages later present a host-level disabled overlay with Refresh as the only available action.
 
 ## Sliced Delivery Plan
 
@@ -392,23 +391,55 @@ Status: implemented on August 9, 2026; final verification recorded below.
 
 ### Slice 3: Persistence-Only Admission And Degraded Actions
 
-Status: pending.
+Status: implemented on August 9, 2026; final verification recorded below.
 
 #### Work
 
 - Separate durable magnet admission from MonoTorrent manager creation.
 - Allow add operations to persist accepted torrents while the global execution gate is closed.
-- Project these torrents as queued with a VPN-specific host wait reason without changing their runnable desired state.
-- Implement the approved degraded pause/resume/remove semantics.
-- Ensure reads and non-engine mutations never initialize MonoTorrent as a side effect.
+- Add a default-open execution gate that stops new engine work immediately and drains operations admitted before
+  closure.
+- Keep list, detail, and history reads available without manufacturing per-torrent VPN wait reasons or queue changes.
+- Return structured `503 vpn_egress_not_validated` responses for pause, resume, remove, metadata actions, callback
+  retry, and peer/tracker reads while the gate is closed.
+- Keep production on the single `MonoTorrentEngineAdapter` path; do not switch production into the fake persisted
+  adapter when degraded.
 - Keep normal oldest-added queue ordering and metadata reservation rules intact for later recovery.
 
 #### Acceptance
 
 - Magnets submitted during degraded state remain durable across full Service restart.
-- No MonoTorrent engine or manager is created by admission, list/detail reads, or approved degraded mutations.
+- Normal magnet, duplicate, category, and download-root acceptance checks still apply while degraded.
+- No MonoTorrent engine or manager is created by closed-gate admission, startup recovery, synchronization, or
+  list/detail/history reads.
 - After the gate opens, stored magnets enter the existing queue policy in deterministic order.
 - Operator-paused torrents remain paused after VPN recovery.
+
+#### Implementation Notes
+
+- The registered singleton gate defaults open, so this slice does not change deployed runtime behavior before the
+  Slice 5 orchestrator controls it. `CloseAsync` prevents new leases immediately, waits for already-admitted work to
+  finish safely, and remains closed if that wait is cancelled.
+- Closed-gate startup and synchronization do not initialize MonoTorrent. Magnet admission uses MonoTorrent's pure
+  magnet parser only; it creates no engine, manager, DHT, listener, tracker, peer, or network work.
+- Accepted degraded magnets persist as `Queued` with durable `Runnable` intent, their original add timestamp, resolved
+  category/callback routing, and a save path constrained beneath the selected download root. They retain no synthetic
+  per-torrent VPN state.
+- Default and category download roots are checked before acceptance. Invalid magnets, disabled/missing categories,
+  unavailable roots, and duplicate active info hashes preserve their existing structured errors.
+- Torrent list/detail and history APIs remain readable for diagnostics. The native macOS page overlay and automatic
+  re-enable behavior are Slice 5 work; the WebUI is explicitly outside the current UI scope.
+- The fake-mode `PersistedTorrentEngineAdapter` remains for development/test simulation and is not used as a second
+  degraded production implementation.
+
+#### Verification
+
+- `dotnet build TorrentCore.sln --no-restore --maxcpucount:1 --disable-build-servers`: succeeded with zero warnings
+  and zero errors.
+- Focused execution-gate, degraded-admission, and OpenAPI suite: 11 passed.
+- Full .NET suite: 267 passed.
+- Swift package suite: 34 passed after adding exhaustive structured-`503` decoding for the eight affected operations.
+- `git diff --check`: passed.
 
 ### Slice 4: Restartable MonoTorrent Lifecycle
 
@@ -445,6 +476,9 @@ Status: pending.
 - On degraded success, initialize/recover MonoTorrent and open normal execution only after recovery succeeds.
 - Apply setting changes deterministically, including enable/disable transitions and interval changes.
 - Prevent overlapping checks and overlapping engine transitions.
+- Publish the minimal host-level degraded phase and reason needed by the native macOS client.
+- Disable the native macOS Torrents and History pages while degraded, leaving Refresh available, and automatically
+  re-enable them when host status returns to ready. Do not add this overlay to the WebUI yet.
 
 #### Acceptance
 

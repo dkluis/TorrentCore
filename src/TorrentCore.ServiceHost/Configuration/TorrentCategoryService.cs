@@ -114,6 +114,11 @@ public sealed class TorrentCategoryService(ITorrentCategoryStore torrentCategory
 
         if (string.IsNullOrWhiteSpace(requestedCategoryKey))
         {
+            EnsureDownloadRootPathAccessible(
+                servicePaths.DownloadRootPath,
+                null,
+                nameof(requestedCategoryKey)
+            );
             return new ResolvedTorrentCategorySelection
             {
                 CategoryKey              = null,

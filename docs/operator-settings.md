@@ -2,8 +2,8 @@
 
 ## VPN Egress Validation
 
-Slice 2 provides the internal public-IPv4 probe, but nothing invokes or schedules it yet and it does not gate
-MonoTorrent. Scheduling and enforcement are introduced by later slices in the
+Slice 3 provides the internal public-IPv4 probe and a default-open execution gate, but nothing schedules validation or
+closes the gate in deployed operation yet. Scheduling and automatic enforcement are introduced by later slices in the
 [VPN egress plan](torrentcore-service-app-vpn-egress-plan.md). Validation is disabled by default, so upgrading an
 existing installation does not change torrent processing.
 
@@ -42,6 +42,11 @@ The internal probe requires a successful JSON response shaped as `{ "ip": "addre
 the body to 16 KiB. It distinguishes HTTP status, DNS, connection, TLS, HTTP protocol, and other HTTP failures for DB
 diagnostics. The first completed outcome is logged; a later row is written only when the outcome or endpoint-failure
 reason changes. Normal Service-shutdown cancellation is not logged.
+
+When the later orchestrator closes the gate, magnet submission retains its normal validity, duplicate, category, and
+download-root checks and persists accepted magnets without creating MonoTorrent managers. Torrent list/detail and
+history reads remain available; engine-dependent reads and torrent mutations return
+`503 vpn_egress_not_validated`. This is a host-level condition and does not rewrite individual torrent queue state.
 
 All six values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
 has no VPN-settings editor in this slice, but its existing updates remain compatible because omitted VPN fields retain

@@ -128,6 +128,7 @@ builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentComp
 builder.Services.AddSingleton<TorrentCompletionFinalizationProbeCoordinator>();
 builder.Services.AddSingleton<TorrentManagerStopCoordinator>();
 builder.Services.AddSingleton<TorrentMetadataResetCoordinator>();
+builder.Services.AddSingleton<TorrentExecutionGate>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackInvoker, TorrentCompletionCallbackInvoker>();
 builder.Services.AddSingleton<ITorrentCompletionCallbackProcessor, TorrentCompletionCallbackProcessor>();
 builder.Services.AddSingleton<TorrentRemovalCleanupService>();
