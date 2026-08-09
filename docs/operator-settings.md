@@ -2,9 +2,10 @@
 
 ## VPN Egress Validation
 
-Slice 1 persists and exposes the VPN egress policy. It does not yet probe the public address or gate MonoTorrent;
-those behaviors are introduced by later slices in the [VPN egress plan](torrentcore-service-app-vpn-egress-plan.md).
-Validation is disabled by default, so upgrading an existing installation does not change torrent processing.
+Slice 2 provides the internal public-IPv4 probe, but nothing invokes or schedules it yet and it does not gate
+MonoTorrent. Scheduling and enforcement are introduced by later slices in the
+[VPN egress plan](torrentcore-service-app-vpn-egress-plan.md). Validation is disabled by default, so upgrading an
+existing installation does not change torrent processing.
 
 ### Enable VPN Egress Validation
 
@@ -26,6 +27,7 @@ Validation is disabled by default, so upgrading an existing installation does no
 - rejects IPv6 CIDRs and requires at least one range while validation is enabled
 - CIDRs identify direct ISP egress; an observed address outside these ranges is validated egress, not proof of a
   particular VPN provider
+- multiple CIDRs are supported so every known direct ISP range for a machine can be represented
 - applies live
 
 ### Check Intervals And Timeout
@@ -35,6 +37,11 @@ Validation is disabled by default, so upgrading an existing installation does no
 - request timeout defaults to `10` seconds
 - all values must be positive, and the request timeout must be shorter than both intervals
 - each value applies live; the future scheduler must read the latest effective settings before choosing its next delay
+
+The internal probe requires a successful JSON response shaped as `{ "ip": "address" }`, accepts IPv4 only, and limits
+the body to 16 KiB. It distinguishes HTTP status, DNS, connection, TLS, HTTP protocol, and other HTTP failures for DB
+diagnostics. The first completed outcome is logged; a later row is written only when the outcome or endpoint-failure
+reason changes. Normal Service-shutdown cancellation is not logged.
 
 All six values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
 has no VPN-settings editor in this slice, but its existing updates remain compatible because omitted VPN fields retain

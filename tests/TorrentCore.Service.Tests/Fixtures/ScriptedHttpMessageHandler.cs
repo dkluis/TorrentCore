@@ -35,6 +35,13 @@ internal sealed class ScriptedHttpMessageHandler : HttpMessageHandler
                 : new CancellationToken(canceled: true)
         ));
 
+    public void EnqueueWaitForCancellation()
+        => _responses.Enqueue(async cancellationToken =>
+        {
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            throw new InvalidOperationException("The cancellation-only response completed without cancellation.");
+        });
+
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)

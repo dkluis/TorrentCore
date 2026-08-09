@@ -17,6 +17,7 @@ using TorrentCore.Service.Callbacks;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
+using TorrentCore.Service.Vpn;
 
 #endregion
 
@@ -63,6 +64,9 @@ builder.Services.AddSingleton(serviceProvider =>
     }
 );
 builder.Services.AddSingleton<ServiceInstanceContext>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddHttpClient(VpnEgressProbe.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
+builder.Services.AddSingleton<IVpnEgressProbe, VpnEgressProbe>();
 builder.Services.AddSingleton<RuntimeOperationDurationDiagnostics>();
 builder.Services.AddSingleton<StartupRecoveryState>();
 builder.Services.AddSingleton(serviceProvider =>

@@ -90,6 +90,12 @@ The WebUI stays a thin client over service contracts. It must not:
 - bypass service APIs for operator workflows
 - embed engine or recovery policy that belongs in the service host
 
+The Service has an internal, callable public-IPv4 egress probe. It compares an observed address with the configured
+direct-ISP CIDRs: matching any configured range means direct ISP egress, while matching none means validated egress
+without claiming a specific VPN provider. The probe is registered but is not invoked at startup or on a schedule yet,
+does not change public API contracts, and does not initialize or call MonoTorrent. Later VPN-gating slices own
+scheduling and engine-state transitions.
+
 ## Engine Dependency
 
 - TorrentCore pins MonoTorrent `3.0.2` as the production baseline.

@@ -13,9 +13,11 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 
 Representative coverage areas:
 
-- deterministic VPN-egress scaffolding for controllable time, scripted HTTP outcomes, engine-instance lifecycle
-  observation, and a sanitized CA-Desktop deployment layout; these fixtures require neither Internet access nor
-  ExpressVPN
+- deterministic VPN-egress coverage for controllable time, scripted HTTP outcomes, typed/bounded IPv4 response
+  parsing, multiple direct-ISP CIDRs, timeout and cancellation behavior, stable endpoint-failure reasons, and
+  change-suppressed DB logging; these tests require neither Internet access nor ExpressVPN
+- engine-instance lifecycle observation and a sanitized CA-Desktop deployment layout for later VPN-gating and app
+  packaging slices
 - VPN-setting defaults, SQLite/API round trips and restart persistence, IPv4 CIDR canonicalization, additive-client
   compatibility, and structured rejection of unsafe endpoints, IPv6/invalid CIDRs, and invalid intervals/timeouts
 - API behavior, including Service semantic-version and Git-build identity reporting

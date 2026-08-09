@@ -267,13 +267,14 @@ VPN activity uses category `vpn` and these stable event types:
 
 | Event type | Persistence rule | Required detail fields when implemented |
 |---|---|---|
-| `vpn.egress.validation_completed` | One result for each completed validation attempt, subject to the existing activity-log retention limit | trigger, outcome, sanitized endpoint authority, duration, and observed IP when parseable |
+| `vpn.egress.validation_completed` | The first completed result and each later change in outcome or endpoint-failure reason, subject to the existing activity-log retention limit | outcome, endpoint-failure reason when applicable, sanitized endpoint authority, duration, and observed IP when parseable; trigger is added with scheduling in Slice 5 |
 | `vpn.egress.state_changed` | One row only when public VPN/engine state changes | previous state, new state, transition reason, validation outcome, and engine disposition |
 | `vpn.egress.engine_transition_failed` | One row for each failed serialized engine start, stop, or dispose attempt | operation, instance identity when available, error, and retry disposition |
 
 Cancellation caused by normal Service shutdown is represented by the validation outcome but must not manufacture a
-degraded transition. Repeated unchanged validation failures may be summarized later, but the event names and core
-detail meanings above remain stable.
+degraded transition. Repeated results with the same outcome and endpoint-failure reason are suppressed. A changed
+endpoint-failure reason, such as DNS failure changing to connection failure, is logged even though the main outcome
+remains endpoint failure. The event names and core detail meanings above remain stable.
 
 #### App Bundle And DMG Verification Inventory
 
@@ -343,7 +344,7 @@ Status: implemented on August 7, 2026; final verification recorded below.
 
 ### Slice 2: Public IPv4 Egress Probe
 
-Status: pending.
+Status: implemented on August 9, 2026; final verification recorded below.
 
 #### Work
 
@@ -358,9 +359,36 @@ Status: pending.
 #### Acceptance
 
 - Unit tests cover every result class without Internet access.
-- A non-`47.*` result is described as validated egress, not proof of a specific VPN provider.
+- An address outside every configured direct-ISP CIDR is described as validated egress, not proof of a specific VPN
+  provider.
 - Cancellation during Service shutdown is not reported as a VPN failure.
 - The probe itself does not initialize or call MonoTorrent.
+
+#### Implementation Notes
+
+- The registered probe is callable only. This slice adds no startup invocation, scheduler, public API, degraded-state
+  transition, or MonoTorrent dependency.
+- Each call uses the caller-provided `RuntimeSettingsSnapshot`, including its endpoint, direct-ISP CIDR list, and
+  request timeout. A matching direct-ISP CIDR returns `DirectIsp`; an IPv4 address matching none returns
+  `ValidatedEgress`.
+- Typed `{ "ip": "address" }` JSON parsing accepts IPv4 only and limits the response body to 16 KiB. IPv6, malformed
+  JSON, missing or invalid addresses, and oversized bodies return `InvalidResponse`.
+- Stable outcomes are `ValidatedEgress`, `DirectIsp`, `InvalidResponse`, `TimedOut`, `Cancelled`, `EndpointFailure`,
+  and `UnexpectedFailure`. Endpoint failures additionally preserve `HttpStatus`, `Dns`, `Connection`, `Tls`,
+  `HttpProtocol`, or `OtherHttp` as their stable reason.
+- Normal caller cancellation returns `Cancelled`, writes no activity row, and does not alter log-suppression state.
+  Other first or changed results use `vpn.egress.validation_completed`; full observed IP addresses may be retained in
+  DB details, while endpoint logging is limited to scheme, host, and port.
+- Identical `(outcome, endpoint-failure reason)` results are suppressed. A changed failure reason is logged even if
+  the main outcome remains `EndpointFailure`; an IP change alone does not create another success log.
+
+#### Verification
+
+- `dotnet build TorrentCore.sln --no-restore --maxcpucount:1 --disable-build-servers`: succeeded with zero warnings
+  and zero errors.
+- Focused egress-probe suite: 18 passed.
+- Full .NET suite: 258 passed.
+- `git diff --check`: passed.
 
 ### Slice 3: Persistence-Only Admission And Degraded Actions
 
