@@ -208,6 +208,14 @@ public sealed class OpenApiContractTests
         Assert.NotNull(historySummaryProperties);
         Assert.NotNull(historySummaryProperties["completionCallbackFinalResult"]);
 
+        var runtimeSettingsProperties =
+                document["components"]?["schemas"]?[nameof(RuntimeSettingsDto)]?["properties"];
+        AssertVpnEgressSettingsShape(runtimeSettingsProperties);
+
+        var runtimeSettingsUpdateProperties =
+                document["components"]?["schemas"]?[nameof(UpdateRuntimeSettingsRequest)]?["properties"];
+        AssertVpnEgressSettingsShape(runtimeSettingsUpdateProperties);
+
         var problemResponseContentTypes = document["paths"]?
             .AsObject()
             .SelectMany(path => path.Value?.AsObject() ?? [])
@@ -224,5 +232,17 @@ public sealed class OpenApiContractTests
             problemResponseContentTypes,
             contentType => Assert.Equal("application/problem+json", contentType)
         );
+    }
+
+    private static void AssertVpnEgressSettingsShape(JsonNode? properties)
+    {
+        Assert.NotNull(properties);
+        Assert.NotNull(properties["vpnEgressValidationEnabled"]);
+        Assert.NotNull(properties["vpnEgressValidationEndpoint"]);
+        Assert.Equal("array", properties["vpnEgressDirectIspCidrs"]?["type"]?.GetValue<string>());
+        Assert.Equal("string", properties["vpnEgressDirectIspCidrs"]?["items"]?["type"]?.GetValue<string>());
+        Assert.NotNull(properties["vpnEgressDegradedCheckIntervalSeconds"]);
+        Assert.NotNull(properties["vpnEgressReadyCheckIntervalSeconds"]);
+        Assert.NotNull(properties["vpnEgressRequestTimeoutSeconds"]);
     }
 }

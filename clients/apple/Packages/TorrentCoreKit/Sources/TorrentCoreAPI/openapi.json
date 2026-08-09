@@ -957,6 +957,32 @@
           },
           "usesPersistedOverrides": {
             "type": "boolean"
+          },
+          "vpnEgressDegradedCheckIntervalSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "vpnEgressDirectIspCidrs": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "vpnEgressReadyCheckIntervalSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "vpnEgressRequestTimeoutSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "vpnEgressValidationEnabled": {
+            "type": "boolean"
+          },
+          "vpnEgressValidationEndpoint": {
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [
@@ -2097,6 +2123,36 @@
           "seedingStopRatio": {
             "format": "double",
             "type": "number"
+          },
+          "vpnEgressDegradedCheckIntervalSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnEgressDirectIspCidrs": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "vpnEgressReadyCheckIntervalSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnEgressRequestTimeoutSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnEgressValidationEnabled": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "vpnEgressValidationEndpoint": {
+            "nullable": true,
+            "type": "string"
           }
         },
         "required": [

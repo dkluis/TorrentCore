@@ -176,6 +176,34 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (!VpnEgressSettingsValidation.TryNormalizeEndpoint(
+                options.VpnEgressValidationEndpoint, out _, out var vpnEndpointError))
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:VpnEgressValidationEndpoint: {vpnEndpointError}");
+        }
+
+        if (!VpnEgressSettingsValidation.TryNormalizeCidrs(
+                options.VpnEgressDirectIspCidrs, out var vpnDirectIspCidrs, out var vpnCidrsError))
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:VpnEgressDirectIspCidrs: {vpnCidrsError}");
+        }
+        else if (options.VpnEgressValidationEnabled && vpnDirectIspCidrs.Count == 0)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:VpnEgressDirectIspCidrs requires at least one IPv4 CIDR when VPN egress validation is enabled."
+            );
+        }
+
+        if (!VpnEgressSettingsValidation.TryValidateIntervals(
+                options.VpnEgressDegradedCheckIntervalSeconds,
+                options.VpnEgressReadyCheckIntervalSeconds,
+                options.VpnEgressRequestTimeoutSeconds,
+                out var vpnIntervalsError,
+                out _))
+        {
+            failures.Add($"{TorrentCoreServiceOptions.SectionName}:{vpnIntervalsError}");
+        }
+
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
             failures.Add(

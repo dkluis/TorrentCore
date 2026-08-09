@@ -15,7 +15,7 @@ func sharedTargetsExposeTheSameProductIdentity() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 40)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 46)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
@@ -28,20 +28,34 @@ func sharedHelpCatalogCoversEveryServiceSetting() {
 }
 
 @Test
-func runtimeSettingsDraftAndRequestPreserveMetadataSafetySettings() throws {
+func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     var settings = TorrentCorePreviewFixtures.runtimeSettings
     settings.metadataResolutionTimeSliceMinutes = 21
     settings.automaticMetadataResetStuckThresholdSeconds = 45
+    settings.vpnEgressValidationEnabled = true
+    settings.vpnEgressValidationEndpoint = "https://vpn-check.example.test/ip"
+    settings.vpnEgressDirectIspCidrs = ["198.51.100.0/24"]
+    settings.vpnEgressDegradedCheckIntervalSeconds = 30
+    settings.vpnEgressReadyCheckIntervalSeconds = 120
+    settings.vpnEgressRequestTimeoutSeconds = 5
 
     let update = TorrentCoreRuntimeSettingsUpdate(settings: settings)
     #expect(update.metadataResolutionTimeSliceMinutes == 21)
     #expect(update.automaticMetadataResetStuckThresholdSeconds == 45)
+    #expect(update.vpnEgressValidationEnabled)
+    #expect(update.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
 
     let request = Components.Schemas.UpdateRuntimeSettingsRequest(update)
     let data = try JSONEncoder().encode(request)
     let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     #expect(body["metadataResolutionTimeSliceMinutes"] as? Int == 21)
     #expect(body["automaticMetadataResetStuckThresholdSeconds"] as? Int == 45)
+    #expect(body["vpnEgressValidationEnabled"] as? Bool == true)
+    #expect(body["vpnEgressValidationEndpoint"] as? String == "https://vpn-check.example.test/ip")
+    #expect(body["vpnEgressDirectIspCidrs"] as? [String] == ["198.51.100.0/24"])
+    #expect(body["vpnEgressDegradedCheckIntervalSeconds"] as? Int == 30)
+    #expect(body["vpnEgressReadyCheckIntervalSeconds"] as? Int == 120)
+    #expect(body["vpnEgressRequestTimeoutSeconds"] as? Int == 5)
 }
 
 @Test

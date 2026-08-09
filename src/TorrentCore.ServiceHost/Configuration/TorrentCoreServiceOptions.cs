@@ -38,6 +38,12 @@ public sealed class TorrentCoreServiceOptions
     public int ColdDownloadRecoveryThresholdMinutes { get; init; } = 120;
     public int ColdDownloadRecoveryIntervalMinutes { get; init; } = 60;
     public int ColdDownloadAbandonAfterHours { get; init; } = 72;
+    public bool VpnEgressValidationEnabled { get; init; }
+    public string VpnEgressValidationEndpoint { get; init; } = "https://api.ipify.org?format=json";
+    public string[] VpnEgressDirectIspCidrs { get; init; } = ["47.0.0.0/8"];
+    public int VpnEgressDegradedCheckIntervalSeconds { get; init; } = 60;
+    public int VpnEgressReadyCheckIntervalSeconds { get; init; } = 240;
+    public int VpnEgressRequestTimeoutSeconds { get; init; } = 10;
     public bool CompletionCallbackEnabled { get; init; }
     public string CompletionCallbackCommandPath { get; init; } = string.Empty;
     public string? CompletionCallbackArguments { get; init; }

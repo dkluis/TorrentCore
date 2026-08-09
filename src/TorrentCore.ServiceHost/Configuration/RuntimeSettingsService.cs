@@ -225,6 +225,58 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
         var completionCallbackApiKeyOverride = request.CompletionCallbackApiKeyOverride is null ?
                 currentSettings.CompletionCallbackApiKeyOverride :
                 NormalizeOptionalText(request.CompletionCallbackApiKeyOverride);
+        var vpnEgressValidationEnabled = request.VpnEgressValidationEnabled ??
+                currentSettings.VpnEgressValidationEnabled;
+        var vpnEgressValidationEndpointValue = request.VpnEgressValidationEndpoint ??
+                currentSettings.VpnEgressValidationEndpoint;
+        var vpnEgressDirectIspCidrValues = request.VpnEgressDirectIspCidrs ??
+                currentSettings.VpnEgressDirectIspCidrs;
+        var vpnEgressDegradedCheckIntervalSeconds = request.VpnEgressDegradedCheckIntervalSeconds ??
+                currentSettings.VpnEgressDegradedCheckIntervalSeconds;
+        var vpnEgressReadyCheckIntervalSeconds = request.VpnEgressReadyCheckIntervalSeconds ??
+                currentSettings.VpnEgressReadyCheckIntervalSeconds;
+        var vpnEgressRequestTimeoutSeconds = request.VpnEgressRequestTimeoutSeconds ??
+                currentSettings.VpnEgressRequestTimeoutSeconds;
+
+        if (!VpnEgressSettingsValidation.TryNormalizeEndpoint(
+                vpnEgressValidationEndpointValue, out var vpnEgressValidationEndpoint, out var vpnEndpointError))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", vpnEndpointError, StatusCodes.Status400BadRequest,
+                nameof(request.VpnEgressValidationEndpoint)
+            );
+        }
+
+        if (!VpnEgressSettingsValidation.TryNormalizeCidrs(
+                vpnEgressDirectIspCidrValues, out var vpnEgressDirectIspCidrs, out var vpnCidrsError))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", vpnCidrsError, StatusCodes.Status400BadRequest,
+                nameof(request.VpnEgressDirectIspCidrs)
+            );
+        }
+
+        if (vpnEgressValidationEnabled && vpnEgressDirectIspCidrs.Count == 0)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "VpnEgressDirectIspCidrs requires at least one IPv4 CIDR when VPN egress validation is enabled.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.VpnEgressDirectIspCidrs)
+            );
+        }
+
+        if (!VpnEgressSettingsValidation.TryValidateIntervals(
+                vpnEgressDegradedCheckIntervalSeconds,
+                vpnEgressReadyCheckIntervalSeconds,
+                vpnEgressRequestTimeoutSeconds,
+                out var vpnIntervalsError,
+                out var vpnIntervalsTarget))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", vpnIntervalsError, StatusCodes.Status400BadRequest, vpnIntervalsTarget
+            );
+        }
 
         if (automaticMetadataResetStuckThresholdSeconds is
             < TorrentCoreServiceOptions.MinimumAutomaticMetadataResetStuckThresholdSeconds or
@@ -335,6 +387,15 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             completionCallbackApiBaseUrlOverride ?? string.Empty,
                     [RuntimeSettingsKeys.CompletionCallbackApiKeyOverride] =
                             completionCallbackApiKeyOverride ?? string.Empty,
+                    [RuntimeSettingsKeys.VpnEgressValidationEnabled] = vpnEgressValidationEnabled.ToString(),
+                    [RuntimeSettingsKeys.VpnEgressValidationEndpoint] = vpnEgressValidationEndpoint,
+                    [RuntimeSettingsKeys.VpnEgressDirectIspCidrs] = JsonSerializer.Serialize(vpnEgressDirectIspCidrs),
+                    [RuntimeSettingsKeys.VpnEgressDegradedCheckIntervalSeconds] =
+                            vpnEgressDegradedCheckIntervalSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.VpnEgressReadyCheckIntervalSeconds] =
+                            vpnEgressReadyCheckIntervalSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.VpnEgressRequestTimeoutSeconds] =
+                            vpnEgressRequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
                 }, cancellationToken
             );
         }
@@ -387,6 +448,13 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             completionCallbackTimeoutSeconds,
                             completionCallbackFinalizationTimeoutSeconds,
                             completionCallbackApiBaseUrlOverride,
+                            vpnEgressValidationEnabled,
+                            vpnEgressValidationEndpointAuthority =
+                                    new Uri(vpnEgressValidationEndpoint).GetLeftPart(UriPartial.Authority),
+                            vpnEgressDirectIspCidrs,
+                            vpnEgressDegradedCheckIntervalSeconds,
+                            vpnEgressReadyCheckIntervalSeconds,
+                            vpnEgressRequestTimeoutSeconds,
                         }
                     ),
                 }, cancellationToken
@@ -695,6 +763,72 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             ) ? completionCallbackApiKeyOverrideValue : baseOptions.CompletionCallbackApiKeyOverride
         );
 
+        var vpnEgressValidationEnabled = baseOptions.VpnEgressValidationEnabled;
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.VpnEgressValidationEnabled, out var vpnEgressValidationEnabledValue
+            ) && bool.TryParse(vpnEgressValidationEnabledValue, out var parsedVpnEgressValidationEnabled))
+        {
+            vpnEgressValidationEnabled = parsedVpnEgressValidationEnabled;
+        }
+
+        VpnEgressSettingsValidation.TryNormalizeEndpoint(
+            baseOptions.VpnEgressValidationEndpoint, out var vpnEgressValidationEndpoint, out _
+        );
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.VpnEgressValidationEndpoint, out var vpnEgressValidationEndpointValue
+            ) && VpnEgressSettingsValidation.TryNormalizeEndpoint(
+                vpnEgressValidationEndpointValue, out var parsedVpnEgressValidationEndpoint, out _))
+        {
+            vpnEgressValidationEndpoint = parsedVpnEgressValidationEndpoint;
+        }
+
+        VpnEgressSettingsValidation.TryNormalizeCidrs(
+            baseOptions.VpnEgressDirectIspCidrs, out var vpnEgressDirectIspCidrs, out _
+        );
+        if (values.TryGetValue(RuntimeSettingsKeys.VpnEgressDirectIspCidrs, out var vpnEgressDirectIspCidrsValue))
+        {
+            try
+            {
+                var persistedCidrs = JsonSerializer.Deserialize<string[]>(vpnEgressDirectIspCidrsValue);
+                if (VpnEgressSettingsValidation.TryNormalizeCidrs(
+                        persistedCidrs, out var parsedVpnEgressDirectIspCidrs, out _))
+                {
+                    vpnEgressDirectIspCidrs = parsedVpnEgressDirectIspCidrs;
+                }
+            }
+            catch (JsonException)
+            {
+                // Invalid manually edited persistence falls back to validated host defaults.
+            }
+        }
+
+        var vpnEgressDegradedCheckIntervalSeconds = ReadPositiveInteger(
+            values,
+            RuntimeSettingsKeys.VpnEgressDegradedCheckIntervalSeconds,
+            baseOptions.VpnEgressDegradedCheckIntervalSeconds
+        );
+        var vpnEgressReadyCheckIntervalSeconds = ReadPositiveInteger(
+            values,
+            RuntimeSettingsKeys.VpnEgressReadyCheckIntervalSeconds,
+            baseOptions.VpnEgressReadyCheckIntervalSeconds
+        );
+        var vpnEgressRequestTimeoutSeconds = ReadPositiveInteger(
+            values,
+            RuntimeSettingsKeys.VpnEgressRequestTimeoutSeconds,
+            baseOptions.VpnEgressRequestTimeoutSeconds
+        );
+        if (!VpnEgressSettingsValidation.TryValidateIntervals(
+                vpnEgressDegradedCheckIntervalSeconds,
+                vpnEgressReadyCheckIntervalSeconds,
+                vpnEgressRequestTimeoutSeconds,
+                out _,
+                out _))
+        {
+            vpnEgressDegradedCheckIntervalSeconds = baseOptions.VpnEgressDegradedCheckIntervalSeconds;
+            vpnEgressReadyCheckIntervalSeconds = baseOptions.VpnEgressReadyCheckIntervalSeconds;
+            vpnEgressRequestTimeoutSeconds = baseOptions.VpnEgressRequestTimeoutSeconds;
+        }
+
         return new RuntimeSettingsSnapshot
         {
             UsesPersistedOverrides                       = persistedSettings.Values.Count > 0,
@@ -731,6 +865,12 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             CompletionCallbackFinalizationTimeoutSeconds = completionCallbackFinalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride         = completionCallbackApiBaseUrlOverride,
             CompletionCallbackApiKeyOverride             = completionCallbackApiKeyOverride,
+            VpnEgressValidationEnabled                   = vpnEgressValidationEnabled,
+            VpnEgressValidationEndpoint                  = vpnEgressValidationEndpoint,
+            VpnEgressDirectIspCidrs                      = vpnEgressDirectIspCidrs,
+            VpnEgressDegradedCheckIntervalSeconds        = vpnEgressDegradedCheckIntervalSeconds,
+            VpnEgressReadyCheckIntervalSeconds           = vpnEgressReadyCheckIntervalSeconds,
+            VpnEgressRequestTimeoutSeconds               = vpnEgressRequestTimeoutSeconds,
             EngineSettingsRequireRestart =
                     engineAllowPeerExchange          != appliedEngineSettingsState.EngineAllowPeerExchange          ||
                     engineEncryptionMode             != appliedEngineSettingsState.EngineEncryptionMode             ||
@@ -784,6 +924,12 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             CompletionCallbackFinalizationTimeoutSeconds = settings.CompletionCallbackFinalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride         = settings.CompletionCallbackApiBaseUrlOverride,
             CompletionCallbackApiKeyOverride             = settings.CompletionCallbackApiKeyOverride,
+            VpnEgressValidationEnabled                   = settings.VpnEgressValidationEnabled,
+            VpnEgressValidationEndpoint                  = settings.VpnEgressValidationEndpoint,
+            VpnEgressDirectIspCidrs                     = settings.VpnEgressDirectIspCidrs,
+            VpnEgressDegradedCheckIntervalSeconds        = settings.VpnEgressDegradedCheckIntervalSeconds,
+            VpnEgressReadyCheckIntervalSeconds           = settings.VpnEgressReadyCheckIntervalSeconds,
+            VpnEgressRequestTimeoutSeconds               = settings.VpnEgressRequestTimeoutSeconds,
             AppliedEngineMaximumConnections              = appliedEngineSettingsState.EngineMaximumConnections,
             AppliedEngineMaximumHalfOpenConnections      = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
             AppliedEngineAllowPeerExchange                = appliedEngineSettingsState.EngineAllowPeerExchange,
@@ -806,5 +952,17 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
     private static string? NormalizeOptionalText(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static int ReadPositiveInteger(
+        IReadOnlyDictionary<string, string> values,
+        string key,
+        int fallback)
+    {
+        return values.TryGetValue(key, out var value) &&
+               int.TryParse(value, CultureInfo.InvariantCulture, out var parsedValue) &&
+               parsedValue > 0
+            ? parsedValue
+            : fallback;
     }
 }

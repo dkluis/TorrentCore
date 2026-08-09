@@ -16,6 +16,8 @@ Representative coverage areas:
 - deterministic VPN-egress scaffolding for controllable time, scripted HTTP outcomes, engine-instance lifecycle
   observation, and a sanitized CA-Desktop deployment layout; these fixtures require neither Internet access nor
   ExpressVPN
+- VPN-setting defaults, SQLite/API round trips and restart persistence, IPv4 CIDR canonicalization, additive-client
+  compatibility, and structured rejection of unsafe endpoints, IPv6/invalid CIDRs, and invalid intervals/timeouts
 - API behavior, including Service semantic-version and Git-build identity reporting
 - launch-agent restart-label resolution, including the native supervisor helper's `XPC_SERVICE_NAME=0` context
 - SQLite schema migration and persistence
@@ -69,8 +71,8 @@ plus automatic History, Logs, and Service Settings loading without manual refres
 also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
 show/hide behavior for the Torrents, History, and Logs inspectors. Service Settings UI coverage also verifies populated
 Downloads values and the inline category grid. Runtime-settings mapping coverage verifies that the metadata-resolution
-time slice and automatic-reset stuck threshold survive draft creation, request encoding, save, and returned-value
-reconciliation.
+time slice, automatic-reset stuck threshold, and all VPN egress policy fields survive draft creation, request encoding,
+save, and returned-value reconciliation.
 Native contract coverage also verifies that the optional full Service build commit maps through the generated client;
 older Service responses that omit it remain supported.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail

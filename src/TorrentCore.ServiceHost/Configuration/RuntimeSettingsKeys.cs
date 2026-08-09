@@ -35,4 +35,10 @@ public static class RuntimeSettingsKeys
             "completion_callback_finalization_timeout_seconds";
     public const string CompletionCallbackApiBaseUrlOverride = "completion_callback_api_base_url_override";
     public const string CompletionCallbackApiKeyOverride     = "completion_callback_api_key_override";
+    public const string VpnEgressValidationEnabled = "vpn_egress_validation_enabled";
+    public const string VpnEgressValidationEndpoint = "vpn_egress_validation_endpoint";
+    public const string VpnEgressDirectIspCidrs = "vpn_egress_direct_isp_cidrs";
+    public const string VpnEgressDegradedCheckIntervalSeconds = "vpn_egress_degraded_check_interval_seconds";
+    public const string VpnEgressReadyCheckIntervalSeconds = "vpn_egress_ready_check_interval_seconds";
+    public const string VpnEgressRequestTimeoutSeconds = "vpn_egress_request_timeout_seconds";
 }

@@ -40,7 +40,10 @@ Current core tables:
 
 ### `runtime_settings`
 
-- persisted host-local runtime settings
+- persisted host-local runtime settings stored as additive key/value rows
+- VPN egress settings use this existing table, including the CIDR list serialized as JSON; adding them requires no
+  schema migration and leaves an existing database on validation-disabled defaults until an operator saves or enables
+  the policy
 
 ### `torrent_categories`
 

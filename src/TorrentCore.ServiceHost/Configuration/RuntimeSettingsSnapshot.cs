@@ -36,6 +36,12 @@ public sealed class RuntimeSettingsSnapshot
     public required int                         CompletionCallbackFinalizationTimeoutSeconds { get; init; }
     public          string?                     CompletionCallbackApiBaseUrlOverride         { get; init; }
     public          string?                     CompletionCallbackApiKeyOverride             { get; init; }
+    public bool                                 VpnEgressValidationEnabled                   { get; init; }
+    public string                               VpnEgressValidationEndpoint                  { get; init; } = "https://api.ipify.org?format=json";
+    public IReadOnlyList<string>                VpnEgressDirectIspCidrs                     { get; init; } = ["47.0.0.0/8"];
+    public int                                  VpnEgressDegradedCheckIntervalSeconds        { get; init; } = 60;
+    public int                                  VpnEgressReadyCheckIntervalSeconds           { get; init; } = 240;
+    public int                                  VpnEgressRequestTimeoutSeconds               { get; init; } = 10;
     public required bool                        EngineSettingsRequireRestart                 { get; init; }
     public          DateTimeOffset?             UpdatedAtUtc                                 { get; init; }
 }

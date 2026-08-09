@@ -202,10 +202,10 @@ Names may be refined to match the existing runtime-settings naming pattern, but 
 |---|---:|---|---|
 | `VpnEgressValidationEnabled` | `false` | Yes | Preserves existing behavior until enabled per installation |
 | `VpnEgressValidationEndpoint` | `https://api.ipify.org?format=json` | Yes | Documented JSON public-IP endpoint |
-| `VpnEgressDirectIspCidrs` | Decision gate | Yes | One or more direct-ISP IPv4 CIDRs |
+| `VpnEgressDirectIspCidrs` | `47.0.0.0/8` | Yes | One or more direct-ISP IPv4 CIDRs |
 | `VpnEgressDegradedCheckIntervalSeconds` | `60` | Yes | Retry cadence while checking or degraded |
 | `VpnEgressReadyCheckIntervalSeconds` | `240` | Yes | Revalidation cadence while ready |
-| `VpnEgressRequestTimeoutSeconds` | Decision gate | Yes | Per-request timeout bounded below both intervals |
+| `VpnEgressRequestTimeoutSeconds` | `10` | Yes | Per-request timeout bounded below both intervals |
 
 The setting validator must reject unsupported schemes, invalid absolute endpoints, credentials in endpoint URLs,
 invalid CIDRs, IPv6 CIDRs for this policy, nonpositive intervals, and a timeout that is not safely below the applicable
@@ -216,16 +216,13 @@ check interval.
 These do not block documenting or scaffolding earlier independent slices, but the owning slice cannot complete without
 the decision.
 
-1. Confirm the initial direct-ISP CIDR value. The supplied recommendation uses `47.0.0.0/8` but prefers a narrower
-   range if known.
-2. Confirm the request-timeout default. The supplied recommendation uses 10 seconds.
-3. Confirm degraded mutation semantics beyond magnet admission. Recommended behavior:
+1. Confirm degraded mutation semantics beyond magnet admission. Recommended behavior:
    - list, detail, history, logs, settings, and category operations remain available;
    - add magnet persists a queued runnable torrent without creating a manager;
    - pause/resume update durable desired state without creating a manager;
    - removal operates from persistence/filesystem state without starting MonoTorrent;
    - explicitly engine-dependent metadata refresh/reset and tracker actions return a structured unavailable response.
-4. Approve the final `NSLocalNetworkUsageDescription` text for the Service bundle.
+2. Approve the final `NSLocalNetworkUsageDescription` text for the Service bundle.
 
 ## Sliced Delivery Plan
 
@@ -306,7 +303,7 @@ Every proof release must verify all of the following before live installation:
 
 ### Slice 1: Persisted VPN Settings
 
-Status: pending.
+Status: implemented on August 7, 2026; final verification recorded below.
 
 #### Work
 
@@ -322,6 +319,27 @@ Status: pending.
 - Settings round-trip through SQLite and the API.
 - Live interval/endpoint/CIDR changes affect the next scheduling decision without restarting the Service.
 - Invalid endpoints, CIDRs, intervals, and timeouts return structured validation errors.
+
+#### Implementation Notes
+
+- The agreed initial direct-ISP range is `47.0.0.0/8`; the agreed request timeout is `10` seconds.
+- VPN settings are additive rows in the existing generic `runtime_settings` table, so no schema migration or rewrite
+  of existing torrent, category, callback, or engine data is required.
+- Effective settings are reloaded from SQLite instead of cached, which gives the later scheduler the latest endpoint,
+  CIDRs, and intervals on its next decision.
+- The public API, committed OpenAPI contract, native Apple model/mapping, macOS settings screen, help catalog, fixture
+  environment, and compatibility tests carry all six settings. The WebUI deliberately has no new editor in this slice;
+  omitted fields preserve the current values.
+
+#### Verification
+
+- `dotnet build TorrentCore.sln --no-restore --maxcpucount:1 --disable-build-servers`: succeeded with zero warnings
+  and zero errors.
+- OpenAPI regeneration test: 2 passed.
+- Full .NET suite: 240 passed.
+- Swift package suite: 34 passed.
+- Unsigned Arm64 `TorrentCoreMac` build-for-testing: succeeded, including the macOS unit and fixture UI targets.
+- `git diff --check`: passed.
 
 ### Slice 2: Public IPv4 Egress Probe
 

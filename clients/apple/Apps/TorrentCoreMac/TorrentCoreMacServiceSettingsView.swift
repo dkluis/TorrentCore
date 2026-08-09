@@ -61,6 +61,7 @@ struct TorrentCoreMacServiceSettingsView: View {
         case seedingCleanup
         case metadataRecovery
         case engine
+        case vpnEgress
         case completionCallback
         case categories
         case cleanup
@@ -73,6 +74,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             case .seedingCleanup: "Seeding & Cleanup"
             case .metadataRecovery: "Metadata Recovery"
             case .engine: "Engine"
+            case .vpnEgress: "VPN Egress"
             case .completionCallback: "Completion Callback"
             case .categories: "Categories"
             case .cleanup: "Cleanup"
@@ -85,6 +87,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             case .seedingCleanup: "externaldrive.badge.checkmark"
             case .metadataRecovery: "arrow.trianglehead.2.clockwise.rotate.90"
             case .engine: "gearshape.2"
+            case .vpnEgress: "network.badge.shield.half.filled"
             case .completionCallback: "terminal"
             case .categories: "folder"
             case .cleanup: "trash"
@@ -529,6 +532,50 @@ struct TorrentCoreMacServiceSettingsView: View {
                         ? "Enabled"
                         : "Disabled"
                 )
+                validationMessage
+            }
+        case .vpnEgress:
+            if let draft = runtimeBinding {
+                Section("Validation") {
+                    Toggle(isOn: draft.vpnEgressValidationEnabled) {
+                        TorrentCoreMacHelpLabel(
+                            "Enabled",
+                            content: TorrentCoreHelpCatalog.Settings.vpnEgressValidationEnabled
+                        )
+                    }
+                    stringField(
+                        "Public IP endpoint",
+                        text: draft.vpnEgressValidationEndpoint,
+                        content: TorrentCoreHelpCatalog.Settings.vpnEgressValidationEndpoint
+                    )
+                    stringField(
+                        "Direct ISP IPv4 CIDRs",
+                        text: commaSeparatedStrings(draft.vpnEgressDirectIspCidrs),
+                        content: TorrentCoreHelpCatalog.Settings.vpnEgressDirectIspCidrs
+                    )
+                }
+                Section("Check Intervals") {
+                    integerField(
+                        "Degraded seconds",
+                        value: draft.vpnEgressDegradedCheckIntervalSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.vpnEgressDegradedCheckIntervalSeconds
+                    )
+                    integerField(
+                        "Ready seconds",
+                        value: draft.vpnEgressReadyCheckIntervalSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.vpnEgressReadyCheckIntervalSeconds
+                    )
+                    integerField(
+                        "Request timeout seconds",
+                        value: draft.vpnEgressRequestTimeoutSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.vpnEgressRequestTimeoutSeconds
+                    )
+                }
+                Text(
+                    "Slice 1 stores these values. VPN enforcement and automatic degraded/ready transitions are added in later slices."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 validationMessage
             }
         case .completionCallback:
@@ -1054,6 +1101,30 @@ struct TorrentCoreMacServiceSettingsView: View {
         {
             return "Command path is required when the completion callback is enabled."
         }
+        guard let endpoint = URLComponents(
+            string: draft.vpnEgressValidationEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        ), endpoint.scheme?.lowercased() == "https", endpoint.host?.isEmpty == false,
+           endpoint.user == nil, endpoint.password == nil, endpoint.fragment == nil
+        else {
+            return "VPN validation endpoint must be an absolute HTTPS URL without credentials or a fragment."
+        }
+        if draft.vpnEgressValidationEnabled && draft.vpnEgressDirectIspCidrs.isEmpty {
+            return "At least one direct ISP IPv4 CIDR is required when VPN validation is enabled."
+        }
+        if draft.vpnEgressDegradedCheckIntervalSeconds < 1 {
+            return "VPN degraded check interval must be 1 or greater."
+        }
+        if draft.vpnEgressReadyCheckIntervalSeconds < 1 {
+            return "VPN ready check interval must be 1 or greater."
+        }
+        if draft.vpnEgressRequestTimeoutSeconds < 1 {
+            return "VPN request timeout must be 1 or greater."
+        }
+        if draft.vpnEgressRequestTimeoutSeconds >= draft.vpnEgressDegradedCheckIntervalSeconds
+            || draft.vpnEgressRequestTimeoutSeconds >= draft.vpnEgressReadyCheckIntervalSeconds
+        {
+            return "VPN request timeout must be shorter than both check intervals."
+        }
         return nil
     }
 
@@ -1148,6 +1219,18 @@ struct TorrentCoreMacServiceSettingsView: View {
         Binding(
             get: { binding.wrappedValue ?? "" },
             set: { binding.wrappedValue = $0.isEmpty ? nil : $0 }
+        )
+    }
+
+    private func commaSeparatedStrings(_ binding: Binding<[String]>) -> Binding<String> {
+        Binding(
+            get: { binding.wrappedValue.joined(separator: ", ") },
+            set: { value in
+                binding.wrappedValue = value
+                    .split(separator: ",", omittingEmptySubsequences: true)
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+            }
         )
     }
 

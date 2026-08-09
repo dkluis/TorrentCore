@@ -38,6 +38,12 @@ public sealed class RuntimeSettingsDto
     public required int             CompletionCallbackFinalizationTimeoutSeconds   { get; init; }
     public          string?         CompletionCallbackApiBaseUrlOverride           { get; init; }
     public          string?         CompletionCallbackApiKeyOverride               { get; init; }
+    public bool                     VpnEgressValidationEnabled                     { get; init; }
+    public string                   VpnEgressValidationEndpoint                    { get; init; } = string.Empty;
+    public IReadOnlyList<string>    VpnEgressDirectIspCidrs                        { get; init; } = [];
+    public int                      VpnEgressDegradedCheckIntervalSeconds           { get; init; }
+    public int                      VpnEgressReadyCheckIntervalSeconds              { get; init; }
+    public int                      VpnEgressRequestTimeoutSeconds                  { get; init; }
     public required int             AppliedEngineMaximumConnections                { get; init; }
     public required int             AppliedEngineMaximumHalfOpenConnections        { get; init; }
     public required bool            AppliedEngineAllowPeerExchange                  { get; init; }

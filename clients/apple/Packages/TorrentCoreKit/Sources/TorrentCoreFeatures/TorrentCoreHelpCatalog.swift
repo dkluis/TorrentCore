@@ -169,6 +169,36 @@ public enum TorrentCoreHelpCatalog {
             "Optionally overrides the API key exposed to the callback.",
             "Leave this blank for the normal setup. The native app does not persist or log the value entered here."
         )
+        public static let vpnEgressValidationEnabled = help(
+            "Enable VPN Egress Validation",
+            "Controls whether TorrentCore requires a verified VPN egress before torrent processing.",
+            "This setting is disabled by default. Slice 1 stores and exposes the value; a later slice will enforce degraded and ready processing states."
+        )
+        public static let vpnEgressValidationEndpoint = help(
+            "Validation Endpoint",
+            "Sets the HTTPS endpoint used to discover TorrentCore's public IPv4 address.",
+            "Use an absolute HTTPS URL without embedded credentials or a fragment. Changes are read from settings without operator restart."
+        )
+        public static let vpnEgressDirectIspCidrs = help(
+            "Direct ISP IPv4 CIDRs",
+            "Lists public IPv4 ranges that identify direct, non-VPN egress.",
+            "Enter one or more comma-separated IPv4 CIDRs. IPv6 ranges are rejected because this installation uses IPv4 for public egress validation."
+        )
+        public static let vpnEgressDegradedCheckIntervalSeconds = help(
+            "Degraded Check Interval Seconds",
+            "Sets how often TorrentCore rechecks egress while validation is degraded.",
+            "The agreed default is 60 seconds. The request timeout must remain shorter than this interval."
+        )
+        public static let vpnEgressReadyCheckIntervalSeconds = help(
+            "Ready Check Interval Seconds",
+            "Sets how often TorrentCore revalidates egress while processing is ready.",
+            "The agreed default is 240 seconds. The request timeout must remain shorter than this interval."
+        )
+        public static let vpnEgressRequestTimeoutSeconds = help(
+            "Validation Request Timeout Seconds",
+            "Limits one public-IP validation request.",
+            "The agreed default is 10 seconds. It must be positive and shorter than both validation intervals."
+        )
         public static let categoryEnabled = help(
             "Enabled",
             "Controls whether the category is available for future torrent adds.",
@@ -231,6 +261,9 @@ public enum TorrentCoreHelpCatalog {
             completionCallbackWorkingDirectory, completionCallbackTimeoutSeconds,
             completionCallbackFinalizationTimeoutSeconds,
             completionCallbackAPIBaseURLOverride, completionCallbackAPIKeyOverride,
+            vpnEgressValidationEnabled, vpnEgressValidationEndpoint,
+            vpnEgressDirectIspCidrs, vpnEgressDegradedCheckIntervalSeconds,
+            vpnEgressReadyCheckIntervalSeconds, vpnEgressRequestTimeoutSeconds,
             categoryEnabled, categoryInvokeCompletionCallback, categoryDisplayName,
             categoryCallbackLabel, categoryDownloadRootPath, categorySortOrder,
             cleanupLogEntries, cleanupHistoryRecords, cleanupOrphanedTorrentLogs,

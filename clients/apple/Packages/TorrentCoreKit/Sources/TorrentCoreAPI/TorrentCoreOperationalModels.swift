@@ -316,6 +316,12 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var supportsLiveUpdates: Bool
     public var updatedAt: Date?
     public var usesPersistedOverrides: Bool
+    public var vpnEgressDegradedCheckIntervalSeconds: Int
+    public var vpnEgressDirectIspCidrs: [String]
+    public var vpnEgressReadyCheckIntervalSeconds: Int
+    public var vpnEgressRequestTimeoutSeconds: Int
+    public var vpnEgressValidationEnabled: Bool
+    public var vpnEgressValidationEndpoint: String
 }
 
 public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
@@ -350,6 +356,12 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var seedingStopMinutes: Int
     public var seedingStopMode: String
     public var seedingStopRatio: Double
+    public var vpnEgressDegradedCheckIntervalSeconds: Int
+    public var vpnEgressDirectIspCidrs: [String]
+    public var vpnEgressReadyCheckIntervalSeconds: Int
+    public var vpnEgressRequestTimeoutSeconds: Int
+    public var vpnEgressValidationEnabled: Bool
+    public var vpnEgressValidationEndpoint: String
 
     public init(settings: TorrentCoreRuntimeSettings) {
         automaticMetadataResetStuckThresholdSeconds = settings.automaticMetadataResetStuckThresholdSeconds
@@ -383,6 +395,12 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         seedingStopMinutes = settings.seedingStopMinutes
         seedingStopMode = settings.seedingStopMode ?? ""
         seedingStopRatio = settings.seedingStopRatio
+        vpnEgressDegradedCheckIntervalSeconds = settings.vpnEgressDegradedCheckIntervalSeconds
+        vpnEgressDirectIspCidrs = settings.vpnEgressDirectIspCidrs
+        vpnEgressReadyCheckIntervalSeconds = settings.vpnEgressReadyCheckIntervalSeconds
+        vpnEgressRequestTimeoutSeconds = settings.vpnEgressRequestTimeoutSeconds
+        vpnEgressValidationEnabled = settings.vpnEgressValidationEnabled
+        vpnEgressValidationEndpoint = settings.vpnEgressValidationEndpoint
     }
 }
 

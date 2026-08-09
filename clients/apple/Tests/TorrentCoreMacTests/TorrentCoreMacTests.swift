@@ -23,6 +23,7 @@ func macNavigationDestinationsExposeStableAccessibleMetadata() {
 @Test
 func serviceSettingsExposeCleanupAfterCategories() {
     let groups = TorrentCoreMacServiceSettingsView.SettingsGroup.allCases
+    #expect(groups.contains(where: { $0.title == "VPN Egress" }))
     #expect(groups.suffix(2).map(\.title) == ["Categories", "Cleanup"])
     #expect(groups.last?.systemImage.isEmpty == false)
 }

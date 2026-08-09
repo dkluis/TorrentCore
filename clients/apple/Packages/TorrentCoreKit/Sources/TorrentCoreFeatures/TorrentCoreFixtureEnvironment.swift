@@ -415,6 +415,12 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         runtimeSettingsValue.seedingStopMinutes = update.seedingStopMinutes
         runtimeSettingsValue.seedingStopMode = update.seedingStopMode
         runtimeSettingsValue.seedingStopRatio = update.seedingStopRatio
+        runtimeSettingsValue.vpnEgressDegradedCheckIntervalSeconds = update.vpnEgressDegradedCheckIntervalSeconds
+        runtimeSettingsValue.vpnEgressDirectIspCidrs = update.vpnEgressDirectIspCidrs
+        runtimeSettingsValue.vpnEgressReadyCheckIntervalSeconds = update.vpnEgressReadyCheckIntervalSeconds
+        runtimeSettingsValue.vpnEgressRequestTimeoutSeconds = update.vpnEgressRequestTimeoutSeconds
+        runtimeSettingsValue.vpnEgressValidationEnabled = update.vpnEgressValidationEnabled
+        runtimeSettingsValue.vpnEgressValidationEndpoint = update.vpnEgressValidationEndpoint
         runtimeSettingsValue.updatedAt = Date()
         return runtimeSettingsValue
     }

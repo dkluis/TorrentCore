@@ -503,7 +503,13 @@ public enum TorrentCorePreviewFixtures {
         seedingStopRatio: 1,
         supportsLiveUpdates: true,
         updatedAt: checkedAt.addingTimeInterval(-86_400),
-        usesPersistedOverrides: true
+        usesPersistedOverrides: true,
+        vpnEgressDegradedCheckIntervalSeconds: 60,
+        vpnEgressDirectIspCidrs: ["47.0.0.0/8"],
+        vpnEgressReadyCheckIntervalSeconds: 240,
+        vpnEgressRequestTimeoutSeconds: 10,
+        vpnEgressValidationEnabled: false,
+        vpnEgressValidationEndpoint: "https://api.ipify.org?format=json"
     )
 
     public static let restartResult = TorrentCoreServiceRestartResult(

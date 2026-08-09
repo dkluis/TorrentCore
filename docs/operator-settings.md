@@ -1,5 +1,45 @@
 # Operator Settings
 
+## VPN Egress Validation
+
+Slice 1 persists and exposes the VPN egress policy. It does not yet probe the public address or gate MonoTorrent;
+those behaviors are introduced by later slices in the [VPN egress plan](torrentcore-service-app-vpn-egress-plan.md).
+Validation is disabled by default, so upgrading an existing installation does not change torrent processing.
+
+### Enable VPN Egress Validation
+
+- defaults to `false`
+- when later enforcement slices are installed, enabled validation will keep the Service API available while preventing
+  torrent processing until egress is validated
+- applies live and does not require a Service restart
+
+### Validation Endpoint
+
+- defaults to `https://api.ipify.org?format=json`
+- must be an absolute HTTPS URL with a host and without embedded credentials or a fragment
+- applies live; the effective setting is loaded from SQLite on every settings read
+
+### Direct ISP IPv4 CIDRs
+
+- defaults to `47.0.0.0/8`
+- accepts one or more IPv4 CIDRs, canonicalizes host addresses to their network address, and removes duplicates
+- rejects IPv6 CIDRs and requires at least one range while validation is enabled
+- CIDRs identify direct ISP egress; an observed address outside these ranges is validated egress, not proof of a
+  particular VPN provider
+- applies live
+
+### Check Intervals And Timeout
+
+- degraded check interval defaults to `60` seconds
+- ready check interval defaults to `240` seconds
+- request timeout defaults to `10` seconds
+- all values must be positive, and the request timeout must be shorter than both intervals
+- each value applies live; the future scheduler must read the latest effective settings before choosing its next delay
+
+All six values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
+has no VPN-settings editor in this slice, but its existing updates remain compatible because omitted VPN fields retain
+their current persisted values.
+
 ## Queue And Concurrency
 
 ### Max Active Metadata Resolutions
@@ -257,6 +297,7 @@ Restart-required settings currently include:
 
 Live settings currently include:
 
+- VPN egress validation policy values; enforcement begins in later plan slices
 - queue concurrency
 - metadata and long-cold download recovery windows
 - logging throttle settings

@@ -461,6 +461,12 @@ public sealed class TorrentApiTests
         Assert.Equal(120, settings.ColdDownloadRecoveryThresholdMinutes);
         Assert.Equal(60, settings.ColdDownloadRecoveryIntervalMinutes);
         Assert.Equal(72, settings.ColdDownloadAbandonAfterHours);
+        Assert.False(settings.VpnEgressValidationEnabled);
+        Assert.Equal("https://api.ipify.org/?format=json", settings.VpnEgressValidationEndpoint);
+        Assert.Equal(["47.0.0.0/8"], settings.VpnEgressDirectIspCidrs);
+        Assert.Equal(60, settings.VpnEgressDegradedCheckIntervalSeconds);
+        Assert.Equal(240, settings.VpnEgressReadyCheckIntervalSeconds);
+        Assert.Equal(10, settings.VpnEgressRequestTimeoutSeconds);
         Assert.False(settings.CompletionCallbackEnabled);
         Assert.Null(settings.CompletionCallbackCommandPath);
         Assert.Null(settings.CompletionCallbackArguments);
@@ -521,6 +527,12 @@ public sealed class TorrentApiTests
                 CompletionCallbackFinalizationTimeoutSeconds = 180,
                 CompletionCallbackApiBaseUrlOverride = "http://127.0.0.1:5501/api/complete",
                 CompletionCallbackApiKeyOverride = "integration-key",
+                VpnEgressValidationEnabled = true,
+                VpnEgressValidationEndpoint = "https://vpn-check.example.test/ip?format=json",
+                VpnEgressDirectIspCidrs = ["198.51.100.19/24", "203.0.113.0/24", "198.51.100.0/24"],
+                VpnEgressDegradedCheckIntervalSeconds = 45,
+                VpnEgressReadyCheckIntervalSeconds = 180,
+                VpnEgressRequestTimeoutSeconds = 9,
             });
             updateResponse.EnsureSuccessStatusCode();
 
@@ -560,6 +572,12 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.CompletionCallbackFinalizationTimeoutSeconds);
             Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
             Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
+            Assert.True(settings.VpnEgressValidationEnabled);
+            Assert.Equal("https://vpn-check.example.test/ip?format=json", settings.VpnEgressValidationEndpoint);
+            Assert.Equal(["198.51.100.0/24", "203.0.113.0/24"], settings.VpnEgressDirectIspCidrs);
+            Assert.Equal(45, settings.VpnEgressDegradedCheckIntervalSeconds);
+            Assert.Equal(180, settings.VpnEgressReadyCheckIntervalSeconds);
+            Assert.Equal(9, settings.VpnEgressRequestTimeoutSeconds);
             Assert.True(settings.EngineSettingsRequireRestart);
             Assert.NotNull(settings.UpdatedAtUtc);
 
@@ -621,6 +639,12 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.CompletionCallbackFinalizationTimeoutSeconds);
             Assert.Equal("http://127.0.0.1:5501/api/complete", settings.CompletionCallbackApiBaseUrlOverride);
             Assert.Equal("integration-key", settings.CompletionCallbackApiKeyOverride);
+            Assert.True(settings.VpnEgressValidationEnabled);
+            Assert.Equal("https://vpn-check.example.test/ip?format=json", settings.VpnEgressValidationEndpoint);
+            Assert.Equal(["198.51.100.0/24", "203.0.113.0/24"], settings.VpnEgressDirectIspCidrs);
+            Assert.Equal(45, settings.VpnEgressDegradedCheckIntervalSeconds);
+            Assert.Equal(180, settings.VpnEgressReadyCheckIntervalSeconds);
+            Assert.Equal(9, settings.VpnEgressRequestTimeoutSeconds);
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
             Assert.Equal(6, settings.AppliedEngineMaximumHalfOpenConnections);
@@ -739,6 +763,131 @@ public sealed class TorrentApiTests
             CreateDefaultRuntimeSettingsUpdateRequest(metadataResolutionTimeSliceMinutes: minutes));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("relative/path")]
+    [InlineData("http://api.ipify.org?format=json")]
+    [InlineData("https://user:secret@example.test/ip")]
+    [InlineData("https://example.test/ip#fragment")]
+    public async Task UpdateRuntimeSettings_RejectsInvalidVpnEndpoint(string endpoint)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(vpnEgressValidationEndpoint: endpoint)
+        );
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(nameof(UpdateRuntimeSettingsRequest.VpnEgressValidationEndpoint), error?.Target);
+    }
+
+    [Theory]
+    [InlineData("47.0.0.0")]
+    [InlineData("47.0.0.0/33")]
+    [InlineData("2001:db8::/32")]
+    [InlineData("not-a-cidr")]
+    public async Task UpdateRuntimeSettings_RejectsInvalidOrIpv6DirectIspCidr(string cidr)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(vpnEgressDirectIspCidrs: [cidr])
+        );
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(nameof(UpdateRuntimeSettingsRequest.VpnEgressDirectIspCidrs), error?.Target);
+    }
+
+    [Theory]
+    [InlineData(0, 240, 10, "VpnEgressDegradedCheckIntervalSeconds")]
+    [InlineData(60, 0, 10, "VpnEgressReadyCheckIntervalSeconds")]
+    [InlineData(60, 240, 0, "VpnEgressRequestTimeoutSeconds")]
+    [InlineData(10, 240, 10, "VpnEgressRequestTimeoutSeconds")]
+    [InlineData(60, 10, 10, "VpnEgressRequestTimeoutSeconds")]
+    public async Task UpdateRuntimeSettings_RejectsInvalidVpnIntervals(
+        int degradedSeconds,
+        int readySeconds,
+        int timeoutSeconds,
+        string expectedTarget)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                vpnEgressDegradedCheckIntervalSeconds: degradedSeconds,
+                vpnEgressReadyCheckIntervalSeconds: readySeconds,
+                vpnEgressRequestTimeoutSeconds: timeoutSeconds)
+        );
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(expectedTarget, error?.Target);
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeSettings_EnablingVpnValidationRequiresDirectIspCidr()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                vpnEgressValidationEnabled: true,
+                vpnEgressDirectIspCidrs: [])
+        );
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(nameof(UpdateRuntimeSettingsRequest.VpnEgressDirectIspCidrs), error?.Target);
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeSettings_OmittedVpnFieldsPreserveCurrentDatabaseValues()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var firstResponse = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                vpnEgressValidationEnabled: true,
+                vpnEgressValidationEndpoint: "https://egress.example.test/address",
+                vpnEgressDirectIspCidrs: ["198.51.100.42/24"],
+                vpnEgressDegradedCheckIntervalSeconds: 30,
+                vpnEgressReadyCheckIntervalSeconds: 120,
+                vpnEgressRequestTimeoutSeconds: 5)
+        );
+        firstResponse.EnsureSuccessStatusCode();
+
+        var legacyResponse = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest()
+        );
+        legacyResponse.EnsureSuccessStatusCode();
+        var settings = await legacyResponse.Content.ReadFromJsonAsync<RuntimeSettingsDto>();
+
+        Assert.NotNull(settings);
+        Assert.True(settings.VpnEgressValidationEnabled);
+        Assert.Equal("https://egress.example.test/address", settings.VpnEgressValidationEndpoint);
+        Assert.Equal(["198.51.100.0/24"], settings.VpnEgressDirectIspCidrs);
+        Assert.Equal(30, settings.VpnEgressDegradedCheckIntervalSeconds);
+        Assert.Equal(120, settings.VpnEgressReadyCheckIntervalSeconds);
+        Assert.Equal(5, settings.VpnEgressRequestTimeoutSeconds);
     }
 
     [Fact]
@@ -3981,7 +4130,13 @@ public sealed class TorrentApiTests
         bool? engineAllowPeerExchange = false,
         int? automaticMetadataResetStuckThresholdSeconds = null,
         int? metadataResolutionTimeSliceMinutes = null,
-        int maxActiveDownloads = 4)
+        int maxActiveDownloads = 4,
+        bool? vpnEgressValidationEnabled = null,
+        string? vpnEgressValidationEndpoint = null,
+        IReadOnlyList<string>? vpnEgressDirectIspCidrs = null,
+        int? vpnEgressDegradedCheckIntervalSeconds = null,
+        int? vpnEgressReadyCheckIntervalSeconds = null,
+        int? vpnEgressRequestTimeoutSeconds = null)
     {
         return new UpdateRuntimeSettingsRequest
         {
@@ -4016,6 +4171,12 @@ public sealed class TorrentApiTests
             CompletionCallbackFinalizationTimeoutSeconds = 120,
             CompletionCallbackApiBaseUrlOverride = null,
             CompletionCallbackApiKeyOverride = null,
+            VpnEgressValidationEnabled = vpnEgressValidationEnabled,
+            VpnEgressValidationEndpoint = vpnEgressValidationEndpoint,
+            VpnEgressDirectIspCidrs = vpnEgressDirectIspCidrs,
+            VpnEgressDegradedCheckIntervalSeconds = vpnEgressDegradedCheckIntervalSeconds,
+            VpnEgressReadyCheckIntervalSeconds = vpnEgressReadyCheckIntervalSeconds,
+            VpnEgressRequestTimeoutSeconds = vpnEgressRequestTimeoutSeconds,
         };
     }
 

@@ -198,6 +198,15 @@ extension TorrentCoreRuntimeSettings {
         supportsLiveUpdates = value.supportsLiveUpdates
         updatedAt = value.updatedAtUtc
         usesPersistedOverrides = value.usesPersistedOverrides
+        vpnEgressDegradedCheckIntervalSeconds = Int(
+            value.vpnEgressDegradedCheckIntervalSeconds ?? 60
+        )
+        vpnEgressDirectIspCidrs = value.vpnEgressDirectIspCidrs ?? ["47.0.0.0/8"]
+        vpnEgressReadyCheckIntervalSeconds = Int(value.vpnEgressReadyCheckIntervalSeconds ?? 240)
+        vpnEgressRequestTimeoutSeconds = Int(value.vpnEgressRequestTimeoutSeconds ?? 10)
+        vpnEgressValidationEnabled = value.vpnEgressValidationEnabled ?? false
+        vpnEgressValidationEndpoint = value.vpnEgressValidationEndpoint
+            ?? "https://api.ipify.org?format=json"
     }
 }
 
@@ -246,7 +255,15 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             metadataResolutionTimeSliceMinutes: Int32(value.metadataResolutionTimeSliceMinutes),
             seedingStopMinutes: Int32(value.seedingStopMinutes),
             seedingStopMode: value.seedingStopMode,
-            seedingStopRatio: value.seedingStopRatio
+            seedingStopRatio: value.seedingStopRatio,
+            vpnEgressDegradedCheckIntervalSeconds: Int32(
+                value.vpnEgressDegradedCheckIntervalSeconds
+            ),
+            vpnEgressDirectIspCidrs: value.vpnEgressDirectIspCidrs,
+            vpnEgressReadyCheckIntervalSeconds: Int32(value.vpnEgressReadyCheckIntervalSeconds),
+            vpnEgressRequestTimeoutSeconds: Int32(value.vpnEgressRequestTimeoutSeconds),
+            vpnEgressValidationEnabled: value.vpnEgressValidationEnabled,
+            vpnEgressValidationEndpoint: value.vpnEgressValidationEndpoint
         )
     }
 }
