@@ -166,13 +166,16 @@ supplying `--signing-identity` additionally runs the Developer ID verifier. The 
 with Service `0.6.0` build `1`, Team `5GRR76N48V`, the required framework-dependent .NET entitlements, and an isolated
 loopback launch using temporary storage/download roots. It did not replace or restart the active Service LaunchAgent.
 
-Slice 8 adds a TorrentCore-owned, manifest-free Service-app DMG boundary. Focused acceptance builds the real signed
-Arm64 payload for a required Dick/Tom installation label and CPU choice, verifies the runtime collection and package
-checksums, and runs `install.zsh plan` plus
+Slice 8 adds a TorrentCore-owned, manifest-free combined Service/native-UI DMG boundary. Focused acceptance builds the
+real signed Arm64 Service payload and native UI for a required Dick/Tom installation label and CPU choice, verifies
+both app signatures, embedded version metadata, the root `Applications` link, release metadata, and package checksums,
+and runs `install.zsh plan` plus
 `install.zsh dry-run` against the staged or mounted package. These checks must resolve only the approved
 `~/Applications/TorrentCore`, `~/TorrentCore`, and Service LaunchAgent locations and must write no filesystem or
-launchd state. The final DMG additionally requires clean committed source plus outside-sandbox notarization, stapling,
-Gatekeeper, and disk-image verification; a broad product test-suite rerun is not part of this packaging-only proof.
+launchd state. The Service deployer must not touch `/Applications/TorrentCore.app`; its installation remains the
+runbook-directed manual drag after Service verify. The final DMG additionally requires clean committed source plus
+outside-sandbox notarization, stapling, Gatekeeper, and disk-image verification; a broad product test-suite rerun is not
+part of this packaging-only proof.
 
 The August 5 Dick Intel deployment release added distinct native supervisor launchers at the established Service and
 WebUI executable paths while retaining the framework-dependent apphosts as sibling `.apphost` helpers. Release

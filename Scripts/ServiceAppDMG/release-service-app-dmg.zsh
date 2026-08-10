@@ -11,6 +11,8 @@ RELEASE_DATE="$(date '+%Y.%m.%d')"
 INSTALLATION=""
 CPU=""
 RELEASE_NAME=""
+UI_VERSION="0.6.0"
+UI_BUILD_NUMBER="11"
 OUTPUT_DIR="/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs"
 PACKAGE_ROOT=""
 STAGE_ONLY=false
@@ -134,11 +136,22 @@ cleanup() {
 }
 trap cleanup EXIT
 
+GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+BUILT_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreService.app"
+UI_APP_PATH="$PACKAGE_ROOT/TorrentCore.app"
 mkdir -p "${APP_PATH:h}" "$PACKAGE_ROOT/Tools"
 "$REPO_ROOT/Scripts/ServiceApp/build-macos-service-app.zsh" \
     --output-bundle "$APP_PATH" \
     --signing-identity "$SIGNING_IDENTITY"
+"$REPO_ROOT/Scripts/MacOSApp/build-signed-macos-ui-app.zsh" \
+    --output-bundle "$UI_APP_PATH" \
+    --version "$UI_VERSION" \
+    --build-number "$UI_BUILD_NUMBER" \
+    --git-sha "$GIT_SHA" \
+    --built-at-utc "$BUILT_AT_UTC" \
+    --signing-identity "$SIGNING_IDENTITY"
+ln -s /Applications "$PACKAGE_ROOT/Applications"
 
 ditto "$SCRIPT_DIR/install.zsh" "$PACKAGE_ROOT/install.zsh"
 ditto "$SCRIPT_DIR/Open Terminal Here.command" "$PACKAGE_ROOT/Open Terminal Here.command"
@@ -148,9 +161,8 @@ ditto "$SCRIPT_DIR/torrentcore_service_app_deploy.py" "$PACKAGE_ROOT/Tools/torre
 ditto "$REPO_ROOT/Scripts/ServiceApp/verify-macos-service-app.zsh" "$PACKAGE_ROOT/Tools/verify-macos-service-app.zsh"
 chmod +x "$PACKAGE_ROOT/install.zsh" "$PACKAGE_ROOT/"*.command "$PACKAGE_ROOT/Tools/"*.zsh "$PACKAGE_ROOT/Tools/"*.py
 
-GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-BUILT_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-APP_SHA="$(python3 - "$APP_PATH" <<'PY'
+tree_sha256() {
+python3 - "$1" <<'PY'
 import hashlib
 import os
 import pathlib
@@ -175,14 +187,16 @@ for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_p
     digest.update(b"\0")
 print(digest.hexdigest())
 PY
-)"
+}
+APP_SHA="$(tree_sha256 "$APP_PATH")"
+UI_APP_SHA="$(tree_sha256 "$UI_APP_PATH")"
 
-python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$CPU" "$RUNTIME" "$RELEASE_NAME" "$GIT_SHA" "$BUILT_AT_UTC" "$APP_SHA" "$SOURCE_DIRTY" <<'PY'
+python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$CPU" "$RUNTIME" "$RELEASE_NAME" "$GIT_SHA" "$BUILT_AT_UTC" "$APP_SHA" "$UI_VERSION" "$UI_BUILD_NUMBER" "$UI_APP_SHA" "$SOURCE_DIRTY" <<'PY'
 import json
 import pathlib
 import sys
 
-output, release_id, release_date, installation, cpu, runtime, release_name, git_sha, built_at, app_sha, dirty = sys.argv[1:]
+output, release_id, release_date, installation, cpu, runtime, release_name, git_sha, built_at, app_sha, ui_version, ui_build, ui_app_sha, dirty = sys.argv[1:]
 value = {
     "schemaVersion": 1,
     "product": "TorrentCoreServiceApp",
@@ -202,6 +216,15 @@ value = {
             "sha256": app_sha,
         }
     },
+    "nativeUi": {
+        "path": "TorrentCore.app",
+        "version": ui_version,
+        "build": ui_build,
+        "runtime": runtime,
+        "sha256": ui_app_sha,
+        "installPath": "/Applications/TorrentCore.app",
+        "installMode": "DragToApplications",
+    },
 }
 pathlib.Path(output).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 PY
@@ -209,8 +232,8 @@ PY
 cat > "$PACKAGE_ROOT/README.md" <<EOF
 # TorrentCore $RELEASE_NAME $RELEASE_DATE ($INSTALLATION, $CPU)
 
-This Service-only package installs ~/Applications/TorrentCore/TorrentCoreService.app and updates only
-com.torrentcore.service.
+This package installs ~/Applications/TorrentCore/TorrentCoreService.app through the Service installer and includes
+TorrentCore.app for a manual drag-to-Applications update after Service verification.
 
 It does not install, stop, start, verify, back up, or otherwise change TorrentCore.WebUI. It preserves the existing
 ~/TorrentCore structure, including Service files, scripts, logs, deployment records, backups, and
@@ -221,7 +244,8 @@ Start with:
     ./install.zsh plan
     ./install.zsh dry-run
 
-Only run ./install.zsh apply --confirm during an explicitly approved Service deployment window.
+Only run ./install.zsh apply --confirm during an explicitly approved Service deployment window. After Service verify
+succeeds, follow Runbook.md to replace the native UI through the Applications link in this mounted DMG.
 EOF
 
 cat > "$PACKAGE_ROOT/Runbook.md" <<'EOF'
@@ -236,6 +260,12 @@ cat > "$PACKAGE_ROOT/Runbook.md" <<'EOF'
 
 VPN Disabled, Ready, and Degraded are valid installation outcomes when API health is `ok`. A degraded VPN state does
 not fail installation and does not require operator recovery of the Service process.
+
+## Install TorrentCore Native UI
+
+After `./install.zsh verify` succeeds, quit the existing TorrentCore UI if it is running. In the mounted DMG, drag
+`TorrentCore.app` onto the `Applications` icon, which links to `/Applications`, and select **Replace** if macOS prompts
+for confirmation. Launch the updated TorrentCore UI and confirm that its Dashboard connects to the verified Service.
 EOF
 
 (

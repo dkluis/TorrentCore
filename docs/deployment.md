@@ -149,13 +149,15 @@ The signed verifier checks the complete nested code tree, Team ID, Hardened Runt
 runtime entitlements, native dependencies, architecture, bundle metadata, launcher/helper UUID separation, and absence
 of mutable TorrentCore data. Run signing verification outside the filesystem sandbox as required by repository policy.
 
-## Service-App DMG
+## Combined Service-App And Native-UI DMG
 
-The Service-only DMG builder and deployer live under `Scripts/ServiceAppDMG`; they have no runtime dependency on the
+The combined DMG builder and Service deployer live under `Scripts/ServiceAppDMG`; they have no runtime dependency on the
 TVMaze repository and require no machine `live.json` manifest. Generation requires an installation label (`Dick` or
 `Tom`) for artifact naming and a CPU choice. No hostname catalog is packaged: installation paths come from the current
 user's home, and apply requires the existing `~/TorrentCore` and `~/TorrentCore/Service` structure. Releases initially
-contain only `payload/osx-arm64/TorrentCoreService.app` and refuse a host whose architecture does not match.
+contain the Service payload at `payload/osx-arm64/TorrentCoreService.app`, the signed native UI at the mounted root as
+`TorrentCore.app`, and an `Applications` link to `/Applications`. The Service deployer refuses a host whose architecture
+does not match and never installs or controls the native UI.
 
 Artifacts follow the established naming convention, for example
 `TorrentCore-torrentcore.2026.08.10.Dick.ServiceApp.dmg`. A real DMG build refuses a dirty source tree. From clean
@@ -172,9 +174,11 @@ committed source, run:
 Use `--installation Tom --cpu arm` for Tom's Mac mini or VM. `--cpu intel` is a reserved future choice and is
 explicitly refused by the current Arm-only builder.
 
-The default output directory is `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs`. The workflow signs the app and
-DMG, submits the DMG through the existing `TorrentCore-notary` profile, staples it, and performs signature, entitlement,
-Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification outside the filesystem sandbox.
+The default output directory is `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs`. The workflow signs both apps
+and the DMG, submits the DMG through the existing `TorrentCore-notary` profile, staples it, and performs signature,
+entitlement, Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification outside the filesystem
+sandbox. `TorrentCore.app/Contents/Resources/version.json` records native UI version, build, Git SHA, build time, and
+runtime. The package `release.json` records both app checksums and the manual `/Applications/TorrentCore.app` target.
 
 From the mounted DMG, begin with:
 
@@ -189,6 +193,11 @@ Neither command writes files or deployment state and neither controls launchd. A
 updates the external version record, and changes only `com.torrentcore.service`. VPN Disabled, Ready, and Degraded are
 valid installation outcomes when API health is successful. Deployment state and history live under
 `~/TorrentCore/.deploy`.
+
+After Service verify succeeds, quit an existing TorrentCore UI, drag the mounted `TorrentCore.app` onto the mounted
+`Applications` link, select **Replace** when prompted, and launch the updated UI to confirm its Dashboard connects to
+the Service. This manual drag is the only native UI installation path in the combined DMG. The Service installer does
+not copy, replace, back up, roll back, or verify `/Applications/TorrentCore.app`.
 
 The deployer never copies, stops, starts, verifies, or backs up WebUI. Legacy Service files and current legacy scripts
 remain in place but inactive until the final cleanup slice. Do not use the legacy `install-launch-agents.zsh service`

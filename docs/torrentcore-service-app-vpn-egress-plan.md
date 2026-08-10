@@ -677,6 +677,34 @@ Status: implemented on August 10, 2026; final clean-source DMG notarization rema
   pass notarization, stapling, Gatekeeper, disk-image, mounted plan, and mounted dry-run verification before Slice 8 is
   complete. The same Arm package logic can generate a Tom-labelled artifact for either of Tom's Arm machines.
 
+### Final Slice: Combined Service And Native UI DMG
+
+Status: implemented on August 10, 2026; final clean-source DMG notarization remains pending.
+
+#### Work
+
+- Keep the current manifest-free Service app payload and Service-only deployer behavior unchanged.
+- Add a TorrentCore-owned native UI archive/export helper based on the proven Developer ID workflow.
+- Build `TorrentCore.app` as Arm64 version `0.6.0`, build `11`, and embed immutable release metadata at
+  `Contents/Resources/version.json` before final signature verification.
+- Place the signed native UI and an `Applications` link to `/Applications` at the mounted DMG root.
+- Record the UI path, version, build, architecture, checksum, install target, and manual install mode in `release.json`.
+- Keep the standalone native UI release builder available.
+- Add a Markdown runbook section after Service verify that instructs the operator to quit the existing UI, drag the new
+  app onto the mounted Applications link, approve replacement, relaunch, and confirm Dashboard connectivity.
+- Do not add or require generated runbook PDFs.
+
+#### Acceptance
+
+- Service plan, dry-run, apply, verify, history, and rollback remain scoped to `TorrentCoreService.app` and its
+  LaunchAgent; they never manipulate `/Applications/TorrentCore.app`.
+- The mounted DMG presents `TorrentCore.app` and the standard Applications target together for a normal Finder drag.
+- Both apps are Developer ID signed, Arm64-only, and covered by the combined notarized DMG.
+- UI version metadata is sealed inside the app bundle and matches `release.json`.
+- The runbook orders UI replacement after successful Service verification.
+- The Dick/Arm `TorrentCore.NextGen.Apps.SplitTunnel` artifact passes notarization, stapling, Gatekeeper, disk-image,
+  internal-checksum, app-signature, metadata, plan, and dry-run verification.
+
 ### Slice 9: WebUI Connection-State Packaging Fix
 
 Status: pending; independent of the Service-only proof deployment.
