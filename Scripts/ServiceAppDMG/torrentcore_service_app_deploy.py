@@ -279,7 +279,11 @@ def stop_service() -> None:
     result = shell(["launchctl", "bootout", f"{launchctl_domain()}/{LABEL}"], check=False, capture=True)
     if result.returncode != 0:
         detail = (result.stderr + result.stdout).lower()
-        if "could not find service" not in detail and "service not found" not in detail:
+        service_was_not_loaded = any(
+            message in detail
+            for message in ("could not find service", "service not found", "no such process")
+        )
+        if not service_was_not_loaded:
             raise DeployError(f"Could not stop {LABEL}: {result.stderr.strip() or result.stdout.strip()}")
 
 
