@@ -41,4 +41,6 @@ public static class RuntimeSettingsKeys
     public const string VpnEgressDegradedCheckIntervalSeconds = "vpn_egress_degraded_check_interval_seconds";
     public const string VpnEgressReadyCheckIntervalSeconds = "vpn_egress_ready_check_interval_seconds";
     public const string VpnEgressRequestTimeoutSeconds = "vpn_egress_request_timeout_seconds";
+    public const string VpnEgressEngineSuspensionTimeoutSeconds =
+            "vpn_egress_engine_suspension_timeout_seconds";
 }

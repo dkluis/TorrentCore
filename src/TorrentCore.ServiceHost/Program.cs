@@ -137,6 +137,8 @@ builder.Services.AddSingleton<ITorrentRemovalCleanupScheduler>(
 );
 builder.Services.AddSingleton<PersistedTorrentEngineAdapter>();
 builder.Services.AddSingleton<MonoTorrentEngineAdapter>();
+builder.Services.AddSingleton<IMonoTorrentLifecycle>(serviceProvider
+        => serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>());
 builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider
         => serviceProvider.GetRequiredService<IOptions<TorrentCoreServiceOptions>>().Value.EngineMode ==
         TorrentEngineMode.MonoTorrent ? serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>() :

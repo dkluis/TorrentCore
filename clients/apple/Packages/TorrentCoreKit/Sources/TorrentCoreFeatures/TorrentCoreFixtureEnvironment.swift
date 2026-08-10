@@ -419,6 +419,8 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         runtimeSettingsValue.vpnEgressDirectIspCidrs = update.vpnEgressDirectIspCidrs
         runtimeSettingsValue.vpnEgressReadyCheckIntervalSeconds = update.vpnEgressReadyCheckIntervalSeconds
         runtimeSettingsValue.vpnEgressRequestTimeoutSeconds = update.vpnEgressRequestTimeoutSeconds
+        runtimeSettingsValue.vpnEgressEngineSuspensionTimeoutSeconds =
+            update.vpnEgressEngineSuspensionTimeoutSeconds
         runtimeSettingsValue.vpnEgressValidationEnabled = update.vpnEgressValidationEnabled
         runtimeSettingsValue.vpnEgressValidationEndpoint = update.vpnEgressValidationEndpoint
         runtimeSettingsValue.updatedAt = Date()

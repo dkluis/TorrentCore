@@ -66,6 +66,11 @@ public sealed class TorrentManagerStopCoordinator(
         _stops.TryRemove(torrentId, out _);
     }
 
+    public void Clear()
+    {
+        _stops.Clear();
+    }
+
     public async Task WaitForPendingAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         if (!_stops.TryGetValue(torrentId, out var stop) || !stop.IsValueCreated)

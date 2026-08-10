@@ -176,8 +176,9 @@ whether degradation is caused by VPN validation.
 1. Serialize the transition against engine synchronization, queue reconciliation, actions, and automatic recovery.
 2. Close the global execution gate before beginning teardown so no replacement work starts.
 3. Stop background engine operations and flush manager snapshots.
-4. Stop managers without changing durable `Runnable` versus `Paused` intent.
-5. Stop and dispose the MonoTorrent `ClientEngine`, including DHT/listener facilities.
+4. Dispose the MonoTorrent `ClientEngine` through its existing non-graceful disposal behavior, including DHT/listener
+   facilities, without adding special per-peer or tracker processing for a VPN outage.
+5. Clear the manager registries without changing durable `Runnable` versus `Paused` intent.
 6. Clear only in-memory engine state and publish degraded state.
 7. Continue API reads, settings, logs, history, category management, and persistence-only magnet admission.
 
@@ -206,6 +207,7 @@ Names may be refined to match the existing runtime-settings naming pattern, but 
 | `VpnEgressDegradedCheckIntervalSeconds` | `60` | Yes | Retry cadence while checking or degraded |
 | `VpnEgressReadyCheckIntervalSeconds` | `240` | Yes | Revalidation cadence while ready |
 | `VpnEgressRequestTimeoutSeconds` | `10` | Yes | Per-request timeout bounded below both intervals |
+| `VpnEgressEngineSuspensionTimeoutSeconds` | `10` | Yes | Bounds local drain and teardown; does not limit activation |
 
 The setting validator must reject unsupported schemes, invalid absolute endpoints, credentials in endpoint URLs,
 invalid CIDRs, IPv6 CIDRs for this policy, nonpositive intervals, and a timeout that is not safely below the applicable
@@ -443,7 +445,7 @@ Status: implemented on August 9, 2026; final verification recorded below.
 
 ### Slice 4: Restartable MonoTorrent Lifecycle
 
-Status: pending.
+Status: completed on August 9, 2026.
 
 #### Work
 
@@ -462,6 +464,33 @@ Status: pending.
 - Recovery preserves torrent desired state, paths, progress, completion/callback state, time-slice history, and cold state.
 - A failed teardown or start stays degraded and can retry without restarting the Service process.
 - Service shutdown remains bounded and does not race the periodic validator.
+
+#### Implemented
+
+- Added one `IMonoTorrentLifecycle` over the production MonoTorrent adapter with serialized, idempotent activation and
+  suspension.
+- Activation recreates `ClientEngine` from the latest effective database settings, restores persisted torrents, and
+  reconciles the normal queue. A partial activation failure disposes the partial engine before returning failure.
+- VPN suspension first closes the execution gate, drains synchronization and adapter-owned background work, flushes
+  durable snapshots without changing state or desired intent, zeroes live peer/rate values, disposes MonoTorrent using
+  its existing non-graceful disposal behavior, and clears all in-memory engine registries and coordinators.
+- Normal Service shutdown retains MonoTorrent's bounded graceful-stop behavior. VPN suspension does not add special
+  peer-by-peer or tracker processing beyond MonoTorrent's existing disposal behavior.
+- Added the live database-backed `VpnEgressEngineSuspensionTimeoutSeconds` setting with a `10`-second default. It bounds
+  local suspension draining and teardown but does not impose an activation timeout.
+- Snapshot-flush failures and individual torrent-recovery failures are recorded without blocking engine release or
+  recovery of healthy torrents. Transition-failure logging is suppressed until either the failure details or the
+  suspension reason changes.
+
+#### Verification
+
+- `dotnet build TorrentCore.sln --no-restore --maxcpucount:1 --disable-build-servers`: succeeded with zero warnings and
+  zero errors.
+- Focused lifecycle, runtime-setting, and OpenAPI tests: 40 passed.
+- Full .NET suite: 273 passed.
+- Swift package suite: 34 passed.
+- Unsigned Arm64 `TorrentCoreMac` Xcode build: succeeded with package plug-in validation explicitly skipped.
+- `git diff --check`: passed.
 
 ### Slice 5: VPN State Orchestrator And Execution Gate
 

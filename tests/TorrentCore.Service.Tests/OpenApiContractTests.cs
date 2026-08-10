@@ -244,5 +244,6 @@ public sealed class OpenApiContractTests
         Assert.NotNull(properties["vpnEgressDegradedCheckIntervalSeconds"]);
         Assert.NotNull(properties["vpnEgressReadyCheckIntervalSeconds"]);
         Assert.NotNull(properties["vpnEgressRequestTimeoutSeconds"]);
+        Assert.NotNull(properties["vpnEgressEngineSuspensionTimeoutSeconds"]);
     }
 }

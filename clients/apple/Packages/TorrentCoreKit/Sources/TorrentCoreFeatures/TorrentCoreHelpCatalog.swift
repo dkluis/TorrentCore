@@ -199,6 +199,11 @@ public enum TorrentCoreHelpCatalog {
             "Limits one public-IP validation request.",
             "The agreed default is 10 seconds. It must be positive and shorter than both validation intervals."
         )
+        public static let vpnEgressEngineSuspensionTimeoutSeconds = help(
+            "Engine Suspension Timeout Seconds",
+            "Limits local MonoTorrent draining and teardown after VPN validation fails.",
+            "The agreed default is 10 seconds. It applies live and does not limit activation or recovery."
+        )
         public static let categoryEnabled = help(
             "Enabled",
             "Controls whether the category is available for future torrent adds.",
@@ -264,6 +269,7 @@ public enum TorrentCoreHelpCatalog {
             vpnEgressValidationEnabled, vpnEgressValidationEndpoint,
             vpnEgressDirectIspCidrs, vpnEgressDegradedCheckIntervalSeconds,
             vpnEgressReadyCheckIntervalSeconds, vpnEgressRequestTimeoutSeconds,
+            vpnEgressEngineSuspensionTimeoutSeconds,
             categoryEnabled, categoryInvokeCompletionCallback, categoryDisplayName,
             categoryCallbackLabel, categoryDownloadRootPath, categorySortOrder,
             cleanupLogEntries, cleanupHistoryRecords, cleanupOrphanedTorrentLogs,

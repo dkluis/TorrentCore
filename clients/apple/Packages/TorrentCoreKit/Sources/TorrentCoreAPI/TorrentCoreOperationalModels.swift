@@ -320,6 +320,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var vpnEgressDirectIspCidrs: [String]
     public var vpnEgressReadyCheckIntervalSeconds: Int
     public var vpnEgressRequestTimeoutSeconds: Int
+    public var vpnEgressEngineSuspensionTimeoutSeconds: Int
     public var vpnEgressValidationEnabled: Bool
     public var vpnEgressValidationEndpoint: String
 }
@@ -360,6 +361,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var vpnEgressDirectIspCidrs: [String]
     public var vpnEgressReadyCheckIntervalSeconds: Int
     public var vpnEgressRequestTimeoutSeconds: Int
+    public var vpnEgressEngineSuspensionTimeoutSeconds: Int
     public var vpnEgressValidationEnabled: Bool
     public var vpnEgressValidationEndpoint: String
 
@@ -399,6 +401,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         vpnEgressDirectIspCidrs = settings.vpnEgressDirectIspCidrs
         vpnEgressReadyCheckIntervalSeconds = settings.vpnEgressReadyCheckIntervalSeconds
         vpnEgressRequestTimeoutSeconds = settings.vpnEgressRequestTimeoutSeconds
+        vpnEgressEngineSuspensionTimeoutSeconds = settings.vpnEgressEngineSuspensionTimeoutSeconds
         vpnEgressValidationEnabled = settings.vpnEgressValidationEnabled
         vpnEgressValidationEndpoint = settings.vpnEgressValidationEndpoint
     }

@@ -92,9 +92,9 @@ The WebUI stays a thin client over service contracts. It must not:
 
 The Service has an internal, callable public-IPv4 egress probe. It compares an observed address with the configured
 direct-ISP CIDRs: matching any configured range means direct ISP egress, while matching none means validated egress
-without claiming a specific VPN provider. The probe is registered but is not invoked at startup or on a schedule yet,
-does not change public API contracts, and does not initialize or call MonoTorrent. Later VPN-gating slices own
-scheduling and engine-state transitions.
+without claiming a specific VPN provider. The probe is registered but is not invoked at startup or on a schedule yet
+and does not initialize or call MonoTorrent. The restartable MonoTorrent lifecycle is also registered, while Slice 5
+will own validation scheduling and automatic degraded/ready transitions.
 
 ## Engine Dependency
 
@@ -115,6 +115,16 @@ scheduling and engine-state transitions.
   history reads remain available, while engine-dependent reads and torrent mutations return
   `503 vpn_egress_not_validated`. VPN degradation is not represented by rewriting each torrent's queue position,
   desired state, or wait reason.
+- `IMonoTorrentLifecycle` serializes explicit activation and suspension. Activation creates a new `ClientEngine` from
+  the latest effective SQLite settings and recovers durable torrents. Suspension drains admitted work, cancels and
+  resets adapter-owned background coordinators, persists current progress while retaining torrent state and desired
+  intent, zeroes live peer/rate values, disposes the engine, and clears every manager/runtime registry.
+- VPN-triggered suspension does not call MonoTorrent's graceful stop path because that path performs final tracker
+  announces. Normal Service shutdown may stop gracefully before disposal. Downloaded files and the external
+  `monotorrent-cache` remain in place for later recovery.
+- A degraded reboot never needs an in-memory engine state to survive: when validation enforcement is added in Slice 5,
+  persisted validation enablement will force a fresh check before explicit activation. Magnets accepted while degraded
+  remain in SQLite and recover after a later successful check.
 - Every active metadata resolution reserves one future download slot. The effective metadata-resolution limit is the
   lower of the configured metadata limit and the download capacity not already claimed by resolved runnable torrents.
   This prevents MonoTorrent's automatic metadata-to-download transition from oversubscribing the download limit.

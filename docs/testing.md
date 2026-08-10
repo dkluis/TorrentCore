@@ -19,10 +19,14 @@ Representative coverage areas:
 - default-open execution-gate drain behavior; closed-gate persistence-only magnet admission, normal acceptance errors,
   constrained save paths, structured unavailable actions, readable diagnostics, and full-restart durability without
   initializing MonoTorrent
+- restartable MonoTorrent activation/suspension, concurrent single-flight requests, repeated cycles, full engine and
+  manager release, durable intent/live-stat projection, recovery after an injected snapshot-flush failure, latest
+  persisted engine settings on recreation, and cold Service restart while the execution gate remains closed
 - engine-instance lifecycle observation and a sanitized CA-Desktop deployment layout for later VPN-gating and app
   packaging slices
 - VPN-setting defaults, SQLite/API round trips and restart persistence, IPv4 CIDR canonicalization, additive-client
-  compatibility, and structured rejection of unsafe endpoints, IPv6/invalid CIDRs, and invalid intervals/timeouts
+  compatibility, and structured rejection of unsafe endpoints, IPv6/invalid CIDRs, and invalid intervals/timeouts,
+  including the independent engine-suspension timeout
 - API behavior, including Service semantic-version and Git-build identity reporting
 - launch-agent restart-label resolution, including the native supervisor helper's `XPC_SERVICE_NAME=0` context
 - SQLite schema migration and persistence

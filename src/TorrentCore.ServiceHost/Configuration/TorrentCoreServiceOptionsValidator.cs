@@ -204,6 +204,13 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             failures.Add($"{TorrentCoreServiceOptions.SectionName}:{vpnIntervalsError}");
         }
 
+        if (options.VpnEgressEngineSuspensionTimeoutSeconds < 1)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:VpnEgressEngineSuspensionTimeoutSeconds must be 1 or greater."
+            );
+        }
+
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
             failures.Add(

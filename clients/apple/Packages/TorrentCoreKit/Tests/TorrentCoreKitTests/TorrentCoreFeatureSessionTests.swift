@@ -358,12 +358,14 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     update.vpnEgressDegradedCheckIntervalSeconds = 30
     update.vpnEgressReadyCheckIntervalSeconds = 120
     update.vpnEgressRequestTimeoutSeconds = 5
+    update.vpnEgressEngineSuspensionTimeoutSeconds = 7
     let updatedSettings = try await session.updateRuntimeSettings(update)
     #expect(updatedSettings.engineAllowPeerExchange)
     #expect(updatedSettings.metadataResolutionTimeSliceMinutes == 20)
     #expect(updatedSettings.automaticMetadataResetStuckThresholdSeconds == 60)
     #expect(updatedSettings.vpnEgressValidationEnabled)
     #expect(updatedSettings.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
+    #expect(updatedSettings.vpnEgressEngineSuspensionTimeoutSeconds == 7)
     let category = try #require(TorrentCorePreviewFixtures.categories.first)
     _ = try await session.updateCategory(
         key: try #require(category.key),
@@ -1160,6 +1162,8 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         settings.vpnEgressDegradedCheckIntervalSeconds = update.vpnEgressDegradedCheckIntervalSeconds
         settings.vpnEgressReadyCheckIntervalSeconds = update.vpnEgressReadyCheckIntervalSeconds
         settings.vpnEgressRequestTimeoutSeconds = update.vpnEgressRequestTimeoutSeconds
+        settings.vpnEgressEngineSuspensionTimeoutSeconds =
+            update.vpnEgressEngineSuspensionTimeoutSeconds
         return settings
     }
 

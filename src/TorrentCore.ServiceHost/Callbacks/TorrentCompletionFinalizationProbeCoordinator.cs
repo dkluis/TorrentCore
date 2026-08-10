@@ -53,6 +53,30 @@ public sealed class TorrentCompletionFinalizationProbeCoordinator(
         _probes.TryRemove(torrentId, out _);
     }
 
+    public async Task<bool> DrainAsync(TimeSpan timeout)
+    {
+        var tasks = _probes.Values.Where(probe => probe.IsValueCreated).Select(probe => probe.Value).ToArray();
+        if (tasks.Length == 0)
+        {
+            return true;
+        }
+
+        try
+        {
+            await Task.WhenAll(tasks).WaitAsync(timeout);
+            return true;
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    public void Clear()
+    {
+        _probes.Clear();
+    }
+
     public static TorrentCompletionFinalizationCheckResult CreateDeferredResult(
         TorrentSnapshot snapshot,
         IReadOnlyList<TorrentCompletionObservedFilePaths>? observedFiles,

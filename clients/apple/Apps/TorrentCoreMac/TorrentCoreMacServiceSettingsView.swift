@@ -570,9 +570,14 @@ struct TorrentCoreMacServiceSettingsView: View {
                         value: draft.vpnEgressRequestTimeoutSeconds,
                         content: TorrentCoreHelpCatalog.Settings.vpnEgressRequestTimeoutSeconds
                     )
+                    integerField(
+                        "Engine suspension timeout seconds",
+                        value: draft.vpnEgressEngineSuspensionTimeoutSeconds,
+                        content: TorrentCoreHelpCatalog.Settings.vpnEgressEngineSuspensionTimeoutSeconds
+                    )
                 }
                 Text(
-                    "Slice 1 stores these values. VPN enforcement and automatic degraded/ready transitions are added in later slices."
+                    "These values apply live. Automatic degraded/ready enforcement is added in Slice 5."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -1119,6 +1124,9 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         if draft.vpnEgressRequestTimeoutSeconds < 1 {
             return "VPN request timeout must be 1 or greater."
+        }
+        if draft.vpnEgressEngineSuspensionTimeoutSeconds < 1 {
+            return "VPN engine suspension timeout must be 1 or greater."
         }
         if draft.vpnEgressRequestTimeoutSeconds >= draft.vpnEgressDegradedCheckIntervalSeconds
             || draft.vpnEgressRequestTimeoutSeconds >= draft.vpnEgressReadyCheckIntervalSeconds

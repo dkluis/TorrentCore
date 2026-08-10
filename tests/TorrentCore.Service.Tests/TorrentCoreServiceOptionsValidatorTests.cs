@@ -100,6 +100,7 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             VpnEgressDegradedCheckIntervalSeconds = 0,
             VpnEgressReadyCheckIntervalSeconds = 0,
             VpnEgressRequestTimeoutSeconds = 0,
+            VpnEgressEngineSuspensionTimeoutSeconds = 0,
             CompletionCallbackEnabled = true,
             CompletionCallbackCommandPath = "",
             CompletionCallbackTimeoutSeconds = 0,
@@ -143,6 +144,8 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             failure => failure.Contains("VpnEgressDirectIspCidrs", StringComparison.Ordinal));
         Assert.Contains(result.Failures,
             failure => failure.Contains("VpnEgressDegradedCheckIntervalSeconds", StringComparison.Ordinal));
+        Assert.Contains(result.Failures,
+            failure => failure.Contains("VpnEgressEngineSuspensionTimeoutSeconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackCommandPath", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackTimeoutSeconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures, failure => failure.Contains("CompletionCallbackFinalizationTimeoutSeconds", StringComparison.Ordinal));

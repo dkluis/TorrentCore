@@ -202,6 +202,19 @@ public sealed class TorrentMetadataResetCoordinator
         }
     }
 
+    public void Reset()
+    {
+        lock (_stateGate)
+        {
+            _activeReset = null;
+            _completedResults.Clear();
+            _failedResetCooldowns.Clear();
+            _loggedSuppressions.Clear();
+            _circuitState = MetadataResetCircuitState.Closed;
+            _circuitOpenUntilUtc = null;
+        }
+    }
+
     private async Task RunCoordinatedResetAsync(
         ActiveReset activeReset,
         Func<CancellationToken, Task> resetOperation,

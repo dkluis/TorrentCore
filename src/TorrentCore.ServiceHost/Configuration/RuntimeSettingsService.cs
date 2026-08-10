@@ -237,6 +237,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 currentSettings.VpnEgressReadyCheckIntervalSeconds;
         var vpnEgressRequestTimeoutSeconds = request.VpnEgressRequestTimeoutSeconds ??
                 currentSettings.VpnEgressRequestTimeoutSeconds;
+        var vpnEgressEngineSuspensionTimeoutSeconds = request.VpnEgressEngineSuspensionTimeoutSeconds ??
+                currentSettings.VpnEgressEngineSuspensionTimeoutSeconds;
 
         if (!VpnEgressSettingsValidation.TryNormalizeEndpoint(
                 vpnEgressValidationEndpointValue, out var vpnEgressValidationEndpoint, out var vpnEndpointError))
@@ -275,6 +277,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
         {
             throw new Application.ServiceOperationException(
                 "invalid_runtime_settings", vpnIntervalsError, StatusCodes.Status400BadRequest, vpnIntervalsTarget
+            );
+        }
+
+        if (vpnEgressEngineSuspensionTimeoutSeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", "VpnEgressEngineSuspensionTimeoutSeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest, nameof(request.VpnEgressEngineSuspensionTimeoutSeconds)
             );
         }
 
@@ -396,6 +406,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             vpnEgressReadyCheckIntervalSeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.VpnEgressRequestTimeoutSeconds] =
                             vpnEgressRequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.VpnEgressEngineSuspensionTimeoutSeconds] =
+                            vpnEgressEngineSuspensionTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
                 }, cancellationToken
             );
         }
@@ -455,6 +467,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             vpnEgressDegradedCheckIntervalSeconds,
                             vpnEgressReadyCheckIntervalSeconds,
                             vpnEgressRequestTimeoutSeconds,
+                            vpnEgressEngineSuspensionTimeoutSeconds,
                         }
                     ),
                 }, cancellationToken
@@ -817,6 +830,11 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             RuntimeSettingsKeys.VpnEgressRequestTimeoutSeconds,
             baseOptions.VpnEgressRequestTimeoutSeconds
         );
+        var vpnEgressEngineSuspensionTimeoutSeconds = ReadPositiveInteger(
+            values,
+            RuntimeSettingsKeys.VpnEgressEngineSuspensionTimeoutSeconds,
+            baseOptions.VpnEgressEngineSuspensionTimeoutSeconds
+        );
         if (!VpnEgressSettingsValidation.TryValidateIntervals(
                 vpnEgressDegradedCheckIntervalSeconds,
                 vpnEgressReadyCheckIntervalSeconds,
@@ -871,6 +889,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             VpnEgressDegradedCheckIntervalSeconds        = vpnEgressDegradedCheckIntervalSeconds,
             VpnEgressReadyCheckIntervalSeconds           = vpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds               = vpnEgressRequestTimeoutSeconds,
+            VpnEgressEngineSuspensionTimeoutSeconds      = vpnEgressEngineSuspensionTimeoutSeconds,
             EngineSettingsRequireRestart =
                     engineAllowPeerExchange          != appliedEngineSettingsState.EngineAllowPeerExchange          ||
                     engineEncryptionMode             != appliedEngineSettingsState.EngineEncryptionMode             ||
@@ -930,6 +949,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             VpnEgressDegradedCheckIntervalSeconds        = settings.VpnEgressDegradedCheckIntervalSeconds,
             VpnEgressReadyCheckIntervalSeconds           = settings.VpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds               = settings.VpnEgressRequestTimeoutSeconds,
+            VpnEgressEngineSuspensionTimeoutSeconds      = settings.VpnEgressEngineSuspensionTimeoutSeconds,
             AppliedEngineMaximumConnections              = appliedEngineSettingsState.EngineMaximumConnections,
             AppliedEngineMaximumHalfOpenConnections      = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,
             AppliedEngineAllowPeerExchange                = appliedEngineSettingsState.EngineAllowPeerExchange,

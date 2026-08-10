@@ -44,6 +44,7 @@ public sealed class TorrentCoreServiceOptions
     public int VpnEgressDegradedCheckIntervalSeconds { get; init; } = 60;
     public int VpnEgressReadyCheckIntervalSeconds { get; init; } = 240;
     public int VpnEgressRequestTimeoutSeconds { get; init; } = 10;
+    public int VpnEgressEngineSuspensionTimeoutSeconds { get; init; } = 10;
     public bool CompletionCallbackEnabled { get; init; }
     public string CompletionCallbackCommandPath { get; init; } = string.Empty;
     public string? CompletionCallbackArguments { get; init; }

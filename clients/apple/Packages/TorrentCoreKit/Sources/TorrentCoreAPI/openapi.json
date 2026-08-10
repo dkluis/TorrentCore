@@ -969,6 +969,10 @@
             "nullable": true,
             "type": "array"
           },
+          "vpnEgressEngineSuspensionTimeoutSeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
           "vpnEgressReadyCheckIntervalSeconds": {
             "format": "int32",
             "type": "integer"
@@ -2135,6 +2139,11 @@
             },
             "nullable": true,
             "type": "array"
+          },
+          "vpnEgressEngineSuspensionTimeoutSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
           },
           "vpnEgressReadyCheckIntervalSeconds": {
             "format": "int32",

@@ -2,8 +2,9 @@
 
 ## VPN Egress Validation
 
-Slice 3 provides the internal public-IPv4 probe and a default-open execution gate, but nothing schedules validation or
-closes the gate in deployed operation yet. Scheduling and automatic enforcement are introduced by later slices in the
+Slice 4 provides the internal public-IPv4 probe, execution gate, and restartable MonoTorrent lifecycle, but nothing
+schedules validation or closes the gate in deployed operation yet. Scheduling and automatic enforcement arrive in
+Slice 5 of the
 [VPN egress plan](torrentcore-service-app-vpn-egress-plan.md). Validation is disabled by default, so upgrading an
 existing installation does not change torrent processing.
 
@@ -38,6 +39,13 @@ existing installation does not change torrent processing.
 - all values must be positive, and the request timeout must be shorter than both intervals
 - each value applies live; the future scheduler must read the latest effective settings before choosing its next delay
 
+### Engine Suspension Timeout
+
+- defaults to `10` seconds
+- limits local MonoTorrent background-work draining and teardown after VPN validation fails
+- must be positive and applies live
+- does not impose a separate timeout on activation or durable recovery; failures remain degraded and retry later
+
 The internal probe requires a successful JSON response shaped as `{ "ip": "address" }`, accepts IPv4 only, and limits
 the body to 16 KiB. It distinguishes HTTP status, DNS, connection, TLS, HTTP protocol, and other HTTP failures for DB
 diagnostics. The first completed outcome is logged; a later row is written only when the outcome or endpoint-failure
@@ -48,7 +56,14 @@ download-root checks and persists accepted magnets without creating MonoTorrent 
 history reads remain available; engine-dependent reads and torrent mutations return
 `503 vpn_egress_not_validated`. This is a host-level condition and does not rewrite individual torrent queue state.
 
-All six values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
+VPN suspension preserves each torrent's state and desired intent, resets live peer/rate values to zero, and disposes the
+entire engine without MonoTorrent's graceful final tracker announcement. A normal Service shutdown may use graceful
+stop before disposal. Snapshot-write failures do not leave the engine running: the last committed SQLite state,
+downloaded files, and usable cache remain for a later automatic recovery attempt. If the machine reboots while
+degraded, enabled validation must be checked again before Slice 5 activates MonoTorrent; the API and persisted magnets
+remain available in the meantime.
+
+All seven values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
 has no VPN-settings editor in this slice, but its existing updates remain compatible because omitted VPN fields retain
 their current persisted values.
 

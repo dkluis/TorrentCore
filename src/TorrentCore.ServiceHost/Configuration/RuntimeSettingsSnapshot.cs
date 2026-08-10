@@ -42,6 +42,7 @@ public sealed class RuntimeSettingsSnapshot
     public int                                  VpnEgressDegradedCheckIntervalSeconds        { get; init; } = 60;
     public int                                  VpnEgressReadyCheckIntervalSeconds           { get; init; } = 240;
     public int                                  VpnEgressRequestTimeoutSeconds               { get; init; } = 10;
+    public int                                  VpnEgressEngineSuspensionTimeoutSeconds      { get; init; } = 10;
     public required bool                        EngineSettingsRequireRestart                 { get; init; }
     public          DateTimeOffset?             UpdatedAtUtc                                 { get; init; }
 }

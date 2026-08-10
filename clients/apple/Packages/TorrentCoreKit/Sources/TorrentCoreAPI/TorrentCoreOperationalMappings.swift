@@ -204,6 +204,9 @@ extension TorrentCoreRuntimeSettings {
         vpnEgressDirectIspCidrs = value.vpnEgressDirectIspCidrs ?? ["47.0.0.0/8"]
         vpnEgressReadyCheckIntervalSeconds = Int(value.vpnEgressReadyCheckIntervalSeconds ?? 240)
         vpnEgressRequestTimeoutSeconds = Int(value.vpnEgressRequestTimeoutSeconds ?? 10)
+        vpnEgressEngineSuspensionTimeoutSeconds = Int(
+            value.vpnEgressEngineSuspensionTimeoutSeconds ?? 10
+        )
         vpnEgressValidationEnabled = value.vpnEgressValidationEnabled ?? false
         vpnEgressValidationEndpoint = value.vpnEgressValidationEndpoint
             ?? "https://api.ipify.org?format=json"
@@ -260,6 +263,9 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
                 value.vpnEgressDegradedCheckIntervalSeconds
             ),
             vpnEgressDirectIspCidrs: value.vpnEgressDirectIspCidrs,
+            vpnEgressEngineSuspensionTimeoutSeconds: Int32(
+                value.vpnEgressEngineSuspensionTimeoutSeconds
+            ),
             vpnEgressReadyCheckIntervalSeconds: Int32(value.vpnEgressReadyCheckIntervalSeconds),
             vpnEgressRequestTimeoutSeconds: Int32(value.vpnEgressRequestTimeoutSeconds),
             vpnEgressValidationEnabled: value.vpnEgressValidationEnabled,
