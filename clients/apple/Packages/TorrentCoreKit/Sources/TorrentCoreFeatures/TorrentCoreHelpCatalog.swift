@@ -172,7 +172,7 @@ public enum TorrentCoreHelpCatalog {
         public static let vpnEgressValidationEnabled = help(
             "Enable VPN Egress Validation",
             "Controls whether TorrentCore requires a verified VPN egress before torrent processing.",
-            "This setting is disabled by default. Slice 1 stores and exposes the value; a later slice will enforce degraded and ready processing states."
+            "This setting is disabled by default. When enabled, TorrentCore accepts new magnets while paused but starts torrent processing only after the VPN connection is confirmed."
         )
         public static let vpnEgressValidationEndpoint = help(
             "Validation Endpoint",
@@ -203,6 +203,11 @@ public enum TorrentCoreHelpCatalog {
             "Engine Suspension Timeout Seconds",
             "Limits local MonoTorrent draining and teardown after VPN validation fails.",
             "The agreed default is 10 seconds. It applies live and does not limit activation or recovery."
+        )
+        public static let runtimeTickDurationSummaryEnabled = help(
+            "Performance Timing Summaries",
+            "Controls one-minute synchronization timing summaries in the Service log.",
+            "This setting is disabled by default. It changes only runtime.tick.duration_summary writes; synchronization, slow-operation logging, failure logging, and all torrent work remain unchanged. Summaries are suppressed while torrent processing is paused for the VPN connection."
         )
         public static let categoryEnabled = help(
             "Enabled",
@@ -269,7 +274,7 @@ public enum TorrentCoreHelpCatalog {
             vpnEgressValidationEnabled, vpnEgressValidationEndpoint,
             vpnEgressDirectIspCidrs, vpnEgressDegradedCheckIntervalSeconds,
             vpnEgressReadyCheckIntervalSeconds, vpnEgressRequestTimeoutSeconds,
-            vpnEgressEngineSuspensionTimeoutSeconds,
+            vpnEgressEngineSuspensionTimeoutSeconds, runtimeTickDurationSummaryEnabled,
             categoryEnabled, categoryInvokeCompletionCallback, categoryDisplayName,
             categoryCallbackLabel, categoryDownloadRootPath, categorySortOrder,
             cleanupLogEntries, cleanupHistoryRecords, cleanupOrphanedTorrentLogs,

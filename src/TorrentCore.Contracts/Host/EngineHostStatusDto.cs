@@ -62,5 +62,12 @@ public sealed class EngineHostStatusDto
     public          string?          VpnConnectionReason                     { get; init; }
     public          bool?            TorrentProcessingAvailable              { get; init; }
     public          string?          TorrentProcessingMessage                { get; init; }
+    public          DateTimeOffset?  VpnLastCheckAtUtc                       { get; init; }
+    public          DateTimeOffset?  VpnLastSuccessAtUtc                     { get; init; }
+    public          DateTimeOffset?  VpnNextAutomaticRetryAtUtc              { get; init; }
+    public          string?          VpnObservedPublicIpv4                   { get; init; }
+    public          int?             VpnDegradedCheckIntervalSeconds         { get; init; }
+    public          int?             VpnReadyCheckIntervalSeconds            { get; init; }
+    public          string?          VpnFailureSummary                       { get; init; }
     public required DateTimeOffset   CheckedAtUtc                            { get; init; }
 }

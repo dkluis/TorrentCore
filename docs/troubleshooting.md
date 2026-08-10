@@ -163,7 +163,10 @@ point, so resolve the external file-system condition and remove the remaining pa
 ## Torrent Processing Is Paused For The VPN
 
 `/api/health` remains successful while VPN validation has paused torrent processing. Inspect `/api/host/status` and
-check `vpnConnectionPhase`, `vpnConnectionReason`, `torrentProcessingAvailable`, and `torrentProcessingMessage`.
+check `vpnConnectionPhase`, `vpnConnectionReason`, `torrentProcessingAvailable`, `torrentProcessingMessage`,
+`vpnLastCheckAtUtc`, `vpnLastSuccessAtUtc`, `vpnNextAutomaticRetryAtUtc`, `vpnObservedPublicIpv4`, and
+`vpnFailureSummary`. The last-success value is deliberately retained after a later failure. A missing current address
+means the latest check did not obtain a usable IPv4; a direct-ISP result shows the observed direct address.
 
 - `DirectIsp` means the observed public IPv4 matched a configured direct-ISP CIDR.
 - `TimedOut` or `EndpointFailure` means TorrentCore could not confirm the VPN through the configured endpoint.
@@ -177,6 +180,13 @@ degraded check. Do not restart the Service merely to clear this state.
 
 The ready interval is detection latency, not immediate packet protection. ExpressVPN Network Lock remains responsible
 for blocking traffic during the interval before TorrentCore performs its next check.
+
+## Performance Timing Summaries Are Missing Or Unexpected
+
+`runtime.tick.duration_summary` is disabled by default. Enable **Performance Timing Summaries** in the native Service
+Settings Diagnostics group when a performance investigation needs the one-minute records. Summaries are intentionally
+suppressed while VPN validation has paused torrent processing. Changing this setting does not stop the runtime tick or
+change other runtime diagnostics.
 
 ## Deployment And Runtime Checks
 

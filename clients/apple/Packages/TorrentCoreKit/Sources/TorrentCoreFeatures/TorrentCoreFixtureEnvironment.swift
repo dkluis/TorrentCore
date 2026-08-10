@@ -423,6 +423,8 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
             update.vpnEgressEngineSuspensionTimeoutSeconds
         runtimeSettingsValue.vpnEgressValidationEnabled = update.vpnEgressValidationEnabled
         runtimeSettingsValue.vpnEgressValidationEndpoint = update.vpnEgressValidationEndpoint
+        runtimeSettingsValue.runtimeTickDurationSummaryEnabled =
+            update.runtimeTickDurationSummaryEnabled
         runtimeSettingsValue.updatedAt = Date()
         return runtimeSettingsValue
     }

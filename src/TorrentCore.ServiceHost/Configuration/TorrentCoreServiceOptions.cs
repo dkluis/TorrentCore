@@ -53,6 +53,7 @@ public sealed class TorrentCoreServiceOptions
     public int CompletionCallbackFinalizationTimeoutSeconds { get; init; } = 120;
     public string? CompletionCallbackApiBaseUrlOverride { get; init; }
     public string? CompletionCallbackApiKeyOverride { get; init; }
+    public bool RuntimeTickDurationSummaryEnabled { get; init; }
     public int RuntimeTickIntervalMilliseconds { get; init; } = 1_000;
     public int MetadataResolutionDelayMilliseconds { get; init; } = 2_000;
     public double DownloadProgressPercentPerTick { get; init; } = 20;

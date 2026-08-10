@@ -5,6 +5,8 @@ using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
+using TorrentCore.Service.Tests.Fixtures;
+using TorrentCore.Service.Vpn;
 
 namespace TorrentCore.Service.Tests;
 
@@ -25,7 +27,10 @@ public sealed class TorrentEngineSynchronizationServiceTests
             ),
             activityLogService,
             new ServiceInstanceContext(),
-            new RuntimeOperationDurationDiagnostics(activityLogService, new ServiceInstanceContext())
+            new RuntimeOperationDurationDiagnostics(activityLogService, new ServiceInstanceContext()),
+            new RuntimeTickDurationSummaryState(),
+            new VpnConnectionRuntimeState(),
+            TimeProvider.System
         );
 
         await service.StartAsync(CancellationToken.None);
@@ -47,7 +52,165 @@ public sealed class TorrentEngineSynchronizationServiceTests
         }
     }
 
-    private sealed class FlakySynchronizationEngineAdapter : ITorrentEngineAdapter
+    [Fact]
+    public async Task DurationSummary_DefaultOff_KeepsSynchronizingWithoutWritingSummary()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 10, 12, 0, 0, TimeSpan.Zero));
+        var adapter = new FlakySynchronizationEngineAdapter(failFirstCall: false);
+        var activityLogService = new RecordingActivityLogService();
+        var summaryState = new RuntimeTickDurationSummaryState();
+        using var service = CreateService(adapter, activityLogService, summaryState, new VpnConnectionRuntimeState(), clock);
+
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForSynchronizationCountAsync(adapter, 1);
+            await AdvanceTicksAsync(clock, adapter, 65);
+
+            Assert.True(adapter.SynchronizeCallCount >= 66);
+            Assert.DoesNotContain(
+                activityLogService.Writes,
+                request => request.EventType == "runtime.tick.duration_summary"
+            );
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task DurationSummary_EnabledLive_StartsFreshWindowAndWritesAfterOneMinute()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 10, 12, 0, 0, TimeSpan.Zero));
+        var adapter = new FlakySynchronizationEngineAdapter(failFirstCall: false);
+        var activityLogService = new RecordingActivityLogService();
+        var summaryState = new RuntimeTickDurationSummaryState();
+        using var service = CreateService(adapter, activityLogService, summaryState, new VpnConnectionRuntimeState(), clock);
+
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForSynchronizationCountAsync(adapter, 1);
+            await AdvanceTicksAsync(clock, adapter, 30);
+            summaryState.Set(true);
+            await AdvanceTicksAsync(clock, adapter, 60);
+            Assert.DoesNotContain(
+                activityLogService.Writes,
+                request => request.EventType == "runtime.tick.duration_summary"
+            );
+
+            await AdvanceTicksAsync(clock, adapter, 1);
+            Assert.Contains(
+                activityLogService.Writes,
+                request => request.EventType == "runtime.tick.duration_summary"
+            );
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    [Fact]
+    public async Task DurationSummary_DegradedWindowIsDiscardedAndReadyStartsFreshWindow()
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 8, 10, 12, 0, 0, TimeSpan.Zero));
+        var adapter = new FlakySynchronizationEngineAdapter(failFirstCall: false);
+        var activityLogService = new RecordingActivityLogService();
+        var summaryState = new RuntimeTickDurationSummaryState();
+        summaryState.Set(true);
+        var vpnState = new VpnConnectionRuntimeState();
+        using var service = CreateService(adapter, activityLogService, summaryState, vpnState, clock);
+
+        await service.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForSynchronizationCountAsync(adapter, 1);
+            await AdvanceTicksAsync(clock, adapter, 30);
+            vpnState.Set(
+                new VpnConnectionRuntimeSnapshot(
+                    true,
+                    VpnConnectionPhase.Degraded,
+                    VpnConnectionReason.DirectIsp,
+                    "Torrent processing is paused."
+                )
+            );
+            await AdvanceTicksAsync(clock, adapter, 35);
+            Assert.DoesNotContain(
+                activityLogService.Writes,
+                request => request.EventType == "runtime.tick.duration_summary"
+            );
+
+            vpnState.Set(new VpnConnectionRuntimeSnapshot(true, VpnConnectionPhase.Ready, null, null));
+            await AdvanceTicksAsync(clock, adapter, 60);
+            Assert.DoesNotContain(
+                activityLogService.Writes,
+                request => request.EventType == "runtime.tick.duration_summary"
+            );
+
+            await AdvanceTicksAsync(clock, adapter, 1);
+            Assert.Contains(
+                activityLogService.Writes,
+                request => request.EventType == "runtime.tick.duration_summary"
+            );
+        }
+        finally
+        {
+            await service.StopAsync(CancellationToken.None);
+        }
+    }
+
+    private static TorrentEngineSynchronizationService CreateService(
+        ITorrentEngineAdapter adapter,
+        IActivityLogService activityLogService,
+        RuntimeTickDurationSummaryState summaryState,
+        VpnConnectionRuntimeState vpnState,
+        TimeProvider timeProvider)
+    {
+        var instanceContext = new ServiceInstanceContext();
+        return new TorrentEngineSynchronizationService(
+            adapter,
+            Options.Create(new TorrentCoreServiceOptions { RuntimeTickIntervalMilliseconds = 1_000 }),
+            activityLogService,
+            instanceContext,
+            new RuntimeOperationDurationDiagnostics(activityLogService, instanceContext),
+            summaryState,
+            vpnState,
+            timeProvider
+        );
+    }
+
+    private static async Task AdvanceTicksAsync(
+        ManualTimeProvider clock,
+        FlakySynchronizationEngineAdapter adapter,
+        int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var expectedCount = adapter.SynchronizeCallCount + 1;
+            clock.Advance(TimeSpan.FromSeconds(1));
+            await WaitForSynchronizationCountAsync(adapter, expectedCount);
+        }
+    }
+
+    private static async Task WaitForSynchronizationCountAsync(
+        FlakySynchronizationEngineAdapter adapter,
+        int expectedCount)
+    {
+        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(2);
+        while (adapter.SynchronizeCallCount < expectedCount && DateTimeOffset.UtcNow < deadline)
+        {
+            await Task.Delay(1);
+        }
+
+        Assert.True(
+            adapter.SynchronizeCallCount >= expectedCount,
+            $"Expected at least {expectedCount} synchronization calls, observed {adapter.SynchronizeCallCount}."
+        );
+    }
+
+    private sealed class FlakySynchronizationEngineAdapter(bool failFirstCall = true) : ITorrentEngineAdapter
     {
         private int _synchronizeCallCount;
 
@@ -65,7 +228,7 @@ public sealed class TorrentEngineSynchronizationServiceTests
         public Task SynchronizeAsync(CancellationToken cancellationToken)
         {
             var callCount = Interlocked.Increment(ref _synchronizeCallCount);
-            if (callCount == 1)
+            if (callCount == 1 && failFirstCall)
             {
                 throw new IOException("Simulated synchronization failure.");
             }

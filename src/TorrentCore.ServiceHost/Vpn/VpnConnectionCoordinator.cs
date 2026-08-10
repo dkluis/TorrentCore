@@ -51,6 +51,7 @@ internal sealed class VpnConnectionCoordinator(
         }
         else
         {
+            ClearLiveVpnDiagnostics();
             var result = await torrentEngineAdapter.RecoverAsync(cancellationToken);
             await startupRecoveryService.CompleteAsync(result, cancellationToken);
             await SetStateAsync(false, VpnConnectionPhase.Disabled, null, null);
@@ -194,6 +195,8 @@ internal sealed class VpnConnectionCoordinator(
             return;
         }
 
+        RecordValidationResult(result);
+
         var latestSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         if (latestSettings.VpnEgressValidationEnabled != _validationEnabled)
         {
@@ -241,7 +244,8 @@ internal sealed class VpnConnectionCoordinator(
                 true,
                 VpnConnectionPhase.Degraded,
                 suspension.Succeeded ? reason : VpnConnectionReason.EngineSuspensionFailed,
-                message
+                message,
+                result.FailureSummary
             );
         }
         catch (Exception exception) when (exception is not OperationCanceledException ||
@@ -261,6 +265,11 @@ internal sealed class VpnConnectionCoordinator(
         bool validationEnabled,
         CancellationToken cancellationToken)
     {
+        if (!validationEnabled)
+        {
+            ClearLiveVpnDiagnostics();
+        }
+
         var message = validationEnabled
             ? "VPN connection is available. Restarting torrent processing…"
             : "Restarting torrent processing…";
@@ -300,11 +309,13 @@ internal sealed class VpnConnectionCoordinator(
     private async Task<bool> WaitForSettingsOrDelayAsync(TimeSpan delay, CancellationToken cancellationToken)
     {
         var deadline = timeProvider.GetUtcNow() + delay;
+        runtimeState.Update(snapshot => snapshot with { NextAutomaticRetryAtUtc = deadline });
         while (true)
         {
             var remaining = deadline - timeProvider.GetUtcNow();
             if (remaining <= TimeSpan.Zero)
             {
+                ClearNextAutomaticRetry();
                 return false;
             }
 
@@ -324,12 +335,14 @@ internal sealed class VpnConnectionCoordinator(
 
             if (completed == delayTask)
             {
+                ClearNextAutomaticRetry();
                 return false;
             }
 
             var settings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
             if (settings.VpnEgressValidationEnabled != _validationEnabled)
             {
+                ClearNextAutomaticRetry();
                 return true;
             }
         }
@@ -342,8 +355,17 @@ internal sealed class VpnConnectionCoordinator(
         string? operatorMessage,
         string? failureSummary = null)
     {
-        var snapshot = new VpnConnectionRuntimeSnapshot(enabled, phase, reason, operatorMessage);
-        if (!runtimeState.Set(snapshot))
+        var current = runtimeState.Snapshot;
+        var snapshot = current with
+        {
+            ValidationEnabled = enabled,
+            Phase = phase,
+            Reason = reason,
+            OperatorMessage = operatorMessage,
+            FailureSummary = failureSummary,
+        };
+        var transition = runtimeState.Set(snapshot);
+        if (transition is null)
         {
             return;
         }
@@ -363,13 +385,47 @@ internal sealed class VpnConnectionCoordinator(
                 DetailsJson = JsonSerializer.Serialize(new
                 {
                     ValidationEnabled = enabled,
-                    Phase = phase.ToString(),
-                    Reason = reason?.ToString(),
-                    FailureSummary = failureSummary,
+                    PreviousPhase = transition.Previous.Phase.ToString(),
+                    PreviousReason = transition.Previous.Reason?.ToString(),
+                    NewPhase = transition.Current.Phase.ToString(),
+                    NewReason = transition.Current.Reason?.ToString(),
+                    FailureSummary = transition.Current.FailureSummary,
                 }),
             },
             CancellationToken.None
         );
+    }
+
+    private void RecordValidationResult(VpnEgressValidationResult result)
+    {
+        runtimeState.Update(snapshot => snapshot with
+        {
+            LastCheckAtUtc = result.CheckedAtUtc,
+            LastSuccessAtUtc = result.IsValidated ? result.CheckedAtUtc : snapshot.LastSuccessAtUtc,
+            ObservedPublicIpv4 = result.Outcome is VpnEgressValidationOutcome.ValidatedEgress or
+                VpnEgressValidationOutcome.DirectIsp
+                    ? result.ObservedAddress?.ToString()
+                    : null,
+            FailureSummary = result.IsValidated ? null : result.FailureSummary,
+            NextAutomaticRetryAtUtc = null,
+        });
+    }
+
+    private void ClearLiveVpnDiagnostics()
+    {
+        runtimeState.Update(snapshot => snapshot with
+        {
+            LastCheckAtUtc = null,
+            LastSuccessAtUtc = null,
+            NextAutomaticRetryAtUtc = null,
+            ObservedPublicIpv4 = null,
+            FailureSummary = null,
+        });
+    }
+
+    private void ClearNextAutomaticRetry()
+    {
+        runtimeState.Update(snapshot => snapshot with { NextAutomaticRetryAtUtc = null });
     }
 
     private static VpnConnectionReason MapReason(VpnEgressValidationOutcome outcome) => outcome switch

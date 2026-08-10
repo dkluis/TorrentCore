@@ -45,6 +45,7 @@ public sealed class RuntimeSettingsDto
     public int                      VpnEgressReadyCheckIntervalSeconds              { get; init; }
     public int                      VpnEgressRequestTimeoutSeconds                  { get; init; }
     public int                      VpnEgressEngineSuspensionTimeoutSeconds         { get; init; }
+    public bool                     RuntimeTickDurationSummaryEnabled               { get; init; }
     public required int             AppliedEngineMaximumConnections                { get; init; }
     public required int             AppliedEngineMaximumHalfOpenConnections        { get; init; }
     public required bool            AppliedEngineAllowPeerExchange                  { get; init; }

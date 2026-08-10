@@ -1,11 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using TorrentCore.Contracts.Host;
+using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
@@ -51,6 +53,15 @@ public sealed class VpnConnectionCoordinatorTests
         Assert.False(status.StartupRecoveryCompleted);
         Assert.False(status.TorrentProcessingAvailable);
         Assert.Equal("DirectIsp", status.VpnConnectionReason);
+        Assert.NotNull(status.VpnLastCheckAtUtc);
+        Assert.Null(status.VpnLastSuccessAtUtc);
+        Assert.Equal(VpnEgressHttpScenarios.DirectIspIpv4, status.VpnObservedPublicIpv4);
+        Assert.Equal(
+            "Observed public IPv4 matched a configured direct ISP CIDR.",
+            status.VpnFailureSummary
+        );
+        Assert.Equal(2, status.VpnDegradedCheckIntervalSeconds);
+        Assert.Equal(2, status.VpnReadyCheckIntervalSeconds);
 
         using var response = await client.PostAsJsonAsync(
             "api/torrents",
@@ -78,6 +89,9 @@ public sealed class VpnConnectionCoordinatorTests
         Assert.True(status.StartupRecoveryCompleted);
         Assert.True(status.TorrentProcessingAvailable);
         Assert.Null(status.VpnConnectionReason);
+        Assert.NotNull(status.VpnLastCheckAtUtc);
+        Assert.Equal(status.VpnLastCheckAtUtc, status.VpnLastSuccessAtUtc);
+        Assert.Equal(VpnEgressHttpScenarios.VpnIpv4, status.VpnObservedPublicIpv4);
     }
 
     [Fact]
@@ -132,6 +146,11 @@ public sealed class VpnConnectionCoordinatorTests
         var disabled = await WaitForHostAsync(client, value => value.VpnConnectionPhase == "Disabled");
         Assert.True(disabled.TorrentProcessingAvailable);
         Assert.True(disabled.StartupRecoveryCompleted);
+        Assert.Null(disabled.VpnLastCheckAtUtc);
+        Assert.Null(disabled.VpnLastSuccessAtUtc);
+        Assert.Null(disabled.VpnNextAutomaticRetryAtUtc);
+        Assert.Null(disabled.VpnObservedPublicIpv4);
+        Assert.Null(disabled.VpnFailureSummary);
 
         var requestCountBeforeEnable = handler.Requests.Count;
         await SetValidationEnabledAsync(client, enabled: true);
@@ -166,6 +185,79 @@ public sealed class VpnConnectionCoordinatorTests
         Assert.True(ready.TorrentProcessingAvailable);
         Assert.Equal(2, lifecycle.ActivationCount);
         Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task RoutineFailure_PreservesLastSuccessAndSchedulesAutomaticRetry()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.VpnIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        await using var factory = CreateFactory(handler);
+        using var client = factory.CreateClient();
+
+        var ready = await WaitForHostAsync(
+            client,
+            value => value.VpnConnectionPhase == "Ready" && value.VpnLastSuccessAtUtc is not null
+        );
+        var degraded = await WaitForHostAsync(
+            client,
+            value => value.VpnConnectionPhase == "Degraded" &&
+                     value.VpnNextAutomaticRetryAtUtc is not null,
+            timeout: TimeSpan.FromSeconds(8)
+        );
+
+        Assert.Equal(ready.VpnLastSuccessAtUtc, degraded.VpnLastSuccessAtUtc);
+        Assert.True(degraded.VpnLastCheckAtUtc > degraded.VpnLastSuccessAtUtc);
+        Assert.Equal(VpnEgressHttpScenarios.DirectIspIpv4, degraded.VpnObservedPublicIpv4);
+        Assert.Equal("DirectIsp", degraded.VpnConnectionReason);
+    }
+
+    [Fact]
+    public async Task EndpointFailure_ExposesTechnicalSummaryWithoutCurrentAddress()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueStatus(HttpStatusCode.ServiceUnavailable);
+        handler.EnqueueStatus(HttpStatusCode.ServiceUnavailable);
+        await using var factory = CreateFactory(handler);
+        using var client = factory.CreateClient();
+
+        var degraded = await WaitForHostAsync(
+            client,
+            value => value.VpnConnectionPhase == "Degraded" && value.VpnNextAutomaticRetryAtUtc is not null
+        );
+
+        Assert.Equal("EndpointFailure", degraded.VpnConnectionReason);
+        Assert.Equal("HTTP status 503.", degraded.VpnFailureSummary);
+        Assert.Null(degraded.VpnObservedPublicIpv4);
+    }
+
+    [Fact]
+    public async Task StateChangedLog_IncludesPreviousAndNewOperatorState()
+    {
+        var handler = CreateHandler(VpnEgressHttpScenarios.DirectIspIpv4, repeat: 3);
+        await using var factory = CreateFactory(handler);
+        using var client = factory.CreateClient();
+
+        await WaitForHostAsync(client, value => value.VpnConnectionPhase == "Degraded");
+        var logs = await client.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+            "api/logs?take=20&eventType=vpn.egress.state_changed"
+        );
+
+        Assert.NotNull(logs);
+        var degradedLog = Assert.Single(logs, log =>
+        {
+            using var details = JsonDocument.Parse(log.DetailsJson ?? "{}");
+            return details.RootElement.TryGetProperty("NewPhase", out var phase) &&
+                   phase.GetString() == "Degraded";
+        });
+        using var degradedDetails = JsonDocument.Parse(degradedLog.DetailsJson!);
+        Assert.True(degradedDetails.RootElement.TryGetProperty("PreviousPhase", out _));
+        Assert.Equal(
+            "DirectIsp",
+            degradedDetails.RootElement.GetProperty("NewReason").GetString()
+        );
     }
 
     private static ScriptedHttpMessageHandler CreateHandler(string publicAddress, int repeat)

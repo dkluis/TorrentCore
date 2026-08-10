@@ -66,14 +66,32 @@ downloaded files, and usable cache remain for a later automatic recovery attempt
 degraded, enabled validation must be checked again before MonoTorrent activates; the API and persisted magnets
 remain available in the meantime.
 
-`/api/host/status` reports `Degraded` while processing is unavailable and adds optional
-`vpnValidationEnabled`, `vpnConnectionPhase`, `vpnConnectionReason`, `torrentProcessingAvailable`, and
-`torrentProcessingMessage` fields. The native macOS Torrents and History pages use these fields to block page actions
-while leaving Refresh available. The WebUI does not add the degraded overlay in this slice.
+`/api/host/status` reports `Degraded` while processing is unavailable. Its additive VPN fields include validation,
+phase, reason, torrent-processing availability, operator message, last check, preserved last successful check, next
+automatic retry, observed public IPv4, configured ready/degraded intervals, and a sanitized technical failure summary.
+The current address is present only after a validated or direct-ISP result. Disabling validation clears the live check,
+success, retry, address, and failure values without deleting historical logs.
 
-All seven values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
+The native macOS Dashboard presents the operator-facing status and configured intervals. Technical failure text stays
+in host status and DB logs. The native Torrents and History pages block page actions while leaving Refresh available.
+The WebUI is not part of the split-tunneling changes.
+
+All seven VPN policy values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
 has no VPN-settings editor in this slice, but its existing updates remain compatible because omitted VPN fields retain
 their current persisted values.
+
+## Performance Timing Summaries
+
+`RuntimeTickDurationSummaryEnabled` controls only `runtime.tick.duration_summary` DB log writes.
+
+- defaults to `false`
+- applies live through the runtime-settings API and native macOS Diagnostics settings group
+- leaves the synchronization timer, torrent processing, slow-operation diagnostics, and failure diagnostics unchanged
+- when enabled, writes the existing one-minute summary only while torrent processing is available
+- turning it on starts a fresh one-minute sample window
+- turning it off or entering VPN-degraded processing discards the partial sample window; returning to ready starts a
+  fresh window
+- the WebUI does not expose this setting
 
 ## Queue And Concurrency
 
@@ -333,6 +351,7 @@ Restart-required settings currently include:
 Live settings currently include:
 
 - VPN validation enablement, endpoint, direct-ISP CIDRs, check intervals, and timeouts
+- performance timing summary logging
 - queue concurrency
 - metadata and long-cold download recovery windows
 - logging throttle settings

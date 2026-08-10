@@ -216,6 +216,10 @@ public sealed class OpenApiContractTests
                 document["components"]?["schemas"]?[nameof(UpdateRuntimeSettingsRequest)]?["properties"];
         AssertVpnEgressSettingsShape(runtimeSettingsUpdateProperties);
 
+        var hostStatusProperties =
+                document["components"]?["schemas"]?[nameof(EngineHostStatusDto)]?["properties"];
+        AssertVpnConnectionStatusShape(hostStatusProperties);
+
         var problemResponseContentTypes = document["paths"]?
             .AsObject()
             .SelectMany(path => path.Value?.AsObject() ?? [])
@@ -245,5 +249,18 @@ public sealed class OpenApiContractTests
         Assert.NotNull(properties["vpnEgressReadyCheckIntervalSeconds"]);
         Assert.NotNull(properties["vpnEgressRequestTimeoutSeconds"]);
         Assert.NotNull(properties["vpnEgressEngineSuspensionTimeoutSeconds"]);
+        Assert.NotNull(properties["runtimeTickDurationSummaryEnabled"]);
+    }
+
+    private static void AssertVpnConnectionStatusShape(JsonNode? properties)
+    {
+        Assert.NotNull(properties);
+        Assert.NotNull(properties["vpnLastCheckAtUtc"]);
+        Assert.NotNull(properties["vpnLastSuccessAtUtc"]);
+        Assert.NotNull(properties["vpnNextAutomaticRetryAtUtc"]);
+        Assert.NotNull(properties["vpnObservedPublicIpv4"]);
+        Assert.NotNull(properties["vpnDegradedCheckIntervalSeconds"]);
+        Assert.NotNull(properties["vpnReadyCheckIntervalSeconds"]);
+        Assert.NotNull(properties["vpnFailureSummary"]);
     }
 }

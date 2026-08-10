@@ -445,6 +445,7 @@ public sealed class TorrentApiTests
         Assert.Equal(CompletedTorrentCleanupMode.Never.ToString(), settings.CompletedTorrentCleanupMode);
         Assert.Equal(60, settings.CompletedTorrentCleanupMinutes);
         Assert.False(settings.DeleteLogsForCompletedTorrents);
+        Assert.False(settings.RuntimeTickDurationSummaryEnabled);
         Assert.Equal(5, settings.EngineConnectionFailureLogBurstLimit);
         Assert.Equal(60, settings.EngineConnectionFailureLogWindowSeconds);
         Assert.False(settings.EngineAllowPeerExchange);
@@ -536,6 +537,7 @@ public sealed class TorrentApiTests
                 VpnEgressReadyCheckIntervalSeconds = 180,
                 VpnEgressRequestTimeoutSeconds = 9,
                 VpnEgressEngineSuspensionTimeoutSeconds = 8,
+                RuntimeTickDurationSummaryEnabled = true,
             });
             updateResponse.EnsureSuccessStatusCode();
 
@@ -582,6 +584,7 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.VpnEgressReadyCheckIntervalSeconds);
             Assert.Equal(9, settings.VpnEgressRequestTimeoutSeconds);
             Assert.Equal(8, settings.VpnEgressEngineSuspensionTimeoutSeconds);
+            Assert.True(settings.RuntimeTickDurationSummaryEnabled);
             Assert.True(settings.EngineSettingsRequireRestart);
             Assert.NotNull(settings.UpdatedAtUtc);
 
@@ -650,6 +653,7 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.VpnEgressReadyCheckIntervalSeconds);
             Assert.Equal(9, settings.VpnEgressRequestTimeoutSeconds);
             Assert.Equal(8, settings.VpnEgressEngineSuspensionTimeoutSeconds);
+            Assert.True(settings.RuntimeTickDurationSummaryEnabled);
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
             Assert.Equal(6, settings.AppliedEngineMaximumHalfOpenConnections);
@@ -893,7 +897,8 @@ public sealed class TorrentApiTests
                 vpnEgressDegradedCheckIntervalSeconds: 30,
                 vpnEgressReadyCheckIntervalSeconds: 120,
                 vpnEgressRequestTimeoutSeconds: 5,
-                vpnEgressEngineSuspensionTimeoutSeconds: 7)
+                vpnEgressEngineSuspensionTimeoutSeconds: 7,
+                runtimeTickDurationSummaryEnabled: true)
         );
         firstResponse.EnsureSuccessStatusCode();
 
@@ -912,6 +917,7 @@ public sealed class TorrentApiTests
         Assert.Equal(120, settings.VpnEgressReadyCheckIntervalSeconds);
         Assert.Equal(5, settings.VpnEgressRequestTimeoutSeconds);
         Assert.Equal(7, settings.VpnEgressEngineSuspensionTimeoutSeconds);
+        Assert.True(settings.RuntimeTickDurationSummaryEnabled);
     }
 
     [Fact]
@@ -4161,7 +4167,8 @@ public sealed class TorrentApiTests
         int? vpnEgressDegradedCheckIntervalSeconds = null,
         int? vpnEgressReadyCheckIntervalSeconds = null,
         int? vpnEgressRequestTimeoutSeconds = null,
-        int? vpnEgressEngineSuspensionTimeoutSeconds = null)
+        int? vpnEgressEngineSuspensionTimeoutSeconds = null,
+        bool? runtimeTickDurationSummaryEnabled = null)
     {
         return new UpdateRuntimeSettingsRequest
         {
@@ -4203,6 +4210,7 @@ public sealed class TorrentApiTests
             VpnEgressReadyCheckIntervalSeconds = vpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds = vpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds = vpnEgressEngineSuspensionTimeoutSeconds,
+            RuntimeTickDurationSummaryEnabled = runtimeTickDurationSummaryEnabled,
         };
     }
 
@@ -4231,7 +4239,8 @@ public sealed class TorrentApiTests
             new NoOpActivityLogService(),
             new ServiceInstanceContext(),
             appliedEngineSettingsState,
-            new VpnSettingsChangeSignal()
+            new VpnSettingsChangeSignal(),
+            new RuntimeTickDurationSummaryState()
         );
     }
 

@@ -18,7 +18,8 @@ Representative coverage areas:
   change-suppressed DB logging; these tests require neither Internet access nor ExpressVPN
 - serialized VPN coordinator coverage for non-blocking degraded startup, persistence-only admission, automatic
   recovery, non-disruptive routine checks, supported settings enable/disable transitions, and direct engine retry after
-  an activation failure
+  an activation failure; host telemetry coverage verifies current-address rules, preserved last success, automatic
+  retry scheduling, sanitized endpoint failures, and previous/new state-log details
 - default-open execution-gate drain behavior; closed-gate persistence-only magnet admission, normal acceptance errors,
   constrained save paths, structured unavailable actions, readable diagnostics, and full-restart durability without
   initializing MonoTorrent
@@ -30,6 +31,8 @@ Representative coverage areas:
 - VPN-setting defaults, SQLite/API round trips and restart persistence, IPv4 CIDR canonicalization, additive-client
   compatibility, and structured rejection of unsafe endpoints, IPv6/invalid CIDRs, and invalid intervals/timeouts,
   including the independent engine-suspension timeout
+- performance-summary coverage verifies default-off and live enablement behavior, no synchronization change, and
+  discarded partial windows across disabled and VPN-degraded periods
 - native client refresh coverage keeps host status current on Torrents and History; the Arm64 macOS build verifies the
   processing-paused overlay that leaves Refresh available
 - API behavior, including Service semantic-version and Git-build identity reporting
@@ -85,8 +88,8 @@ plus automatic History, Logs, and Service Settings loading without manual refres
 also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
 show/hide behavior for the Torrents, History, and Logs inspectors. Service Settings UI coverage also verifies populated
 Downloads values and the inline category grid. Runtime-settings mapping coverage verifies that the metadata-resolution
-time slice, automatic-reset stuck threshold, and all VPN egress policy fields survive draft creation, request encoding,
-save, and returned-value reconciliation.
+time slice, automatic-reset stuck threshold, all VPN egress policy fields, and Performance Timing Summaries survive
+draft creation, request encoding, save, and returned-value reconciliation.
 Native contract coverage also verifies that the optional full Service build commit maps through the generated client;
 older Service responses that omit it remain supported.
 The live read-only probe also decodes History, Logs, runtime settings, peer/tracker diagnostics, and history detail

@@ -210,6 +210,7 @@ extension TorrentCoreRuntimeSettings {
         vpnEgressValidationEnabled = value.vpnEgressValidationEnabled ?? false
         vpnEgressValidationEndpoint = value.vpnEgressValidationEndpoint
             ?? "https://api.ipify.org?format=json"
+        runtimeTickDurationSummaryEnabled = value.runtimeTickDurationSummaryEnabled ?? false
     }
 }
 
@@ -256,6 +257,7 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             metadataRefreshRestartDelaySeconds: Int32(value.metadataRefreshRestartDelaySeconds),
             metadataRefreshStaleSeconds: Int32(value.metadataRefreshStaleSeconds),
             metadataResolutionTimeSliceMinutes: Int32(value.metadataResolutionTimeSliceMinutes),
+            runtimeTickDurationSummaryEnabled: value.runtimeTickDurationSummaryEnabled,
             seedingStopMinutes: Int32(value.seedingStopMinutes),
             seedingStopMode: value.seedingStopMode,
             seedingStopRatio: value.seedingStopRatio,

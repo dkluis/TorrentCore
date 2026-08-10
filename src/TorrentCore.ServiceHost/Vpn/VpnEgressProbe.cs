@@ -171,7 +171,10 @@ internal sealed class VpnEgressProbe(
                 ? VpnEgressValidationOutcome.DirectIsp
                 : VpnEgressValidationOutcome.ValidatedEgress,
             startedTimestamp,
-            observedAddress: observedAddress
+            observedAddress: observedAddress,
+            failureSummary: isDirectIsp
+                ? "Observed public IPv4 matched a configured direct ISP CIDR."
+                : null
         );
     }
 

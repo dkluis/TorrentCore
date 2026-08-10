@@ -69,6 +69,7 @@ builder.Services.AddHttpClient(VpnEgressProbe.HttpClientName, client => client.T
 builder.Services.AddSingleton<IVpnEgressProbe, VpnEgressProbe>();
 builder.Services.AddSingleton<VpnConnectionRuntimeState>();
 builder.Services.AddSingleton<VpnSettingsChangeSignal>();
+builder.Services.AddSingleton<RuntimeTickDurationSummaryState>();
 builder.Services.AddSingleton<RuntimeOperationDurationDiagnostics>();
 builder.Services.AddSingleton<StartupRecoveryState>();
 builder.Services.AddSingleton(serviceProvider =>

@@ -77,7 +77,8 @@ Rules:
 Duration diagnostics:
 
 - `runtime.operation.slow` identifies slow synchronization, gate-wait, MonoTorrent, callback, and storage phases
-- `runtime.tick.duration_summary` records minute-scale synchronization timing baselines without logging every tick
+- `runtime.tick.duration_summary` records minute-scale synchronization timing baselines without logging every tick;
+  it is disabled by default through `RuntimeTickDurationSummaryEnabled` and suppressed during VPN degradation
 - `runtime.recovery.action_completed` records each automatic recovery action, attempt number, duration, outcome,
   recovery cycle, bounded backoff timing, and long-cold cadence state
 - `runtime.callback.dispatch_completed` records callback process-launch duration independently from callback feedback state

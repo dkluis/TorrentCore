@@ -74,6 +74,13 @@ extension TorrentCoreHostStatus {
         vpnConnectionReason = value.vpnConnectionReason
         torrentProcessingAvailable = value.torrentProcessingAvailable
         torrentProcessingMessage = value.torrentProcessingMessage
+        vpnLastCheckAt = value.vpnLastCheckAtUtc
+        vpnLastSuccessAt = value.vpnLastSuccessAtUtc
+        vpnNextAutomaticRetryAt = value.vpnNextAutomaticRetryAtUtc
+        vpnObservedPublicIPv4 = value.vpnObservedPublicIpv4
+        vpnDegradedCheckIntervalSeconds = value.vpnDegradedCheckIntervalSeconds.map(Int.init)
+        vpnReadyCheckIntervalSeconds = value.vpnReadyCheckIntervalSeconds.map(Int.init)
+        vpnFailureSummary = value.vpnFailureSummary
         checkedAt = value.checkedAtUtc
     }
 }

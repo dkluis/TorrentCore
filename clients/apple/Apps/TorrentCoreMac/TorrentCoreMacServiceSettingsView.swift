@@ -62,6 +62,7 @@ struct TorrentCoreMacServiceSettingsView: View {
         case metadataRecovery
         case engine
         case vpnEgress
+        case diagnostics
         case completionCallback
         case categories
         case cleanup
@@ -75,6 +76,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             case .metadataRecovery: "Metadata Recovery"
             case .engine: "Engine"
             case .vpnEgress: "VPN Egress"
+            case .diagnostics: "Diagnostics"
             case .completionCallback: "Completion Callback"
             case .categories: "Categories"
             case .cleanup: "Cleanup"
@@ -88,6 +90,7 @@ struct TorrentCoreMacServiceSettingsView: View {
             case .metadataRecovery: "arrow.trianglehead.2.clockwise.rotate.90"
             case .engine: "gearshape.2"
             case .vpnEgress: "network.badge.shield.half.filled"
+            case .diagnostics: "waveform.path.ecg"
             case .completionCallback: "terminal"
             case .categories: "folder"
             case .cleanup: "trash"
@@ -577,7 +580,24 @@ struct TorrentCoreMacServiceSettingsView: View {
                     )
                 }
                 Text(
-                    "These values apply live. Automatic degraded/ready enforcement is added in Slice 5."
+                    "These values apply live. Interval edits take effect at the next scheduled check without resetting the current countdown."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                validationMessage
+            }
+        case .diagnostics:
+            if let draft = runtimeBinding {
+                Section("Performance Logging") {
+                    Toggle(isOn: draft.runtimeTickDurationSummaryEnabled) {
+                        TorrentCoreMacHelpLabel(
+                            "Performance Timing Summaries",
+                            content: TorrentCoreHelpCatalog.Settings.runtimeTickDurationSummaryEnabled
+                        )
+                    }
+                }
+                Text(
+                    "This setting controls only the one-minute synchronization timing summary written to the Service log. Torrent processing and all other diagnostics remain unchanged."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

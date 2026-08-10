@@ -20,6 +20,7 @@ struct TorrentCoreMacDashboardView: View {
                         )
 
                         serviceHeader(status: status)
+                        vpnConnection(status: status)
                         transferMetrics(status: status)
                         torrentMetrics(status: status)
                         queueAndRecovery(status: status)
@@ -92,6 +93,115 @@ struct TorrentCoreMacDashboardView: View {
             return "--"
         }
         return String(build.prefix(12))
+    }
+
+    private func vpnConnection(status: TorrentCoreHostStatus) -> some View {
+        GroupBox("VPN Connection") {
+            VStack(alignment: .leading, spacing: 12) {
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 10) {
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Validation",
+                            value: validationDescription(status.vpnValidationEnabled)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Connection",
+                            value: displayIdentifier(status.vpnConnectionPhase)
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Torrent Processing",
+                            value: processingDescription(status.torrentProcessingAvailable)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Reason",
+                            value: displayIdentifier(status.vpnConnectionReason)
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Current Public IPv4",
+                            value: status.vpnObservedPublicIPv4 ?? "--"
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Last Check",
+                            value: TorrentCoreDisplayFormatter.timestamp(status.vpnLastCheckAt)
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Last Successful Check",
+                            value: TorrentCoreDisplayFormatter.timestamp(status.vpnLastSuccessAt)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Next Automatic Retry",
+                            value: TorrentCoreDisplayFormatter.timestamp(
+                                status.vpnNextAutomaticRetryAt
+                            )
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Ready Check Interval",
+                            value: intervalDescription(status.vpnReadyCheckIntervalSeconds)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Paused Check Interval",
+                            value: intervalDescription(status.vpnDegradedCheckIntervalSeconds)
+                        )
+                    }
+                }
+                Text(vpnOperatorMessage(status))
+                    .foregroundStyle(
+                        status.torrentProcessingAvailable == false
+                            ? Color.orange
+                            : Color.secondary
+                    )
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    private func displayIdentifier(_ value: String?) -> String {
+        guard let value, !value.isEmpty else {
+            return "--"
+        }
+        return TorrentCoreDisplayFormatter.splitIdentifier(value)
+    }
+
+    private func intervalDescription(_ seconds: Int?) -> String {
+        guard let seconds else {
+            return "--"
+        }
+        return "\(seconds.formatted()) seconds"
+    }
+
+    private func validationDescription(_ enabled: Bool?) -> String {
+        guard let enabled else {
+            return "--"
+        }
+        return enabled ? "Enabled" : "Disabled"
+    }
+
+    private func processingDescription(_ available: Bool?) -> String {
+        guard let available else {
+            return "--"
+        }
+        return available ? "Active" : "Paused"
+    }
+
+    private func vpnOperatorMessage(_ status: TorrentCoreHostStatus) -> String {
+        if let message = status.torrentProcessingMessage, !message.isEmpty {
+            return message
+        }
+        if status.vpnValidationEnabled == true {
+            return "VPN connection is available. Torrent processing is active."
+        }
+        if status.vpnValidationEnabled == nil {
+            return "VPN connection status is unavailable from this Service version."
+        }
+        return "VPN validation is disabled. Torrent processing is active."
     }
 
     private func transferMetrics(status: TorrentCoreHostStatus) -> some View {

@@ -145,6 +145,13 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             VpnConnectionReason = vpnConnection.Reason?.ToString(),
             TorrentProcessingAvailable = vpnConnection.IsTorrentProcessingAvailable,
             TorrentProcessingMessage = vpnConnection.OperatorMessage,
+            VpnLastCheckAtUtc = vpnConnection.LastCheckAtUtc,
+            VpnLastSuccessAtUtc = vpnConnection.LastSuccessAtUtc,
+            VpnNextAutomaticRetryAtUtc = vpnConnection.NextAutomaticRetryAtUtc,
+            VpnObservedPublicIpv4 = vpnConnection.ObservedPublicIpv4,
+            VpnDegradedCheckIntervalSeconds = runtimeSettings.VpnEgressDegradedCheckIntervalSeconds,
+            VpnReadyCheckIntervalSeconds = runtimeSettings.VpnEgressReadyCheckIntervalSeconds,
+            VpnFailureSummary = vpnConnection.FailureSummary,
             CheckedAtUtc = DateTimeOffset.UtcNow,
         };
     }

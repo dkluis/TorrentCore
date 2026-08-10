@@ -561,17 +561,22 @@ range, with ExpressVPN applied to the whole machine because the Service app bund
 
 ### Slice 6: Host Status, Logs, And Operator Diagnostics
 
-Status: pending.
+Status: completed on August 10, 2026.
 
 #### Work
 
-- Reuse `EngineHostStatus.Degraded` and add structured VPN-validation details to host status.
-- Expose enabled state, phase, last check time, last success time, next check time, observed public IPv4 when available,
-  configured intervals, and a safe failure summary.
-- Add queue/wait diagnostics that distinguish VPN gating from capacity and operator pause.
-- Keep `/api/health` successful while the process and persistence boundary are healthy.
-- Update WebUI/native client decoding for additive fields even though the proof DMG does not deploy WebUI.
-- Update active operator settings and troubleshooting documentation.
+- Reused `EngineHostStatus.Degraded` and added optional host-status fields for last check, preserved last success, next
+  automatic retry, observed public IPv4, configured intervals, and sanitized failure summary.
+- Kept `/api/health` successful while the process and persistence boundary are healthy.
+- Added previous/new phase and reason to change-suppressed `vpn.egress.state_changed` records.
+- Added a read-only native macOS Dashboard VPN section with operator terminology. Technical failure details remain in
+  host status and DB logs.
+- Added the DB-backed, live `RuntimeTickDurationSummaryEnabled` setting, defaulting off, plus the native Diagnostics
+  toggle. It controls only `runtime.tick.duration_summary` writes and discards partial windows when disabled or
+  VPN-degraded.
+- Left WebUI unchanged and added no queue diagnostics because VPN degradation already pauses all engine processing at
+  the host boundary.
+- Updated active operator, troubleshooting, architecture, development, and testing documentation.
 
 #### Acceptance
 
@@ -579,6 +584,14 @@ Status: pending.
 - Persistent logs contain the full observed public IP as approved.
 - Successful repeated checks do not flood activity logs.
 - Older clients tolerate the additive fields according to the current API-version policy.
+
+#### Verification
+
+- Deterministic coordinator tests cover timestamps, current-address semantics, preserved last success, automatic retry,
+  sanitized endpoint failure, cleared disabled diagnostics, and transition-log details.
+- Synchronization tests prove the summary default is off, enabling begins a fresh one-minute window, degradation
+  discards a partial window, and synchronization continues throughout.
+- OpenAPI and native models preserve additive compatibility; the native Dashboard omits technical failure text.
 
 ### Slice 7: Arm64 TorrentCoreService App Bundle
 

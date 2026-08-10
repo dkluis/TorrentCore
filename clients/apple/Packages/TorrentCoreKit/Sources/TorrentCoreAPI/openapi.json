@@ -641,6 +641,39 @@
             "nullable": true,
             "type": "string"
           },
+          "vpnDegradedCheckIntervalSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnFailureSummary": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnLastCheckAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnLastSuccessAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnNextAutomaticRetryAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnObservedPublicIpv4": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnReadyCheckIntervalSeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
           "vpnValidationEnabled": {
             "nullable": true,
             "type": "boolean"
@@ -954,6 +987,9 @@
           "retrievedAtUtc": {
             "format": "date-time",
             "type": "string"
+          },
+          "runtimeTickDurationSummaryEnabled": {
+            "type": "boolean"
           },
           "seedingStopMinutes": {
             "format": "int32",
@@ -2135,6 +2171,10 @@
             "format": "int32",
             "nullable": true,
             "type": "integer"
+          },
+          "runtimeTickDurationSummaryEnabled": {
+            "nullable": true,
+            "type": "boolean"
           },
           "seedingStopMinutes": {
             "format": "int32",

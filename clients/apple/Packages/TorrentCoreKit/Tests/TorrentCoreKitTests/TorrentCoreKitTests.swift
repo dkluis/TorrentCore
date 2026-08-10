@@ -15,7 +15,7 @@ func sharedTargetsExposeTheSameProductIdentity() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 47)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 48)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
@@ -39,6 +39,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     settings.vpnEgressReadyCheckIntervalSeconds = 120
     settings.vpnEgressRequestTimeoutSeconds = 5
     settings.vpnEgressEngineSuspensionTimeoutSeconds = 7
+    settings.runtimeTickDurationSummaryEnabled = true
 
     let update = TorrentCoreRuntimeSettingsUpdate(settings: settings)
     #expect(update.metadataResolutionTimeSliceMinutes == 21)
@@ -46,6 +47,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     #expect(update.vpnEgressValidationEnabled)
     #expect(update.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
     #expect(update.vpnEgressEngineSuspensionTimeoutSeconds == 7)
+    #expect(update.runtimeTickDurationSummaryEnabled)
 
     let request = Components.Schemas.UpdateRuntimeSettingsRequest(update)
     let data = try JSONEncoder().encode(request)
@@ -59,6 +61,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     #expect(body["vpnEgressReadyCheckIntervalSeconds"] as? Int == 120)
     #expect(body["vpnEgressRequestTimeoutSeconds"] as? Int == 5)
     #expect(body["vpnEgressEngineSuspensionTimeoutSeconds"] as? Int == 7)
+    #expect(body["runtimeTickDurationSummaryEnabled"] as? Bool == true)
 }
 
 @Test

@@ -131,6 +131,13 @@ public struct TorrentCoreHostStatus: Codable, Hashable, Sendable {
     public var vpnConnectionReason: String?
     public var torrentProcessingAvailable: Bool?
     public var torrentProcessingMessage: String?
+    public var vpnLastCheckAt: Date?
+    public var vpnLastSuccessAt: Date?
+    public var vpnNextAutomaticRetryAt: Date?
+    public var vpnObservedPublicIPv4: String?
+    public var vpnDegradedCheckIntervalSeconds: Int?
+    public var vpnReadyCheckIntervalSeconds: Int?
+    public var vpnFailureSummary: String?
     public var checkedAt: Date
 }
 

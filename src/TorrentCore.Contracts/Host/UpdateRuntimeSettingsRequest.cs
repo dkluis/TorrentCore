@@ -40,4 +40,5 @@ public sealed class UpdateRuntimeSettingsRequest
     public          int?    VpnEgressReadyCheckIntervalSeconds           { get; init; }
     public          int?    VpnEgressRequestTimeoutSeconds               { get; init; }
     public          int?    VpnEgressEngineSuspensionTimeoutSeconds      { get; init; }
+    public          bool?   RuntimeTickDurationSummaryEnabled            { get; init; }
 }

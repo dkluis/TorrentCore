@@ -73,6 +73,13 @@ public enum TorrentCorePreviewFixtures {
         vpnConnectionReason: nil,
         torrentProcessingAvailable: true,
         torrentProcessingMessage: nil,
+        vpnLastCheckAt: checkedAt,
+        vpnLastSuccessAt: checkedAt,
+        vpnNextAutomaticRetryAt: checkedAt.addingTimeInterval(240),
+        vpnObservedPublicIPv4: "203.0.113.44",
+        vpnDegradedCheckIntervalSeconds: 60,
+        vpnReadyCheckIntervalSeconds: 240,
+        vpnFailureSummary: nil,
         checkedAt: checkedAt
     )
 
@@ -515,7 +522,8 @@ public enum TorrentCorePreviewFixtures {
         vpnEgressRequestTimeoutSeconds: 10,
         vpnEgressEngineSuspensionTimeoutSeconds: 10,
         vpnEgressValidationEnabled: false,
-        vpnEgressValidationEndpoint: "https://api.ipify.org?format=json"
+        vpnEgressValidationEndpoint: "https://api.ipify.org?format=json",
+        runtimeTickDurationSummaryEnabled: false
     )
 
     public static let restartResult = TorrentCoreServiceRestartResult(

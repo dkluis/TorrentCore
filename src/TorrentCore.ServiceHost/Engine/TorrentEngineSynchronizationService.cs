@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Infrastructure;
+using TorrentCore.Service.Vpn;
 
 #endregion
 
@@ -14,18 +15,25 @@ namespace TorrentCore.Service.Engine;
 public sealed class TorrentEngineSynchronizationService(ITorrentEngineAdapter torrentEngineAdapter,
     IOptions<TorrentCoreServiceOptions> serviceOptions, IActivityLogService activityLogService,
     ServiceInstanceContext serviceInstanceContext,
-    RuntimeOperationDurationDiagnostics durationDiagnostics) : BackgroundService
+    RuntimeOperationDurationDiagnostics durationDiagnostics,
+    RuntimeTickDurationSummaryState durationSummaryState,
+    VpnConnectionRuntimeState vpnConnectionRuntimeState,
+    TimeProvider timeProvider) : BackgroundService
 {
     private static readonly TimeSpan DurationSummaryInterval = TimeSpan.FromMinutes(1);
     private readonly TorrentCoreServiceOptions _serviceOptions = serviceOptions.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_serviceOptions.RuntimeTickIntervalMilliseconds));
-        var summaryStartedAt = DateTimeOffset.UtcNow;
+        using var timer = new PeriodicTimer(
+            TimeSpan.FromMilliseconds(_serviceOptions.RuntimeTickIntervalMilliseconds),
+            timeProvider
+        );
+        var summaryStartedAt = timeProvider.GetUtcNow();
         var summaryDurationTicks = 0L;
         var summaryMaximumTicks = 0L;
         var summarySampleCount = 0;
+        var collectingSummary = false;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -62,9 +70,6 @@ public sealed class TorrentEngineSynchronizationService(ITorrentEngineAdapter to
             }
 
             tickStopwatch.Stop();
-            summarySampleCount++;
-            summaryDurationTicks += tickStopwatch.Elapsed.Ticks;
-            summaryMaximumTicks = Math.Max(summaryMaximumTicks, tickStopwatch.Elapsed.Ticks);
             await durationDiagnostics.RecordIfSlowAsync(
                 "engine",
                 "synchronization_tick",
@@ -73,19 +78,42 @@ public sealed class TorrentEngineSynchronizationService(ITorrentEngineAdapter to
                 outcome
             );
 
-            var now = DateTimeOffset.UtcNow;
-            if (now - summaryStartedAt >= DurationSummaryInterval)
+            var now = timeProvider.GetUtcNow();
+            var shouldCollectSummary = durationSummaryState.Enabled &&
+                                       vpnConnectionRuntimeState.Snapshot.IsTorrentProcessingAvailable;
+            if (!shouldCollectSummary)
             {
-                await durationDiagnostics.WriteSynchronizationSummaryAsync(
-                    summarySampleCount,
-                    TimeSpan.FromTicks(summaryDurationTicks / Math.Max(1, summarySampleCount)),
-                    TimeSpan.FromTicks(summaryMaximumTicks),
-                    now - summaryStartedAt
-                );
+                collectingSummary = false;
                 summaryStartedAt = now;
                 summaryDurationTicks = 0;
                 summaryMaximumTicks = 0;
                 summarySampleCount = 0;
+            }
+            else
+            {
+                if (!collectingSummary)
+                {
+                    collectingSummary = true;
+                    summaryStartedAt = now;
+                }
+
+                summarySampleCount++;
+                summaryDurationTicks += tickStopwatch.Elapsed.Ticks;
+                summaryMaximumTicks = Math.Max(summaryMaximumTicks, tickStopwatch.Elapsed.Ticks);
+
+                if (now - summaryStartedAt >= DurationSummaryInterval)
+                {
+                    await durationDiagnostics.WriteSynchronizationSummaryAsync(
+                        summarySampleCount,
+                        TimeSpan.FromTicks(summaryDurationTicks / Math.Max(1, summarySampleCount)),
+                        TimeSpan.FromTicks(summaryMaximumTicks),
+                        now - summaryStartedAt
+                    );
+                    summaryStartedAt = now;
+                    summaryDurationTicks = 0;
+                    summaryMaximumTicks = 0;
+                    summarySampleCount = 0;
+                }
             }
 
             if (!await timer.WaitForNextTickAsync(stoppingToken))

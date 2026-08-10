@@ -102,6 +102,16 @@ reopening admission. Activation failure retries the engine directly at the degra
 already-successful VPN check. Supported settings updates wake the coordinator for immediate enable/disable behavior;
 other policy changes take effect on the next scheduled check without resetting the current countdown.
 
+The coordinator's live host snapshot also records the last completed check, preserved last successful check, next
+automatic retry, current observed public IPv4 when the latest result supplied one, and a sanitized failure summary.
+State-change DB logs are driven by enabled/phase/reason transitions and include both previous and new values; timestamp
+updates from unchanged routine results do not create state-change rows. `/api/health` remains independent of this
+processing state and stays successful while the process and persistence boundary are healthy.
+
+Synchronization timing summaries are an optional DB-log output, not part of engine scheduling. The synchronization
+loop always runs. When `RuntimeTickDurationSummaryEnabled` is off or torrent processing is VPN-degraded, it does not
+accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to ready begins a new one-minute window.
+
 ## Engine Dependency
 
 - TorrentCore pins MonoTorrent `3.0.2` as the production baseline.
