@@ -632,7 +632,7 @@ Status: completed on August 10, 2026.
 
 ### Slice 8: Generic Service-Only Arm DMG And Deployer
 
-Status: implemented on August 10, 2026; final clean-source DMG notarization remains pending.
+Status: completed on August 10, 2026.
 
 #### Work
 
@@ -679,7 +679,7 @@ Status: implemented on August 10, 2026; final clean-source DMG notarization rema
 
 ### Final Slice: Combined Service And Native UI DMG
 
-Status: implemented on August 10, 2026; final clean-source DMG notarization remains pending.
+Status: completed on August 10, 2026.
 
 #### Work
 
@@ -704,6 +704,15 @@ Status: implemented on August 10, 2026; final clean-source DMG notarization rema
 - The runbook orders UI replacement after successful Service verification.
 - The Dick/Arm `TorrentCore.NextGen.Apps.SplitTunnel` artifact passes notarization, stapling, Gatekeeper, disk-image,
   internal-checksum, app-signature, metadata, plan, and dry-run verification.
+
+#### Release Evidence
+
+- Artifact: `TorrentCore-torrentcore.2026.08.10.Dick.TorrentCore.NextGen.Apps.SplitTunnel.dmg`
+- Source commit: `fb260a9`
+- Apple notarization submission: `974b6991-e8df-4eb0-b662-0d58f47179df` (`Accepted`)
+- DMG SHA-256: `7f102d4288ea8297d7ce536addc1553e84b7831531f97556b8d4e853a096ba50`
+- The signed stage passed app-signature, Arm64 architecture, embedded UI metadata, checksum, Service plan, and Service
+  dry-run checks. The completed DMG passed notarization, stapling, Gatekeeper, and disk-image verification.
 
 ### Slice 9: WebUI Connection-State Packaging Fix
 
