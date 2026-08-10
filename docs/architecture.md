@@ -17,6 +17,12 @@ Primary components:
 - `TorrentCore.Core`
 - `TorrentCore.Persistence.Sqlite`
 
+On Arm64 macOS, the Service can be represented by the background-only `TorrentCoreService.app`. Its native launcher is
+the stable process identity seen by macOS and VPN split-tunneling controls; the framework-dependent .NET Service remains
+the child runtime. The launcher executes that helper from the sealed bundle while using `~/TorrentCore/Service` for
+host-local configuration and installed version metadata. Packaging changes process representation only and does not
+move SQLite, cache, download, category, or callback state into the sealed app bundle.
+
 The supported operator UI is `TorrentCore.WebUI`.
 
 Removed surfaces:

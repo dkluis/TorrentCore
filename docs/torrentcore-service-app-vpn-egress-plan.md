@@ -595,7 +595,7 @@ Status: completed on August 10, 2026.
 
 ### Slice 7: Arm64 TorrentCoreService App Bundle
 
-Status: pending.
+Status: completed on August 10, 2026.
 
 #### Work
 
@@ -618,9 +618,21 @@ Status: pending.
 - Launching the app from launchd preserves configuration, storage, categories, callback paths, and API behavior.
 - The app is registered and available for operator selection in ExpressVPN.
 
+#### Verification
+
+- The real `osx-arm64` framework-dependent publish output passed the unsigned layout verifier as version `0.6.0`,
+  build `1`, with the native TorrentCore icon and macOS 26 minimum.
+- The staged standalone app passed outside-sandbox Developer ID verification for Team `5GRR76N48V`, Hardened Runtime,
+  secure timestamps, distinct launcher/helper UUIDs, both required .NET helper entitlements, and the signed native
+  SQLite dependency.
+- The verified app was copied to `~/Applications/TorrentCore/TorrentCoreService.app`, reverified there, and registered
+  successfully with Launch Services. The active Service LaunchAgent was intentionally not changed in this slice.
+- An isolated launch on loopback port `17033` used temporary storage and download roots. Health returned `ok`, host
+  status reported Service `0.6.0`, and the native launcher forwarded shutdown and exited cleanly.
+
 ### Slice 8: Generic Service-Only Arm DMG And Deployer
 
-Status: pending.
+Status: implemented on August 10, 2026; final clean-source DMG notarization remains pending.
 
 #### Work
 
@@ -633,8 +645,8 @@ Status: pending.
 - Preserve `torrentcore.env`, the SQLite storage root, category paths, download data, and installed state.
 - Back up the legacy Service directory into a compressed, non-discoverable artifact.
 - Verify the new bundle before stopping the legacy Service.
-- Replace the bundle atomically, register it, install only the Service LaunchAgent, and verify rollback material before
-  deleting the live legacy Service directory.
+- Replace the bundle atomically, register it, install only the Service LaunchAgent, and verify rollback material while
+  leaving the live legacy Service directory intact and inactive until the final cleanup slice.
 - Keep plan, dry-run, confirmed apply, backup, verify, history, checksums, quarantine, signing, notarization, and
   stapling behavior.
 
@@ -647,6 +659,23 @@ Status: pending.
   with a failed process installation.
 - Operational verification separately requires a successful Service-owned egress result and ready engine state.
 - Rollback can restore the legacy executable/LaunchAgent without rolling back or overwriting the database.
+
+#### Verification
+
+- The TorrentCore-owned release builder stages a Developer ID-signed `osx-arm64` payload with installation-labelled,
+  dated identity such as `torrentcore.2026.08.10.Dick.ServiceApp`, runtime-keyed metadata, internal checksums, and no
+  machine manifest or hostname catalog. Generation requires `--installation Dick|Tom`, `--cpu arm|intel`, and an
+  operator-selected release purpose such as `ServiceApp.InitialDeploy`; Intel is recognized but refused in the current
+  Arm-only slice.
+- The staged package's real `plan` and `dry-run` resolved only the current user's app, `~/TorrentCore` Service, Scripts,
+  Logs, `.deploy`, `.backups`, and Service LaunchAgent paths. Both reported that no filesystem, backup, service,
+  installed-record, or history change was made.
+- Source validation, bundle verification, backup/app replacement preparation, failure history, confirmed rollback,
+  architecture refusal, and WebUI exclusion are owned by this repository; TVMaze was not changed.
+- The initial final artifact is `TorrentCore-torrentcore.2026.08.10.Dick.ServiceApp.InitialDeploy.dmg`; it must be
+  built from committed clean source, then
+  pass notarization, stapling, Gatekeeper, disk-image, mounted plan, and mounted dry-run verification before Slice 8 is
+  complete. The same Arm package logic can generate a Tom-labelled artifact for either of Tom's Arm machines.
 
 ### Slice 9: WebUI Connection-State Packaging Fix
 
@@ -736,8 +765,8 @@ Status: deferred and not implied by Service proof acceptance.
 - Keep `service-connection.json` outside the sealed bundle.
 - Give WebUI a separate stable bundle identity, launcher UUID, LaunchAgent association, signing verification, and
   component-level deployment/rollback path.
-- Decide whether WebUI shares a combined multi-component DMG or receives its own release artifact only after the
-  Service workflow is stable.
+- After WebUI split-tunnel and app-bundle work is proven, extend the installation-labelled, CPU-selected deployment so
+  the Service and WebUI apps are delivered together in the same DMG.
 
 #### Acceptance
 

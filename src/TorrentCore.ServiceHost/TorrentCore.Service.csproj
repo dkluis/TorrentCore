@@ -5,7 +5,7 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <AssemblyName>TorrentCoreService</AssemblyName>
-        <Version>0.5.1</Version>
+        <Version>0.6.0</Version>
     </PropertyGroup>
 
     <ItemGroup>
@@ -18,5 +18,14 @@
         <ProjectReference Include="..\TorrentCore.Core\TorrentCore.Core.csproj"/>
         <ProjectReference Include="..\TorrentCore.Persistence.Sqlite\TorrentCore.Persistence.Sqlite.csproj"/>
     </ItemGroup>
+
+    <Target Name="CopyMacOSAppDeploymentResources" AfterTargets="Publish">
+        <ItemGroup>
+            <MacOSAppDeploymentResource Include="Deployment/**/*" />
+        </ItemGroup>
+        <Copy
+            SourceFiles="@(MacOSAppDeploymentResource)"
+            DestinationFiles="@(MacOSAppDeploymentResource->'$(PublishDir)$(AssemblyName).Deployment/%(RecursiveDir)%(Filename)%(Extension)')" />
+    </Target>
 
 </Project>

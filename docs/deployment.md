@@ -9,9 +9,8 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
-Current source Service/WebUI release version: `0.5.1`. This hotfix restores the MonoTorrent `3.0.2` production baseline
-and corrects launch-agent restart targeting. Native-app-only updates may advance the Apple marketing version without a
-Service/WebUI deployment. The native build number remains a separate monotonically increasing Apple bundle value.
+Current source Service version: `0.6.0`. The WebUI remains at `0.5.1` and is not part of the Service app-bundle work.
+The native macOS UI version and build number remain a separate release sequence.
 
 Launch agent labels:
 
@@ -27,6 +26,10 @@ Published executables:
 
 - `~/TorrentCore/Service/TorrentCoreService`
 - `~/TorrentCore/WebUI/TorrentCore.WebUI`
+
+The Arm64 Service app proof is separately installed at `~/Applications/TorrentCore/TorrentCoreService.app`. Its
+presence does not change the active Service. Until the Service-only DMG/deployer slice is accepted, the installed
+LaunchAgent continues to use the legacy published executable above.
 
 ## Target Layout
 
@@ -110,6 +113,86 @@ fixed. `dotnet publish` currently includes the Git-ignored `WebUI/Config/service
 directory replacement then overwrites Tom's saved endpoint with the release machine's value. The fix must exclude the
 machine-local file from payloads and preserve the target's existing WebUI connection setting, with package and apply
 verification for both behaviors.
+
+## Arm64 Service App Bundle
+
+`Scripts/ServiceApp/build-macos-service-app.zsh` publishes and packages the background-only Arm64
+`TorrentCoreService.app`. The immutable framework-dependent Service runtime, packaged defaults, and static publish
+content live under `Contents/Resources/Runtime`; app-specific deployment resources live under
+`Contents/Resources/Deployment`. The launcher executes the helper from the bundle but uses `~/TorrentCore/Service` as
+the working/configuration directory. An existing `Service/appsettings.json` is never overwritten; a fresh installation
+receives the packaged default. The installed `Service/version.json` is updated to the app release metadata. SQLite,
+MonoTorrent cache, download data, category paths, and callback state remain at their existing external locations.
+
+The bundle identity is `com.conadv.torrentcore.service`, while the LaunchAgent label remains
+`com.torrentcore.service`. The embedded installer associates those identities, binds the Service to
+`http://0.0.0.0:7033` by default, and changes only the Service LaunchAgent. Do not run it merely to build or inspect an
+app, because it boots out and replaces the active Service agent. Slice 8 owns the supported DMG install/rollback path.
+
+The builder requires the `net10.0/osx-arm64` restore graph to exist. Restore it once, then build an unsigned proof:
+
+```bash
+dotnet restore src/TorrentCore.ServiceHost/TorrentCore.Service.csproj --runtime osx-arm64
+./Scripts/ServiceApp/build-macos-service-app.zsh \
+  --output-bundle /private/tmp/TorrentCoreService-proof/TorrentCoreService.app
+```
+
+For a Developer ID proof, add the exact keychain identity:
+
+```bash
+./Scripts/ServiceApp/build-macos-service-app.zsh \
+  --output-bundle /private/tmp/TorrentCoreService-signed/TorrentCoreService.app \
+  --signing-identity 'Developer ID Application: Dick Kluis (5GRR76N48V)'
+```
+
+The signed verifier checks the complete nested code tree, Team ID, Hardened Runtime, timestamps, .NET JIT and shared
+runtime entitlements, native dependencies, architecture, bundle metadata, launcher/helper UUID separation, and absence
+of mutable TorrentCore data. Run signing verification outside the filesystem sandbox as required by repository policy.
+
+## Service-App DMG
+
+The Service-only DMG builder and deployer live under `Scripts/ServiceAppDMG`; they have no runtime dependency on the
+TVMaze repository and require no machine `live.json` manifest. Generation requires an installation label (`Dick` or
+`Tom`) for artifact naming and a CPU choice. No hostname catalog is packaged: installation paths come from the current
+user's home, and apply requires the existing `~/TorrentCore` and `~/TorrentCore/Service` structure. Releases initially
+contain only `payload/osx-arm64/TorrentCoreService.app` and refuse a host whose architecture does not match.
+
+Artifacts follow the established naming convention, for example
+`TorrentCore-torrentcore.2026.08.10.Dick.ServiceApp.dmg`. A real DMG build refuses a dirty source tree. From clean
+committed source, run:
+
+```bash
+./Scripts/ServiceAppDMG/release-service-app-dmg.zsh \
+  --installation Dick \
+  --cpu arm \
+  --release-name ServiceApp.InitialDeploy \
+  --date 2026.08.10
+```
+
+Use `--installation Tom --cpu arm` for Tom's Mac mini or VM. `--cpu intel` is a reserved future choice and is
+explicitly refused by the current Arm-only builder.
+
+The default output directory is `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs`. The workflow signs the app and
+DMG, submits the DMG through the existing `TorrentCore-notary` profile, staples it, and performs signature, entitlement,
+Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification outside the filesystem sandbox.
+
+From the mounted DMG, begin with:
+
+```bash
+./install.zsh plan
+./install.zsh dry-run
+```
+
+Neither command writes files or deployment state and neither controls launchd. A real apply additionally requires
+`./install.zsh apply --confirm`. It verifies the source app before stopping anything, creates compressed backups under
+`~/TorrentCore/.backups`, atomically replaces the app, preserves every existing file under `~/TorrentCore/Service`,
+updates the external version record, and changes only `com.torrentcore.service`. VPN Disabled, Ready, and Degraded are
+valid installation outcomes when API health is successful. Deployment state and history live under
+`~/TorrentCore/.deploy`.
+
+The deployer never copies, stops, starts, verifies, or backs up WebUI. Legacy Service files and current legacy scripts
+remain in place but inactive until the final cleanup slice. Do not use the legacy `install-launch-agents.zsh service`
+after app cutover because it still describes the intentionally retained legacy executable layout.
 
 ## Launch-Agent Management
 

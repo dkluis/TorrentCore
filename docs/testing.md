@@ -37,6 +37,9 @@ Representative coverage areas:
   processing-paused overlay that leaves Refresh available
 - API behavior, including Service semantic-version and Git-build identity reporting
 - launch-agent restart-label resolution, including the native supervisor helper's `XPC_SERVICE_NAME=0` context
+- Arm64 Service app packaging coverage for fixed bundle identity/version, macOS 26 minimum, native UI icon reuse,
+  framework-dependent Runtime layout, embedded Service-only deployment resources, distinct Mach-O UUIDs, LAN binding,
+  mutable-data exclusion, and separate unsigned/Developer ID verification
 - SQLite schema migration and persistence
 - torrent state persistence and restart recovery
 - history-store and history-service behavior
@@ -156,6 +159,20 @@ The Service/WebUI deployment DMG has a separate acceptance boundary from the nat
 must verify Developer ID signatures plus JIT and shared-runtime library-validation entitlements on both framework-
 dependent apphosts, the signature on every native Mach-O dependency, an accepted and stapled DMG, and a direct-email
 install on the target Mac without any xattr clearing.
+
+The standalone Arm64 Service app proof uses the commands in the
+[deployment guide](deployment.md#arm64-service-app-bundle). The builder always runs the unsigned structural verifier;
+supplying `--signing-identity` additionally runs the Developer ID verifier. The August 10, 2026 Slice 7 proof passed
+with Service `0.6.0` build `1`, Team `5GRR76N48V`, the required framework-dependent .NET entitlements, and an isolated
+loopback launch using temporary storage/download roots. It did not replace or restart the active Service LaunchAgent.
+
+Slice 8 adds a TorrentCore-owned, manifest-free Service-app DMG boundary. Focused acceptance builds the real signed
+Arm64 payload for a required Dick/Tom installation label and CPU choice, verifies the runtime collection and package
+checksums, and runs `install.zsh plan` plus
+`install.zsh dry-run` against the staged or mounted package. These checks must resolve only the approved
+`~/Applications/TorrentCore`, `~/TorrentCore`, and Service LaunchAgent locations and must write no filesystem or
+launchd state. The final DMG additionally requires clean committed source plus outside-sandbox notarization, stapling,
+Gatekeeper, and disk-image verification; a broad product test-suite rerun is not part of this packaging-only proof.
 
 The August 5 Dick Intel deployment release added distinct native supervisor launchers at the established Service and
 WebUI executable paths while retaining the framework-dependent apphosts as sibling `.apphost` helpers. Release
