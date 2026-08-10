@@ -7,6 +7,7 @@ using TorrentCore.Contracts.Host;
 using TorrentCore.Core.Diagnostics;
 using TorrentCore.Persistence.Sqlite.Configuration;
 using TorrentCore.Service.Application;
+using TorrentCore.Service.Vpn;
 
 #endregion
 
@@ -14,7 +15,8 @@ namespace TorrentCore.Service.Configuration;
 
 public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> serviceOptions,
     SqliteRuntimeSettingsStore runtimeSettingsStore, IActivityLogService activityLogService,
-    ServiceInstanceContext serviceInstanceContext, AppliedEngineSettingsState appliedEngineSettingsState)
+    ServiceInstanceContext serviceInstanceContext, AppliedEngineSettingsState appliedEngineSettingsState,
+    VpnSettingsChangeSignal vpnSettingsChangeSignal)
         : IRuntimeSettingsService
 {
     public async Task<RuntimeSettingsSnapshot> GetEffectiveSettingsAsync(CancellationToken cancellationToken)
@@ -418,6 +420,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 null
             );
         }
+
+        vpnSettingsChangeSignal.Notify();
 
         try
         {

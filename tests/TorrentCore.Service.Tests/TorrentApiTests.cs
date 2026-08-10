@@ -23,6 +23,7 @@ using TorrentCore.Service.Application;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
+using TorrentCore.Service.Vpn;
 
 namespace TorrentCore.Service.Tests;
 
@@ -4229,7 +4230,8 @@ public sealed class TorrentApiTests
             store,
             new NoOpActivityLogService(),
             new ServiceInstanceContext(),
-            appliedEngineSettingsState
+            appliedEngineSettingsState,
+            new VpnSettingsChangeSignal()
         );
     }
 

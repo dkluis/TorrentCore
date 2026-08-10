@@ -494,7 +494,7 @@ Status: completed on August 9, 2026.
 
 ### Slice 5: VPN State Orchestrator And Execution Gate
 
-Status: pending.
+Status: completed.
 
 #### Work
 
@@ -516,6 +516,48 @@ Status: pending.
 - Recovery is automatic and requires no operator action.
 - A slow check cannot overlap itself or resurrect a stale state after settings change or shutdown.
 - The accepted ready interval bounds application detection; documentation does not overstate leak prevention.
+
+#### Completed implementation
+
+- Added one serialized service coordinator for scheduled VPN checks, MonoTorrent activation and suspension, execution
+  admission, startup recovery completion, and live enable/disable changes.
+- An enabled service starts with torrent processing paused, exposes its API immediately, and performs its first VPN
+  check immediately. A disabled service preserves the existing startup recovery path.
+- Routine checks leave torrent processing and the native UI available. Only a failed check closes execution admission
+  and suspends MonoTorrent. Repeated degraded checks do not repeat engine suspension or duplicate unchanged state logs.
+- Degraded checks use the configured degraded interval and ready checks use the configured ready interval, measured
+  after the preceding check and transition finish. Other setting edits take effect on the next scheduled check without
+  resetting the current countdown.
+- Turning validation on through the supported settings API starts an immediate check without preemptively pausing
+  torrents. Turning it off immediately retries MonoTorrent activation without another VPN check.
+- A failed MonoTorrent activation remains degraded and retries activation directly at the degraded interval without
+  repeating the already-successful VPN check.
+- Added additive optional host-status fields for validation enabled state, connection phase and reason, torrent
+  processing availability, and the operator message. The native Torrents and History refresh paths consume those
+  fields while remaining compatible with older services.
+- Added native macOS processing-paused overlays to Torrents and History. The overlay blocks page actions and leaves
+  Refresh available; normal global auto-refresh behavior remains unchanged.
+- Added deterministic coordinator coverage for degraded startup admission, successful startup, automatic recovery,
+  non-disruptive routine checking, supported settings enable/disable transitions, and direct activation retry.
+
+#### Live CA-Desktop proof
+
+The August 10, 2026 source-build proof used the normal CA-Desktop database and the configured `47.0.0.0/8` direct-ISP
+range, with ExpressVPN applied to the whole machine because the Service app bundle is a later slice.
+
+- With ExpressVPN off, the Service started `Degraded` with reason `DirectIsp`; the API remained healthy, startup
+  recovery remained incomplete, and MonoTorrent counts and rates stayed at zero.
+- The native Torrents and History pages both displayed the processing-paused overlay.
+- A real magnet submitted through the native UI was accepted and persisted as `Queued` with
+  `PendingMetadataDispatch`, zero peers, and zero transfer rates.
+- After ExpressVPN connected, one check during the network transition timed out and safely remained degraded. The next
+  60-second degraded check succeeded without operator action, completed startup recovery, removed both overlays, and
+  began processing the queued torrent.
+- After ExpressVPN disconnected again, the Service remained ready until the configured 240-second check. It then
+  reported `DirectIsp`, suspended the active engine, reduced peer and transfer activity to zero, retained the torrent,
+  and restored both native overlays.
+- The development Service stopped cleanly afterward: port `7033` was released and SQLite checkpointed without WAL or
+  SHM files remaining.
 
 ### Slice 6: Host Status, Logs, And Operator Diagnostics
 

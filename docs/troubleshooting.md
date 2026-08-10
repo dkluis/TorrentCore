@@ -160,6 +160,24 @@ If all attempts fail, inspect the persistent activity log for `torrent.data_clea
 torrent id, candidate paths, and final error. TorrentCore has already removed the torrent from active tracking at that
 point, so resolve the external file-system condition and remove the remaining payload manually.
 
+## Torrent Processing Is Paused For The VPN
+
+`/api/health` remains successful while VPN validation has paused torrent processing. Inspect `/api/host/status` and
+check `vpnConnectionPhase`, `vpnConnectionReason`, `torrentProcessingAvailable`, and `torrentProcessingMessage`.
+
+- `DirectIsp` means the observed public IPv4 matched a configured direct-ISP CIDR.
+- `TimedOut` or `EndpointFailure` means TorrentCore could not confirm the VPN through the configured endpoint.
+- `EngineActivationFailed` means the VPN check succeeded but MonoTorrent could not restart; TorrentCore retries the
+  engine directly at the degraded interval.
+- `EngineSuspensionFailed` means execution admission is closed but engine teardown did not complete cleanly.
+
+Magnets remain accepted and queued while degraded. Torrents and History remain readable through the API, while the
+native macOS pages show a processing-paused overlay with Refresh available. Recovery is automatic after a successful
+degraded check. Do not restart the Service merely to clear this state.
+
+The ready interval is detection latency, not immediate packet protection. ExpressVPN Network Lock remains responsible
+for blocking traffic during the interval before TorrentCore performs its next check.
+
 ## Deployment And Runtime Checks
 
 Useful runtime checks on the host:

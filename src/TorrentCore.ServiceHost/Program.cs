@@ -67,6 +67,8 @@ builder.Services.AddSingleton<ServiceInstanceContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(VpnEgressProbe.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddSingleton<IVpnEgressProbe, VpnEgressProbe>();
+builder.Services.AddSingleton<VpnConnectionRuntimeState>();
+builder.Services.AddSingleton<VpnSettingsChangeSignal>();
 builder.Services.AddSingleton<RuntimeOperationDurationDiagnostics>();
 builder.Services.AddSingleton<StartupRecoveryState>();
 builder.Services.AddSingleton(serviceProvider =>
@@ -144,10 +146,12 @@ builder.Services.AddSingleton<ITorrentEngineAdapter>(serviceProvider
         TorrentEngineMode.MonoTorrent ? serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>() :
                 serviceProvider.GetRequiredService<PersistedTorrentEngineAdapter>()
 );
+builder.Services.AddSingleton<TorrentStartupRecoveryService>();
+builder.Services.AddSingleton<VpnConnectionCoordinator>();
 builder.Services.AddHostedService<SqlitePersistenceInitializer>();
 builder.Services.AddHostedService<TorrentCategoryInitializationService>();
 builder.Services.AddHostedService<AppliedEngineSettingsInitializationService>();
-builder.Services.AddHostedService<TorrentStartupRecoveryService>();
+builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<VpnConnectionCoordinator>());
 builder.Services.AddHostedService<FakeTorrentRuntimeService>();
 builder.Services.AddHostedService<CompletedTorrentCleanupService>();
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<MonoTorrentEngineAdapter>());

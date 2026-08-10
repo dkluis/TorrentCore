@@ -90,11 +90,17 @@ The WebUI stays a thin client over service contracts. It must not:
 - bypass service APIs for operator workflows
 - embed engine or recovery policy that belongs in the service host
 
-The Service has an internal, callable public-IPv4 egress probe. It compares an observed address with the configured
-direct-ISP CIDRs: matching any configured range means direct ISP egress, while matching none means validated egress
-without claiming a specific VPN provider. The probe is registered but is not invoked at startup or on a schedule yet
-and does not initialize or call MonoTorrent. The restartable MonoTorrent lifecycle is also registered, while Slice 5
-will own validation scheduling and automatic degraded/ready transitions.
+The Service has one serialized VPN connection coordinator over its public-IPv4 probe, execution gate, and restartable
+MonoTorrent lifecycle. The probe compares an observed address with the configured direct-ISP CIDRs: matching any
+configured range means direct ISP access, while matching none means validated access without claiming a specific VPN
+provider. When validation is enabled, startup leaves MonoTorrent inactive and the API available until the immediate
+first check succeeds. Ready and degraded checks use their independent configured intervals and never overlap.
+
+A routine check does not close the execution gate or publish degraded state. A failed check closes admission before
+suspending and disposing MonoTorrent. A later successful degraded check recreates and recovers MonoTorrent before
+reopening admission. Activation failure retries the engine directly at the degraded interval without repeating an
+already-successful VPN check. Supported settings updates wake the coordinator for immediate enable/disable behavior;
+other policy changes take effect on the next scheduled check without resetting the current countdown.
 
 ## Engine Dependency
 
@@ -122,9 +128,8 @@ will own validation scheduling and automatic degraded/ready transitions.
 - VPN-triggered suspension does not call MonoTorrent's graceful stop path because that path performs final tracker
   announces. Normal Service shutdown may stop gracefully before disposal. Downloaded files and the external
   `monotorrent-cache` remain in place for later recovery.
-- A degraded reboot never needs an in-memory engine state to survive: when validation enforcement is added in Slice 5,
-  persisted validation enablement will force a fresh check before explicit activation. Magnets accepted while degraded
-  remain in SQLite and recover after a later successful check.
+- A degraded reboot never needs an in-memory engine state to survive. Persisted validation enablement forces a fresh
+  check before activation. Magnets accepted while degraded remain in SQLite and recover after a later successful check.
 - Every active metadata resolution reserves one future download slot. The effective metadata-resolution limit is the
   lower of the configured metadata limit and the download capacity not already claimed by resolved runnable torrents.
   This prevents MonoTorrent's automatic metadata-to-download transition from oversubscribing the download limit.

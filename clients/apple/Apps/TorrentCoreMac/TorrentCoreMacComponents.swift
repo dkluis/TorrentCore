@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TorrentCoreAPI
 import TorrentCoreFeatures
 
 enum TorrentCoreMacErrorPresenter {
@@ -72,6 +73,70 @@ struct TorrentCoreMacMetric: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
         .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct TorrentCoreMacProcessingPausedOverlay: View {
+    let hostStatus: TorrentCoreHostStatus
+    let refresh: () -> Void
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(.regularMaterial)
+                .contentShape(Rectangle())
+
+            VStack(spacing: 12) {
+                Image(systemName: isRestarting ? "arrow.clockwise.circle.fill" : "pause.circle.fill")
+                    .font(.system(size: 38))
+                    .foregroundStyle(isRestarting ? .blue : .orange)
+                Text(isRestarting ? "Restarting Torrent Processing" : "Torrent Processing Paused")
+                    .font(.title2.weight(.semibold))
+                Text(hostStatus.torrentProcessingMessage
+                     ?? "VPN connection could not be confirmed. Torrent processing is paused.")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 520)
+                if let reason = reasonText {
+                    Text(reason)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    refresh()
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .keyboardShortcut("r", modifiers: .command)
+            }
+            .padding(28)
+        }
+        .accessibilityIdentifier("vpn.processingPaused")
+    }
+
+    private var isRestarting: Bool {
+        hostStatus.vpnConnectionPhase == "Activating"
+    }
+
+    private var reasonText: String? {
+        switch hostStatus.vpnConnectionReason {
+        case "DirectIsp":
+            "The service is using the configured direct ISP connection."
+        case "InvalidResponse":
+            "The VPN check returned an invalid public address."
+        case "TimedOut":
+            "The VPN check timed out."
+        case "EndpointFailure":
+            "The VPN check service could not be reached."
+        case "UnexpectedFailure":
+            "The VPN check failed unexpectedly."
+        case "EngineActivationFailed":
+            "The VPN is available, but torrent processing could not restart."
+        case "EngineSuspensionFailed":
+            "Torrent processing could not be paused cleanly."
+        default:
+            nil
+        }
     }
 }
 

@@ -57,5 +57,10 @@ public sealed class EngineHostStatusDto
     public required int              StartupRecoveredTorrentCount            { get; init; }
     public required int              StartupNormalizedTorrentCount           { get; init; }
     public          DateTimeOffset?  StartupRecoveryCompletedAtUtc           { get; init; }
+    public          bool?            VpnValidationEnabled                    { get; init; }
+    public          string?          VpnConnectionPhase                      { get; init; }
+    public          string?          VpnConnectionReason                     { get; init; }
+    public          bool?            TorrentProcessingAvailable              { get; init; }
+    public          string?          TorrentProcessingMessage                { get; init; }
     public required DateTimeOffset   CheckedAtUtc                            { get; init; }
 }

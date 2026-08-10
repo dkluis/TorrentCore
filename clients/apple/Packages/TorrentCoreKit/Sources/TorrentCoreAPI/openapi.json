@@ -624,6 +624,26 @@
           "torrentCount": {
             "format": "int32",
             "type": "integer"
+          },
+          "torrentProcessingAvailable": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "torrentProcessingMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnConnectionPhase": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnConnectionReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnValidationEnabled": {
+            "nullable": true,
+            "type": "boolean"
           }
         },
         "required": [

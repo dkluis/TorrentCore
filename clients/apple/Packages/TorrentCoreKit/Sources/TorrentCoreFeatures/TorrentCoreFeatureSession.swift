@@ -826,7 +826,9 @@ public final class TorrentCoreFeatureSession {
                 acceptHostStatus(status, for: context, at: completedAt)
                 dashboardLifecycle.succeed(lifecycle, at: completedAt)
             case .torrents:
-                let summaries = try await serviceClient.torrents()
+                async let statusRequest = loadHostStatus(serviceClient, newlyLoadedHost: newlyLoadedHost)
+                async let summariesRequest = serviceClient.torrents()
+                let (status, summaries) = try await (statusRequest, summariesRequest)
                 guard isCurrent(
                     profile: profile,
                     context: context,
@@ -834,7 +836,9 @@ public final class TorrentCoreFeatureSession {
                 ) else {
                     return
                 }
-                torrents.succeed(summaries, at: now())
+                let completedAt = now()
+                acceptHostStatus(status, for: context, at: completedAt)
+                torrents.succeed(summaries, at: completedAt)
             case let .torrentDetail(torrentID):
                 let detail = try await serviceClient.torrent(id: torrentID)
                 guard isCurrent(
@@ -846,7 +850,9 @@ public final class TorrentCoreFeatureSession {
                 }
                 torrentDetail.succeed(detail, at: now())
             case let .torrentListAndDetail(torrentID):
-                let summaries = try await serviceClient.torrents()
+                async let statusRequest = loadHostStatus(serviceClient, newlyLoadedHost: newlyLoadedHost)
+                async let summariesRequest = serviceClient.torrents()
+                let (status, summaries) = try await (statusRequest, summariesRequest)
                 guard isCurrent(
                     profile: profile,
                     context: context,
@@ -854,7 +860,9 @@ public final class TorrentCoreFeatureSession {
                 ) else {
                     return
                 }
-                torrents.succeed(summaries, at: now())
+                let completedAt = now()
+                acceptHostStatus(status, for: context, at: completedAt)
+                torrents.succeed(summaries, at: completedAt)
 
                 guard summaries.contains(where: { $0.torrentID == torrentID }) else {
                     torrentDetail.reset()
@@ -902,11 +910,13 @@ public final class TorrentCoreFeatureSession {
                 }
                 categories.succeed(availableCategories, at: now())
             case let .history(query, selectedTorrentID):
+                async let statusRequest = loadHostStatus(serviceClient, newlyLoadedHost: newlyLoadedHost)
                 async let historyRequest = serviceClient.history(query: query)
                 async let abandonedRequest = serviceClient.history(
                     query: .init(outcome: .abandoned, take: 500)
                 )
-                let (historyValues, abandonedValues) = try await (
+                let (status, historyValues, abandonedValues) = try await (
+                    statusRequest,
                     historyRequest,
                     abandonedRequest
                 )
@@ -918,6 +928,7 @@ public final class TorrentCoreFeatureSession {
                     return
                 }
                 let completedAt = now()
+                acceptHostStatus(status, for: context, at: completedAt)
                 history.succeed(historyValues, at: completedAt)
                 abandonedHistory.succeed(abandonedValues, at: completedAt)
 
@@ -1034,6 +1045,16 @@ public final class TorrentCoreFeatureSession {
         acceptHostStatus(loadedHost, for: context)
         connectionState = .connected(profileID: profile.id, connectedAt: now())
         return loadedHost
+    }
+
+    private func loadHostStatus(
+        _ serviceClient: any TorrentCoreServiceClientProtocol,
+        newlyLoadedHost: TorrentCoreHostStatus?
+    ) async throws -> TorrentCoreHostStatus {
+        if let newlyLoadedHost {
+            return newlyLoadedHost
+        }
+        return try await serviceClient.hostStatus()
     }
 
     private func acceptHostStatus(

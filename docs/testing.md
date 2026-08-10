@@ -16,6 +16,9 @@ Representative coverage areas:
 - deterministic VPN-egress coverage for controllable time, scripted HTTP outcomes, typed/bounded IPv4 response
   parsing, multiple direct-ISP CIDRs, timeout and cancellation behavior, stable endpoint-failure reasons, and
   change-suppressed DB logging; these tests require neither Internet access nor ExpressVPN
+- serialized VPN coordinator coverage for non-blocking degraded startup, persistence-only admission, automatic
+  recovery, non-disruptive routine checks, supported settings enable/disable transitions, and direct engine retry after
+  an activation failure
 - default-open execution-gate drain behavior; closed-gate persistence-only magnet admission, normal acceptance errors,
   constrained save paths, structured unavailable actions, readable diagnostics, and full-restart durability without
   initializing MonoTorrent
@@ -27,6 +30,8 @@ Representative coverage areas:
 - VPN-setting defaults, SQLite/API round trips and restart persistence, IPv4 CIDR canonicalization, additive-client
   compatibility, and structured rejection of unsafe endpoints, IPv6/invalid CIDRs, and invalid intervals/timeouts,
   including the independent engine-suspension timeout
+- native client refresh coverage keeps host status current on Torrents and History; the Arm64 macOS build verifies the
+  processing-paused overlay that leaves Refresh available
 - API behavior, including Service semantic-version and Git-build identity reporting
 - launch-agent restart-label resolution, including the native supervisor helper's `XPC_SERVICE_NAME=0` context
 - SQLite schema migration and persistence

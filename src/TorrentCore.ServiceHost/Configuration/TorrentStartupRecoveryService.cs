@@ -16,6 +16,16 @@ public sealed class TorrentStartupRecoveryService(ITorrentEngineAdapter torrentE
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var result = await torrentEngineAdapter.RecoverAsync(cancellationToken);
+        await CompleteAsync(result, cancellationToken);
+    }
+
+    public async Task CompleteAsync(TorrentEngineRecoveryResult result, CancellationToken cancellationToken)
+    {
+        if (startupRecoveryState.Completed)
+        {
+            return;
+        }
+
         startupRecoveryState.MarkCompleted(
             result.RecoveredTorrentCount, result.NormalizedTorrentCount, result.CompletedAtUtc
         );

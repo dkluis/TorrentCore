@@ -271,6 +271,18 @@ struct TorrentCoreMacHistoryView: View {
             session: session,
             context: refreshContext
         )
+        .allowsHitTesting(!isTorrentProcessingPaused)
+        .overlay {
+            if isTorrentProcessingPaused, let hostStatus = session.hostStatus.value {
+                TorrentCoreMacProcessingPausedOverlay(hostStatus: hostStatus) {
+                    Task { await session.refresh(refreshContext) }
+                }
+            }
+        }
+    }
+
+    private var isTorrentProcessingPaused: Bool {
+        session.hostStatus.value?.torrentProcessingAvailable == false
     }
 
     private var refreshContext: TorrentCoreFeatureContext {

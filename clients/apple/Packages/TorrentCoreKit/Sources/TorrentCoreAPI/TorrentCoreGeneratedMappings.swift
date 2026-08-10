@@ -69,6 +69,11 @@ extension TorrentCoreHostStatus {
         startupRecoveredTorrentCount = Int(value.startupRecoveredTorrentCount)
         startupNormalizedTorrentCount = Int(value.startupNormalizedTorrentCount)
         startupRecoveryCompletedAt = value.startupRecoveryCompletedAtUtc
+        vpnValidationEnabled = value.vpnValidationEnabled
+        vpnConnectionPhase = value.vpnConnectionPhase
+        vpnConnectionReason = value.vpnConnectionReason
+        torrentProcessingAvailable = value.torrentProcessingAvailable
+        torrentProcessingMessage = value.torrentProcessingMessage
         checkedAt = value.checkedAtUtc
     }
 }

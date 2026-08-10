@@ -13,6 +13,7 @@ using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
 using TorrentCore.Service.Infrastructure;
+using TorrentCore.Service.Vpn;
 
 #endregion
 
@@ -26,6 +27,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     ITorrentHistoryService torrentHistoryService,
     AppliedEngineSettingsState appliedEngineSettingsState, ServiceInstanceContext serviceInstanceContext,
     StartupRecoveryState startupRecoveryState, ILaunchAgentServiceRestartScheduler restartScheduler,
+    VpnConnectionRuntimeState vpnConnectionRuntimeState,
     ILogger<TorrentApplicationService> logger) : ITorrentApplicationService
 {
     private static readonly HashSet<string> DashboardLifecycleRecentEventTypes = new(StringComparer.Ordinal)
@@ -76,6 +78,7 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         var currentConnectedPeerCount = torrents.Sum(torrent => torrent.ConnectedPeerCount);
         var currentDownloadRateBytesPerSecond = torrents.Sum(torrent => torrent.DownloadRateBytesPerSecond);
         var currentUploadRateBytesPerSecond = torrents.Sum(torrent => torrent.UploadRateBytesPerSecond);
+        var vpnConnection = vpnConnectionRuntimeState.Snapshot;
 
         return new EngineHostStatusDto
         {
@@ -121,7 +124,9 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             CompletedTorrentCleanupMode = runtimeSettings.CompletedTorrentCleanupMode.ToString(),
             CompletedTorrentCleanupMinutes = runtimeSettings.CompletedTorrentCleanupMinutes,
             DeleteLogsForCompletedTorrents = runtimeSettings.DeleteLogsForCompletedTorrents,
-            Status = startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
+            Status = !vpnConnection.IsTorrentProcessingAvailable
+                ? EngineHostStatus.Degraded
+                : startupRecoveryState.Completed ? EngineHostStatus.Ready : EngineHostStatus.Starting,
             EnvironmentName = hostEnvironment.EnvironmentName,
             DownloadRootPath = servicePaths.DownloadRootPath,
             TorrentCount = torrents.Count,
@@ -135,6 +140,11 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
             StartupRecoveredTorrentCount = startupRecoveryState.RecoveredTorrentCount,
             StartupNormalizedTorrentCount = startupRecoveryState.NormalizedTorrentCount,
             StartupRecoveryCompletedAtUtc = startupRecoveryState.CompletedAtUtc,
+            VpnValidationEnabled = vpnConnection.ValidationEnabled,
+            VpnConnectionPhase = vpnConnection.Phase.ToString(),
+            VpnConnectionReason = vpnConnection.Reason?.ToString(),
+            TorrentProcessingAvailable = vpnConnection.IsTorrentProcessingAvailable,
+            TorrentProcessingMessage = vpnConnection.OperatorMessage,
             CheckedAtUtc = DateTimeOffset.UtcNow,
         };
     }

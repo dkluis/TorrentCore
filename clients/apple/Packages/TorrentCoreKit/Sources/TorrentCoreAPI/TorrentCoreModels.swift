@@ -126,6 +126,11 @@ public struct TorrentCoreHostStatus: Codable, Hashable, Sendable {
     public var startupRecoveredTorrentCount: Int
     public var startupNormalizedTorrentCount: Int
     public var startupRecoveryCompletedAt: Date?
+    public var vpnValidationEnabled: Bool?
+    public var vpnConnectionPhase: String?
+    public var vpnConnectionReason: String?
+    public var torrentProcessingAvailable: Bool?
+    public var torrentProcessingMessage: String?
     public var checkedAt: Date
 }
 

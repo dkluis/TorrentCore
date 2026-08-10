@@ -68,6 +68,11 @@ public enum TorrentCorePreviewFixtures {
         startupRecoveredTorrentCount: 0,
         startupNormalizedTorrentCount: 0,
         startupRecoveryCompletedAt: checkedAt,
+        vpnValidationEnabled: true,
+        vpnConnectionPhase: "Ready",
+        vpnConnectionReason: nil,
+        torrentProcessingAvailable: true,
+        torrentProcessingMessage: nil,
         checkedAt: checkedAt
     )
 
