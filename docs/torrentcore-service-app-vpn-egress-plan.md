@@ -793,23 +793,18 @@ Status: deferred until Arm proof acceptance.
 
 ### Slice 12: WebUI App Bundle
 
-Status: deferred and not implied by Service proof acceptance.
+Status: superseded by
+[WebUI Functional Alignment Plan, Slice 5](webui-functional-alignment-plan.md#slice-5-bundled-webui-and-combined-managed-deployment).
 
 #### Work
 
-- Package `TorrentCore.WebUI` as its own app bundle using the proven TVMazeWeb static-content pattern.
-- Keep immutable `wwwroot`, CSS, JavaScript, assemblies, and defaults inside the bundle.
-- Keep `service-connection.json` outside the sealed bundle.
-- Give WebUI a separate stable bundle identity, launcher UUID, LaunchAgent association, signing verification, and
-  component-level deployment/rollback path.
-- After WebUI split-tunnel and app-bundle work is proven, extend the installation-labelled, CPU-selected deployment so
-  the Service and WebUI apps are delivered together in the same DMG.
+- Implement the current WebUI app-bundle and combined managed-deployment requirements in the linked active plan.
+- Treat that plan's confirmed decisions as authoritative where this older plan differs, including Arm64-only delivery
+  and Service plus WebUI always deploying together from the DMG installer.
 
 #### Acceptance
 
-- WebUI static assets served from the bundle are byte-identical to staged publish output.
-- Saved Service connection state survives upgrade and rollback.
-- Service-only deployments remain able to leave WebUI untouched.
+- Use the linked plan's acceptance criteria.
 
 ### Slice 13: Final Deployment Cleanup
 
