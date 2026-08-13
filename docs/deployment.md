@@ -195,6 +195,12 @@ entitlement, Gatekeeper, stapler-ticket, disk-image, checksum, and architecture 
 sandbox. `TorrentCore.app/Contents/Resources/version.json` records native UI version, build, Git SHA, build time, and
 runtime. The package `release.json` records both managed-app checksums and the manual `/Applications/TorrentCore.app` target.
 
+The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 combined release was accepted and stapled on August 13,
+2026 under notarization submission `9e10a30b-d520-40dc-95c8-379d89de7884`. Its SHA-256 checksum is
+`bd4d3f70bcb10ee96a66634660696ce36502950bdd0329d883f7fdd519bc3b3d`. The artifact was built from clean commit
+`9410b68c40dcc6ae7db621fbe2ea36fed18c4670`; the copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper,
+mounted-payload, managed-app signature, and machine-local connection-file exclusion verification.
+
 From the mounted DMG, begin with:
 
 ```bash

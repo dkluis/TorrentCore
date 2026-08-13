@@ -491,7 +491,7 @@ Completed on August 13, 2026, before bundled deployment work:
 
 ### Slice 5: Bundled WebUI And Combined Managed Deployment
 
-Status: pending; follows Slices 0 through 4 so the combined release contains the functionally aligned WebUI.
+Status: completed August 13, 2026. The combined release contains the functionally aligned WebUI.
 
 #### Work
 
@@ -571,6 +571,19 @@ Status: pending; follows Slices 0 through 4 so the combined release contains the
   notarization, stapler, Gatekeeper, checksum, LaunchAgent-definition, and payload verification outside the filesystem
   sandbox.
 - Perform a live `plan`, `dry-run`, apply, and verification only during an explicitly authorized deployment window.
+
+Completed release evidence:
+
+- Both unsigned Arm64 proof bundles built and passed their structural verifiers.
+- WebUI served a fingerprinted CSS asset from its signed bundle with an empty external working directory; the response
+  was byte-identical to the bundled source.
+- Solution build and all 286 existing tests passed; no WebUI tests were added.
+- Apple accepted notarization submission `9e10a30b-d520-40dc-95c8-379d89de7884` for the clean-source Dick combined DMG.
+- The stapled final artifact passed Developer ID, Hardened Runtime, entitlement, architecture, UUID, Gatekeeper,
+  disk-image, mounted-payload, and connection-file exclusion checks. Its SHA-256 checksum is
+  `bd4d3f70bcb10ee96a66634660696ce36502950bdd0329d883f7fdd519bc3b3d`.
+- No live `plan`, `dry-run`, apply, or installed-runtime verification was performed; those remain gated on explicit
+  deployment authorization.
 
 ### Slice 6: Active Documentation And Final Verification
 
