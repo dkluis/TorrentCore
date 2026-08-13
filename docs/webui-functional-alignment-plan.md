@@ -491,7 +491,8 @@ Completed on August 13, 2026, before bundled deployment work:
 
 ### Slice 5: Bundled WebUI And Combined Managed Deployment
 
-Status: completed August 13, 2026. The combined release contains the functionally aligned WebUI.
+Status: implementation complete August 13, 2026. Corrected persistent release-package staging is pending operator
+inspection before a replacement DMG is built.
 
 #### Work
 
@@ -567,21 +568,21 @@ Status: completed August 13, 2026. The combined release contains the functionall
 - Run installer dry-run fixtures covering an existing saved connection and a fresh WebUI working directory without
   adding WebUI tests.
 - Run the current solution build and existing test suite.
-- From clean committed source, build the signed combined DMG and run signature, entitlement, architecture,
-  notarization, stapler, Gatekeeper, checksum, LaunchAgent-definition, and payload verification outside the filesystem
-  sandbox.
+- From clean committed source, first save and inspect the standard persistent deployment directory with package docs,
+  PDFs, five root helper scripts, release metadata, signed app payloads, and the native UI app.
+- Only after operator approval of that directory, build the signed combined DMG from it and run signature, entitlement,
+  architecture, notarization, stapler, Gatekeeper, checksum, LaunchAgent-definition, and payload verification outside
+  the filesystem sandbox.
 - Perform a live `plan`, `dry-run`, apply, and verification only during an explicitly authorized deployment window.
 
-Completed release evidence:
+Completed implementation evidence:
 
 - Both unsigned Arm64 proof bundles built and passed their structural verifiers.
 - WebUI served a fingerprinted CSS asset from its signed bundle with an empty external working directory; the response
   was byte-identical to the bundled source.
 - Solution build and all 286 existing tests passed; no WebUI tests were added.
-- Apple accepted notarization submission `9e10a30b-d520-40dc-95c8-379d89de7884` for the clean-source Dick combined DMG.
-- The stapled final artifact passed Developer ID, Hardened Runtime, entitlement, architecture, UUID, Gatekeeper,
-  disk-image, mounted-payload, and connection-file exclusion checks. Its SHA-256 checksum is
-  `bd4d3f70bcb10ee96a66634660696ce36502950bdd0329d883f7fdd519bc3b3d`.
+- Replacement release evidence remains pending until the persistent Dick deployment directory is inspected and its
+  DMG build is explicitly approved.
 - No live `plan`, `dry-run`, apply, or installed-runtime verification was performed; those remain gated on explicit
   deployment authorization.
 

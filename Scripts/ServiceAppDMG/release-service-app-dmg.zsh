@@ -1,45 +1,51 @@
-#!/bin/zsh
+#!/usr/bin/env zsh
 
 set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
-REPO_ROOT="${SCRIPT_DIR:h:h}"
-TEAM_ID="5GRR76N48V"
-NOTARY_PROFILE="TorrentCore-notary"
-SIGNING_IDENTITY=""
-RELEASE_DATE="$(date '+%Y.%m.%d')"
+DEPLOYMENTS_ROOT="/Volumes/CA-Desktop-HD-2/Development/Deployments"
 INSTALLATION=""
 CPU=""
 RELEASE_NAME=""
-UI_VERSION="0.6.0"
-UI_BUILD_NUMBER="11"
-OUTPUT_DIR="/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs"
+RELEASE_DATE="$(date '+%Y.%m.%d')"
+NOTES=""
+PACKAGE_DIR=""
 PACKAGE_ROOT=""
-STAGE_ONLY=false
-ALLOW_DIRTY=false
-CHECK_ONLY=false
+DMG_DIR=""
+DMG_PATH=""
+VOLUME_NAME=""
+SIGNING_IDENTITY=""
+NOTARY_PROFILE="TorrentCore-notary"
+PDF_TOOL="pandoc"
+PDF_ENGINE="tectonic"
+SKIP_PDF=false
+REQUIRE_PDF=false
+CLEAN=false
 
-fail() {
-    print -ru2 -- "[TorrentCore managed-app DMG] ERROR: $*"
-    exit 1
-}
+fail() { print -ru2 -- "[TorrentCore release DMG] ERROR: $*"; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: release-service-app-dmg.zsh [options]
+Usage: release-service-app-dmg.zsh --installation <Dick|Tom> --cpu arm --release-name <name> --notes <summary> [options]
+
+This is the established two-step TorrentCore release driver. It first saves the complete release package under
+TorrentCore-Deployments/<installation>, then creates the DMG from that saved package.
 
 Options:
-  --installation <Dick|Tom>   Required deployment environment name.
-  --cpu <arm|intel>           Required CPU choice. Intel is reserved and currently refused.
-  --release-name <name>       Required release purpose, for example ManagedApps.InitialDeploy.
-  --date <YYYY.MM.DD>          Artifact date. Defaults to today.
-  --output-dir <path>          DMG output directory.
-  --package-root <path>        Staged package directory. Required with --stage-only.
+  --date <YYYY.MM.DD>          Release date. Defaults to today.
+  --package-dir <path>         Installation package parent directory.
+  --package-root <path>        Exact persistent package directory.
+  --dmg-dir <path>             DMG output directory.
+  --output-dir <path>          Compatibility alias for --dmg-dir.
+  --dmg-path <path>            Exact DMG path.
+  --volume-name <name>         Defaults to the package directory name.
   --signing-identity <name>    Exact Developer ID Application identity.
   --notary-profile <name>      Defaults to TorrentCore-notary.
-  --stage-only                 Build/sign the app and stage mounted-DMG contents without creating a DMG.
-  --allow-dirty                Permit a marked dirty development package; never valid for a release DMG.
-  --check                      Validate release credentials and tools without building.
+  --pdf-tool <command>         Defaults to pandoc.
+  --pdf-engine <engine>        Defaults to tectonic.
+  --skip-pdf                   Generate Markdown only.
+  --require-pdf                Fail if either PDF cannot be generated.
+  --clean                      Replace an existing package directory and DMG.
 EOF
 }
 
@@ -49,13 +55,19 @@ while (( $# > 0 )); do
         --cpu) CPU="${2:-}"; shift 2 ;;
         --release-name) RELEASE_NAME="${2:-}"; shift 2 ;;
         --date) RELEASE_DATE="${2:-}"; shift 2 ;;
-        --output-dir) OUTPUT_DIR="${2:-}"; shift 2 ;;
+        --notes) NOTES="${2:-}"; shift 2 ;;
+        --package-dir) PACKAGE_DIR="${2:-}"; shift 2 ;;
         --package-root) PACKAGE_ROOT="${2:-}"; shift 2 ;;
+        --dmg-dir|--output-dir) DMG_DIR="${2:-}"; shift 2 ;;
+        --dmg-path) DMG_PATH="${2:-}"; shift 2 ;;
+        --volume-name) VOLUME_NAME="${2:-}"; shift 2 ;;
         --signing-identity) SIGNING_IDENTITY="${2:-}"; shift 2 ;;
         --notary-profile) NOTARY_PROFILE="${2:-}"; shift 2 ;;
-        --stage-only) STAGE_ONLY=true; shift ;;
-        --allow-dirty) ALLOW_DIRTY=true; shift ;;
-        --check) CHECK_ONLY=true; shift ;;
+        --pdf-tool) PDF_TOOL="${2:-}"; shift 2 ;;
+        --pdf-engine) PDF_ENGINE="${2:-}"; shift 2 ;;
+        --skip-pdf) SKIP_PDF=true; shift ;;
+        --require-pdf) REQUIRE_PDF=true; shift ;;
+        --clean) CLEAN=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) fail "Unknown argument: $1" ;;
     esac
@@ -66,271 +78,59 @@ case "${INSTALLATION:l}" in
     tom) INSTALLATION="Tom" ;;
     *) fail "--installation must be Dick or Tom." ;;
 esac
-case "${CPU:l}" in
-    arm) CPU="arm"; RUNTIME="osx-arm64" ;;
-    intel) fail "Intel managed-app generation is recognized but not supported; this release is Arm64-only." ;;
-    *) fail "--cpu must be arm or intel." ;;
-esac
-[[ "$RELEASE_NAME" =~ '^[A-Za-z][A-Za-z0-9.-]*$' ]] ||
-    fail "--release-name is required and may contain only letters, numbers, dots, and hyphens."
+[[ "${CPU:l}" == arm ]] || fail "--cpu must be arm; Intel packaging is not supported."
+CPU="arm"
+[[ "$RELEASE_NAME" =~ '^[A-Za-z][A-Za-z0-9.-]*$' ]] || fail "--release-name is required and invalid."
 [[ "$RELEASE_DATE" =~ '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$' ]] || fail "Invalid release date: $RELEASE_DATE"
-if [[ "$ALLOW_DIRTY" == true && "$STAGE_ONLY" != true ]]; then
-    fail "--allow-dirty is permitted only with --stage-only."
-fi
-if [[ "$STAGE_ONLY" == true && -z "$PACKAGE_ROOT" ]]; then
-    fail "--package-root is required with --stage-only."
-fi
-
-for command_name in codesign ditto file hdiutil security shasum spctl xcrun; do
-    command -v "$command_name" >/dev/null 2>&1 || fail "Required command is unavailable: $command_name"
-done
-xcrun --find notarytool >/dev/null || fail "notarytool is unavailable."
-xcrun --find stapler >/dev/null || fail "stapler is unavailable."
-
-if [[ -z "$SIGNING_IDENTITY" ]]; then
-    identities=()
-    while IFS= read -r line; do
-        if [[ "$line" =~ '"(Developer ID Application:.*\('"$TEAM_ID"'\))"' ]]; then
-            identities+=("${match[1]}")
-        fi
-    done < <(security find-identity -v -p codesigning)
-    (( ${#identities[@]} == 1 )) || fail "Expected exactly one valid Developer ID Application identity for Team $TEAM_ID."
-    SIGNING_IDENTITY="${identities[1]}"
-fi
-[[ "$SIGNING_IDENTITY" == Developer\ ID\ Application:*"($TEAM_ID)" ]] || fail "Signing identity is not for Team $TEAM_ID."
-
-print -r -- "[TorrentCore managed-app DMG] Developer ID identity: $SIGNING_IDENTITY"
-print -r -- "[TorrentCore managed-app DMG] Validating notary profile: $NOTARY_PROFILE"
-xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-format json >/dev/null ||
-    fail "Notary profile is missing or invalid: $NOTARY_PROFILE"
-
-if [[ "$CHECK_ONLY" == true ]]; then
-    print -r -- "TorrentCore managed-app DMG release prerequisites are ready."
-    exit 0
-fi
-
-SOURCE_DIRTY=false
-if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
-    SOURCE_DIRTY=true
-fi
-if [[ "$SOURCE_DIRTY" == true && "$ALLOW_DIRTY" != true ]]; then
-    fail "The TorrentCore source tree is dirty. Commit the intended release source before creating a DMG."
-fi
+[[ -n "$NOTES" ]] || fail "--notes is required so the package states what changed."
+[[ "$SKIP_PDF" != true || "$REQUIRE_PDF" != true ]] || fail "--skip-pdf cannot be used with --require-pdf."
 
 RELEASE_ID="torrentcore.$RELEASE_DATE.$INSTALLATION.$RELEASE_NAME"
 ARTIFACT_STEM="TorrentCore-$RELEASE_ID"
 if [[ -z "$PACKAGE_ROOT" ]]; then
-    PACKAGE_ROOT="$(mktemp -d "/private/tmp/$ARTIFACT_STEM.package.XXXXXX")"
-else
-    [[ ! -e "$PACKAGE_ROOT" ]] || fail "Package root already exists: $PACKAGE_ROOT"
-    mkdir -p "$PACKAGE_ROOT"
-    PACKAGE_ROOT="${PACKAGE_ROOT:A}"
+    [[ -n "$PACKAGE_DIR" ]] || PACKAGE_DIR="$DEPLOYMENTS_ROOT/TorrentCore-Deployments/$INSTALLATION"
+    mkdir -p "$PACKAGE_DIR"
+    PACKAGE_ROOT="${PACKAGE_DIR:A}/$ARTIFACT_STEM"
 fi
-
-WORK_ROOT="$(mktemp -d /private/tmp/TorrentCore-ManagedApps-DMG.XXXXXX)"
-cleanup() {
-    rm -rf "$WORK_ROOT"
-    if [[ "$STAGE_ONLY" != true ]]; then
-        rm -rf "$PACKAGE_ROOT"
-    fi
-}
-trap cleanup EXIT
-
-GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-BUILT_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-SERVICE_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreService.app"
-WEBUI_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreWebUI.app"
-UI_APP_PATH="$PACKAGE_ROOT/TorrentCore.app"
-mkdir -p "${SERVICE_APP_PATH:h}" "$PACKAGE_ROOT/Tools"
-"$REPO_ROOT/Scripts/ServiceApp/build-macos-service-app.zsh" \
-    --output-bundle "$SERVICE_APP_PATH" \
-    --signing-identity "$SIGNING_IDENTITY"
-"$REPO_ROOT/Scripts/WebUIApp/build-macos-webui-app.zsh" \
-    --output-bundle "$WEBUI_APP_PATH" \
-    --signing-identity "$SIGNING_IDENTITY"
-"$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh" "$WEBUI_APP_PATH"
-"$REPO_ROOT/Scripts/MacOSApp/build-signed-macos-ui-app.zsh" \
-    --output-bundle "$UI_APP_PATH" \
-    --version "$UI_VERSION" \
-    --build-number "$UI_BUILD_NUMBER" \
-    --git-sha "$GIT_SHA" \
-    --built-at-utc "$BUILT_AT_UTC" \
-    --signing-identity "$SIGNING_IDENTITY"
-ln -s /Applications "$PACKAGE_ROOT/Applications"
-
-ditto "$SCRIPT_DIR/install.zsh" "$PACKAGE_ROOT/install.zsh"
-ditto "$SCRIPT_DIR/Open Terminal Here.command" "$PACKAGE_ROOT/Open Terminal Here.command"
-ditto "$SCRIPT_DIR/Open README.command" "$PACKAGE_ROOT/Open README.command"
-ditto "$SCRIPT_DIR/torrentcore-service-app-deploy.zsh" "$PACKAGE_ROOT/Tools/torrentcore-service-app-deploy.zsh"
-ditto "$SCRIPT_DIR/torrentcore_service_app_deploy.py" "$PACKAGE_ROOT/Tools/torrentcore_service_app_deploy.py"
-ditto "$REPO_ROOT/Scripts/ServiceApp/verify-macos-service-app.zsh" "$PACKAGE_ROOT/Tools/verify-macos-service-app.zsh"
-ditto "$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-app.zsh" "$PACKAGE_ROOT/Tools/verify-macos-webui-app.zsh"
-ditto "$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh" "$PACKAGE_ROOT/Tools/verify-macos-webui-static-assets.zsh"
-chmod +x "$PACKAGE_ROOT/install.zsh" "$PACKAGE_ROOT/"*.command "$PACKAGE_ROOT/Tools/"*.zsh "$PACKAGE_ROOT/Tools/"*.py
-
-tree_sha256() {
-python3 - "$1" <<'PY'
-import hashlib
-import os
-import pathlib
-import sys
-
-root = pathlib.Path(sys.argv[1])
-digest = hashlib.sha256()
-for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()):
-    relative = path.relative_to(root).as_posix()
-    digest.update(relative.encode("utf-8"))
-    digest.update(b"\0")
-    if path.is_symlink():
-        digest.update(b"L")
-        digest.update(os.readlink(path).encode("utf-8"))
-    elif path.is_file():
-        digest.update(b"F")
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                digest.update(chunk)
-    elif path.is_dir():
-        digest.update(b"D")
-    digest.update(b"\0")
-print(digest.hexdigest())
-PY
-}
-SERVICE_APP_SHA="$(tree_sha256 "$SERVICE_APP_PATH")"
-WEBUI_APP_SHA="$(tree_sha256 "$WEBUI_APP_PATH")"
-UI_APP_SHA="$(tree_sha256 "$UI_APP_PATH")"
-
-python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$CPU" "$RUNTIME" "$RELEASE_NAME" "$GIT_SHA" "$BUILT_AT_UTC" "$SERVICE_APP_SHA" "$WEBUI_APP_SHA" "$UI_VERSION" "$UI_BUILD_NUMBER" "$UI_APP_SHA" "$SOURCE_DIRTY" <<'PY'
-import json
-import pathlib
-import sys
-
-output, release_id, release_date, installation, cpu, runtime, release_name, git_sha, built_at, service_sha, webui_sha, ui_version, ui_build, ui_app_sha, dirty = sys.argv[1:]
-value = {
-    "schemaVersion": 2,
-    "product": "TorrentCoreManagedApps",
-    "releaseId": release_id,
-    "releaseDate": release_date,
-    "installation": installation,
-    "cpu": cpu,
-    "releaseName": release_name,
-    "version": "0.6.0",
-    "build": "1",
-    "gitSha": git_sha,
-    "builtAtUtc": built_at,
-    "sourceTreeDirty": dirty == "true",
-    "managedApps": {
-        "service": {
-            "path": f"payload/{runtime}/TorrentCoreService.app",
-            "runtime": runtime,
-            "bundleIdentifier": "com.conadv.torrentcore.service",
-            "version": "0.6.0",
-            "build": "1",
-            "sha256": service_sha,
-        },
-        "webUi": {
-            "path": f"payload/{runtime}/TorrentCoreWebUI.app",
-            "runtime": runtime,
-            "bundleIdentifier": "com.conadv.torrentcore.webui",
-            "version": ui_version,
-            "build": ui_build,
-            "sha256": webui_sha,
-        },
-    },
-    "nativeUi": {
-        "path": "TorrentCore.app",
-        "version": ui_version,
-        "build": ui_build,
-        "runtime": runtime,
-        "sha256": ui_app_sha,
-        "installPath": "/Applications/TorrentCore.app",
-        "installMode": "DragToApplications",
-    },
-}
-pathlib.Path(output).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
-PY
-
-cat > "$PACKAGE_ROOT/README.md" <<EOF
-# TorrentCore $RELEASE_NAME $RELEASE_DATE ($INSTALLATION, $CPU)
-
-This package installs both managed apps as one unit:
-
-- ~/Applications/TorrentCore/TorrentCoreService.app
-- ~/Applications/TorrentCore/TorrentCoreWebUI.app
-
-It preserves the complete ~/TorrentCore/Service and ~/TorrentCore/WebUI working directories, including the machine-local
-WebUI Config/service-connection.json, plus scripts, logs, deployment records, backups, and Scripts/torrentcore.env.
-TorrentCore.app remains a manual drag-to-Applications update after managed Service and WebUI verification.
-
-Start with:
-
-    ./install.zsh plan
-    ./install.zsh dry-run
-
-Only run ./install.zsh apply --confirm during an explicitly approved deployment window. After combined verification
-succeeds, follow Runbook.md to replace the native UI through the Applications link in this mounted DMG.
-EOF
-
-cat > "$PACKAGE_ROOT/Runbook.md" <<'EOF'
-# TorrentCore Combined Managed-App Runbook
-
-1. Run `./install.zsh plan` and review every resolved path.
-2. Run `./install.zsh dry-run`; it must report that nothing changed.
-3. Run `./install.zsh apply --confirm` only after explicit approval.
-4. Run `./install.zsh verify` after installation.
-5. Use `./install.zsh history` to locate an apply record.
-6. Review `./install.zsh rollback --dry-run --history <record>` before a confirmed rollback.
-
-VPN Disabled, Ready, and Degraded are valid installation outcomes when API health is `ok` and WebUI is reachable.
-
-## Install TorrentCore Native UI
-
-After combined `./install.zsh verify` succeeds, quit the existing TorrentCore UI if it is running. In the mounted DMG, drag
-`TorrentCore.app` onto the `Applications` icon, which links to `/Applications`, and select **Replace** if macOS prompts
-for confirmation. Launch the updated TorrentCore UI and confirm that its Dashboard connects to the verified Service.
-EOF
-
-if find "$PACKAGE_ROOT" -path '*/Config/service-connection.json' -print -quit | grep -q .; then
-    fail "Machine-local Config/service-connection.json was found in the staged package."
+if [[ -z "$DMG_PATH" ]]; then
+    [[ -n "$DMG_DIR" ]] || DMG_DIR="$DEPLOYMENTS_ROOT/DMGs"
+    mkdir -p "$DMG_DIR"
+    DMG_PATH="${DMG_DIR:A}/${PACKAGE_ROOT:t}.dmg"
 fi
+[[ -n "$VOLUME_NAME" ]] || VOLUME_NAME="${PACKAGE_ROOT:t}"
 
-SERVICE_LAUNCHER_UUID="$(dwarfdump --uuid "$SERVICE_APP_PATH/Contents/MacOS/TorrentCoreService" | awk 'NR == 1 {print $2}')"
-WEBUI_LAUNCHER_UUID="$(dwarfdump --uuid "$WEBUI_APP_PATH/Contents/MacOS/TorrentCoreWebUI" | awk 'NR == 1 {print $2}')"
-[[ -n "$SERVICE_LAUNCHER_UUID" && -n "$WEBUI_LAUNCHER_UUID" && "$SERVICE_LAUNCHER_UUID" != "$WEBUI_LAUNCHER_UUID" ]] ||
-    fail "Service and WebUI native launchers do not have distinct Mach-O UUIDs."
+print -r -- "Creating TorrentCore release DMG..."
+print -r -- "Package root: $PACKAGE_ROOT"
+print -r -- "DMG path:     $DMG_PATH"
+print -r -- "Volume name:  $VOLUME_NAME"
 
-(
-    cd "$PACKAGE_ROOT"
-    find . -type f ! -name checksums.txt -print | LC_ALL=C sort | while IFS= read -r file; do
-        shasum -a 256 "$file"
-    done
-) > "$PACKAGE_ROOT/checksums.txt"
+stage_args=(
+    --installation "$INSTALLATION"
+    --cpu "$CPU"
+    --release-name "$RELEASE_NAME"
+    --date "$RELEASE_DATE"
+    --notes "$NOTES"
+    --package-root "$PACKAGE_ROOT"
+    --pdf-tool "$PDF_TOOL"
+    --pdf-engine "$PDF_ENGINE"
+)
+[[ -z "$SIGNING_IDENTITY" ]] || stage_args+=(--signing-identity "$SIGNING_IDENTITY")
+[[ "$SKIP_PDF" != true ]] || stage_args+=(--skip-pdf)
+[[ "$REQUIRE_PDF" != true ]] || stage_args+=(--require-pdf)
+[[ "$CLEAN" != true ]] || stage_args+=(--clean)
+zsh "$SCRIPT_DIR/stage-release-package.zsh" "${stage_args[@]}"
 
-if [[ "$STAGE_ONLY" == true ]]; then
-    if find "$PACKAGE_ROOT" -path '*/Config/service-connection.json' -print -quit | grep -q .; then
-        fail "Machine-local Config/service-connection.json was found in the staged package."
-    fi
-    print -r -- "Staged signed TorrentCore managed-app package: $PACKAGE_ROOT"
-    exit 0
-fi
+build_args=(
+    --package-root "$PACKAGE_ROOT"
+    --dmg-path "$DMG_PATH"
+    --volume-name "$VOLUME_NAME"
+    --notary-profile "$NOTARY_PROFILE"
+)
+[[ -z "$SIGNING_IDENTITY" ]] || build_args+=(--signing-identity "$SIGNING_IDENTITY")
+[[ "$CLEAN" != true ]] || build_args+=(--clean)
+zsh "$SCRIPT_DIR/build-package-dmg.zsh" "${build_args[@]}"
 
-mkdir -p "$OUTPUT_DIR"
-OUTPUT_DIR="${OUTPUT_DIR:A}"
-OUTPUT_DMG="$OUTPUT_DIR/$ARTIFACT_STEM.dmg"
-[[ ! -e "$OUTPUT_DMG" ]] || fail "Release artifact already exists: $OUTPUT_DMG"
-WORK_DMG="$WORK_ROOT/$ARTIFACT_STEM.dmg"
-
-hdiutil create -fs HFS+ -srcfolder "$PACKAGE_ROOT" -volname "$ARTIFACT_STEM" -format UDZO "$WORK_DMG" >/dev/null
-codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$WORK_DMG"
-codesign --verify --verbose=2 "$WORK_DMG"
-xcrun notarytool submit "$WORK_DMG" --keychain-profile "$NOTARY_PROFILE" --wait
-xcrun stapler staple -v "$WORK_DMG"
-xcrun stapler validate -v "$WORK_DMG"
-hdiutil verify "$WORK_DMG"
-spctl --assess --type open --context context:primary-signature --verbose=2 "$WORK_DMG"
-ditto "$WORK_DMG" "$OUTPUT_DMG"
-codesign --verify --verbose=2 "$OUTPUT_DMG"
-xcrun stapler validate -v "$OUTPUT_DMG"
-hdiutil verify "$OUTPUT_DMG"
-spctl --assess --type open --context context:primary-signature --verbose=2 "$OUTPUT_DMG"
-shasum -a 256 "$OUTPUT_DMG"
-print -r -- "TorrentCore managed-app DMG complete: $OUTPUT_DMG"
+print -r -- ""
+print -r -- "TorrentCore release DMG complete."
+print -r -- "Package root: $PACKAGE_ROOT"
+print -r -- "DMG path:     $DMG_PATH"

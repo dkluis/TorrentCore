@@ -7,16 +7,19 @@ cd "$PACKAGE_ROOT"
 clear
 
 cat <<'EOF'
-TorrentCore combined Service/WebUI DMG
+TorrentCore deployment DMG
 
 This Terminal is now in the mounted DMG root.
 
-Start with:
+Suggested sequence:
 
-  ./install.zsh plan
-  ./install.zsh dry-run
+  ./plan.zsh
+  ./dry-run.zsh
+  ./backup.zsh
+  ./apply.zsh
+  ./verify.zsh
 
-Runbook.md contains the complete apply, verify, history, and rollback commands.
+Runbook.pdf / Runbook.md contains the same commands.
 EOF
 
 print -r -- ""

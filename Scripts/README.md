@@ -8,7 +8,8 @@ This folder contains:
 - `ServiceApp/`: the Arm64 background-app launcher, packager, signer, and verifier
 - `WebUIApp/`: the Arm64 WebUI background-app launcher, packager, signer, and static-content verifier
 - `MacOSApp/`: the signed native macOS UI app archive/export helper
-- `ServiceAppDMG/`: the dated combined Service/WebUI/native-UI DMG builder and managed-app deployer
+- `ServiceAppDMG/`: the persistent TorrentCore release-package staging, combined Service/WebUI/native-UI DMG
+  construction, and managed-app deployment tools
 
 For the current runtime and deployment model, use [docs/deployment.md](../docs/deployment.md).
 

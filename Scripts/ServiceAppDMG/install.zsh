@@ -10,6 +10,7 @@ usage() {
 Usage:
   ./install.zsh plan
   ./install.zsh dry-run
+  ./install.zsh backup
   ./install.zsh apply --confirm
   ./install.zsh verify
   ./install.zsh history
@@ -42,7 +43,7 @@ for argument in "$@"; do
 done
 
 case "$COMMAND" in
-    plan|apply|verify|history|rollback)
+    plan|backup|apply|verify|history|rollback)
         exec "$DEPLOY_TOOL" --package-root "$PACKAGE_ROOT" "$COMMAND" "$@"
         ;;
     dry-run)

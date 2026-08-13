@@ -439,6 +439,31 @@ def apply(ctx: Context, *, confirm: bool, dry_run: bool) -> None:
     print(f"Service app: {ctx.service_app}\nWebUI app:   {ctx.webui_app}\nBackup:     {backup}\nHistory:    {history_path}")
 
 
+def backup(ctx: Context) -> None:
+    if os.geteuid() == 0:
+        raise DeployError("Run the backup as the target user, not with sudo or as root.")
+    verify_source(ctx)
+    verify_target_structure(ctx)
+    backup_path, metadata = create_backup(ctx)
+    history_id = datetime.now().strftime("%Y%m%d-%H%M%S") + f"_{ctx.release['releaseId']}_backup"
+    history_path = ctx.history_home / f"{history_id}.json"
+    write_json_atomic(history_path, {
+        "schemaVersion": 2,
+        "toolVersion": TOOL_VERSION,
+        "action": "backup",
+        "status": "backedUp",
+        "historyId": history_id,
+        "releaseId": ctx.release["releaseId"],
+        "completedAtUtc": utc_now(),
+        "home": str(ctx.user_home),
+        "backupRoot": str(backup_path),
+        "backup": metadata,
+    })
+    print("TorrentCore Service and WebUI backup completed.")
+    print(f"Backup:  {backup_path}")
+    print(f"History: {history_path}")
+
+
 def rollback_plan(ctx: Context, history_path: Path) -> tuple[dict[str, Any], Path, dict[str, Any]]:
     history = load_json(history_path)
     if history.get("action") != "apply" or history.get("status") not in {"applied", "applying", "failed"}:
@@ -512,6 +537,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--package-root", required=True)
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("plan")
+    subparsers.add_parser("backup")
     apply_parser = subparsers.add_parser("apply")
     apply_parser.add_argument("--dry-run", action="store_true")
     apply_parser.add_argument("--confirm", action="store_true")
@@ -530,6 +556,8 @@ def main() -> int:
         ctx = Context(Path(args.package_root))
         if args.command == "plan":
             print_plan(ctx, dry_run=False)
+        elif args.command == "backup":
+            backup(ctx)
         elif args.command == "apply":
             apply(ctx, confirm=args.confirm, dry_run=args.dry_run)
         elif args.command == "verify":

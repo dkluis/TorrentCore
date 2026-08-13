@@ -175,41 +175,53 @@ and an `Applications` link to `/Applications`. The deployer refuses non-Arm64 ho
 native UI.
 
 Artifacts follow the established naming convention, for example
-`TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment.dmg`. A real DMG build refuses a dirty source tree. From clean
-committed source, run:
+`TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment`. A release is always staged first as a complete, persistent
+directory under `Deployments/TorrentCore-Deployments/<installation>`. The saved directory contains `README.md`,
+`README.pdf`, `Runbook.md`, `Runbook.pdf`, `plan.zsh`, `dry-run.zsh`, `backup.zsh`, `apply.zsh`, `verify.zsh`,
+`release.json`, the two managed app payloads, and the native UI app. It remains in place after DMG construction.
+
+From clean committed source, stage the release package first:
 
 ```bash
-./Scripts/ServiceAppDMG/release-service-app-dmg.zsh \
+./Scripts/ServiceAppDMG/stage-release-package.zsh \
   --installation Dick \
   --cpu arm \
   --release-name WebUIAlignment \
-  --date 2026.08.13
+  --date 2026.08.13 \
+  --notes "Align WebUI with the macOS VPN, cleanup, Dashboard, and degraded-processing controls and deploy Service and WebUI together." \
+  --require-pdf
 ```
 
-Use `--installation Tom --cpu arm` for Tom's Mac mini or VM. `--cpu intel` is a reserved future choice and is
-explicitly refused by the current Arm-only builder.
+Inspect that saved directory before building its DMG. After approval, create the DMG from the exact saved package:
 
-The default output directory is `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs`. The workflow signs all three
-apps and the DMG, submits the DMG through the existing `TorrentCore-notary` profile, staples it, and performs signature,
-entitlement, Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification outside the filesystem
-sandbox. `TorrentCore.app/Contents/Resources/version.json` records native UI version, build, Git SHA, build time, and
-runtime. The package `release.json` records both managed-app checksums and the manual `/Applications/TorrentCore.app` target.
+```bash
+./Scripts/ServiceAppDMG/build-package-dmg.zsh \
+  --package-root /Volumes/CA-Desktop-HD-2/Development/Deployments/TorrentCore-Deployments/Dick/TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment
+```
 
-The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 combined release was accepted and stapled on August 13,
-2026 under notarization submission `9e10a30b-d520-40dc-95c8-379d89de7884`. Its SHA-256 checksum is
-`bd4d3f70bcb10ee96a66634660696ce36502950bdd0329d883f7fdd519bc3b3d`. The artifact was built from clean commit
-`9410b68c40dcc6ae7db621fbe2ea36fed18c4670`; the copied DMG passed signature, stapler-ticket, disk-image, Gatekeeper,
-mounted-payload, managed-app signature, and machine-local connection-file exclusion verification.
+`release-service-app-dmg.zsh` remains the normal all-in-one driver when prior inspection is not required. It performs
+those same two steps and never uses or deletes a temporary package root. Use `--installation Tom --cpu arm` for Tom's
+Mac mini or VM. `--cpu intel` is explicitly refused by the current Arm-only tooling.
+
+The default DMG output directory is `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs`. DMG construction signs
+the DMG, submits it through the existing `TorrentCore-notary` profile, staples it, and performs signature, entitlement,
+Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification outside the filesystem sandbox.
+`TorrentCore.app/Contents/Resources/version.json` records native UI version, build, Git SHA, build time, and runtime.
+The package `release.json` records both managed-app checksums, the short change description, and the manual
+`/Applications/TorrentCore.app` target.
 
 From the mounted DMG, begin with:
 
 ```bash
-./install.zsh plan
-./install.zsh dry-run
+./plan.zsh
+./dry-run.zsh
+./backup.zsh
+./apply.zsh
+./verify.zsh
 ```
 
-Neither command writes files or deployment state and neither controls launchd. A real apply additionally requires
-`./install.zsh apply --confirm`. It verifies both source apps before stopping anything, creates one compressed backup
+Plan and dry-run do not write files or deployment state and do not control launchd. `apply.zsh` supplies the required
+confirmation argument. It verifies both source apps before stopping anything, creates one compressed backup
 under `~/TorrentCore/.backups`, stages and replaces both apps, preserves every existing file under both working
 directories, installs both LaunchAgents, and verifies Service API health/version plus WebUI reachability. VPN Disabled,
 Ready, and Degraded are valid outcomes when API health is successful. Deployment state and history live under
