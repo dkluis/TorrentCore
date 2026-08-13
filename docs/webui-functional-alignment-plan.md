@@ -491,8 +491,8 @@ Completed on August 13, 2026, before bundled deployment work:
 
 ### Slice 5: Bundled WebUI And Combined Managed Deployment
 
-Status: implementation complete August 13, 2026. Corrected persistent release-package staging is pending operator
-inspection before a replacement DMG is built.
+Status: completed August 13, 2026. The operator approved the persistent release package before its replacement DMG was
+built.
 
 #### Work
 
@@ -581,8 +581,13 @@ Completed implementation evidence:
 - WebUI served a fingerprinted CSS asset from its signed bundle with an empty external working directory; the response
   was byte-identical to the bundled source.
 - Solution build and all 286 existing tests passed; no WebUI tests were added.
-- Replacement release evidence remains pending until the persistent Dick deployment directory is inspected and its
-  DMG build is explicitly approved.
+- The persistent Dick deployment directory contains the standard Markdown and PDF documents, five root helper scripts,
+  signed managed-app payloads, signed native UI, and clean-source release metadata. The operator reviewed and approved
+  that directory before DMG construction.
+- Apple accepted replacement notarization submission `8bd817c5-861a-4c14-9dbc-58304c026461`. The final stapled DMG
+  passed signature, stapler-ticket, disk-image, Gatekeeper, mounted-checksum, required-content, managed-app signature,
+  native-app signature, and connection-file exclusion verification. Its SHA-256 checksum is
+  `7d0e3844988ee1d74dde0e1ce9db7d4d4c668460dc1bd405db191242b756b746`.
 - No live `plan`, `dry-run`, apply, or installed-runtime verification was performed; those remain gated on explicit
   deployment authorization.
 

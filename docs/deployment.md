@@ -210,6 +210,14 @@ Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification 
 The package `release.json` records both managed-app checksums, the short change description, and the manual
 `/Applications/TorrentCore.app` target.
 
+The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 release was staged permanently under
+`Deployments/TorrentCore-Deployments/Dick`, reviewed and approved by the operator, and then built from clean commit
+`b43f55545f2e9367af7295ad0700466d13405774`. Apple accepted notarization submission
+`8bd817c5-861a-4c14-9dbc-58304c026461`. The final stapled DMG SHA-256 is
+`7d0e3844988ee1d74dde0e1ce9db7d4d4c668460dc1bd405db191242b756b746`; its signature, stapler ticket, disk-image
+checksum, Gatekeeper assessment, mounted file checksums, required root helpers, all three app signatures, and
+machine-local connection-file exclusion passed outside-sandbox verification.
+
 From the mounted DMG, begin with:
 
 ```bash
