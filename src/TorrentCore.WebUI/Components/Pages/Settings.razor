@@ -1,6 +1,8 @@
 @page "/settings"
+@using System.Net
 @using TorrentCore.Contracts.Categories
 @using TorrentCore.Contracts.Host
+@using TorrentCore.Contracts.Maintenance
 @inject ITorrentCoreApiAdapter Api
 @inject IOperatorFeedbackService Feedback
 @inject IDialogService DialogService
@@ -9,14 +11,14 @@
 
 <OperatorPage Kicker="Administration"
               Title="Settings"
-              Summary="Compact grouped editor for runtime policy, engine limits, callback handling, and category routing."
+              Summary="Compact grouped editor for runtime policy, VPN egress, diagnostics, engine limits, callback handling, and category routing."
               Class="settings-page"
               StatusLine="@BuildStatusLine()">
     <HeaderActions>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    Size="Size.Small"
-                   Disabled="@(_isRefreshing || _savingGroupKey is not null)"
+                   Disabled="@(_isRefreshing || _savingGroupKey is not null || _cleanupOperation is not null)"
                    OnClick="RefreshAsync">
             Refresh
         </MudButton>
@@ -210,7 +212,7 @@
                                         <MudButton Variant="Variant.Filled"
                                                    Color="Color.Primary"
                                                    Size="Size.Small"
-                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Queue) || IsBusy)"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Queue) || IsBusy || GetGroupValidationError(SettingsGroupKey.Queue) is not null)"
                                                    OnClick="() => SaveGroupAsync(SettingsGroupKey.Queue)">
                                             Save
                                         </MudButton>
@@ -262,6 +264,32 @@
                                                          Variant="Variant.Outlined"
                                                          Margin="Margin.Dense"
                                                          Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.MetadataResolutionTimeSliceMinutes" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.MetadataResolutionTimeSliceMinutes"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.MetadataResolutionTimeSliceMinutes = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Max="1440"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.AutomaticMetadataResetStuckThresholdSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.AutomaticMetadataResetStuckThresholdSeconds"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.AutomaticMetadataResetStuckThresholdSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="15"
+                                                         Max="300"
                                                          Step="1"
                                                          Immediate="true" />
                                     </div>
@@ -326,6 +354,11 @@
                                                          Immediate="true" />
                                     </div>
                                 </div>
+
+                                @if (GetGroupValidationError(SettingsGroupKey.Queue) is { } queueValidationError)
+                                {
+                                    <p class="validation-message">@queueValidationError</p>
+                                }
 
                                 <p class="dashboard-panel-copy">
                                     New magnets are accepted immediately; queue limits only control execution. Recovery first refreshes discovery, then escalates if the torrent stays cold.
@@ -473,6 +506,188 @@
 
                                 <p class="dashboard-panel-copy">
                                     Peer exchange supplements tracker and DHT discovery but is disabled by default because of the observed MonoTorrent 3.0.2 failure. Use <strong>0</strong> for unlimited download or upload rate. Restart-required values are shown separately from the engine's currently applied settings.
+                                </p>
+                            </div>
+                        </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.VpnEgress))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.VpnEgress)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>VPN Egress</h2>
+                                        <p class="dashboard-panel-copy">Live public-egress validation policy and engine suspension timing.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.VpnEgress)">@GetGroupStateText(SettingsGroupKey.VpnEgress)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.VpnEgress) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.VpnEgress)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.VpnEgress) || IsBusy || GetGroupValidationError(SettingsGroupKey.VpnEgress) is not null)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.VpnEgress)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
+
+                                <div class="settings-field-grid">
+                                    <div class="settings-field-block settings-field-block--toggle">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressValidationEnabled" />
+                                        <MudCheckBox T="bool"
+                                                     Value="_vpn.VpnEgressValidationEnabled"
+                                                     ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressValidationEnabled = next)"
+                                                     Dense="true"
+                                                     Color="Color.Primary" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressValidationEndpoint" />
+                                        <MudTextField T="string"
+                                                      Value="_vpn.VpnEgressValidationEndpoint"
+                                                      ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressValidationEndpoint = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressDirectIspCidrs" />
+                                        <MudTextField T="string"
+                                                      Value="_vpn.VpnEgressDirectIspCidrs"
+                                                      ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressDirectIspCidrs = next)"
+                                                      Variant="Variant.Outlined"
+                                                      Margin="Margin.Dense"
+                                                      Placeholder="47.0.0.0/8, 192.0.2.0/24"
+                                                      Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressDegradedCheckIntervalSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_vpn.VpnEgressDegradedCheckIntervalSeconds"
+                                                         ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressDegradedCheckIntervalSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressReadyCheckIntervalSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_vpn.VpnEgressReadyCheckIntervalSeconds"
+                                                         ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressReadyCheckIntervalSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressRequestTimeoutSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_vpn.VpnEgressRequestTimeoutSeconds"
+                                                         ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressRequestTimeoutSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.VpnEgressEngineSuspensionTimeoutSeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_vpn.VpnEgressEngineSuspensionTimeoutSeconds"
+                                                         ValueChanged="value => UpdateVpn(value, (group, next) => group.VpnEgressEngineSuspensionTimeoutSeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+                                </div>
+
+                                @if (GetGroupValidationError(SettingsGroupKey.VpnEgress) is { } vpnValidationError)
+                                {
+                                    <p class="validation-message">@vpnValidationError</p>
+                                }
+
+                                <p class="dashboard-panel-copy">
+                                    These values apply live. Interval edits take effect at the next scheduled check without resetting the current countdown.
+                                </p>
+                            </div>
+                        </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Diagnostics))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Diagnostics)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before editing this section.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Diagnostics</h2>
+                                        <p class="dashboard-panel-copy">Live control for optional Service performance summaries.</p>
+                                    </div>
+                                    <div class="dashboard-inline-actions dashboard-inline-actions--compact settings-group-actions">
+                                        <span class="@GetGroupStateClass(SettingsGroupKey.Diagnostics)">@GetGroupStateText(SettingsGroupKey.Diagnostics)</span>
+                                        <MudButton Variant="Variant.Outlined"
+                                                   Color="Color.Secondary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Diagnostics) || IsBusy)"
+                                                   OnClick="() => DiscardGroupAsync(SettingsGroupKey.Diagnostics)">
+                                            Discard
+                                        </MudButton>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Primary"
+                                                   Size="Size.Small"
+                                                   Disabled="@(!IsGroupDirty(SettingsGroupKey.Diagnostics) || IsBusy)"
+                                                   OnClick="() => SaveGroupAsync(SettingsGroupKey.Diagnostics)">
+                                            Save
+                                        </MudButton>
+                                    </div>
+                                </div>
+
+                                <div class="settings-field-grid">
+                                    <div class="settings-field-block settings-field-block--toggle">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.RuntimeTickDurationSummaryEnabled" />
+                                        <MudCheckBox T="bool"
+                                                     Value="_diagnostics.RuntimeTickDurationSummaryEnabled"
+                                                     ValueChanged="value => UpdateDiagnostics(value, (group, next) => group.RuntimeTickDurationSummaryEnabled = next)"
+                                                     Dense="true"
+                                                     Color="Color.Primary" />
+                                    </div>
+                                </div>
+
+                                <p class="dashboard-panel-copy">
+                                    This changes only the one-minute synchronization timing summary written to the Service log. Torrent processing and other diagnostics remain unchanged.
                                 </p>
                             </div>
                         </OperatorCard>
@@ -723,6 +938,107 @@
                                 </div>
                             </div>
                         </OperatorCard>
+
+                        <OperatorCard Class="settings-group-card settings-group-card--wide">
+                            <div class="settings-group-shell">
+                                @if (IsGroupBlocked(SettingsGroupKey.Cleanup))
+                                {
+                                    <button type="button"
+                                            class="settings-group-blocker"
+                                            @onclick="() => OnBlockedGroupClickedAsync(SettingsGroupKey.Cleanup)">
+                                        <span class="settings-group-blocker-copy">
+                                            Resolve @GetGroupTitle(_dirtyGroupKey!.Value) before running cleanup.
+                                        </span>
+                                    </button>
+                                }
+
+                                <div class="dashboard-panel-header">
+                                    <div>
+                                        <h2>Cleanup</h2>
+                                        <p class="dashboard-panel-copy">Protected destructive maintenance operations owned by TorrentCore.Service.</p>
+                                    </div>
+                                </div>
+
+                                <div class="settings-cleanup-grid">
+                                    <section class="settings-cleanup-action">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CleanupLogEntries" />
+                                        <p class="dashboard-panel-copy">
+                                            Delete log entries strictly before Service-local 00:00:00 on the selected date. Logs associated with torrents still in the live torrent table are protected.
+                                        </p>
+                                        <MudDatePicker Label="Up To Date"
+                                                       Date="_logCleanupDate"
+                                                       DateChanged="OnLogCleanupDateChanged"
+                                                       DateFormat="yyyy-MM-dd"
+                                                       MaxDate="@DateTime.Today"
+                                                       Clearable="true"
+                                                       Editable="true"
+                                                       Disabled="@IsBusy"
+                                                       Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense" />
+                                        @if (GetCleanupDateValidationError(_logCleanupDate, "Log Entries") is { } logDateError)
+                                        {
+                                            <p class="validation-message">@logDateError</p>
+                                        }
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   Disabled="@(IsBusy || GetCleanupDateValidationError(_logCleanupDate, "Log Entries") is not null)"
+                                                   OnClick="CleanupLogsAsync">
+                                            @(_cleanupOperation == CleanupOperation.LogEntries ? "Deleting..." : "Delete Log Entries")
+                                        </MudButton>
+                                    </section>
+
+                                    <section class="settings-cleanup-action">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CleanupHistoryRecords" />
+                                        <p class="dashboard-panel-copy">
+                                            Delete history records whose Last Updated value is strictly before Service-local 00:00:00 on the selected date. Records associated with torrents still in the live torrent table are protected.
+                                        </p>
+                                        <MudDatePicker Label="Up To Date"
+                                                       Date="_historyCleanupDate"
+                                                       DateChanged="OnHistoryCleanupDateChanged"
+                                                       DateFormat="yyyy-MM-dd"
+                                                       MaxDate="@DateTime.Today"
+                                                       Clearable="true"
+                                                       Editable="true"
+                                                       Disabled="@IsBusy"
+                                                       Variant="Variant.Outlined"
+                                                       Margin="Margin.Dense" />
+                                        @if (GetCleanupDateValidationError(_historyCleanupDate, "History Records") is { } historyDateError)
+                                        {
+                                            <p class="validation-message">@historyDateError</p>
+                                        }
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   Disabled="@(IsBusy || GetCleanupDateValidationError(_historyCleanupDate, "History Records") is not null)"
+                                                   OnClick="CleanupHistoryAsync">
+                                            @(_cleanupOperation == CleanupOperation.HistoryRecords ? "Deleting..." : "Delete History Records")
+                                        </MudButton>
+                                    </section>
+
+                                    <section class="settings-cleanup-action">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.CleanupOrphanedTorrentLogs" />
+                                        <p class="dashboard-panel-copy">
+                                            Delete torrent-scoped logs whose Torrent ID is no longer present in the live torrent table. Service-level logs and logs for live torrents are retained.
+                                        </p>
+                                        <MudButton Variant="Variant.Filled"
+                                                   Color="Color.Error"
+                                                   Size="Size.Small"
+                                                   Disabled="@IsBusy"
+                                                   OnClick="CleanupOrphanedTorrentLogsAsync">
+                                            @(_cleanupOperation == CleanupOperation.OrphanedTorrentLogs ? "Deleting..." : "Delete Orphan Logs")
+                                        </MudButton>
+                                    </section>
+                                </div>
+
+                                @if (!string.IsNullOrWhiteSpace(_cleanupMessage))
+                                {
+                                    <p class="@(_cleanupMessageIsError ? "dashboard-panel-copy tc-error-text" : "dashboard-panel-copy")">
+                                        @_cleanupMessage
+                                    </p>
+                                }
+                            </div>
+                        </OperatorCard>
                     </div>
                 </div>
             }
@@ -734,6 +1050,8 @@
     private readonly LifecycleSettingsGroup _lifecycle = new();
     private readonly QueueSettingsGroup _queue = new();
     private readonly EngineThrottleSettingsGroup _engine = new();
+    private readonly VpnEgressSettingsGroup _vpn = new();
+    private readonly DiagnosticsSettingsGroup _diagnostics = new();
     private readonly CallbackSettingsGroup _callback = new();
     private readonly List<EditableCategoryModel> _categories = [];
 
@@ -756,8 +1074,14 @@
     private List<TorrentCategoryDto> _categorySnapshots = [];
     private SettingsGroupKey? _dirtyGroupKey;
     private SettingsGroupKey? _savingGroupKey;
+    private CleanupOperation? _cleanupOperation;
+    private DateTime? _logCleanupDate = DateTime.Today.AddDays(-7);
+    private DateTime? _historyCleanupDate = DateTime.Today.AddDays(-30);
+    private string? _cleanupMessage;
+    private bool _cleanupMessageIsError;
 
-    private bool IsBusy => _isRefreshing || _isResolvingPendingGroup || _savingGroupKey is not null;
+    private bool IsBusy =>
+        _isRefreshing || _isResolvingPendingGroup || _savingGroupKey is not null || _cleanupOperation is not null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -839,6 +1163,12 @@
 
     private async Task SaveRuntimeGroupAsync(SettingsGroupKey key)
     {
+        if (GetGroupValidationError(key) is { } validationError)
+        {
+            Feedback.Error(validationError);
+            return;
+        }
+
         var result = await Api.UpdateRuntimeSettingsAsync(BuildRuntimeSettingsRequest());
         if (!result.IsSuccess || result.Value is null)
         {
@@ -890,6 +1220,182 @@
         Feedback.Success("Categories saved.");
     }
 
+    private Task OnLogCleanupDateChanged(DateTime? value)
+    {
+        _logCleanupDate = value?.Date;
+        ClearCleanupMessage();
+        return Task.CompletedTask;
+    }
+
+    private Task OnHistoryCleanupDateChanged(DateTime? value)
+    {
+        _historyCleanupDate = value?.Date;
+        ClearCleanupMessage();
+        return Task.CompletedTask;
+    }
+
+    private async Task CleanupLogsAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        var validationError = GetCleanupDateValidationError(_logCleanupDate, "Log Entries");
+        if (validationError is not null)
+        {
+            SetCleanupError(validationError);
+            return;
+        }
+
+        var upToDate = DateOnly.FromDateTime(_logCleanupDate!.Value);
+        var confirmed = await Feedback.ConfirmAsync(
+            "Delete Log Entries?",
+            $"Permanently delete eligible log entries before {upToDate:yyyy-MM-dd} at Service-local 00:00:00? Logs for torrents still in the live torrent table are protected.",
+            "Delete Log Entries"
+        );
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _cleanupOperation = CleanupOperation.LogEntries;
+        ClearCleanupMessage();
+        try
+        {
+            var result = await Api.CleanupLogsAsync(new CleanupByDateRequest { UpToDate = upToDate });
+            if (!result.IsSuccess || result.Value is null)
+            {
+                SetCleanupError(result.ErrorMessage ?? "Unable to clean up log entries.");
+                return;
+            }
+
+            var count = result.Value.DeletedRecordCount;
+            var summary = count == 1 ? "Deleted 1 log entry." : $"Deleted {count:n0} log entries.";
+            SetCleanupSuccess(summary);
+        }
+        finally
+        {
+            _cleanupOperation = null;
+        }
+    }
+
+    private async Task CleanupHistoryAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        var validationError = GetCleanupDateValidationError(_historyCleanupDate, "History Records");
+        if (validationError is not null)
+        {
+            SetCleanupError(validationError);
+            return;
+        }
+
+        var upToDate = DateOnly.FromDateTime(_historyCleanupDate!.Value);
+        var confirmed = await Feedback.ConfirmAsync(
+            "Delete History Records?",
+            $"Permanently delete eligible history records last updated before {upToDate:yyyy-MM-dd} at Service-local 00:00:00? History for torrents still in the live torrent table is protected.",
+            "Delete History Records"
+        );
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _cleanupOperation = CleanupOperation.HistoryRecords;
+        ClearCleanupMessage();
+        try
+        {
+            var result = await Api.CleanupHistoryAsync(new CleanupByDateRequest { UpToDate = upToDate });
+            if (!result.IsSuccess || result.Value is null)
+            {
+                SetCleanupError(result.ErrorMessage ?? "Unable to clean up history records.");
+                return;
+            }
+
+            var count = result.Value.DeletedRecordCount;
+            var summary = count == 1 ? "Deleted 1 history record." : $"Deleted {count:n0} history records.";
+            SetCleanupSuccess(summary);
+        }
+        finally
+        {
+            _cleanupOperation = null;
+        }
+    }
+
+    private async Task CleanupOrphanedTorrentLogsAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        var confirmed = await Feedback.ConfirmAsync(
+            "Delete Orphan Logs?",
+            "Permanently delete torrent-scoped logs whose Torrent ID is no longer present in the live torrent table?",
+            "Delete Orphan Logs"
+        );
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _cleanupOperation = CleanupOperation.OrphanedTorrentLogs;
+        ClearCleanupMessage();
+        try
+        {
+            var result = await Api.DeleteOrphanedTorrentLogsAsync();
+            if (!result.IsSuccess || result.Value is null)
+            {
+                SetCleanupError(result.ErrorMessage ?? "Unable to delete orphaned torrent logs.");
+                return;
+            }
+
+            var count = result.Value.DeletedLogEntryCount;
+            var summary = count == 1
+                ? "Deleted 1 orphaned torrent log entry."
+                : $"Deleted {count:n0} orphaned torrent log entries.";
+            SetCleanupSuccess(summary);
+        }
+        finally
+        {
+            _cleanupOperation = null;
+        }
+    }
+
+    private static string? GetCleanupDateValidationError(DateTime? value, string label)
+    {
+        if (value is null)
+        {
+            return $"{label} Up To Date is required.";
+        }
+
+        return value.Value.Date > DateTime.Today ? $"{label} Up To Date cannot be in the future." : null;
+    }
+
+    private void SetCleanupError(string message)
+    {
+        _cleanupMessage = message;
+        _cleanupMessageIsError = true;
+        Feedback.Error(message);
+    }
+
+    private void SetCleanupSuccess(string message)
+    {
+        _cleanupMessage = message;
+        _cleanupMessageIsError = false;
+        Feedback.Success(message);
+    }
+
+    private void ClearCleanupMessage()
+    {
+        _cleanupMessage = null;
+        _cleanupMessageIsError = false;
+    }
+
     private Task DiscardGroupAsync(SettingsGroupKey key)
     {
         switch (key)
@@ -902,6 +1408,12 @@
                 break;
             case SettingsGroupKey.Engine:
                 ApplyEngineFromSnapshot();
+                break;
+            case SettingsGroupKey.VpnEgress:
+                ApplyVpnFromSnapshot();
+                break;
+            case SettingsGroupKey.Diagnostics:
+                ApplyDiagnosticsFromSnapshot();
                 break;
             case SettingsGroupKey.Callback:
                 ApplyCallbackFromSnapshot();
@@ -1001,6 +1513,8 @@
         ApplyLifecycleFromSnapshot();
         ApplyQueueFromSnapshot();
         ApplyEngineFromSnapshot();
+        ApplyVpnFromSnapshot();
+        ApplyDiagnosticsFromSnapshot();
         ApplyCallbackFromSnapshot();
     }
 
@@ -1054,6 +1568,9 @@
         _queue.MaxActiveDownloads = _runtimeSnapshot.MaxActiveDownloads;
         _queue.MetadataRefreshStaleSeconds = _runtimeSnapshot.MetadataRefreshStaleSeconds;
         _queue.MetadataRefreshRestartDelaySeconds = _runtimeSnapshot.MetadataRefreshRestartDelaySeconds;
+        _queue.MetadataResolutionTimeSliceMinutes = _runtimeSnapshot.MetadataResolutionTimeSliceMinutes;
+        _queue.AutomaticMetadataResetStuckThresholdSeconds =
+            _runtimeSnapshot.AutomaticMetadataResetStuckThresholdSeconds;
         _queue.ColdDownloadRecoveryThresholdMinutes = _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes;
         _queue.ColdDownloadRecoveryIntervalMinutes = _runtimeSnapshot.ColdDownloadRecoveryIntervalMinutes;
         _queue.ColdDownloadAbandonAfterHours = _runtimeSnapshot.ColdDownloadAbandonAfterHours;
@@ -1074,6 +1591,32 @@
         _engine.EngineEncryptionMode = _runtimeSnapshot.EngineEncryptionMode;
         _engine.EngineMaximumDownloadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond;
         _engine.EngineMaximumUploadRateBytesPerSecond = _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond;
+    }
+
+    private void ApplyVpnFromSnapshot()
+    {
+        if (_runtimeSnapshot is null)
+        {
+            return;
+        }
+
+        _vpn.VpnEgressValidationEnabled = _runtimeSnapshot.VpnEgressValidationEnabled;
+        _vpn.VpnEgressValidationEndpoint = _runtimeSnapshot.VpnEgressValidationEndpoint;
+        _vpn.VpnEgressDirectIspCidrs = string.Join(", ", _runtimeSnapshot.VpnEgressDirectIspCidrs);
+        _vpn.VpnEgressDegradedCheckIntervalSeconds = _runtimeSnapshot.VpnEgressDegradedCheckIntervalSeconds;
+        _vpn.VpnEgressReadyCheckIntervalSeconds = _runtimeSnapshot.VpnEgressReadyCheckIntervalSeconds;
+        _vpn.VpnEgressRequestTimeoutSeconds = _runtimeSnapshot.VpnEgressRequestTimeoutSeconds;
+        _vpn.VpnEgressEngineSuspensionTimeoutSeconds = _runtimeSnapshot.VpnEgressEngineSuspensionTimeoutSeconds;
+    }
+
+    private void ApplyDiagnosticsFromSnapshot()
+    {
+        if (_runtimeSnapshot is null)
+        {
+            return;
+        }
+
+        _diagnostics.RuntimeTickDurationSummaryEnabled = _runtimeSnapshot.RuntimeTickDurationSummaryEnabled;
     }
 
     private void ApplyCallbackFromSnapshot()
@@ -1115,6 +1658,8 @@
             MaxActiveDownloads = _queue.MaxActiveDownloads,
             MetadataRefreshStaleSeconds = _queue.MetadataRefreshStaleSeconds,
             MetadataRefreshRestartDelaySeconds = _queue.MetadataRefreshRestartDelaySeconds,
+            MetadataResolutionTimeSliceMinutes = _queue.MetadataResolutionTimeSliceMinutes,
+            AutomaticMetadataResetStuckThresholdSeconds = _queue.AutomaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes = _queue.ColdDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = _queue.ColdDownloadRecoveryIntervalMinutes,
             ColdDownloadAbandonAfterHours = _queue.ColdDownloadAbandonAfterHours,
@@ -1126,6 +1671,14 @@
             CompletionCallbackFinalizationTimeoutSeconds = _callback.CompletionCallbackFinalizationTimeoutSeconds,
             CompletionCallbackApiBaseUrlOverride = _callback.CompletionCallbackApiBaseUrlOverride,
             CompletionCallbackApiKeyOverride = _callback.CompletionCallbackApiKeyOverride,
+            VpnEgressValidationEnabled = _vpn.VpnEgressValidationEnabled,
+            VpnEgressValidationEndpoint = _vpn.VpnEgressValidationEndpoint,
+            VpnEgressDirectIspCidrs = ParseCidrEntries(_vpn.VpnEgressDirectIspCidrs),
+            VpnEgressDegradedCheckIntervalSeconds = _vpn.VpnEgressDegradedCheckIntervalSeconds,
+            VpnEgressReadyCheckIntervalSeconds = _vpn.VpnEgressReadyCheckIntervalSeconds,
+            VpnEgressRequestTimeoutSeconds = _vpn.VpnEgressRequestTimeoutSeconds,
+            VpnEgressEngineSuspensionTimeoutSeconds = _vpn.VpnEgressEngineSuspensionTimeoutSeconds,
+            RuntimeTickDurationSummaryEnabled = _diagnostics.RuntimeTickDurationSummaryEnabled,
         };
     }
 
@@ -1147,6 +1700,20 @@
     {
         assign(_engine, value);
         UpdateDirtyGroup(SettingsGroupKey.Engine);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateVpn<T>(T value, Action<VpnEgressSettingsGroup, T> assign)
+    {
+        assign(_vpn, value);
+        UpdateDirtyGroup(SettingsGroupKey.VpnEgress);
+        return Task.CompletedTask;
+    }
+
+    private Task UpdateDiagnostics<T>(T value, Action<DiagnosticsSettingsGroup, T> assign)
+    {
+        assign(_diagnostics, value);
+        UpdateDirtyGroup(SettingsGroupKey.Diagnostics);
         return Task.CompletedTask;
     }
 
@@ -1185,6 +1752,8 @@
             SettingsGroupKey.Lifecycle => IsLifecycleDirty(),
             SettingsGroupKey.Queue => IsQueueDirty(),
             SettingsGroupKey.Engine => IsEngineDirty(),
+            SettingsGroupKey.VpnEgress => IsVpnDirty(),
+            SettingsGroupKey.Diagnostics => IsDiagnosticsDirty(),
             SettingsGroupKey.Callback => IsCallbackDirty(),
             SettingsGroupKey.Categories => IsCategoriesDirty(),
             _ => false,
@@ -1214,6 +1783,9 @@
                 _queue.MaxActiveDownloads != _runtimeSnapshot.MaxActiveDownloads ||
                 _queue.MetadataRefreshStaleSeconds != _runtimeSnapshot.MetadataRefreshStaleSeconds ||
                 _queue.MetadataRefreshRestartDelaySeconds != _runtimeSnapshot.MetadataRefreshRestartDelaySeconds ||
+                _queue.MetadataResolutionTimeSliceMinutes != _runtimeSnapshot.MetadataResolutionTimeSliceMinutes ||
+                _queue.AutomaticMetadataResetStuckThresholdSeconds !=
+                    _runtimeSnapshot.AutomaticMetadataResetStuckThresholdSeconds ||
                 _queue.ColdDownloadRecoveryThresholdMinutes != _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes ||
                 _queue.ColdDownloadRecoveryIntervalMinutes != _runtimeSnapshot.ColdDownloadRecoveryIntervalMinutes ||
                 _queue.ColdDownloadAbandonAfterHours != _runtimeSnapshot.ColdDownloadAbandonAfterHours ||
@@ -1230,6 +1802,28 @@
                 _engine.EngineMaximumHalfOpenConnections != _runtimeSnapshot.EngineMaximumHalfOpenConnections ||
                 _engine.EngineMaximumDownloadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumDownloadRateBytesPerSecond ||
                 _engine.EngineMaximumUploadRateBytesPerSecond != _runtimeSnapshot.EngineMaximumUploadRateBytesPerSecond);
+    }
+
+    private bool IsVpnDirty()
+    {
+        return _runtimeSnapshot is not null &&
+               (_vpn.VpnEgressValidationEnabled != _runtimeSnapshot.VpnEgressValidationEnabled ||
+                _vpn.VpnEgressValidationEndpoint != _runtimeSnapshot.VpnEgressValidationEndpoint ||
+                !ParseCidrEntries(_vpn.VpnEgressDirectIspCidrs)
+                    .SequenceEqual(_runtimeSnapshot.VpnEgressDirectIspCidrs, StringComparer.Ordinal) ||
+                _vpn.VpnEgressDegradedCheckIntervalSeconds !=
+                    _runtimeSnapshot.VpnEgressDegradedCheckIntervalSeconds ||
+                _vpn.VpnEgressReadyCheckIntervalSeconds != _runtimeSnapshot.VpnEgressReadyCheckIntervalSeconds ||
+                _vpn.VpnEgressRequestTimeoutSeconds != _runtimeSnapshot.VpnEgressRequestTimeoutSeconds ||
+                _vpn.VpnEgressEngineSuspensionTimeoutSeconds !=
+                    _runtimeSnapshot.VpnEgressEngineSuspensionTimeoutSeconds);
+    }
+
+    private bool IsDiagnosticsDirty()
+    {
+        return _runtimeSnapshot is not null &&
+               _diagnostics.RuntimeTickDurationSummaryEnabled !=
+               _runtimeSnapshot.RuntimeTickDurationSummaryEnabled;
     }
 
     private bool IsCallbackDirty()
@@ -1274,8 +1868,109 @@
         return false;
     }
 
+    private string? GetGroupValidationError(SettingsGroupKey key)
+    {
+        if (key == SettingsGroupKey.Queue)
+        {
+            if (_queue.MetadataResolutionTimeSliceMinutes is < 1 or > 1440)
+            {
+                return "Metadata resolution time slice must be between 1 and 1,440 minutes.";
+            }
+
+            if (_queue.AutomaticMetadataResetStuckThresholdSeconds is < 15 or > 300)
+            {
+                return "Automatic metadata reset stuck threshold must be between 15 and 300 seconds.";
+            }
+
+            return null;
+        }
+
+        if (key != SettingsGroupKey.VpnEgress)
+        {
+            return null;
+        }
+
+        var endpointValue = _vpn.VpnEgressValidationEndpoint.Trim();
+        if (!Uri.TryCreate(endpointValue, UriKind.Absolute, out var endpoint) ||
+            !string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(endpoint.Host) ||
+            !string.IsNullOrEmpty(endpoint.UserInfo) ||
+            !string.IsNullOrEmpty(endpoint.Fragment))
+        {
+            return "VPN validation endpoint must be an absolute HTTPS URL without credentials or a fragment.";
+        }
+
+        var cidrs = ParseCidrEntries(_vpn.VpnEgressDirectIspCidrs);
+        if (_vpn.VpnEgressValidationEnabled && cidrs.Count == 0)
+        {
+            return "At least one direct ISP IPv4 CIDR is required when VPN validation is enabled.";
+        }
+
+        foreach (var cidr in cidrs)
+        {
+            if (!IsValidIpv4Cidr(cidr))
+            {
+                return $"VPN direct-ISP CIDR '{cidr}' must be a valid IPv4 CIDR.";
+            }
+        }
+
+        if (_vpn.VpnEgressDegradedCheckIntervalSeconds < 1)
+        {
+            return "VPN degraded check interval must be 1 or greater.";
+        }
+
+        if (_vpn.VpnEgressReadyCheckIntervalSeconds < 1)
+        {
+            return "VPN ready check interval must be 1 or greater.";
+        }
+
+        if (_vpn.VpnEgressRequestTimeoutSeconds < 1)
+        {
+            return "VPN request timeout must be 1 or greater.";
+        }
+
+        if (_vpn.VpnEgressEngineSuspensionTimeoutSeconds < 1)
+        {
+            return "VPN engine suspension timeout must be 1 or greater.";
+        }
+
+        if (_vpn.VpnEgressRequestTimeoutSeconds >= _vpn.VpnEgressDegradedCheckIntervalSeconds ||
+            _vpn.VpnEgressRequestTimeoutSeconds >= _vpn.VpnEgressReadyCheckIntervalSeconds)
+        {
+            return "VPN request timeout must be shorter than both check intervals.";
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<string> ParseCidrEntries(string value)
+    {
+        return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    private static bool IsValidIpv4Cidr(string value)
+    {
+        var separatorIndex = value.LastIndexOf('/');
+        if (separatorIndex <= 0 || separatorIndex == value.Length - 1)
+        {
+            return false;
+        }
+
+        var addressValue = value[..separatorIndex];
+        var prefixValue = value[(separatorIndex + 1)..];
+        return IPAddress.TryParse(addressValue, out var address) &&
+               address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+               int.TryParse(prefixValue, out var prefixLength) &&
+               prefixLength is >= 0 and <= 32;
+    }
+
     private string BuildStatusLine()
     {
+        if (_cleanupOperation is not null)
+        {
+            return $"{GetCleanupOperationTitle(_cleanupOperation.Value)} cleanup is in progress.";
+        }
+
         if (_dirtyGroupKey is null)
         {
             return "Each group saves independently. Once you start editing a group, save or discard it before moving to another section.";
@@ -1306,9 +2001,23 @@
             SettingsGroupKey.Lifecycle => "Lifecycle & Cleanup",
             SettingsGroupKey.Queue => "Queue & Recovery",
             SettingsGroupKey.Engine => "Engine Throttles",
+            SettingsGroupKey.VpnEgress => "VPN Egress",
+            SettingsGroupKey.Diagnostics => "Diagnostics",
             SettingsGroupKey.Callback => "Completion Callback",
             SettingsGroupKey.Categories => "Categories",
+            SettingsGroupKey.Cleanup => "Cleanup",
             _ => "Settings",
+        };
+    }
+
+    private static string GetCleanupOperationTitle(CleanupOperation operation)
+    {
+        return operation switch
+        {
+            CleanupOperation.LogEntries => "Log Entries",
+            CleanupOperation.HistoryRecords => "History Records",
+            CleanupOperation.OrphanedTorrentLogs => "Orphaned Torrent Logs",
+            _ => "Record",
         };
     }
 
@@ -1322,8 +2031,18 @@
         Lifecycle,
         Queue,
         Engine,
+        VpnEgress,
+        Diagnostics,
         Callback,
         Categories,
+        Cleanup,
+    }
+
+    private enum CleanupOperation
+    {
+        LogEntries,
+        HistoryRecords,
+        OrphanedTorrentLogs,
     }
 
     private sealed class LifecycleSettingsGroup
@@ -1342,6 +2061,8 @@
         public int MaxActiveDownloads { get; set; } = 4;
         public int MetadataRefreshStaleSeconds { get; set; } = 90;
         public int MetadataRefreshRestartDelaySeconds { get; set; } = 30;
+        public int MetadataResolutionTimeSliceMinutes { get; set; } = 15;
+        public int AutomaticMetadataResetStuckThresholdSeconds { get; set; } = 30;
         public int ColdDownloadRecoveryThresholdMinutes { get; set; } = 120;
         public int ColdDownloadRecoveryIntervalMinutes { get; set; } = 60;
         public int ColdDownloadAbandonAfterHours { get; set; } = 72;
@@ -1357,6 +2078,22 @@
         public int EngineMaximumHalfOpenConnections { get; set; } = 8;
         public int EngineMaximumDownloadRateBytesPerSecond { get; set; }
         public int EngineMaximumUploadRateBytesPerSecond { get; set; }
+    }
+
+    private sealed class VpnEgressSettingsGroup
+    {
+        public bool VpnEgressValidationEnabled { get; set; }
+        public string VpnEgressValidationEndpoint { get; set; } = string.Empty;
+        public string VpnEgressDirectIspCidrs { get; set; } = string.Empty;
+        public int VpnEgressDegradedCheckIntervalSeconds { get; set; } = 60;
+        public int VpnEgressReadyCheckIntervalSeconds { get; set; } = 240;
+        public int VpnEgressRequestTimeoutSeconds { get; set; } = 10;
+        public int VpnEgressEngineSuspensionTimeoutSeconds { get; set; } = 10;
+    }
+
+    private sealed class DiagnosticsSettingsGroup
+    {
+        public bool RuntimeTickDurationSummaryEnabled { get; set; }
     }
 
     private sealed class CallbackSettingsGroup

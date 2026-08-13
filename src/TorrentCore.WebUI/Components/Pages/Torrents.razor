@@ -5,6 +5,7 @@
 @inject IPageStateStore PageStateStore
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
+@inject TorrentProcessingAvailabilityState ProcessingAvailability
 
 <PageTitle>Torrents</PageTitle>
 
@@ -24,11 +25,14 @@
     </HeaderActions>
 
     <ChildContent>
-        <StateView Mode="@_mode"
-                   Title="Torrent list unavailable"
-                   Message="@_errorMessage"
-                   ActionText="Retry"
-                   OnAction="RefreshAsync">
+        <TorrentProcessingAvailabilityBoundary HostStatus="ProcessingAvailability.LastExplicitStatus"
+                                               IsRefreshing="@(_isRefreshing || _isActingOnSelected)"
+                                               OnRefresh="RefreshAsync">
+            <StateView Mode="@_mode"
+                       Title="Torrent list unavailable"
+                       Message="@_errorMessage"
+                       ActionText="Retry"
+                       OnAction="RefreshAsync">
             <div class="dashboard-tab-content torrents-tab-content">
                 <div class="torrents-grid">
                     <OperatorCard Class="section-card torrents-panel torrents-panel--filters">
@@ -564,7 +568,8 @@
                     </OperatorCard>
                 </div>
             </div>
-        </StateView>
+            </StateView>
+        </TorrentProcessingAvailabilityBoundary>
     </ChildContent>
 </OperatorPage>
 
@@ -710,10 +715,21 @@
 
         _errorMessage = null;
 
-        var torrentsResult = await Api.GetTorrentsAsync();
-        if (!torrentsResult.IsSuccess)
+        var torrentsTask = Api.GetTorrentsAsync();
+        var hostStatusTask = Api.GetHostStatusAsync();
+        await Task.WhenAll(torrentsTask, hostStatusTask);
+
+        var torrentsResult = torrentsTask.Result;
+        var hostStatusResult = hostStatusTask.Result;
+        if (hostStatusResult.IsSuccess)
         {
-            var errorMessage = torrentsResult.ErrorMessage ?? "Torrent list request failed.";
+            ProcessingAvailability.Accept(hostStatusResult.Value);
+        }
+
+        if (!torrentsResult.IsSuccess || !hostStatusResult.IsSuccess)
+        {
+            var errorMessage = torrentsResult.ErrorMessage ?? hostStatusResult.ErrorMessage ??
+                               "Torrent list and processing status request failed.";
             _errorMessage = errorMessage;
             _mode = _allTorrents.Count == 0 ? StateViewMode.Error : StateViewMode.Ready;
             _isRefreshing = false;

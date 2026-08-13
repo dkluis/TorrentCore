@@ -50,6 +50,13 @@ Current code and active documentation remain authoritative if this plan becomes 
 - Existing repository build and test commands remain required verification; this exclusion applies to adding WebUI
   tests, not to running the current suite or release-time bundle, signing, static-asset, LaunchAgent, and health
   verification.
+- CA-Desktop is the only current VPN-enhanced production Service. CA-Server is neither running nor current enough for
+  this work and must not be used as a verification target.
+- Do not perform intermediate live WebUI settings mutations. Run one explicitly approved production acceptance against
+  CA-Desktop at the end of the complete WebUI alignment process, with the exact temporary changes and restoration
+  checklist agreed immediately before that test.
+- The final production acceptance does not implicitly authorize destructive cleanup. Any live log, history, or orphan
+  cleanup operation and its exact cutoff must receive separate explicit approval in the final checklist.
 
 ### Deployment
 
@@ -169,7 +176,7 @@ Current code and active documentation remain authoritative if this plan becomes 
 
 ### Slice 0: Compatibility And API Adapter Foundation
 
-Status: pending.
+Status: completed on August 13, 2026.
 
 #### Work
 
@@ -196,9 +203,28 @@ Status: pending.
 - Run the existing client and Service contract tests that cover the touched contracts.
 - Do not add WebUI tests.
 
+#### Implemented Result
+
+- The shared connection probe now decodes successful health responses before declaring an endpoint reachable.
+- Service identity must exactly match `TorrentCore.Service`.
+- Missing, null, current, and older numeric API versions are accepted; a version greater than
+  `ServiceApiContract.CurrentVersion` is rejected with the native-client compatibility message.
+- Invalid health JSON and nonnumeric API versions return operator-facing probe failures.
+- The WebUI adapter exposes the existing client log and history date-cleanup operations through its established
+  `ServiceCallResult` error boundary.
+- Endpoint parsing, normalization, persistence, timeout, candidate fallback, and connection-form behavior were not
+  changed.
+- `dotnet build src/TorrentCore.WebUI/TorrentCore.WebUI.csproj --no-restore --maxcpucount:1
+  --disable-build-servers`: succeeded with zero warnings and zero errors.
+- Existing OpenAPI and maintenance-cleanup contract tests: all five selected tests passed.
+- `dotnet test TorrentCore.sln --no-build --no-restore --maxcpucount:1 --disable-build-servers`: all 286 existing
+  tests passed.
+- No WebUI tests or test infrastructure were added.
+
 ### Slice 1: Runtime Settings Parity
 
-Status: pending; depends on Slice 0 only for the common connection policy.
+Status: completed on August 13, 2026. Live mutation acceptance is intentionally deferred to the final one-time
+CA-Desktop production verification.
 
 #### Work
 
@@ -238,13 +264,39 @@ Status: pending; depends on Slice 0 only for the common connection policy.
 
 - Build the WebUI project.
 - Run the existing Service runtime-settings and OpenAPI contract tests.
-- Manually verify load, dirty, discard, save, and returned-value reconciliation against a designated non-production
-  current Service only when the operator authorizes that mutation.
+- Defer live load, dirty, discard, save, and returned-value reconciliation to the final explicitly authorized
+  CA-Desktop production acceptance. Do not use CA-Server or perform an intermediate live mutation.
 - Do not add WebUI tests.
+
+#### Implemented Result
+
+- Queue & Recovery now loads and edits the metadata-resolution time slice and automatic-reset stuck threshold with the
+  confirmed `1...1440` minute and `15...300` second limits.
+- VPN Egress is an independent live settings group containing all seven current policy values. Direct-ISP CIDRs use
+  the macOS comma-separated input format and preserve multiple Service-returned entries.
+- Diagnostics is an independent live settings group containing Performance Timing Summaries.
+- Both new groups participate in the existing one-dirty-group workflow, including blocking, pending-change prompts,
+  discard, save state, status text, and returned-value reconciliation.
+- Every runtime update request carries the loaded/edited values for the two queue controls, all VPN values, and the
+  diagnostics flag, including when an unrelated runtime group is saved.
+- WebUI validation blocks invalid metadata bounds, VPN endpoints, IPv4 CIDRs, nonpositive durations, missing enabled
+  CIDRs, and request timeouts that are not shorter than both check intervals. Service validation remains final.
+- VPN and diagnostics saves use the existing live-setting success path and are not presented as restart-required
+  engine changes.
+- Help content matches the current macOS operational descriptions and limits.
+- `dotnet build src/TorrentCore.WebUI/TorrentCore.WebUI.csproj --no-restore --maxcpucount:1
+  --disable-build-servers`: succeeded with zero warnings and zero errors.
+- Existing runtime-settings, options-validation, and OpenAPI contract tests: all 33 selected tests passed.
+- `dotnet test TorrentCore.sln --no-build --no-restore --maxcpucount:1 --disable-build-servers`: all 286 existing
+  tests passed on the final run. An unrelated cold-download abandonment timing test failed on the first full run, then
+  passed both in isolation and in the complete rerun.
+- No WebUI tests or test infrastructure were added.
+- Live save/discard verification was not run. By operator decision, it belongs to the one-time final CA-Desktop
+  production acceptance after the remaining WebUI alignment slices are complete.
 
 ### Slice 2: Settings Cleanup Operations
 
-Status: pending; depends on the Slice 0 adapter methods.
+Status: completed on August 13, 2026. No live cleanup was performed.
 
 #### Work
 
@@ -275,9 +327,32 @@ Status: pending; depends on the Slice 0 adapter methods.
   approval and a designated disposable target.
 - Do not add WebUI tests.
 
+#### Implemented Result
+
+- Settings now contains one wide Cleanup group after the configuration groups with Log Entries, History Records, and
+  Orphaned Torrent Logs operations.
+- Log and history selectors initialize to seven and 30 days before today, remain clearable, reject missing or future
+  dates, and construct `DateOnly` requests without instant or time-zone conversion.
+- Each action has its own destructive confirmation using the macOS scope wording. Log and history confirmations state
+  the selected date, Service-local midnight, exclusive eligibility, and live-torrent protection.
+- Cleanup uses the page's busy state to prevent concurrent cleanup, refresh, or settings/category saves. An unsaved
+  settings group blocks access to Cleanup through the existing pending-group workflow.
+- Success feedback reports the exact Service deletion count, including zero as a successful no-op. Failure feedback
+  preserves the adapter's operator-safe Service problem detail.
+- The orphan action delegates to the existing guarded Service operation. The existing Logs-page action was not changed.
+- Help content matches the current macOS cleanup descriptions; cutoff conversion and record protection remain
+  Service-owned.
+- `dotnet build src/TorrentCore.WebUI/TorrentCore.WebUI.csproj --no-restore --maxcpucount:1
+  --disable-build-servers`: succeeded with zero warnings and zero errors.
+- Existing maintenance-cleanup and OpenAPI contract tests: all five selected tests passed.
+- `dotnet test TorrentCore.sln --no-build --no-restore --maxcpucount:1 --disable-build-servers`: all 286 existing
+  tests passed.
+- No WebUI tests or test infrastructure were added, and no cleanup request was sent to CA-Desktop.
+
 ### Slice 3: Dashboard VPN Status
 
-Status: pending; may proceed after Slice 0 independently of Slices 1 and 2.
+Status: completed on August 13, 2026. The operator completed the end-of-coding UI check against the production
+Service before deployment work began.
 
 #### Work
 
@@ -315,9 +390,31 @@ Status: pending; may proceed after Slice 0 independently of Slices 1 and 2.
 - Run the existing host-status, VPN coordinator, and OpenAPI contract tests.
 - Manually inspect representative current host-status payloads without adding WebUI tests.
 
+#### Implemented Result
+
+- Dashboard retains its existing lifecycle, pipeline, callback, and attention summaries and adds one wide VPN
+  Connection panel sourced only from the existing host-status response.
+- The panel presents validation, connection phase, torrent-processing availability, connection reason, observed
+  public IPv4, last check, preserved last successful check, next automatic retry, both check intervals, and the
+  Service-provided operator message.
+- Phase, reason, validation, processing, interval, and unavailable-value presentation follows the native macOS
+  terminology. The Service's technical failure summary is not repeated in the primary operator panel.
+- Missing additive VPN fields render as unavailable and do not make the Dashboard itself degraded or hide any
+  existing content. Dashboard refresh remains manual and no VPN mutation action was added.
+- `dotnet build src/TorrentCore.WebUI/TorrentCore.WebUI.csproj --no-restore --maxcpucount:1
+  --disable-build-servers`: succeeded with zero warnings and zero errors.
+- The selected existing host-status, VPN coordinator, degraded-admission, and OpenAPI contract tests all passed (18
+  tests). No WebUI tests or test infrastructure were added.
+- `dotnet test TorrentCore.sln --no-build --no-restore --maxcpucount:1 --disable-build-servers`: all 286 existing
+  tests passed.
+- During the end-of-coding check, the operator connected the locally running current-source WebUI to the production
+  Service and reported that the screens and UI implementation looked correct. This live check used the production
+  state available at that time and does not claim that every synthetic VPN transition state was exercised.
+
 ### Slice 4: VPN-Degraded Torrents And History
 
-Status: pending; should follow Slice 3 so VPN terminology and presentation are already established.
+Status: completed on August 13, 2026. The operator completed the end-of-coding UI check against the production
+Service before deployment work began.
 
 #### Work
 
@@ -350,6 +447,47 @@ Status: pending; should follow Slice 3 so VPN terminology and presentation are a
 - Run the existing VPN degraded-admission, host-status, and OpenAPI contract tests.
 - Manually inspect ready, degraded, activating, recovered, missing-field, and host-refresh-failure states without adding
   WebUI tests.
+
+#### Implemented Result
+
+- Torrents and History now request host status as part of their existing page refreshes. Torrents includes that request
+  in its existing periodic loop without changing the loop, enabled preference, or interval choices; History remains
+  manual-only.
+- One shared processing-availability boundary makes the covered content inert and presents only Refresh when the last
+  successful explicit host status reports `torrentProcessingAvailable == false`.
+- Activating uses the native Restarting Torrent Processing presentation. Other unavailable phases use Torrent
+  Processing Paused, the Service operator message or native fallback, and the native operator-facing reason mapping.
+- A failed host-status request leaves the last explicit processing state untouched while continuing through the
+  page's existing error handling. Missing or null processing availability does not create or clear a last-known
+  explicit state; only explicit `false` pauses and explicit `true` restores the page.
+- The shared circuit state also disables the existing app-bar Add Magnet command while the operator is on Torrents or
+  History and processing is explicitly unavailable. The command's behavior on every other page and in every other
+  state is unchanged.
+- Existing filters, tables, selection, dialogs, torrent actions, Add Magnet input behavior, History refresh behavior,
+  and Torrents auto-refresh controls were not otherwise changed.
+- `dotnet build src/TorrentCore.WebUI/TorrentCore.WebUI.csproj --no-restore --maxcpucount:1
+  --disable-build-servers`: succeeded with zero warnings and zero errors.
+- The selected existing VPN degraded-admission, host-status, VPN coordinator, and OpenAPI contract tests all passed
+  (18 tests). No WebUI tests or test infrastructure were added.
+- `dotnet test TorrentCore.sln --no-build --no-restore --maxcpucount:1 --disable-build-servers`: all 286 existing
+  tests passed.
+- During the end-of-coding check, the operator connected the locally running current-source WebUI to the production
+  Service and accepted the rendered screens and UI implementation. The production state available during this check
+  did not establish coverage of every synthetic ready, degraded, activating, recovered, missing-field, and
+  refresh-failure transition.
+
+### End-Of-Coding Operator Check
+
+Completed on August 13, 2026, before bundled deployment work:
+
+- The current-source WebUI served successfully on localhost and connected to the production TorrentCore Service after
+  the operator selected the current endpoint through the existing Service Connection UI.
+- The operator reviewed the rendered screens and reported that the screens and UI implementation looked correct.
+- One runtime-settings update completed successfully against the production Service and subsequent settings reads
+  succeeded.
+- The operator ran the orphaned-torrent-logs cleanup from WebUI; the Service returned success.
+- This was a focused coding-acceptance check. It does not claim execution of every synthetic VPN state or the broader
+  final settings mutation/restoration checklist described for Slice 6.
 
 ### Slice 5: Bundled WebUI And Combined Managed Deployment
 
@@ -449,6 +587,8 @@ Status: pending; follows implementation of Slices 0 through 5.
 - Update [Architecture](architecture.md) only if an implementation decision changes a durable boundary; do not copy UI
   implementation detail into architecture documentation.
 - Keep active docs short and move completed planning history to `docs/archive/` when this plan is fully delivered.
+- Prepare the exact temporary setting changes, expected results, restoration values, and recovery checks for one
+  operator-approved CA-Desktop production acceptance. Do not involve CA-Server.
 
 #### Acceptance
 
@@ -463,6 +603,9 @@ Status: pending; follows implementation of Slices 0 through 5.
 - Run `git diff --check`.
 - Verify repo-relative documentation links.
 - Confirm no WebUI test project or WebUI test case was added.
+- After explicit operator approval of the final checklist, run the one-time CA-Desktop production acceptance covering
+  WebUI load, dirty-group blocking, discard, save, returned-value reconciliation, and restoration of the original
+  settings. Record the observed results and final restored values.
 
 ## Delivery Order
 

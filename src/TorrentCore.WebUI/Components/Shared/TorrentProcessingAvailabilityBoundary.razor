@@ -1,0 +1,85 @@
+<div class="@GetFrameClass()">
+    <div class="processing-availability-content"
+         inert="@InertAttribute"
+         aria-hidden="@AriaHiddenAttribute">
+        @ChildContent
+    </div>
+
+    @if (IsPaused)
+    {
+        <div class="@GetOverlayClass()"
+             role="status"
+             aria-live="polite"
+             aria-label="Torrent processing unavailable">
+            <div class="processing-paused-card">
+                <MudIcon Icon="@GetIcon()"
+                         Color="@GetIconColor()"
+                         Class="processing-paused-icon" />
+                <h2>@GetTitle()</h2>
+                <p class="processing-paused-message">@GetMessage()</p>
+                @if (VpnStatusDisplayText.PausedReason(HostStatus?.VpnConnectionReason) is { } reason)
+                {
+                    <p class="processing-paused-reason">@reason</p>
+                }
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           Disabled="IsRefreshing"
+                           OnClick="OnRefresh">
+                    Refresh
+                </MudButton>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public EngineHostStatusDto? HostStatus { get; set; }
+
+    [Parameter]
+    public bool IsRefreshing { get; set; }
+
+    [Parameter]
+    public EventCallback OnRefresh { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private bool IsPaused => HostStatus?.TorrentProcessingAvailable == false;
+
+    private bool IsRestarting => string.Equals(
+        HostStatus?.VpnConnectionPhase,
+        "Activating",
+        StringComparison.Ordinal
+    );
+
+    private string? InertAttribute => IsPaused ? string.Empty : null;
+
+    private string? AriaHiddenAttribute => IsPaused ? "true" : null;
+
+    private string GetFrameClass()
+        => IsPaused
+            ? "processing-availability-frame processing-availability-frame--paused"
+            : "processing-availability-frame";
+
+    private string GetOverlayClass()
+        => IsRestarting
+            ? "processing-paused-overlay processing-paused-overlay--restarting"
+            : "processing-paused-overlay";
+
+    private string GetTitle()
+        => IsRestarting ? "Restarting Torrent Processing" : "Torrent Processing Paused";
+
+    private string GetMessage()
+        => string.IsNullOrWhiteSpace(HostStatus?.TorrentProcessingMessage)
+            ? VpnStatusDisplayText.DefaultPausedMessage
+            : HostStatus.TorrentProcessingMessage;
+
+    private string GetIcon()
+        => IsRestarting ? Icons.Material.Filled.Autorenew : Icons.Material.Filled.PauseCircle;
+
+    private Color GetIconColor()
+        => IsRestarting ? Color.Info : Color.Warning;
+}

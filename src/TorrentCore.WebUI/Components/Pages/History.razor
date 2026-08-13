@@ -2,6 +2,7 @@
 @inject ITorrentCoreApiAdapter Api
 @inject IOperatorFeedbackService Feedback
 @inject IPageStateStore PageStateStore
+@inject TorrentProcessingAvailabilityState ProcessingAvailability
 
 <PageTitle>History</PageTitle>
 
@@ -21,11 +22,14 @@
     </HeaderActions>
 
     <ChildContent>
-        <StateView Mode="@_mode"
-                   Title="History unavailable"
-                   Message="@_errorMessage"
-                   ActionText="Retry"
-                   OnAction="RefreshAsync">
+        <TorrentProcessingAvailabilityBoundary HostStatus="ProcessingAvailability.LastExplicitStatus"
+                                               IsRefreshing="@(_isRefreshing || _isLoadingSelectedDetail)"
+                                               OnRefresh="RefreshAsync">
+            <StateView Mode="@_mode"
+                       Title="History unavailable"
+                       Message="@_errorMessage"
+                       ActionText="Retry"
+                       OnAction="RefreshAsync">
             @if (_abandonedHistoryCount > 0)
             {
                 <MudAlert Severity="Severity.Warning"
@@ -549,7 +553,8 @@
                     </OperatorCard>
                 </div>
             </div>
-        </StateView>
+            </StateView>
+        </TorrentProcessingAvailabilityBoundary>
     </ChildContent>
 </OperatorPage>
 
@@ -742,9 +747,29 @@
                 Outcome = TorrentHistoryOutcome.Abandoned,
                 Take = 500,
             });
+        var hostStatusTask = Api.GetHostStatusAsync();
 
-        var historyResult = await historyTask;
-        var abandonedHistoryResult = await abandonedHistoryTask;
+        await Task.WhenAll(historyTask, abandonedHistoryTask, hostStatusTask);
+        var historyResult = historyTask.Result;
+        var abandonedHistoryResult = abandonedHistoryTask.Result;
+        var hostStatusResult = hostStatusTask.Result;
+        if (hostStatusResult.IsSuccess)
+        {
+            ProcessingAvailability.Accept(hostStatusResult.Value);
+        }
+
+        if (!hostStatusResult.IsSuccess)
+        {
+            var errorMessage = hostStatusResult.ErrorMessage ?? "Torrent processing status request failed.";
+            _errorMessage = errorMessage;
+            _mode = _historyRows.Count == 0 ? StateViewMode.Error : StateViewMode.Ready;
+            _isRefreshing = false;
+            _actionMessage = errorMessage;
+            _actionIsError = true;
+            Feedback.Error(errorMessage);
+            return;
+        }
+
         if (abandonedHistoryResult.IsSuccess)
         {
             var abandonedRows = abandonedHistoryResult.Value ?? [];

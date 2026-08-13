@@ -2,6 +2,7 @@ using TorrentCore.Contracts.Categories;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Host;
 using TorrentCore.Contracts.History;
+using TorrentCore.Contracts.Maintenance;
 using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.WebUI.Services;
@@ -48,6 +49,14 @@ public interface ITorrentCoreApiAdapter
         CancellationToken cancellationToken = default
     );
     Task<ServiceCallResult<DeleteOrphanedTorrentLogsResultDto>> DeleteOrphanedTorrentLogsAsync(
+        CancellationToken cancellationToken = default
+    );
+    Task<ServiceCallResult<CleanupByDateResultDto>> CleanupLogsAsync(
+        CleanupByDateRequest request,
+        CancellationToken cancellationToken = default
+    );
+    Task<ServiceCallResult<CleanupByDateResultDto>> CleanupHistoryAsync(
+        CleanupByDateRequest request,
         CancellationToken cancellationToken = default
     );
     Task<ServiceCallResult<TorrentDetailDto?>> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken = default);

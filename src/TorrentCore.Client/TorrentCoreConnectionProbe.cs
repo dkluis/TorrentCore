@@ -1,8 +1,12 @@
+using System.Text.Json;
+using TorrentCore.Contracts;
+
 namespace TorrentCore.Client;
 
 public static class TorrentCoreConnectionProbe
 {
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(2);
+    private const string ExpectedServiceName = "TorrentCore.Service";
 
     public static async Task<TorrentCoreConnectionProbeResult> CheckAsync(string? baseUrl,
         CancellationToken                                                         cancellationToken = default)
@@ -113,11 +117,64 @@ public static class TorrentCoreConnectionProbe
                 return (false, $"The service returned HTTP {(int)response.StatusCode}.");
             }
 
-            return (true, null);
+            return await ValidateHealthResponseAsync(response, cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
             return (false, exception.Message);
         }
+    }
+
+    private static async Task<(bool IsReachable, string? ErrorMessage)> ValidateHealthResponseAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            await using var content = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(content, cancellationToken: cancellationToken);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return (false, "TorrentCore returned an invalid health response.");
+            }
+
+            var root = document.RootElement;
+            var serviceName = ReadOptionalString(root, "serviceName");
+            if (!string.Equals(serviceName, ExpectedServiceName, StringComparison.Ordinal))
+            {
+                var nameDetail = string.IsNullOrWhiteSpace(serviceName) ? string.Empty : $" ({serviceName})";
+                return (false, $"The address responded, but it is not a TorrentCore service{nameDetail}.");
+            }
+
+            if (!root.TryGetProperty("apiVersion", out var apiVersionElement) ||
+                apiVersionElement.ValueKind == JsonValueKind.Null)
+            {
+                return (true, null);
+            }
+
+            if (apiVersionElement.ValueKind != JsonValueKind.Number || !apiVersionElement.TryGetInt32(out var apiVersion))
+            {
+                return (false, "TorrentCore returned an invalid API version in its health response.");
+            }
+
+            return apiVersion > ServiceApiContract.CurrentVersion
+                ? (false, $"This TorrentCore service uses unsupported API version {apiVersion}.")
+                : (true, null);
+        }
+        catch (JsonException exception)
+        {
+            return (false, $"TorrentCore returned an invalid health response: {exception.Message}");
+        }
+    }
+
+    private static string? ReadOptionalString(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var element) || element.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        return element.ValueKind == JsonValueKind.String ? element.GetString() : null;
     }
 }

@@ -114,6 +114,60 @@
                             </table>
                         </OperatorCard>
 
+                        <OperatorCard Class="dashboard-panel dashboard-panel--wide">
+                            <div class="dashboard-panel-header">
+                                <div>
+                                    <h2>VPN Connection</h2>
+                                    <p class="dashboard-panel-copy">Service-reported VPN validation and torrent-processing availability.</p>
+                                </div>
+                            </div>
+
+                            <div class="dashboard-vpn-grid">
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Validation</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Validation(_hostStatus.VpnValidationEnabled)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Connection</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Identifier(_hostStatus.VpnConnectionPhase)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Torrent Processing</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Processing(_hostStatus.TorrentProcessingAvailable)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Reason</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Identifier(_hostStatus.VpnConnectionReason)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Current Public IPv4</p>
+                                    <p class="dashboard-detail-value">@ValueOrDash(_hostStatus.VpnObservedPublicIpv4)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Check</p>
+                                    <p class="dashboard-detail-value">@FormatVpnTimestamp(_hostStatus.VpnLastCheckAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Successful Check</p>
+                                    <p class="dashboard-detail-value">@FormatVpnTimestamp(_hostStatus.VpnLastSuccessAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Next Automatic Retry</p>
+                                    <p class="dashboard-detail-value">@FormatVpnTimestamp(_hostStatus.VpnNextAutomaticRetryAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Ready Check Interval</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Interval(_hostStatus.VpnReadyCheckIntervalSeconds)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Paused Check Interval</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Interval(_hostStatus.VpnDegradedCheckIntervalSeconds)</p>
+                                </div>
+                            </div>
+
+                            <p class="@GetVpnOperatorMessageClass()">@VpnStatusDisplayText.OperatorMessage(_hostStatus)</p>
+                        </OperatorCard>
+
                         <OperatorCard Class="dashboard-panel">
                             <div class="dashboard-panel-header">
                                 <div>
@@ -636,6 +690,23 @@
     private static string FormatTimestamp(DateTimeOffset? timestamp)
     {
         return timestamp is null ? "N/A" : timestamp.Value.LocalDateTime.ToString("g");
+    }
+
+    private static string FormatVpnTimestamp(DateTimeOffset? timestamp)
+    {
+        return timestamp is null ? "--" : timestamp.Value.LocalDateTime.ToString("g");
+    }
+
+    private static string ValueOrDash(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "--" : value;
+    }
+
+    private string GetVpnOperatorMessageClass()
+    {
+        return _hostStatus?.TorrentProcessingAvailable == false
+            ? "dashboard-vpn-message dashboard-vpn-message--paused"
+            : "dashboard-vpn-message";
     }
 
     private static string FormatWaitReason(TorrentWaitReason? waitReason, int? queuePosition)

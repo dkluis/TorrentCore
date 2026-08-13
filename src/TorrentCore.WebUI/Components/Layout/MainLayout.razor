@@ -1,10 +1,12 @@
 @inherits LayoutComponentBase
+@implements IDisposable
 @inject IOptions<TorrentCoreClientOptions> ClientOptionsAccessor
 @inject IHostEnvironment HostEnvironment
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ITorrentCoreApiAdapter Api
 @inject IOperatorFeedbackService Feedback
+@inject TorrentProcessingAvailabilityState ProcessingAvailability
 
 <MudThemeProvider Theme="_theme" />
 <MudDialogProvider />
@@ -30,6 +32,7 @@
                        Size="Size.Small"
                        StartIcon="@Icons.Material.Filled.Download"
                        Class="shell-appbar-action"
+                       Disabled="@DisableAddMagnetForProcessingState"
                        OnClick="OpenAddMagnetAsync">
                 Add Magnet
             </MudButton>
@@ -39,6 +42,7 @@
             <MudIconButton Icon="@Icons.Material.Filled.Download"
                            Color="Color.Inherit"
                            Class="shell-appbar-icon-action"
+                           Disabled="@DisableAddMagnetForProcessingState"
                            OnClick="OpenAddMagnetAsync"
                            aria-label="Open Torrents" />
         </MudHidden>
@@ -86,6 +90,15 @@
 
 @code {
     private bool _drawerOpen = true;
+
+    private bool DisableAddMagnetForProcessingState =>
+        ProcessingAvailability.IsUnavailable && IsProcessingGuardedPage();
+
+    protected override void OnInitialized()
+    {
+        ProcessingAvailability.Changed += OnProcessingAvailabilityChanged;
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
 
     private readonly MudTheme _theme = new()
     {
@@ -172,5 +185,35 @@
         );
 
         NavigationManager.NavigateTo("/torrents");
+    }
+
+    private bool IsProcessingGuardedPage()
+    {
+        var relativePath = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        var queryIndex = relativePath.IndexOf('?', StringComparison.Ordinal);
+        if (queryIndex >= 0)
+        {
+            relativePath = relativePath[..queryIndex];
+        }
+
+        relativePath = relativePath.Trim('/');
+        return string.Equals(relativePath, "torrents", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(relativePath, "history", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void OnProcessingAvailabilityChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ProcessingAvailability.Changed -= OnProcessingAvailabilityChanged;
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }

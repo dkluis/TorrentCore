@@ -64,6 +64,18 @@ public static class SettingsHelpCatalog
         "TorrentCore first tries a non-destructive discovery refresh. If the torrent is still cold after this additional delay, TorrentCore escalates to a stop/start recovery path and fresh peer discovery. Lower values recover faster but can create more churn for slow swarms. It applies live."
     );
 
+    public static readonly SettingHelpContent MetadataResolutionTimeSliceMinutes = new(
+        "Metadata Resolution Time Slice Minutes",
+        "Limits one unresolved magnet's turn when another magnet is waiting.",
+        "After this many minutes, TorrentCore yields the metadata slot to a waiting unresolved magnet. A lone resolver keeps running, never-tried magnets run first, and yielded magnets retry oldest first. The allowed range is 1 through 1,440 minutes and changes apply live."
+    );
+
+    public static readonly SettingHelpContent AutomaticMetadataResetStuckThresholdSeconds = new(
+        "Automatic Reset Stuck Threshold Seconds",
+        "Limits how long an automatic metadata reset may run before isolation.",
+        "TorrentCore quarantines a reset that exceeds this threshold so it cannot hold normal synchronization, then applies its reset circuit-breaker rules. The allowed range is 15 through 300 seconds and changes apply live."
+    );
+
     public static readonly SettingHelpContent ColdDownloadRecoveryThresholdMinutes = new(
         "Long-Cold Threshold Minutes",
         "Defines when a continuously inactive download switches from progressive recovery to long-cold recovery.",
@@ -128,6 +140,72 @@ public static class SettingsHelpCatalog
         "Saved Max Upload Rate",
         "Sets the global upload-throughput ceiling for the engine host.",
         "This is a host-wide send cap across all torrents combined, not a per-torrent limit. Use 0 for unlimited. TorrentCore measures this as network upload throughput seen by the engine, not disk read speed. This setting requires a service restart to apply."
+    );
+
+    public static readonly SettingHelpContent VpnEgressValidationEnabled = new(
+        "Enable VPN Egress Validation",
+        "Controls whether TorrentCore requires verified VPN egress before torrent processing.",
+        "When enabled, TorrentCore accepts new magnets while paused but starts torrent processing only after the VPN connection is confirmed. This setting applies live."
+    );
+
+    public static readonly SettingHelpContent VpnEgressValidationEndpoint = new(
+        "Validation Endpoint",
+        "Sets the HTTPS endpoint used to discover TorrentCore's public IPv4 address.",
+        "Use an absolute HTTPS URL without embedded credentials or a fragment. Changes apply live without an operator restart."
+    );
+
+    public static readonly SettingHelpContent VpnEgressDirectIspCidrs = new(
+        "Direct ISP IPv4 CIDRs",
+        "Lists public IPv4 ranges that identify direct, non-VPN egress.",
+        "Enter one or more comma-separated IPv4 CIDRs. IPv6 ranges are rejected because this installation uses IPv4 for public egress validation. TorrentCore canonicalizes and deduplicates the saved ranges."
+    );
+
+    public static readonly SettingHelpContent VpnEgressDegradedCheckIntervalSeconds = new(
+        "Degraded Check Interval Seconds",
+        "Sets how often TorrentCore rechecks egress while validation is degraded.",
+        "The value must be at least one second, and the validation request timeout must be shorter than this interval. Changes apply live."
+    );
+
+    public static readonly SettingHelpContent VpnEgressReadyCheckIntervalSeconds = new(
+        "Ready Check Interval Seconds",
+        "Sets how often TorrentCore revalidates egress while processing is ready.",
+        "The value must be at least one second, and the validation request timeout must be shorter than this interval. Changes apply live."
+    );
+
+    public static readonly SettingHelpContent VpnEgressRequestTimeoutSeconds = new(
+        "Validation Request Timeout Seconds",
+        "Limits one public-IP validation request.",
+        "The value must be positive and shorter than both validation intervals. Changes apply live."
+    );
+
+    public static readonly SettingHelpContent VpnEgressEngineSuspensionTimeoutSeconds = new(
+        "Engine Suspension Timeout Seconds",
+        "Limits local MonoTorrent draining and teardown after VPN validation fails.",
+        "The value must be at least one second. It applies live and does not limit activation or recovery."
+    );
+
+    public static readonly SettingHelpContent RuntimeTickDurationSummaryEnabled = new(
+        "Performance Timing Summaries",
+        "Controls one-minute synchronization timing summaries in the Service log.",
+        "This changes only runtime.tick.duration_summary writes. Synchronization, slow-operation logging, failure logging, and torrent work remain unchanged. Summaries are suppressed while torrent processing is paused for the VPN connection."
+    );
+
+    public static readonly SettingHelpContent CleanupLogEntries = new(
+        "Log Entries",
+        "Deletes eligible log entries older than the selected date.",
+        "The Service uses local midnight at the start of the selected date as an exclusive cutoff. Logs tied to torrent ids still present in the live torrent table are protected."
+    );
+
+    public static readonly SettingHelpContent CleanupHistoryRecords = new(
+        "History Records",
+        "Deletes eligible history records older than the selected date.",
+        "Eligibility uses Last Updated and the Service's local midnight at the start of the selected date. History tied to torrent ids still present in the live torrent table is protected."
+    );
+
+    public static readonly SettingHelpContent CleanupOrphanedTorrentLogs = new(
+        "Orphaned Torrent Logs",
+        "Deletes torrent-scoped logs whose torrent id is no longer live.",
+        "This is the same guarded orphan-log maintenance operation available on the Logs screen. Service-level logs and logs for still-tracked torrents are kept."
     );
 
     public static readonly SettingHelpContent CompletionCallbackEnabled = new(

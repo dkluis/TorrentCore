@@ -2,6 +2,7 @@ using MudBlazor;
 using MudBlazor.Services;
 using TorrentCore.Client;
 using TorrentCore.WebUI.Components;
+using TorrentCore.WebUI.Components.Shared;
 using TorrentCore.WebUI.Connection;
 using TorrentCore.WebUI.Services;
 using TorrentCore.WebUI.State;
@@ -30,6 +31,7 @@ builder.Services.AddSingleton<WebServiceConnectionManager>();
 builder.Services.AddScoped<ITorrentCoreApiAdapter, TorrentCoreApiAdapter>();
 builder.Services.AddScoped<IOperatorFeedbackService, OperatorFeedbackService>();
 builder.Services.AddScoped<IPageStateStore, CircuitPageStateStore>();
+builder.Services.AddScoped<TorrentProcessingAvailabilityState>();
 builder.Services.AddHttpClient<TorrentCoreClient>();
 
 var app = builder.Build();
