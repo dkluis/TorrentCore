@@ -23,7 +23,10 @@ the child runtime. The launcher executes that helper from the sealed bundle whil
 host-local configuration and installed version metadata. Packaging changes process representation only and does not
 move SQLite, cache, download, category, or callback state into the sealed app bundle.
 
-The supported operator UI is `TorrentCore.WebUI`.
+The supported operator UI is `TorrentCore.WebUI`. On Arm64 macOS it is represented by the background-only
+`TorrentCoreWebUI.app`; bundled runtime and static assets remain sealed while host-local configuration stays under
+`~/TorrentCore/WebUI`. The managed DMG treats Service and WebUI as one install, backup, recovery, and verification
+unit. The native `TorrentCore.app` remains a separate drag-to-Applications client.
 
 Removed surfaces:
 

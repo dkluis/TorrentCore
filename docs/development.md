@@ -45,7 +45,10 @@ Important groups:
 
 Live settings currently include:
 
+- VPN validation policy and check/suspension timing
+- performance timing summary logging
 - queue concurrency
+- metadata and long-cold recovery windows
 - seeding policy
 - completed-torrent cleanup policy
 - connection-failure log throttling
@@ -101,7 +104,13 @@ Rules:
 
 - the persisted endpoint is host-global for that WebUI host
 - the UI tests `/api/health` before saving a new endpoint
+- health must identify `TorrentCore.Service` exactly
+- the current API contract version is `1`; a missing or older/current `apiVersion` is accepted and a future version is
+  rejected
+- `serviceVersion` and `serviceBuild` are display information, not compatibility gates
 - the saved endpoint is runtime state and should not be tracked in git
+- publish and deployment payloads exclude `Config/service-connection.json`, and managed upgrades preserve the target
+  file when it exists
 - source-controlled defaults should remain environment-neutral
 
 ## Scripts Boundary

@@ -242,6 +242,16 @@ notarization submission `baffb509-1e96-4d8e-a56e-59a630de1bfe`; the signed and s
 workflow's app and DMG signature, stapler-ticket, disk-image, and Gatekeeper checks. Its SHA-256 checksum is
 `51f8704b3a1769b51f29d7f3b611384e888cf02c43a135d488c9458b92965458`.
 
+The August 13 WebUI alignment completed with a successful solution build and all 286 existing tests passing; no WebUI
+tests or test infrastructure were added. The operator accepted the rendered current-source WebUI against the
+production Service and successfully exercised one settings save and one cleanup operation. The persistent Dick Arm64
+release package was reviewed before DMG construction. Apple accepted notarization submission
+`8bd817c5-861a-4c14-9dbc-58304c026461`; the final stapled combined Service/WebUI and native-UI DMG passed signature,
+entitlement, architecture, Gatekeeper, disk-image, mounted-checksum, required-content, and machine-local connection-file
+exclusion checks. Its SHA-256 checksum is
+`7d0e3844988ee1d74dde0e1ce9db7d4d4c668460dc1bd405db191242b756b746`. Production installation remains an operator
+action for the approved deployment window rather than an incomplete coding or release-verification step.
+
 ## Testing Rules
 
 - use real SQLite-backed tests for persistence behavior

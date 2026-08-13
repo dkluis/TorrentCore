@@ -15,6 +15,5 @@ Start here:
 - [docs/testing.md](docs/testing.md)
 - [docs/deployment.md](docs/deployment.md)
 - [docs/native-apple-client-development-plan.md](docs/native-apple-client-development-plan.md)
-- [docs/webui-functional-alignment-plan.md](docs/webui-functional-alignment-plan.md)
 
 Historical planning and handoff material lives under [docs/archive/](docs/archive/).

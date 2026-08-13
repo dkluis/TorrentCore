@@ -794,7 +794,7 @@ Status: deferred until Arm proof acceptance.
 ### Slice 12: WebUI App Bundle
 
 Status: superseded by
-[WebUI Functional Alignment Plan, Slice 5](webui-functional-alignment-plan.md#slice-5-bundled-webui-and-combined-managed-deployment).
+[WebUI Functional Alignment Plan, Slice 5](archive/webui-functional-alignment-plan.md#slice-5-bundled-webui-and-combined-managed-deployment).
 
 #### Work
 

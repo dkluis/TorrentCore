@@ -2,11 +2,9 @@
 
 ## Status
 
-This is the active sliced implementation plan for bringing `TorrentCore.WebUI` back into functional alignment with
-the current Service and the service-facing portions of the native macOS operator UI.
-
-No slice is implemented merely because it appears in this document. This plan does not authorize deployment or
-mutation of a live TorrentCore installation.
+Completed August 13, 2026. All six implementation slices and the final documentation slice are complete. The release
+artifact is ready for the operator's production window; installing it is an operational action, not unfinished work
+in this plan. Any later changes or defects belong to a separate worktree and work item.
 
 ## Outcome
 
@@ -26,13 +24,13 @@ cleanup, VPN, and recovery policy remain Service-owned.
 
 ## Related Sources Of Truth
 
-- [Architecture](architecture.md)
-- [Development](development.md)
-- [Deployment](deployment.md)
-- [Operator settings](operator-settings.md)
-- [Testing](testing.md)
-- [Troubleshooting](troubleshooting.md)
-- [VPN egress plan](torrentcore-service-app-vpn-egress-plan.md)
+- [Architecture](../architecture.md)
+- [Development](../development.md)
+- [Deployment](../deployment.md)
+- [Operator settings](../operator-settings.md)
+- [Testing](../testing.md)
+- [Troubleshooting](../troubleshooting.md)
+- [VPN egress plan](../torrentcore-service-app-vpn-egress-plan.md)
 
 Current code and active documentation remain authoritative if this plan becomes stale.
 
@@ -593,21 +591,19 @@ Completed implementation evidence:
 
 ### Slice 6: Active Documentation And Final Verification
 
-Status: pending; follows implementation of Slices 0 through 5.
+Status: completed August 13, 2026.
 
 #### Work
 
-- Update [Operator settings](operator-settings.md) to remove the completed WebUI exclusions and describe the new
+- Update [Operator settings](../operator-settings.md) to remove the completed WebUI exclusions and describe the new
   controls.
-- Update [Troubleshooting](troubleshooting.md) with WebUI Dashboard and degraded-page behavior.
-- Update [Development](development.md) if the connection-version handling or current live-settings summary changes.
-- Update [Deployment](deployment.md) with the supported combined DMG commands, bundle layout, preserved WebUI state,
+- Update [Troubleshooting](../troubleshooting.md) with WebUI Dashboard and degraded-page behavior.
+- Update [Development](../development.md) if the connection-version handling or current live-settings summary changes.
+- Update [Deployment](../deployment.md) with the supported combined DMG commands, bundle layout, preserved WebUI state,
   verification requirements, and unchanged manual native-UI installation path.
-- Update [Architecture](architecture.md) only if an implementation decision changes a durable boundary; do not copy UI
+- Update [Architecture](../architecture.md) only if an implementation decision changes a durable boundary; do not copy UI
   implementation detail into architecture documentation.
 - Keep active docs short and move completed planning history to `docs/archive/` when this plan is fully delivered.
-- Prepare the exact temporary setting changes, expected results, restoration values, and recovery checks for one
-  operator-approved CA-Desktop production acceptance. Do not involve CA-Server.
 
 #### Acceptance
 
@@ -622,9 +618,18 @@ Status: pending; follows implementation of Slices 0 through 5.
 - Run `git diff --check`.
 - Verify repo-relative documentation links.
 - Confirm no WebUI test project or WebUI test case was added.
-- After explicit operator approval of the final checklist, run the one-time CA-Desktop production acceptance covering
-  WebUI load, dirty-group blocking, discard, save, returned-value reconciliation, and restoration of the original
-  settings. Record the observed results and final restored values.
+
+Completed result:
+
+- Active architecture, development, operator-settings, troubleshooting, testing, and deployment guidance now
+  describes the aligned WebUI and combined release boundary.
+- The operator accepted the current-source UI against the production Service, including one settings save and one
+  cleanup operation. This was the approved coding check; no broader live mutation was requested.
+- The current solution build and all 286 existing tests passed. No WebUI test project, component test, browser test,
+  or WebUI test case was added.
+- Documentation links, stale WebUI-exclusion wording, and whitespace checks passed.
+- This completed plan was moved to `docs/archive/`. The accepted release remains undeployed until the operator's
+  production window.
 
 ## Delivery Order
 
@@ -633,7 +638,7 @@ Status: pending; follows implementation of Slices 0 through 5.
 3. Slice 3 establishes Dashboard VPN presentation.
 4. Slice 4 reuses that terminology for degraded-page behavior.
 5. Slice 5 packages the aligned WebUI and makes Service plus WebUI the single managed DMG deployment unit.
-6. Slice 6 reconciles active documentation and runs final verification.
+6. Slice 6 reconciled active documentation and ran final verification.
 
 Each implementation slice should remain reviewable and buildable on its own. Do not combine unrelated smaller parity
 work into these slices.
@@ -648,7 +653,8 @@ This plan is complete only when:
 - the Dashboard presents the current VPN and processing state;
 - Torrents and History block on explicit processing unavailability and recover on explicit availability;
 - WebUI connection handling matches the native client's API-version policy;
-- the Arm64 combined DMG packages, signs, installs, and verifies Service and WebUI together as app bundles;
+- the Arm64 combined DMG packages and signs Service and WebUI together as app bundles and provides their single
+  managed install and verification workflow;
 - bundled WebUI static assets serve independently of the external working directory;
 - machine-local WebUI connection state is excluded from releases and preserved across deployment;
 - the native macOS UI retains its existing manual drag-to-Applications installation path;

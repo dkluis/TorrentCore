@@ -174,19 +174,33 @@ means the latest check did not obtain a usable IPv4; a direct-ISP result shows t
   engine directly at the degraded interval.
 - `EngineSuspensionFailed` means execution admission is closed but engine teardown did not complete cleanly.
 
-Magnets remain accepted and queued while degraded. Torrents and History remain readable through the API, while the
-native macOS pages show a processing-paused overlay with Refresh available. Recovery is automatic after a successful
-degraded check. Do not restart the Service merely to clear this state.
+Magnets remain accepted and queued through the API while degraded. The native macOS and WebUI Torrents and History
+pages show a processing-paused overlay with Refresh available after an explicit unavailable host status. The WebUI
+Torrents page continues using its existing refresh loop; History remains manual-refresh only. A host-status request
+failure preserves the last explicit unavailable state, while a missing or null availability value does not create a
+degraded state. Recovery follows an explicit available host status after a successful degraded check. Do not restart
+the Service merely to clear this state.
+
+The WebUI Dashboard's VPN Connection section shows validation, phase, processing availability, operator reason,
+observed address, check/retry timestamps, and configured intervals. Use host status or DB logs for the sanitized
+technical failure detail.
 
 The ready interval is detection latency, not immediate packet protection. ExpressVPN Network Lock remains responsible
 for blocking traffic during the interval before TorrentCore performs its next check.
 
 ## Performance Timing Summaries Are Missing Or Unexpected
 
-`runtime.tick.duration_summary` is disabled by default. Enable **Performance Timing Summaries** in the native Service
+`runtime.tick.duration_summary` is disabled by default. Enable **Performance Timing Summaries** in either operator
 Settings Diagnostics group when a performance investigation needs the one-minute records. Summaries are intentionally
 suppressed while VPN validation has paused torrent processing. Changing this setting does not stop the runtime tick or
 change other runtime diagnostics.
+
+## Settings Cleanup Is Rejected
+
+WebUI Settings and the native macOS client use the same Service cleanup operations. Each destructive action requires
+its own confirmation. For Log Entries and History Records, select a non-future date; the Service interprets it as
+local midnight and deletes only eligible rows strictly before that cutoff. Rows tied to live torrents remain
+protected. Orphaned Torrent Logs removes only torrent-scoped rows whose torrent id is no longer live.
 
 ## Deployment And Runtime Checks
 
@@ -211,3 +225,5 @@ If the WebUI cannot reach the backend:
 - verify the service health endpoint
 - verify listen bindings and host firewall settings
 - use the `Service Connection` page to test and save the intended endpoint
+- confirm `/api/health` identifies `TorrentCore.Service`; a missing or API version up to `1` is accepted, while a
+  future API version is rejected

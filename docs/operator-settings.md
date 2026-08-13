@@ -40,7 +40,7 @@ existing installation does not change torrent processing until an operator enabl
 - all values must be positive, and the request timeout must be shorter than both intervals
 - intervals are measured after the previous check and engine transition complete
 - interval and policy edits apply on the next scheduled check without resetting the current countdown
-- routine checks do not pause torrents or disable the native UI while the result is pending
+- routine checks do not pause torrents or block operator pages while the result is pending
 
 ### Engine Suspension Timeout
 
@@ -72,26 +72,26 @@ automatic retry, observed public IPv4, configured ready/degraded intervals, and 
 The current address is present only after a validated or direct-ISP result. Disabling validation clears the live check,
 success, retry, address, and failure values without deleting historical logs.
 
-The native macOS Dashboard presents the operator-facing status and configured intervals. Technical failure text stays
-in host status and DB logs. The native Torrents and History pages block page actions while leaving Refresh available.
-The WebUI is not part of the split-tunneling changes.
+The native macOS and WebUI Dashboards present the operator-facing status and configured intervals. Technical failure
+text stays in host status and DB logs. Their Torrents and History pages block page actions while leaving Refresh
+available whenever the Service explicitly reports `torrentProcessingAvailable == false`. A missing value does not
+block either page.
 
-All seven VPN policy values are editable through the runtime-settings API and the native macOS Service Settings screen. The WebUI
-has no VPN-settings editor in this slice, but its existing updates remain compatible because omitted VPN fields retain
-their current persisted values.
+All seven VPN policy values are editable through the runtime-settings API and both operator Settings screens. The
+WebUI applies the same limits described above, saves the VPN group independently, and reconciles the form with the
+effective values returned by the Service.
 
 ## Performance Timing Summaries
 
 `RuntimeTickDurationSummaryEnabled` controls only `runtime.tick.duration_summary` DB log writes.
 
 - defaults to `false`
-- applies live through the runtime-settings API and native macOS Diagnostics settings group
+- applies live through the runtime-settings API and both operator Diagnostics settings groups
 - leaves the synchronization timer, torrent processing, slow-operation diagnostics, and failure diagnostics unchanged
 - when enabled, writes the existing one-minute summary only while torrent processing is available
 - turning it on starts a fresh one-minute sample window
 - turning it off or entering VPN-degraded processing discards the partial sample window; returning to ready starts a
   fresh window
-- the WebUI does not expose this setting
 
 ## Queue And Concurrency
 
@@ -120,8 +120,7 @@ their current persisted values.
   oldest-yielded order
 - a lone unresolved magnet continues resolving instead of being stopped and immediately restarted
 - metadata refresh, restart, and automatic reset actions do not restart the time-slice clock
-- applies live; configurable through the runtime-settings API/Swagger and native macOS Service Settings, with no
-  WebUI control
+- applies live; configurable through the runtime-settings API/Swagger and both operator Settings screens
 
 Queue diagnostics currently expose:
 
@@ -153,8 +152,7 @@ seconds until it succeeds or the service shuts down. Manual metadata reset remai
 - elapsed reset time before TorrentCore reports the operation as stuck and opens the automatic-reset circuit breaker
 - defaults to `30`; accepted range is `15` through `300`
 - applies live to newly scheduled automatic resets
-- configurable through the runtime-settings API/Swagger and native macOS Service Settings; no WebUI control is
-  provided yet
+- configurable through the runtime-settings API/Swagger and both operator Settings screens
 - a timed-out manager remains quarantined until the underlying MonoTorrent operation actually finishes
 - the circuit breaker remains open for a fixed five minutes, then permits one half-open probe
 
@@ -270,6 +268,20 @@ seconds until it succeeds or the service shuts down. Manual metadata reset remai
 - does not delete payload data
 - does not run while callback state is still pending, failed, or timed out
 - applies live
+
+## Protected Cleanup Operations
+
+Both operator Settings screens expose three separately confirmed Service maintenance operations:
+
+- Log Entries starts at seven days before the operator's current date and deletes eligible logs strictly before
+  Service-local midnight on the selected date.
+- History Records starts at 30 days before the operator's current date and deletes eligible history rows, based on
+  last-updated time, strictly before Service-local midnight on the selected date.
+- Orphaned Torrent Logs deletes torrent-scoped logs whose torrent id is no longer present in the live torrent table.
+
+The initial dates are UI conveniences rather than persisted settings. A date is required and cannot be in the future.
+Log and history cleanup preserve rows associated with live torrent ids. Orphan cleanup preserves Service-level logs
+and logs for live torrents. The WebUI also retains the existing orphan-log action on the Logs page.
 
 ## Completion Callback Settings
 
