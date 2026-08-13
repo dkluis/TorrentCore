@@ -133,7 +133,7 @@ class Context:
         self.connection_file = self.webui_home / "Config/service-connection.json"
         self.logs_home = self.torrentcore_home / "Logs"
         self.env_file = self.torrentcore_home / "Scripts/torrentcore.env"
-        self.deploy_home = self.torrentcore_home / "DeploymentState"
+        self.deploy_home = self.torrentcore_home / ".deploy"
         self.history_home = self.deploy_home / "history"
         self.backups_home = self.torrentcore_home / ".backups"
         self.installed_path = self.deploy_home / "installed.json"
@@ -206,6 +206,7 @@ def print_plan(ctx: Context, *, dry_run: bool) -> None:
     print(f"WebUI files:         {ctx.webui_home}")
     print(f"Connection override: {ctx.connection_file} ({'present and preserved' if ctx.connection_file.is_file() else 'absent; fallback retained'})")
     print(f"Environment file:    {ctx.env_file}")
+    print(f"Deployment state:    {ctx.deploy_home}")
     print(f"Backups:             {ctx.backups_home}")
     print(f"Service LaunchAgent: {ctx.service_agent}")
     print(f"WebUI LaunchAgent:   {ctx.webui_agent}")
@@ -253,7 +254,7 @@ def create_backup(ctx: Context) -> tuple[Path, dict[str, Any]]:
         if source.is_file():
             relative = (Path("LaunchAgents") / source.name if source in (ctx.service_agent, ctx.webui_agent)
                         else Path("Scripts/torrentcore.env") if source == ctx.env_file
-                        else Path("DeploymentState/installed.before.json"))
+                        else Path(".deploy/installed.before.json"))
             target = backup / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -508,7 +509,7 @@ def rollback(ctx: Context, history_path: Path, *, confirm: bool, dry_run: bool) 
             shell(["launchctl", "kickstart", "-k", f"{launchctl_domain()}/{label}"])
         elif agent.exists():
             agent.unlink()
-    before = backup / "DeploymentState/installed.before.json"
+    before = backup / ".deploy/installed.before.json"
     if before.is_file():
         shutil.copy2(before, ctx.installed_path)
     elif ctx.installed_path.exists():
