@@ -24,7 +24,7 @@ PDF_LATEX_HEADER = r"""
 \AtBeginDocument{%
   \RecustomVerbatimEnvironment{Verbatim}{Verbatim}{breaklines,breakanywhere,fontsize=\small}%
   \@ifundefined{Highlighting}{}{%
-    \RecustomVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,fontsize=\small,commandchars=\{\}}%
+    \RecustomVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,fontsize=\small,commandchars=\\\{\}}%
   }%
 }
 \makeatother
