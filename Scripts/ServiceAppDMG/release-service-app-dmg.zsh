@@ -20,7 +20,7 @@ ALLOW_DIRTY=false
 CHECK_ONLY=false
 
 fail() {
-    print -ru2 -- "[TorrentCore Service app DMG] ERROR: $*"
+    print -ru2 -- "[TorrentCore managed-app DMG] ERROR: $*"
     exit 1
 }
 
@@ -31,7 +31,7 @@ Usage: release-service-app-dmg.zsh [options]
 Options:
   --installation <Dick|Tom>   Required deployment environment name.
   --cpu <arm|intel>           Required CPU choice. Intel is reserved and currently refused.
-  --release-name <name>       Required release purpose, for example ServiceApp.InitialDeploy.
+  --release-name <name>       Required release purpose, for example ManagedApps.InitialDeploy.
   --date <YYYY.MM.DD>          Artifact date. Defaults to today.
   --output-dir <path>          DMG output directory.
   --package-root <path>        Staged package directory. Required with --stage-only.
@@ -68,7 +68,7 @@ case "${INSTALLATION:l}" in
 esac
 case "${CPU:l}" in
     arm) CPU="arm"; RUNTIME="osx-arm64" ;;
-    intel) fail "Intel Service-app generation is recognized but not supported in the current Arm proof slice." ;;
+    intel) fail "Intel managed-app generation is recognized but not supported; this release is Arm64-only." ;;
     *) fail "--cpu must be arm or intel." ;;
 esac
 [[ "$RELEASE_NAME" =~ '^[A-Za-z][A-Za-z0-9.-]*$' ]] ||
@@ -99,13 +99,13 @@ if [[ -z "$SIGNING_IDENTITY" ]]; then
 fi
 [[ "$SIGNING_IDENTITY" == Developer\ ID\ Application:*"($TEAM_ID)" ]] || fail "Signing identity is not for Team $TEAM_ID."
 
-print -r -- "[TorrentCore Service app DMG] Developer ID identity: $SIGNING_IDENTITY"
-print -r -- "[TorrentCore Service app DMG] Validating notary profile: $NOTARY_PROFILE"
+print -r -- "[TorrentCore managed-app DMG] Developer ID identity: $SIGNING_IDENTITY"
+print -r -- "[TorrentCore managed-app DMG] Validating notary profile: $NOTARY_PROFILE"
 xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" --output-format json >/dev/null ||
     fail "Notary profile is missing or invalid: $NOTARY_PROFILE"
 
 if [[ "$CHECK_ONLY" == true ]]; then
-    print -r -- "TorrentCore Service app DMG release prerequisites are ready."
+    print -r -- "TorrentCore managed-app DMG release prerequisites are ready."
     exit 0
 fi
 
@@ -127,7 +127,7 @@ else
     PACKAGE_ROOT="${PACKAGE_ROOT:A}"
 fi
 
-WORK_ROOT="$(mktemp -d /private/tmp/TorrentCore-ServiceApp-DMG.XXXXXX)"
+WORK_ROOT="$(mktemp -d /private/tmp/TorrentCore-ManagedApps-DMG.XXXXXX)"
 cleanup() {
     rm -rf "$WORK_ROOT"
     if [[ "$STAGE_ONLY" != true ]]; then
@@ -138,12 +138,17 @@ trap cleanup EXIT
 
 GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 BUILT_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreService.app"
+SERVICE_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreService.app"
+WEBUI_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreWebUI.app"
 UI_APP_PATH="$PACKAGE_ROOT/TorrentCore.app"
-mkdir -p "${APP_PATH:h}" "$PACKAGE_ROOT/Tools"
+mkdir -p "${SERVICE_APP_PATH:h}" "$PACKAGE_ROOT/Tools"
 "$REPO_ROOT/Scripts/ServiceApp/build-macos-service-app.zsh" \
-    --output-bundle "$APP_PATH" \
+    --output-bundle "$SERVICE_APP_PATH" \
     --signing-identity "$SIGNING_IDENTITY"
+"$REPO_ROOT/Scripts/WebUIApp/build-macos-webui-app.zsh" \
+    --output-bundle "$WEBUI_APP_PATH" \
+    --signing-identity "$SIGNING_IDENTITY"
+"$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh" "$WEBUI_APP_PATH"
 "$REPO_ROOT/Scripts/MacOSApp/build-signed-macos-ui-app.zsh" \
     --output-bundle "$UI_APP_PATH" \
     --version "$UI_VERSION" \
@@ -159,6 +164,8 @@ ditto "$SCRIPT_DIR/Open README.command" "$PACKAGE_ROOT/Open README.command"
 ditto "$SCRIPT_DIR/torrentcore-service-app-deploy.zsh" "$PACKAGE_ROOT/Tools/torrentcore-service-app-deploy.zsh"
 ditto "$SCRIPT_DIR/torrentcore_service_app_deploy.py" "$PACKAGE_ROOT/Tools/torrentcore_service_app_deploy.py"
 ditto "$REPO_ROOT/Scripts/ServiceApp/verify-macos-service-app.zsh" "$PACKAGE_ROOT/Tools/verify-macos-service-app.zsh"
+ditto "$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-app.zsh" "$PACKAGE_ROOT/Tools/verify-macos-webui-app.zsh"
+ditto "$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh" "$PACKAGE_ROOT/Tools/verify-macos-webui-static-assets.zsh"
 chmod +x "$PACKAGE_ROOT/install.zsh" "$PACKAGE_ROOT/"*.command "$PACKAGE_ROOT/Tools/"*.zsh "$PACKAGE_ROOT/Tools/"*.py
 
 tree_sha256() {
@@ -188,18 +195,19 @@ for path in sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_p
 print(digest.hexdigest())
 PY
 }
-APP_SHA="$(tree_sha256 "$APP_PATH")"
+SERVICE_APP_SHA="$(tree_sha256 "$SERVICE_APP_PATH")"
+WEBUI_APP_SHA="$(tree_sha256 "$WEBUI_APP_PATH")"
 UI_APP_SHA="$(tree_sha256 "$UI_APP_PATH")"
 
-python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$CPU" "$RUNTIME" "$RELEASE_NAME" "$GIT_SHA" "$BUILT_AT_UTC" "$APP_SHA" "$UI_VERSION" "$UI_BUILD_NUMBER" "$UI_APP_SHA" "$SOURCE_DIRTY" <<'PY'
+python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$CPU" "$RUNTIME" "$RELEASE_NAME" "$GIT_SHA" "$BUILT_AT_UTC" "$SERVICE_APP_SHA" "$WEBUI_APP_SHA" "$UI_VERSION" "$UI_BUILD_NUMBER" "$UI_APP_SHA" "$SOURCE_DIRTY" <<'PY'
 import json
 import pathlib
 import sys
 
-output, release_id, release_date, installation, cpu, runtime, release_name, git_sha, built_at, app_sha, ui_version, ui_build, ui_app_sha, dirty = sys.argv[1:]
+output, release_id, release_date, installation, cpu, runtime, release_name, git_sha, built_at, service_sha, webui_sha, ui_version, ui_build, ui_app_sha, dirty = sys.argv[1:]
 value = {
-    "schemaVersion": 1,
-    "product": "TorrentCoreServiceApp",
+    "schemaVersion": 2,
+    "product": "TorrentCoreManagedApps",
     "releaseId": release_id,
     "releaseDate": release_date,
     "installation": installation,
@@ -210,11 +218,23 @@ value = {
     "gitSha": git_sha,
     "builtAtUtc": built_at,
     "sourceTreeDirty": dirty == "true",
-    "runtimes": {
-        runtime: {
+    "managedApps": {
+        "service": {
             "path": f"payload/{runtime}/TorrentCoreService.app",
-            "sha256": app_sha,
-        }
+            "runtime": runtime,
+            "bundleIdentifier": "com.conadv.torrentcore.service",
+            "version": "0.6.0",
+            "build": "1",
+            "sha256": service_sha,
+        },
+        "webUi": {
+            "path": f"payload/{runtime}/TorrentCoreWebUI.app",
+            "runtime": runtime,
+            "bundleIdentifier": "com.conadv.torrentcore.webui",
+            "version": ui_version,
+            "build": ui_build,
+            "sha256": webui_sha,
+        },
     },
     "nativeUi": {
         "path": "TorrentCore.app",
@@ -232,24 +252,26 @@ PY
 cat > "$PACKAGE_ROOT/README.md" <<EOF
 # TorrentCore $RELEASE_NAME $RELEASE_DATE ($INSTALLATION, $CPU)
 
-This package installs ~/Applications/TorrentCore/TorrentCoreService.app through the Service installer and includes
-TorrentCore.app for a manual drag-to-Applications update after Service verification.
+This package installs both managed apps as one unit:
 
-It does not install, stop, start, verify, back up, or otherwise change TorrentCore.WebUI. It preserves the existing
-~/TorrentCore structure, including Service files, scripts, logs, deployment records, backups, and
-Scripts/torrentcore.env.
+- ~/Applications/TorrentCore/TorrentCoreService.app
+- ~/Applications/TorrentCore/TorrentCoreWebUI.app
+
+It preserves the complete ~/TorrentCore/Service and ~/TorrentCore/WebUI working directories, including the machine-local
+WebUI Config/service-connection.json, plus scripts, logs, deployment records, backups, and Scripts/torrentcore.env.
+TorrentCore.app remains a manual drag-to-Applications update after managed Service and WebUI verification.
 
 Start with:
 
     ./install.zsh plan
     ./install.zsh dry-run
 
-Only run ./install.zsh apply --confirm during an explicitly approved Service deployment window. After Service verify
+Only run ./install.zsh apply --confirm during an explicitly approved deployment window. After combined verification
 succeeds, follow Runbook.md to replace the native UI through the Applications link in this mounted DMG.
 EOF
 
 cat > "$PACKAGE_ROOT/Runbook.md" <<'EOF'
-# TorrentCore Service App Runbook
+# TorrentCore Combined Managed-App Runbook
 
 1. Run `./install.zsh plan` and review every resolved path.
 2. Run `./install.zsh dry-run`; it must report that nothing changed.
@@ -258,15 +280,23 @@ cat > "$PACKAGE_ROOT/Runbook.md" <<'EOF'
 5. Use `./install.zsh history` to locate an apply record.
 6. Review `./install.zsh rollback --dry-run --history <record>` before a confirmed rollback.
 
-VPN Disabled, Ready, and Degraded are valid installation outcomes when API health is `ok`. A degraded VPN state does
-not fail installation and does not require operator recovery of the Service process.
+VPN Disabled, Ready, and Degraded are valid installation outcomes when API health is `ok` and WebUI is reachable.
 
 ## Install TorrentCore Native UI
 
-After `./install.zsh verify` succeeds, quit the existing TorrentCore UI if it is running. In the mounted DMG, drag
+After combined `./install.zsh verify` succeeds, quit the existing TorrentCore UI if it is running. In the mounted DMG, drag
 `TorrentCore.app` onto the `Applications` icon, which links to `/Applications`, and select **Replace** if macOS prompts
 for confirmation. Launch the updated TorrentCore UI and confirm that its Dashboard connects to the verified Service.
 EOF
+
+if find "$PACKAGE_ROOT" -path '*/Config/service-connection.json' -print -quit | grep -q .; then
+    fail "Machine-local Config/service-connection.json was found in the staged package."
+fi
+
+SERVICE_LAUNCHER_UUID="$(dwarfdump --uuid "$SERVICE_APP_PATH/Contents/MacOS/TorrentCoreService" | awk 'NR == 1 {print $2}')"
+WEBUI_LAUNCHER_UUID="$(dwarfdump --uuid "$WEBUI_APP_PATH/Contents/MacOS/TorrentCoreWebUI" | awk 'NR == 1 {print $2}')"
+[[ -n "$SERVICE_LAUNCHER_UUID" && -n "$WEBUI_LAUNCHER_UUID" && "$SERVICE_LAUNCHER_UUID" != "$WEBUI_LAUNCHER_UUID" ]] ||
+    fail "Service and WebUI native launchers do not have distinct Mach-O UUIDs."
 
 (
     cd "$PACKAGE_ROOT"
@@ -276,7 +306,10 @@ EOF
 ) > "$PACKAGE_ROOT/checksums.txt"
 
 if [[ "$STAGE_ONLY" == true ]]; then
-    print -r -- "Staged signed TorrentCore Service app package: $PACKAGE_ROOT"
+    if find "$PACKAGE_ROOT" -path '*/Config/service-connection.json' -print -quit | grep -q .; then
+        fail "Machine-local Config/service-connection.json was found in the staged package."
+    fi
+    print -r -- "Staged signed TorrentCore managed-app package: $PACKAGE_ROOT"
     exit 0
 fi
 
@@ -300,4 +333,4 @@ xcrun stapler validate -v "$OUTPUT_DMG"
 hdiutil verify "$OUTPUT_DMG"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$OUTPUT_DMG"
 shasum -a 256 "$OUTPUT_DMG"
-print -r -- "TorrentCore Service app DMG complete: $OUTPUT_DMG"
+print -r -- "TorrentCore managed-app DMG complete: $OUTPUT_DMG"

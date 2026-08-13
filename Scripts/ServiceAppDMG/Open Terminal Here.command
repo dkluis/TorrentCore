@@ -7,7 +7,7 @@ cd "$PACKAGE_ROOT"
 clear
 
 cat <<'EOF'
-TorrentCore Service app DMG
+TorrentCore combined Service/WebUI DMG
 
 This Terminal is now in the mounted DMG root.
 

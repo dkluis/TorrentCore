@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
     <LangVersion>14</LangVersion>
-    <Version>0.5.1</Version>
+    <Version>0.6.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,5 +17,22 @@
   <ItemGroup>
     <PackageReference Include="MudBlazor" Version="8.15.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="Config/service-connection.json" />
+    <None Remove="Config/service-connection.json" />
+  </ItemGroup>
+
+  <Target Name="CopyMacOSAppDeploymentResources" AfterTargets="Publish">
+    <ItemGroup>
+      <MacOSAppDeploymentResource Include="Deployment/**/*" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(MacOSAppDeploymentResource)"
+      DestinationFiles="@(MacOSAppDeploymentResource->'$(PublishDir)TorrentCoreWebUI.Deployment/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Error
+      Condition="Exists('$(PublishDir)Config/service-connection.json')"
+      Text="Machine-local Config/service-connection.json must not be present in WebUI publish output." />
+  </Target>
 
 </Project>

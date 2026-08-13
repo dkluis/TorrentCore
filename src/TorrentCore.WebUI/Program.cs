@@ -7,7 +7,11 @@ using TorrentCore.WebUI.Connection;
 using TorrentCore.WebUI.Services;
 using TorrentCore.WebUI.State;
 
-var builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+});
 var clientOptions =
         builder.Configuration.GetSection(TorrentCoreClientOptions.SectionName).Get<TorrentCoreClientOptions>() ??
         new TorrentCoreClientOptions();

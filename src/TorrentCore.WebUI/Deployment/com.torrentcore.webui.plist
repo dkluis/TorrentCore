@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.torrentcore.webui</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__PROGRAM_PATH__</string>
+    </array>
+
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>__BUNDLE_IDENTIFIER__</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__WORKING_DIRECTORY__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>ASPNETCORE_ENVIRONMENT</key>
+        <string>__ASPNETCORE_ENVIRONMENT__</string>
+        <key>ASPNETCORE_URLS</key>
+        <string>__ASPNETCORE_URLS__</string>
+        <key>TorrentCoreService__BaseUrl</key>
+        <string>__SERVICE_BASE_URL__</string>
+        <key>TORRENTCORE_WEBUI_WORKING_DIRECTORY</key>
+        <string>__WORKING_DIRECTORY__</string>
+        <key>Logging__LogLevel__Default</key>
+        <string>Warning</string>
+        <key>Logging__LogLevel__Microsoft</key>
+        <string>Warning</string>
+        <key>Logging__LogLevel__Microsoft.AspNetCore</key>
+        <string>Warning</string>
+        <key>Logging__LogLevel__Microsoft.Hosting.Lifetime</key>
+        <string>Warning</string>
+        <key>Logging__LogLevel__System.Net.Http.HttpClient</key>
+        <string>Warning</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Background</string>
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>__STDOUT_PATH__</string>
+    <key>StandardErrorPath</key>
+    <string>__STDERR_PATH__</string>
+</dict>
+</plist>
