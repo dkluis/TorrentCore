@@ -170,7 +170,12 @@ EOF
     find . -type f ! -name checksums.txt -print | LC_ALL=C sort | while IFS= read -r file; do shasum -a 256 "$file"; done
 ) > "$IMAGE_ROOT/checksums.txt"
 
-hdiutil create -fs HFS+ -srcfolder "$IMAGE_ROOT" -volname "$VOLUME_NAME" -format UDZO "$WORK_DMG" >/dev/null
+hdiutil create \
+    -volname "$VOLUME_NAME" \
+    -srcfolder "$IMAGE_ROOT" \
+    -format UDZO \
+    -imagekey zlib-level=9 \
+    "$WORK_DMG" >/dev/null
 codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$WORK_DMG"
 codesign --verify --verbose=2 "$WORK_DMG"
 xcrun notarytool submit "$WORK_DMG" --keychain-profile "$NOTARY_PROFILE" --wait
