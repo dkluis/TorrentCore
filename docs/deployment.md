@@ -167,16 +167,18 @@ working directory and compares a served fingerprinted CSS route byte-for-byte wi
 ## Combined Service/WebUI And Native-UI DMG
 
 The combined DMG builder and managed-app deployer live under `Scripts/ServiceAppDMG`; they have no runtime dependency on the
-TVMaze repository and require no machine `live.json` manifest. Generation requires an installation label (`Dick` or
-`Tom`) for artifact naming and a CPU choice. No hostname catalog is packaged: installation paths come from the current
-user's home, and apply requires the existing `~/TorrentCore` and `~/TorrentCore/Service` structure. Releases contain
+TVMaze repository and require no machine `live.json` manifest. Generation requires an installation target (`Dick`,
+`Tom`, or `Shared`) and a CPU choice. Dick and Tom retain installation-specific artifact names. Shared packages are
+reusable and omit the installation segment from the artifact name. No hostname catalog is packaged: installation paths
+come from the current user's home, and apply requires the existing `~/TorrentCore` and `~/TorrentCore/Service` structure. Releases contain
 the Service and WebUI payloads under `payload/osx-arm64`, the signed native UI at the mounted root as `TorrentCore.app`,
 and an `Applications` link to `/Applications`. The deployer refuses non-Arm64 hosts and never installs or controls the
 native UI.
 
 Artifacts follow the established naming convention, for example
-`TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment`. A release is always staged first as a complete, persistent
-directory under `Deployments/TorrentCore-Deployments/<installation>`. The saved directory contains `README.md`,
+`TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment` for a specific installation or
+`TorrentCore-torrentcore.2026.08.14.deploy-patches` for Shared. A release is always staged first as a complete,
+persistent directory under `Deployments/TorrentCore-Deployments/<installation>`. The saved directory contains `README.md`,
 `README.pdf`, `Runbook.md`, `Runbook.pdf`, `plan.zsh`, `dry-run.zsh`, `backup.zsh`, `apply.zsh`, `verify.zsh`,
 `release.json`, the two managed app payloads, and the native UI app. It remains in place after DMG construction.
 
@@ -184,11 +186,11 @@ From clean committed source, stage the release package first:
 
 ```bash
 ./Scripts/ServiceAppDMG/stage-release-package.zsh \
-  --installation Dick \
+  --installation Shared \
   --cpu arm \
-  --release-name WebUIAlignment \
-  --date 2026.08.13 \
-  --notes "Align WebUI with the macOS VPN, cleanup, Dashboard, and degraded-processing controls and deploy Service and WebUI together." \
+  --release-name deploy-patches \
+  --date 2026.08.14 \
+  --notes "Apply the shared TorrentCore deployment packaging corrections." \
   --require-pdf
 ```
 
@@ -196,12 +198,13 @@ Inspect that saved directory before building its DMG. After approval, create the
 
 ```bash
 ./Scripts/ServiceAppDMG/build-package-dmg.zsh \
-  --package-root /Volumes/CA-Desktop-HD-2/Development/Deployments/TorrentCore-Deployments/Dick/TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment
+  --package-root /Volumes/CA-Desktop-HD-2/Development/Deployments/TorrentCore-Deployments/Shared/TorrentCore-torrentcore.2026.08.14.deploy-patches
 ```
 
 `release-service-app-dmg.zsh` remains the normal all-in-one driver when prior inspection is not required. It performs
-those same two steps and never uses or deletes a temporary package root. Use `--installation Tom --cpu arm` for Tom's
-Mac mini or VM. `--cpu intel` is explicitly refused by the current Arm-only tooling.
+those same two steps and never uses or deletes a temporary package root. Use `--installation Dick`,
+`--installation Tom`, or `--installation Shared` with `--cpu arm` as appropriate. `--cpu intel` is explicitly refused
+by the current Arm-only tooling.
 
 The default DMG output directory is `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs`. DMG construction signs
 the DMG, submits it through the existing `TorrentCore-notary` profile, staples it, and performs signature, entitlement,
@@ -209,6 +212,9 @@ Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification 
 `TorrentCore.app/Contents/Resources/version.json` records native UI version, build, Git SHA, build time, and runtime.
 The package `release.json` records both managed-app checksums, the short change description, and the manual
 `/Applications/TorrentCore.app` target.
+
+The current combined package aligns `TorrentCoreService.app`, `TorrentCoreWebUI.app`, and `TorrentCore.app` at version
+`0.6.0`, build `12`.
 
 The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 release was staged permanently under
 `Deployments/TorrentCore-Deployments/Dick`, reviewed and approved by the operator, and then built from clean commit

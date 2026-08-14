@@ -26,7 +26,7 @@ fail() { print -ru2 -- "[TorrentCore release DMG] ERROR: $*"; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: release-service-app-dmg.zsh --installation <Dick|Tom> --cpu arm --release-name <name> --notes <summary> [options]
+Usage: release-service-app-dmg.zsh --installation <Dick|Tom|Shared> --cpu arm --release-name <name> --notes <summary> [options]
 
 This is the established two-step TorrentCore release driver. It first saves the complete release package under
 TorrentCore-Deployments/<installation>, then creates the DMG from that saved package.
@@ -76,7 +76,8 @@ done
 case "${INSTALLATION:l}" in
     dick) INSTALLATION="Dick" ;;
     tom) INSTALLATION="Tom" ;;
-    *) fail "--installation must be Dick or Tom." ;;
+    shared) INSTALLATION="Shared" ;;
+    *) fail "--installation must be Dick, Tom, or Shared." ;;
 esac
 [[ "${CPU:l}" == arm ]] || fail "--cpu must be arm; Intel packaging is not supported."
 CPU="arm"
@@ -85,7 +86,11 @@ CPU="arm"
 [[ -n "$NOTES" ]] || fail "--notes is required so the package states what changed."
 [[ "$SKIP_PDF" != true || "$REQUIRE_PDF" != true ]] || fail "--skip-pdf cannot be used with --require-pdf."
 
-RELEASE_ID="torrentcore.$RELEASE_DATE.$INSTALLATION.$RELEASE_NAME"
+if [[ "$INSTALLATION" == "Shared" ]]; then
+    RELEASE_ID="torrentcore.$RELEASE_DATE.$RELEASE_NAME"
+else
+    RELEASE_ID="torrentcore.$RELEASE_DATE.$INSTALLATION.$RELEASE_NAME"
+fi
 ARTIFACT_STEM="TorrentCore-$RELEASE_ID"
 if [[ -z "$PACKAGE_ROOT" ]]; then
     [[ -n "$PACKAGE_DIR" ]] || PACKAGE_DIR="$DEPLOYMENTS_ROOT/TorrentCore-Deployments/$INSTALLATION"

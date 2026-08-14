@@ -19,12 +19,14 @@ PDF_ENGINE="tectonic"
 SKIP_PDF=false
 REQUIRE_PDF=false
 CLEAN=false
+COMPONENT_VERSION="0.6.0"
+BUILD_NUMBER="12"
 
 fail() { print -ru2 -- "[TorrentCore package staging] ERROR: $*"; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: stage-release-package.zsh --installation <Dick|Tom> --cpu arm --release-name <name> --notes <summary> [options]
+Usage: stage-release-package.zsh --installation <Dick|Tom|Shared> --cpu arm --release-name <name> --notes <summary> [options]
 
 Options:
   --date <YYYY.MM.DD>          Release date. Defaults to today.
@@ -62,7 +64,8 @@ done
 case "${INSTALLATION:l}" in
     dick) INSTALLATION="Dick"; MACHINE="CA-Desktop"; TARGET_HOME="/Users/dick/TorrentCore" ;;
     tom) INSTALLATION="Tom"; MACHINE="vm"; TARGET_HOME="/Users/tomhyer/TorrentCore" ;;
-    *) fail "--installation must be Dick or Tom." ;;
+    shared) INSTALLATION="Shared"; MACHINE="Any compatible Arm64 Mac"; TARGET_HOME="~/TorrentCore" ;;
+    *) fail "--installation must be Dick, Tom, or Shared." ;;
 esac
 case "${CPU:l}" in
     arm) CPU="arm"; RUNTIME="osx-arm64" ;;
@@ -80,7 +83,11 @@ if [[ "$SOURCE_DIRTY" == true ]]; then
     fail "The TorrentCore source tree is dirty. Commit the intended package source before staging."
 fi
 
-RELEASE_ID="torrentcore.$RELEASE_DATE.$INSTALLATION.$RELEASE_NAME"
+if [[ "$INSTALLATION" == "Shared" ]]; then
+    RELEASE_ID="torrentcore.$RELEASE_DATE.$RELEASE_NAME"
+else
+    RELEASE_ID="torrentcore.$RELEASE_DATE.$INSTALLATION.$RELEASE_NAME"
+fi
 ARTIFACT_STEM="TorrentCore-$RELEASE_ID"
 if [[ -z "$PACKAGE_ROOT" ]]; then
     [[ -n "$PACKAGE_DIR" ]] || PACKAGE_DIR="$DEPLOYMENTS_ROOT/TorrentCore-Deployments/$INSTALLATION"
@@ -127,7 +134,7 @@ print -r -- "Description:  $NOTES"
 "$REPO_ROOT/Scripts/WebUIApp/build-macos-webui-app.zsh" --output-bundle "$WEBUI_APP_PATH" --signing-identity "$SIGNING_IDENTITY"
 "$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh" "$WEBUI_APP_PATH"
 "$REPO_ROOT/Scripts/MacOSApp/build-signed-macos-ui-app.zsh" \
-    --output-bundle "$UI_APP_PATH" --version 0.6.0 --build-number 11 \
+    --output-bundle "$UI_APP_PATH" --version "$COMPONENT_VERSION" --build-number "$BUILD_NUMBER" \
     --git-sha "$GIT_SHA" --built-at-utc "$BUILT_AT_UTC" --signing-identity "$SIGNING_IDENTITY"
 
 tree_sha256() {
@@ -150,21 +157,21 @@ SERVICE_SHA="$(tree_sha256 "$SERVICE_APP_PATH")"
 WEBUI_SHA="$(tree_sha256 "$WEBUI_APP_PATH")"
 UI_SHA="$(tree_sha256 "$UI_APP_PATH")"
 
-python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$MACHINE" "$TARGET_HOME" "$RUNTIME" "$NOTES" "$GIT_SHA" "$BUILT_AT_UTC" "$SOURCE_DIRTY" "$SERVICE_SHA" "$WEBUI_SHA" "$UI_SHA" <<'PY'
+python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$MACHINE" "$TARGET_HOME" "$RUNTIME" "$NOTES" "$GIT_SHA" "$BUILT_AT_UTC" "$SOURCE_DIRTY" "$SERVICE_SHA" "$WEBUI_SHA" "$UI_SHA" "$COMPONENT_VERSION" "$BUILD_NUMBER" <<'PY'
 import json, pathlib, sys
 (output, release_id, release_date, installation, machine, target_home, runtime, notes,
- git_sha, built_at, dirty, service_sha, webui_sha, ui_sha)=sys.argv[1:]
+ git_sha, built_at, dirty, service_sha, webui_sha, ui_sha, component_version, build_number)=sys.argv[1:]
 value={
  "schemaVersion":2, "product":"TorrentCoreManagedApps", "installation":installation,
  "machine":machine, "targetHome":target_home, "runtime":runtime, "releaseId":release_id,
- "releaseDate":release_date, "componentVersion":"0.6.0", "version":"0.6.0", "build":"1",
+ "releaseDate":release_date, "componentVersion":component_version, "version":component_version, "build":build_number,
  "notes":notes, "gitSha":git_sha, "builtAtUtc":built_at, "sourceTreeDirty":dirty=="true",
  "managedApps":{
   "service":{"path":f"payload/{runtime}/TorrentCoreService.app", "runtime":runtime,
-   "bundleIdentifier":"com.conadv.torrentcore.service", "version":"0.6.0", "build":"1", "sha256":service_sha},
+   "bundleIdentifier":"com.conadv.torrentcore.service", "version":component_version, "build":build_number, "sha256":service_sha},
   "webUi":{"path":f"payload/{runtime}/TorrentCoreWebUI.app", "runtime":runtime,
-   "bundleIdentifier":"com.conadv.torrentcore.webui", "version":"0.6.0", "build":"11", "sha256":webui_sha}},
- "nativeUi":{"path":"TorrentCore.app", "version":"0.6.0", "build":"11", "runtime":runtime,
+   "bundleIdentifier":"com.conadv.torrentcore.webui", "version":component_version, "build":build_number, "sha256":webui_sha}},
+ "nativeUi":{"path":"TorrentCore.app", "version":component_version, "build":build_number, "runtime":runtime,
   "sha256":ui_sha, "installPath":"/Applications/TorrentCore.app", "installMode":"DragToApplications"},
  "protectedFiles":["Scripts/torrentcore.env", "WebUI/Config/service-connection.json"],
 }

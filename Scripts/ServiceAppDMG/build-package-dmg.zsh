@@ -158,7 +158,7 @@ Changes:
 
 Start here:
   1. Open README.pdf for the package summary.
-  2. Open Runbook.pdf for the machine-specific manual deployment commands. If PDF output was skipped, open Runbook.md.
+  2. Open Runbook.pdf for the manual deployment commands. If PDF output was skipped, open Runbook.md.
   3. Open Terminal in this mounted DMG root before running any manual command from the runbook.
 
 Important:

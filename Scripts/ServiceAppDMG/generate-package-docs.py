@@ -78,6 +78,10 @@ exec {arguments}
 def render_readme(release: dict[str, Any]) -> str:
     managed = release["managedApps"]
     protected = "\n".join(f"- `{item}`" for item in release.get("protectedFiles", []))
+    if release["installation"] == "Shared":
+        scope = "This reusable package deploys the complete managed TorrentCore runtime on a compatible Arm64 host:"
+    else:
+        scope = "This package always deploys the complete managed TorrentCore runtime for one installation host:"
     return f"""# TorrentCore Package Summary
 
 Generated: `{local_time()}`
@@ -99,7 +103,7 @@ Generated: `{local_time()}`
 
 ## Package Scope
 
-This package always deploys the complete managed TorrentCore runtime for one installation host:
+{scope}
 
 - `TorrentCoreService.app`
 - `TorrentCoreWebUI.app`
@@ -142,6 +146,10 @@ Open `Runbook.md` or `Runbook.pdf` for the manual deployment procedure for this 
 
 
 def render_runbook(release: dict[str, Any]) -> str:
+    if release["installation"] == "Shared":
+        mount_instruction = "Mount this DMG on the target compatible Arm64 Mac."
+    else:
+        mount_instruction = f"Mount this DMG on `{release['machine']}`."
     return f"""# TorrentCore Runbook
 
 Generated: `{local_time()}`
@@ -160,7 +168,7 @@ Generated: `{local_time()}`
 
 ## Preconditions
 
-- Mount this DMG on `{release['machine']}`.
+- {mount_instruction}
 - Open Terminal in the mounted DMG root.
 - Confirm the existing `{release['targetHome']}/Service` working directory is present.
 - Review `{release['targetHome']}/Scripts/torrentcore.env` when it exists; the package preserves it.

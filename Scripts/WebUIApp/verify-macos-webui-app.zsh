@@ -27,7 +27,7 @@ plutil -lint "$INFO" >/dev/null
 [[ "$(plutil -extract CFBundleIdentifier raw -o - "$INFO")" == "com.conadv.torrentcore.webui" ]] || fail "Bundle identifier is incorrect."
 [[ "$(plutil -extract CFBundleExecutable raw -o - "$INFO")" == "TorrentCoreWebUI" ]] || fail "Bundle executable is incorrect."
 [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$INFO")" == "0.6.0" ]] || fail "Bundle version is not 0.6.0."
-[[ "$(plutil -extract CFBundleVersion raw -o - "$INFO")" == "11" ]] || fail "Bundle build is not 11."
+[[ "$(plutil -extract CFBundleVersion raw -o - "$INFO")" == "12" ]] || fail "Bundle build is not 12."
 [[ "$(plutil -extract LSMinimumSystemVersion raw -o - "$INFO")" == "26.0" ]] || fail "Minimum macOS version is not 26.0."
 [[ "$(plutil -extract LSBackgroundOnly raw -o - "$INFO")" == "true" ]] || fail "Bundle is not background-only."
 [[ -x "$MAIN" && -x "$HELPER" ]] || fail "Bundle executables are incomplete."
