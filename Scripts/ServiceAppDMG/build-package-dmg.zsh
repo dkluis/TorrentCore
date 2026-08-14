@@ -136,15 +136,13 @@ IMAGE_ROOT="$WORK_ROOT/$VOLUME_NAME"
 WORK_DMG="$WORK_ROOT/${DMG_PATH:t}"
 ditto --noqtn "$PACKAGE_ROOT" "$IMAGE_ROOT"
 ditto --noqtn "$SCRIPT_DIR/install.zsh" "$IMAGE_ROOT/install.zsh"
-ditto --noqtn "$SCRIPT_DIR/Open Terminal Here.command" "$IMAGE_ROOT/Open Terminal Here.command"
-ditto --noqtn "$SCRIPT_DIR/Open README.command" "$IMAGE_ROOT/Open README.command"
 mkdir -p "$IMAGE_ROOT/Tools"
 ditto --noqtn "$SCRIPT_DIR/torrentcore-service-app-deploy.zsh" "$IMAGE_ROOT/Tools/torrentcore-service-app-deploy.zsh"
 ditto --noqtn "$SCRIPT_DIR/torrentcore_service_app_deploy.py" "$IMAGE_ROOT/Tools/torrentcore_service_app_deploy.py"
 ditto --noqtn "$SERVICE_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-service-app.zsh"
 ditto --noqtn "$WEBUI_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-webui-app.zsh"
 ditto --noqtn "$STATIC_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-webui-static-assets.zsh"
-chmod +x "$IMAGE_ROOT/install.zsh" "$IMAGE_ROOT/"*.command "$IMAGE_ROOT/Tools/"*
+chmod +x "$IMAGE_ROOT/install.zsh" "$IMAGE_ROOT/Tools/"*
 ln -s /Applications "$IMAGE_ROOT/Applications"
 
 cat > "$IMAGE_ROOT/README-FIRST.txt" <<EOF
