@@ -80,6 +80,17 @@ public enum TorrentCorePreviewFixtures {
         vpnDegradedCheckIntervalSeconds: 60,
         vpnReadyCheckIntervalSeconds: 240,
         vpnFailureSummary: nil,
+        expressVPNRecoveryMode: "DirectIspOnly",
+        expressVPNRecoveryPhase: "Inactive",
+        expressVPNConnectionState: "Connected",
+        expressVPNReconnectAttemptsUsed: 0,
+        expressVPNReconnectAttemptsMaximum: 2,
+        expressVPNLaunchAttemptsUsed: 0,
+        expressVPNLaunchAttemptsMaximum: 2,
+        expressVPNNextActionAt: nil,
+        expressVPNLastActionAt: nil,
+        expressVPNLastActionOutcome: nil,
+        expressVPNRecoveryMessage: nil,
         checkedAt: checkedAt
     )
 
@@ -516,6 +527,9 @@ public enum TorrentCorePreviewFixtures {
         supportsLiveUpdates: true,
         updatedAt: checkedAt.addingTimeInterval(-86_400),
         usesPersistedOverrides: true,
+        expressVPNAutomaticRecoveryMode: "Disabled",
+        expressVPNRecoveryDelaySeconds: 180,
+        expressVPNUnavailableLaunchDelaySeconds: 300,
         vpnEgressDegradedCheckIntervalSeconds: 60,
         vpnEgressDirectIspCidrs: ["47.0.0.0/8"],
         vpnEgressReadyCheckIntervalSeconds: 240,

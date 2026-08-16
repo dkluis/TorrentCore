@@ -359,6 +359,9 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     update.vpnEgressReadyCheckIntervalSeconds = 120
     update.vpnEgressRequestTimeoutSeconds = 5
     update.vpnEgressEngineSuspensionTimeoutSeconds = 7
+    update.expressVPNAutomaticRecoveryMode = "DirectIspOnly"
+    update.expressVPNRecoveryDelaySeconds = 181
+    update.expressVPNUnavailableLaunchDelaySeconds = 301
     update.runtimeTickDurationSummaryEnabled = true
     let updatedSettings = try await session.updateRuntimeSettings(update)
     #expect(updatedSettings.engineAllowPeerExchange)
@@ -367,6 +370,9 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     #expect(updatedSettings.vpnEgressValidationEnabled)
     #expect(updatedSettings.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
     #expect(updatedSettings.vpnEgressEngineSuspensionTimeoutSeconds == 7)
+    #expect(updatedSettings.expressVPNAutomaticRecoveryMode == "DirectIspOnly")
+    #expect(updatedSettings.expressVPNRecoveryDelaySeconds == 181)
+    #expect(updatedSettings.expressVPNUnavailableLaunchDelaySeconds == 301)
     #expect(updatedSettings.runtimeTickDurationSummaryEnabled)
     let category = try #require(TorrentCorePreviewFixtures.categories.first)
     _ = try await session.updateCategory(
@@ -1166,6 +1172,10 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         settings.vpnEgressRequestTimeoutSeconds = update.vpnEgressRequestTimeoutSeconds
         settings.vpnEgressEngineSuspensionTimeoutSeconds =
             update.vpnEgressEngineSuspensionTimeoutSeconds
+        settings.expressVPNAutomaticRecoveryMode = update.expressVPNAutomaticRecoveryMode
+        settings.expressVPNRecoveryDelaySeconds = update.expressVPNRecoveryDelaySeconds
+        settings.expressVPNUnavailableLaunchDelaySeconds =
+            update.expressVPNUnavailableLaunchDelaySeconds
         settings.runtimeTickDurationSummaryEnabled = update.runtimeTickDurationSummaryEnabled
         return settings
     }

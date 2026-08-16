@@ -20,6 +20,10 @@ Representative coverage areas:
   recovery, non-disruptive routine checks, supported settings enable/disable transitions, and direct engine retry after
   an activation failure; host telemetry coverage verifies current-address rules, preserved last success, automatic
   retry scheduling, sanitized endpoint failures, and previous/new state-log details
+- isolated ExpressVPN recovery coverage verifies the two-check interlock, successful MonoTorrent suspension before any
+  provider read or mutation, connect-only and disconnect/connect ordering, two-attempt launch and reconnect exhaustion,
+  continued degraded validation, additive host telemetry, stable activity events, and unchanged-poll log suppression;
+  these tests use a fake controller and never contact the installed ExpressVPN application
 - default-open execution-gate drain behavior; closed-gate persistence-only magnet admission, normal acceptance errors,
   constrained save paths, structured unavailable actions, readable diagnostics, and full-restart durability without
   initializing MonoTorrent

@@ -204,6 +204,21 @@ public enum TorrentCoreHelpCatalog {
             "Limits local MonoTorrent draining and teardown after VPN validation fails.",
             "The agreed default is 10 seconds. It applies live and does not limit activation or recovery."
         )
+        public static let expressVPNAutomaticRecoveryMode = help(
+            "ExpressVPN Automatic Recovery",
+            "Selects when TorrentCore may ask ExpressVPN to reconnect after VPN validation fails.",
+            "Disabled performs no ExpressVPN commands. Direct ISP Only requires two consecutive direct-ISP detections. Any Validation Failure accepts two consecutive failed validation outcomes. MonoTorrent remains suspended until public-IP validation succeeds."
+        )
+        public static let expressVPNRecoveryDelaySeconds = help(
+            "ExpressVPN Recovery Delay Seconds",
+            "Sets the shared startup grace period and minimum interval between reconnect cycles.",
+            "The default is 180 seconds. This delay never permits torrent processing while egress is degraded."
+        )
+        public static let expressVPNUnavailableLaunchDelaySeconds = help(
+            "ExpressVPN Unavailable Launch Delay Seconds",
+            "Sets how long TorrentCore waits before asking macOS to launch ExpressVPN.",
+            "The default is 300 seconds. TorrentCore makes at most two launch requests per degradation episode."
+        )
         public static let runtimeTickDurationSummaryEnabled = help(
             "Performance Timing Summaries",
             "Controls one-minute synchronization timing summaries in the Service log.",
@@ -274,7 +289,9 @@ public enum TorrentCoreHelpCatalog {
             vpnEgressValidationEnabled, vpnEgressValidationEndpoint,
             vpnEgressDirectIspCidrs, vpnEgressDegradedCheckIntervalSeconds,
             vpnEgressReadyCheckIntervalSeconds, vpnEgressRequestTimeoutSeconds,
-            vpnEgressEngineSuspensionTimeoutSeconds, runtimeTickDurationSummaryEnabled,
+            vpnEgressEngineSuspensionTimeoutSeconds, expressVPNAutomaticRecoveryMode,
+            expressVPNRecoveryDelaySeconds, expressVPNUnavailableLaunchDelaySeconds,
+            runtimeTickDurationSummaryEnabled,
             categoryEnabled, categoryInvokeCompletionCallback, categoryDisplayName,
             categoryCallbackLabel, categoryDownloadRootPath, categorySortOrder,
             cleanupLogEntries, cleanupHistoryRecords, cleanupOrphanedTorrentLogs,

@@ -39,7 +39,7 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal(ServiceApiContract.CurrentVersion, hostStatus.ApiVersion);
-        Assert.Equal("0.6.0", hostStatus.ServiceVersion);
+        Assert.Equal("0.7.0", hostStatus.ServiceVersion);
         Assert.Matches("^[0-9a-f]{40}$", hostStatus.ServiceBuild);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
@@ -74,6 +74,12 @@ public sealed class TorrentApiTests
         Assert.True(hostStatus.SupportsPersistentStorage);
         Assert.True(hostStatus.StartupRecoveryCompleted);
         Assert.NotEqual(Guid.Empty, hostStatus.ServiceInstanceId);
+        Assert.Equal(ExpressVpnAutomaticRecoveryMode.Disabled.ToString(), hostStatus.ExpressVpnRecoveryMode);
+        Assert.Equal(ExpressVpnRecoveryPhase.Inactive.ToString(), hostStatus.ExpressVpnRecoveryPhase);
+        Assert.Equal(0, hostStatus.ExpressVpnReconnectAttemptsUsed);
+        Assert.Equal(2, hostStatus.ExpressVpnReconnectAttemptsMaximum);
+        Assert.Equal(0, hostStatus.ExpressVpnLaunchAttemptsUsed);
+        Assert.Equal(2, hostStatus.ExpressVpnLaunchAttemptsMaximum);
     }
 
     [Fact]
@@ -470,6 +476,9 @@ public sealed class TorrentApiTests
         Assert.Equal(240, settings.VpnEgressReadyCheckIntervalSeconds);
         Assert.Equal(10, settings.VpnEgressRequestTimeoutSeconds);
         Assert.Equal(10, settings.VpnEgressEngineSuspensionTimeoutSeconds);
+        Assert.Equal(ExpressVpnAutomaticRecoveryMode.Disabled.ToString(), settings.ExpressVpnAutomaticRecoveryMode);
+        Assert.Equal(180, settings.ExpressVpnRecoveryDelaySeconds);
+        Assert.Equal(300, settings.ExpressVpnUnavailableLaunchDelaySeconds);
         Assert.False(settings.CompletionCallbackEnabled);
         Assert.Null(settings.CompletionCallbackCommandPath);
         Assert.Null(settings.CompletionCallbackArguments);
@@ -537,6 +546,9 @@ public sealed class TorrentApiTests
                 VpnEgressReadyCheckIntervalSeconds = 180,
                 VpnEgressRequestTimeoutSeconds = 9,
                 VpnEgressEngineSuspensionTimeoutSeconds = 8,
+                ExpressVpnAutomaticRecoveryMode = ExpressVpnAutomaticRecoveryMode.AnyValidationFailure.ToString(),
+                ExpressVpnRecoveryDelaySeconds = 181,
+                ExpressVpnUnavailableLaunchDelaySeconds = 301,
                 RuntimeTickDurationSummaryEnabled = true,
             });
             updateResponse.EnsureSuccessStatusCode();
@@ -584,6 +596,10 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.VpnEgressReadyCheckIntervalSeconds);
             Assert.Equal(9, settings.VpnEgressRequestTimeoutSeconds);
             Assert.Equal(8, settings.VpnEgressEngineSuspensionTimeoutSeconds);
+            Assert.Equal(ExpressVpnAutomaticRecoveryMode.AnyValidationFailure.ToString(),
+                settings.ExpressVpnAutomaticRecoveryMode);
+            Assert.Equal(181, settings.ExpressVpnRecoveryDelaySeconds);
+            Assert.Equal(301, settings.ExpressVpnUnavailableLaunchDelaySeconds);
             Assert.True(settings.RuntimeTickDurationSummaryEnabled);
             Assert.True(settings.EngineSettingsRequireRestart);
             Assert.NotNull(settings.UpdatedAtUtc);
@@ -653,6 +669,10 @@ public sealed class TorrentApiTests
             Assert.Equal(180, settings.VpnEgressReadyCheckIntervalSeconds);
             Assert.Equal(9, settings.VpnEgressRequestTimeoutSeconds);
             Assert.Equal(8, settings.VpnEgressEngineSuspensionTimeoutSeconds);
+            Assert.Equal(ExpressVpnAutomaticRecoveryMode.AnyValidationFailure.ToString(),
+                settings.ExpressVpnAutomaticRecoveryMode);
+            Assert.Equal(181, settings.ExpressVpnRecoveryDelaySeconds);
+            Assert.Equal(301, settings.ExpressVpnUnavailableLaunchDelaySeconds);
             Assert.True(settings.RuntimeTickDurationSummaryEnabled);
             Assert.Equal(TorrentEncryptionMode.EncryptedRequired.ToString(), settings.EngineEncryptionMode);
             Assert.Equal(70, settings.AppliedEngineMaximumConnections);
@@ -861,6 +881,47 @@ public sealed class TorrentApiTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal("invalid_runtime_settings", error?.Code);
         Assert.Equal(nameof(UpdateRuntimeSettingsRequest.VpnEgressEngineSuspensionTimeoutSeconds), error?.Target);
+    }
+
+    [Theory]
+    [InlineData(0, 300, "ExpressVpnRecoveryDelaySeconds")]
+    [InlineData(180, 0, "ExpressVpnUnavailableLaunchDelaySeconds")]
+    public async Task UpdateRuntimeSettings_RejectsInvalidExpressVpnRecoveryDelays(
+        int recoveryDelaySeconds,
+        int unavailableDelaySeconds,
+        string expectedTarget)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                expressVpnRecoveryDelaySeconds: recoveryDelaySeconds,
+                expressVpnUnavailableLaunchDelaySeconds: unavailableDelaySeconds)
+        );
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(expectedTarget, error?.Target);
+    }
+
+    [Fact]
+    public async Task UpdateRuntimeSettings_RejectsInvalidExpressVpnRecoveryMode()
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(expressVpnAutomaticRecoveryMode: "Always")
+        );
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(nameof(UpdateRuntimeSettingsRequest.ExpressVpnAutomaticRecoveryMode), error?.Target);
     }
 
     [Fact]
@@ -4168,6 +4229,9 @@ public sealed class TorrentApiTests
         int? vpnEgressReadyCheckIntervalSeconds = null,
         int? vpnEgressRequestTimeoutSeconds = null,
         int? vpnEgressEngineSuspensionTimeoutSeconds = null,
+        string? expressVpnAutomaticRecoveryMode = null,
+        int? expressVpnRecoveryDelaySeconds = null,
+        int? expressVpnUnavailableLaunchDelaySeconds = null,
         bool? runtimeTickDurationSummaryEnabled = null)
     {
         return new UpdateRuntimeSettingsRequest
@@ -4210,6 +4274,9 @@ public sealed class TorrentApiTests
             VpnEgressReadyCheckIntervalSeconds = vpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds = vpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds = vpnEgressEngineSuspensionTimeoutSeconds,
+            ExpressVpnAutomaticRecoveryMode = expressVpnAutomaticRecoveryMode,
+            ExpressVpnRecoveryDelaySeconds = expressVpnRecoveryDelaySeconds,
+            ExpressVpnUnavailableLaunchDelaySeconds = expressVpnUnavailableLaunchDelaySeconds,
             RuntimeTickDurationSummaryEnabled = runtimeTickDurationSummaryEnabled,
         };
     }

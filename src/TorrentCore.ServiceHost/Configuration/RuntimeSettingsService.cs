@@ -244,8 +244,28 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 currentSettings.VpnEgressRequestTimeoutSeconds;
         var vpnEgressEngineSuspensionTimeoutSeconds = request.VpnEgressEngineSuspensionTimeoutSeconds ??
                 currentSettings.VpnEgressEngineSuspensionTimeoutSeconds;
+        var expressVpnAutomaticRecoveryModeValue = request.ExpressVpnAutomaticRecoveryMode ??
+                currentSettings.ExpressVpnAutomaticRecoveryMode.ToString();
+        var expressVpnRecoveryDelaySeconds = request.ExpressVpnRecoveryDelaySeconds ??
+                currentSettings.ExpressVpnRecoveryDelaySeconds;
+        var expressVpnUnavailableLaunchDelaySeconds = request.ExpressVpnUnavailableLaunchDelaySeconds ??
+                currentSettings.ExpressVpnUnavailableLaunchDelaySeconds;
         var runtimeTickDurationSummaryEnabled = request.RuntimeTickDurationSummaryEnabled ??
                 currentSettings.RuntimeTickDurationSummaryEnabled;
+
+        if (!Enum.TryParse<ExpressVpnAutomaticRecoveryMode>(
+                expressVpnAutomaticRecoveryModeValue,
+                true,
+                out var expressVpnAutomaticRecoveryMode
+            ) || !Enum.IsDefined(expressVpnAutomaticRecoveryMode))
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                "ExpressVpnAutomaticRecoveryMode is invalid.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.ExpressVpnAutomaticRecoveryMode)
+            );
+        }
 
         if (!VpnEgressSettingsValidation.TryNormalizeEndpoint(
                 vpnEgressValidationEndpointValue, out var vpnEgressValidationEndpoint, out var vpnEndpointError))
@@ -292,6 +312,22 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             throw new Application.ServiceOperationException(
                 "invalid_runtime_settings", "VpnEgressEngineSuspensionTimeoutSeconds must be 1 or greater.",
                 StatusCodes.Status400BadRequest, nameof(request.VpnEgressEngineSuspensionTimeoutSeconds)
+            );
+        }
+
+        if (expressVpnRecoveryDelaySeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", "ExpressVpnRecoveryDelaySeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest, nameof(request.ExpressVpnRecoveryDelaySeconds)
+            );
+        }
+
+        if (expressVpnUnavailableLaunchDelaySeconds < 1)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings", "ExpressVpnUnavailableLaunchDelaySeconds must be 1 or greater.",
+                StatusCodes.Status400BadRequest, nameof(request.ExpressVpnUnavailableLaunchDelaySeconds)
             );
         }
 
@@ -415,6 +451,12 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             vpnEgressRequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.VpnEgressEngineSuspensionTimeoutSeconds] =
                             vpnEgressEngineSuspensionTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.ExpressVpnAutomaticRecoveryMode] =
+                            expressVpnAutomaticRecoveryMode.ToString(),
+                    [RuntimeSettingsKeys.ExpressVpnRecoveryDelaySeconds] =
+                            expressVpnRecoveryDelaySeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.ExpressVpnUnavailableLaunchDelaySeconds] =
+                            expressVpnUnavailableLaunchDelaySeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.RuntimeTickDurationSummaryEnabled] =
                             runtimeTickDurationSummaryEnabled.ToString(),
                 }, cancellationToken
@@ -479,6 +521,9 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             vpnEgressReadyCheckIntervalSeconds,
                             vpnEgressRequestTimeoutSeconds,
                             vpnEgressEngineSuspensionTimeoutSeconds,
+                            expressVpnAutomaticRecoveryMode,
+                            expressVpnRecoveryDelaySeconds,
+                            expressVpnUnavailableLaunchDelaySeconds,
                             runtimeTickDurationSummaryEnabled,
                         }
                     ),
@@ -847,6 +892,28 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             RuntimeSettingsKeys.VpnEgressEngineSuspensionTimeoutSeconds,
             baseOptions.VpnEgressEngineSuspensionTimeoutSeconds
         );
+        var expressVpnAutomaticRecoveryMode = baseOptions.ExpressVpnAutomaticRecoveryMode;
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.ExpressVpnAutomaticRecoveryMode,
+                out var expressVpnAutomaticRecoveryModeValue
+            ) && Enum.TryParse<ExpressVpnAutomaticRecoveryMode>(
+                expressVpnAutomaticRecoveryModeValue,
+                true,
+                out var parsedExpressVpnAutomaticRecoveryMode
+            ) && Enum.IsDefined(parsedExpressVpnAutomaticRecoveryMode))
+        {
+            expressVpnAutomaticRecoveryMode = parsedExpressVpnAutomaticRecoveryMode;
+        }
+        var expressVpnRecoveryDelaySeconds = ReadPositiveInteger(
+            values,
+            RuntimeSettingsKeys.ExpressVpnRecoveryDelaySeconds,
+            baseOptions.ExpressVpnRecoveryDelaySeconds
+        );
+        var expressVpnUnavailableLaunchDelaySeconds = ReadPositiveInteger(
+            values,
+            RuntimeSettingsKeys.ExpressVpnUnavailableLaunchDelaySeconds,
+            baseOptions.ExpressVpnUnavailableLaunchDelaySeconds
+        );
         var runtimeTickDurationSummaryEnabled = baseOptions.RuntimeTickDurationSummaryEnabled;
         if (values.TryGetValue(
                 RuntimeSettingsKeys.RuntimeTickDurationSummaryEnabled,
@@ -910,6 +977,9 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             VpnEgressReadyCheckIntervalSeconds           = vpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds               = vpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds      = vpnEgressEngineSuspensionTimeoutSeconds,
+            ExpressVpnAutomaticRecoveryMode               = expressVpnAutomaticRecoveryMode,
+            ExpressVpnRecoveryDelaySeconds                 = expressVpnRecoveryDelaySeconds,
+            ExpressVpnUnavailableLaunchDelaySeconds        = expressVpnUnavailableLaunchDelaySeconds,
             RuntimeTickDurationSummaryEnabled            = runtimeTickDurationSummaryEnabled,
             EngineSettingsRequireRestart =
                     engineAllowPeerExchange          != appliedEngineSettingsState.EngineAllowPeerExchange          ||
@@ -971,6 +1041,9 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             VpnEgressReadyCheckIntervalSeconds           = settings.VpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds               = settings.VpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds      = settings.VpnEgressEngineSuspensionTimeoutSeconds,
+            ExpressVpnAutomaticRecoveryMode               = settings.ExpressVpnAutomaticRecoveryMode.ToString(),
+            ExpressVpnRecoveryDelaySeconds                 = settings.ExpressVpnRecoveryDelaySeconds,
+            ExpressVpnUnavailableLaunchDelaySeconds        = settings.ExpressVpnUnavailableLaunchDelaySeconds,
             RuntimeTickDurationSummaryEnabled            = settings.RuntimeTickDurationSummaryEnabled,
             AppliedEngineMaximumConnections              = appliedEngineSettingsState.EngineMaximumConnections,
             AppliedEngineMaximumHalfOpenConnections      = appliedEngineSettingsState.EngineMaximumHalfOpenConnections,

@@ -11,6 +11,7 @@ using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Service.Configuration;
 using TorrentCore.Service.Engine;
+using TorrentCore.Service.Infrastructure;
 using TorrentCore.Service.Tests.Fixtures;
 using TorrentCore.Service.Vpn;
 
@@ -215,6 +216,38 @@ public sealed class VpnConnectionCoordinatorTests
     }
 
     [Fact]
+    public async Task SuspensionFailure_IsRetriedBeforeCoordinatorRemainsDegraded()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.VpnIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        var lifecycle = new FailFirstSuspensionLifecycle();
+        await using var factory = CreateFactory(handler, services =>
+        {
+            services.RemoveAll<IMonoTorrentLifecycle>();
+            services.AddSingleton<IMonoTorrentLifecycle>(lifecycle);
+        });
+        using var client = factory.CreateClient();
+
+        await WaitForHostAsync(
+            client,
+            value => value.VpnConnectionReason == "EngineSuspensionFailed",
+            timeout: TimeSpan.FromSeconds(8)
+        );
+        var retried = await WaitForHostAsync(
+            client,
+            value => lifecycle.SuspensionCount >= 2 && value.VpnConnectionReason == "DirectIsp",
+            timeout: TimeSpan.FromSeconds(8)
+        );
+
+        Assert.False(retried.TorrentProcessingAvailable);
+        Assert.Equal(2, lifecycle.SuspensionCount);
+        Assert.Equal(1, lifecycle.ActivationCount);
+    }
+
+    [Fact]
     public async Task EndpointFailure_ExposesTechnicalSummaryWithoutCurrentAddress()
     {
         var handler = new ScriptedHttpMessageHandler();
@@ -260,6 +293,287 @@ public sealed class VpnConnectionCoordinatorTests
         );
     }
 
+    [Fact]
+    public async Task AutomaticRecoveryDisabled_IssuesNoExpressVpnCommandsOrReads()
+    {
+        var handler = CreateHandler(VpnEgressHttpScenarios.DirectIspIpv4, repeat: 5);
+        var controller = new RecordingExpressVpnController();
+        await using var factory = CreateFactory(handler, services => ReplaceController(services, controller));
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(() => handler.Requests.Count >= 2, TimeSpan.FromSeconds(5));
+
+        Assert.Empty(controller.Calls);
+    }
+
+    [Fact]
+    public async Task DirectIspRecovery_AfterTwoChecks_DisconnectsConnectsValidatesThenActivates()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.VpnIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.VpnIpv4}}"}""");
+        var controller = new RecordingExpressVpnController(ExpressVpnConnectionState.Connected);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        var ready = await WaitForHostAsync(
+            client,
+            value => value.VpnConnectionPhase == "Ready" && value.StartupRecoveryCompleted &&
+                     value.ExpressVpnLastActionOutcome == "ValidatedEgress",
+            timeout: TimeSpan.FromSeconds(8)
+        );
+
+        Assert.True(ready.TorrentProcessingAvailable);
+        Assert.Equal(
+            ["Get", "Disconnect", "Wait:Disconnected", "Connect", "Wait:Connected"],
+            controller.Calls
+        );
+        Assert.Equal(3, handler.Requests.Count);
+        Assert.Equal("DirectIspOnly", ready.ExpressVpnRecoveryMode);
+        Assert.Equal("Inactive", ready.ExpressVpnRecoveryPhase);
+        Assert.Equal("Connected", ready.ExpressVpnConnectionState);
+        Assert.Equal(0, ready.ExpressVpnReconnectAttemptsUsed);
+        Assert.Equal(2, ready.ExpressVpnReconnectAttemptsMaximum);
+        Assert.NotNull(ready.ExpressVpnLastActionAtUtc);
+        Assert.Null(ready.ExpressVpnNextActionAtUtc);
+
+        var recoveryLogs = await WaitForLogsAsync(
+            client,
+            VpnEgressActivityEvents.ExpressVpnRecoveryAttempted,
+            logs => logs.Count == 1
+        );
+        using var recoveryDetails = JsonDocument.Parse(recoveryLogs[0].DetailsJson!);
+        Assert.Equal(1, recoveryDetails.RootElement.GetProperty("Attempt").GetInt32());
+        Assert.Equal("ValidatedEgress", recoveryDetails.RootElement.GetProperty("ValidationOutcome").GetString());
+    }
+
+    [Fact]
+    public async Task DisconnectedRecovery_UsesConnectOnly()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.VpnIpv4}}"}""");
+        var controller = new RecordingExpressVpnController(ExpressVpnConnectionState.Disconnected);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitForHostAsync(client, value => value.VpnConnectionPhase == "Ready", TimeSpan.FromSeconds(8));
+
+        Assert.Equal(["Get", "Connect", "Wait:Connected"], controller.Calls);
+    }
+
+    [Fact]
+    public async Task SuspensionFailure_ForbidsExpressVpnActionsAndReads()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.VpnIpv4}}"}""");
+        for (var index = 0; index < 4; index++)
+        {
+            handler.EnqueueJson($$"""{"ip":"{{VpnEgressHttpScenarios.DirectIspIpv4}}"}""");
+        }
+        var controller = new RecordingExpressVpnController();
+        var lifecycle = new AlwaysFailSuspensionLifecycle();
+        await using var factory = CreateFactory(
+            handler,
+            services =>
+            {
+                ReplaceController(services, controller);
+                services.RemoveAll<IMonoTorrentLifecycle>();
+                services.AddSingleton<IMonoTorrentLifecycle>(lifecycle);
+            },
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(() => lifecycle.SuspensionCount >= 2, TimeSpan.FromSeconds(8));
+
+        Assert.Empty(controller.Calls);
+    }
+
+    [Fact]
+    public async Task RecoveryCycles_StopAfterTwoAttemptsWhileValidationContinues()
+    {
+        var handler = CreateHandler(VpnEgressHttpScenarios.DirectIspIpv4, repeat: 12);
+        var controller = new RecordingExpressVpnController(ExpressVpnConnectionState.Connected);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(
+            () => controller.Calls.Count(call => call == "Connect") == 2,
+            TimeSpan.FromSeconds(8)
+        );
+        var validationCountAfterSecondAttempt = handler.Requests.Count;
+        await WaitUntilAsync(
+            () => handler.Requests.Count > validationCountAfterSecondAttempt,
+            TimeSpan.FromSeconds(5)
+        );
+        var exhausted = await WaitForHostAsync(
+            client,
+            value => value.ExpressVpnRecoveryPhase == "Exhausted",
+            TimeSpan.FromSeconds(5)
+        );
+
+        Assert.Equal(2, controller.Calls.Count(call => call == "Disconnect"));
+        Assert.Equal(2, controller.Calls.Count(call => call == "Connect"));
+        Assert.Equal(2, exhausted.ExpressVpnReconnectAttemptsUsed);
+        Assert.Contains("Two automatic reconnect attempts", exhausted.ExpressVpnRecoveryMessage);
+        var exhaustionLogs = await WaitForLogsAsync(
+            client,
+            VpnEgressActivityEvents.ExpressVpnRecoveryExhausted,
+            logs => logs.Count == 1
+        );
+        Assert.Single(exhaustionLogs);
+    }
+
+    [Fact]
+    public async Task UnavailableController_LaunchesApplicationAtMostTwice()
+    {
+        var handler = CreateHandler(VpnEgressHttpScenarios.DirectIspIpv4, repeat: 8);
+        var controller = new RecordingExpressVpnController(available: false);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1,
+            unavailableLaunchDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(
+            () => controller.Calls.Count(call => call == "Launch") == 2,
+            TimeSpan.FromSeconds(8)
+        );
+        var validationCountAfterSecondLaunch = handler.Requests.Count;
+        await WaitUntilAsync(
+            () => handler.Requests.Count > validationCountAfterSecondLaunch,
+            TimeSpan.FromSeconds(5)
+        );
+        var exhausted = await WaitForHostAsync(
+            client,
+            value => value.ExpressVpnRecoveryPhase == "Exhausted",
+            TimeSpan.FromSeconds(5)
+        );
+
+        Assert.Equal(2, controller.Calls.Count(call => call == "Launch"));
+        Assert.DoesNotContain("Disconnect", controller.Calls);
+        Assert.DoesNotContain("Connect", controller.Calls);
+        Assert.Equal(2, exhausted.ExpressVpnLaunchAttemptsUsed);
+        Assert.Contains("Two automatic launch attempts", exhausted.ExpressVpnRecoveryMessage);
+        var launchLogs = await WaitForLogsAsync(
+            client,
+            VpnEgressActivityEvents.ExpressVpnLaunchAttempted,
+            logs => logs.Count == 2
+        );
+        Assert.Equal(2, launchLogs.Count);
+    }
+
+    [Fact]
+    public async Task DirectIspOnly_DoesNotRecoverForEndpointFailures()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        for (var index = 0; index < 4; index++)
+        {
+            handler.EnqueueStatus(HttpStatusCode.ServiceUnavailable);
+        }
+        var controller = new RecordingExpressVpnController();
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(() => handler.Requests.Count >= 2, TimeSpan.FromSeconds(5));
+
+        Assert.Empty(controller.Calls);
+    }
+
+    [Fact]
+    public async Task AnyValidationFailure_RecoversAfterTwoEndpointFailures()
+    {
+        var handler = new ScriptedHttpMessageHandler();
+        handler.EnqueueStatus(HttpStatusCode.ServiceUnavailable);
+        handler.EnqueueStatus(HttpStatusCode.ServiceUnavailable);
+        handler.EnqueueStatus(HttpStatusCode.ServiceUnavailable);
+        var controller = new RecordingExpressVpnController(ExpressVpnConnectionState.Disconnected);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.AnyValidationFailure,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(() => controller.Calls.Contains("Connect"), TimeSpan.FromSeconds(5));
+
+        Assert.Equal(["Get", "Connect", "Wait:Connected"], controller.Calls);
+    }
+
+    [Theory]
+    [InlineData("Connecting")]
+    [InlineData("Reconnecting")]
+    [InlineData("DisconnectingToReconnect")]
+    public async Task TransitionalControllerState_DoesNotConsumeMutatingAttempt(
+        string stateValue)
+    {
+        var handler = CreateHandler(VpnEgressHttpScenarios.DirectIspIpv4, repeat: 5);
+        var state = Enum.Parse<ExpressVpnConnectionState>(stateValue);
+        var controller = new RecordingExpressVpnController(state);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(() => controller.Calls.Count >= 1, TimeSpan.FromSeconds(5));
+
+        Assert.All(controller.Calls, call => Assert.Equal("Get", call));
+    }
+
+    [Fact]
+    public async Task UnchangedControllerPolling_DoesNotFloodActivityLog()
+    {
+        var handler = CreateHandler(VpnEgressHttpScenarios.DirectIspIpv4, repeat: 6);
+        var controller = new RecordingExpressVpnController(ExpressVpnConnectionState.Connecting);
+        await using var factory = CreateFactory(
+            handler,
+            services => ReplaceController(services, controller),
+            recoveryMode: ExpressVpnAutomaticRecoveryMode.DirectIspOnly,
+            recoveryDelaySeconds: 1
+        );
+        using var client = factory.CreateClient();
+
+        await WaitUntilAsync(() => controller.Calls.Count >= 2, TimeSpan.FromSeconds(8));
+        var logs = await client.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+            $"api/logs?take=20&eventType={VpnEgressActivityEvents.ExpressVpnControllerStateChanged}"
+        );
+
+        Assert.NotNull(logs);
+        Assert.Single(logs);
+    }
+
     private static ScriptedHttpMessageHandler CreateHandler(string publicAddress, int repeat)
     {
         var handler = new ScriptedHttpMessageHandler();
@@ -284,7 +598,10 @@ public sealed class VpnConnectionCoordinatorTests
         ScriptedHttpMessageHandler handler,
         Action<IServiceCollection>? configureServices = null,
         int requestTimeoutSeconds = 1,
-        int checkIntervalSeconds = 2)
+        int checkIntervalSeconds = 2,
+        ExpressVpnAutomaticRecoveryMode recoveryMode = ExpressVpnAutomaticRecoveryMode.Disabled,
+        int recoveryDelaySeconds = 180,
+        int unavailableLaunchDelaySeconds = 300)
     {
         var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-vpn-coordinator-{Guid.NewGuid():N}");
         var portOffset = Random.Shared.Next(0, 5_000);
@@ -308,6 +625,9 @@ public sealed class VpnConnectionCoordinatorTests
                     [$"{TorrentCoreServiceOptions.SectionName}:VpnEgressReadyCheckIntervalSeconds"] = checkIntervalSeconds.ToString(),
                     [$"{TorrentCoreServiceOptions.SectionName}:VpnEgressRequestTimeoutSeconds"] = requestTimeoutSeconds.ToString(),
                     [$"{TorrentCoreServiceOptions.SectionName}:VpnEgressEngineSuspensionTimeoutSeconds"] = "2",
+                    [$"{TorrentCoreServiceOptions.SectionName}:ExpressVpnAutomaticRecoveryMode"] = recoveryMode.ToString(),
+                    [$"{TorrentCoreServiceOptions.SectionName}:ExpressVpnRecoveryDelaySeconds"] = recoveryDelaySeconds.ToString(),
+                    [$"{TorrentCoreServiceOptions.SectionName}:ExpressVpnUnavailableLaunchDelaySeconds"] = unavailableLaunchDelaySeconds.ToString(),
                 });
             });
             builder.ConfigureServices(services =>
@@ -317,6 +637,14 @@ public sealed class VpnConnectionCoordinatorTests
                 configureServices?.Invoke(services);
             });
         });
+    }
+
+    private static void ReplaceController(
+        IServiceCollection services,
+        IExpressVpnController controller)
+    {
+        services.RemoveAll<IExpressVpnController>();
+        services.AddSingleton(controller);
     }
 
     private static async Task<EngineHostStatusDto> WaitForHostAsync(
@@ -354,6 +682,30 @@ public sealed class VpnConnectionCoordinatorTests
         throw new Xunit.Sdk.XunitException("Timed out waiting for the scheduled VPN check.");
     }
 
+    private static async Task<IReadOnlyList<ActivityLogEntryDto>> WaitForLogsAsync(
+        HttpClient client,
+        string eventType,
+        Func<IReadOnlyList<ActivityLogEntryDto>, bool> predicate,
+        TimeSpan? timeout = null)
+    {
+        IReadOnlyList<ActivityLogEntryDto> last = [];
+        var deadline = DateTimeOffset.UtcNow + (timeout ?? TimeSpan.FromSeconds(3));
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            last = await client.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+                $"api/logs?take=20&eventType={eventType}"
+            ) ?? [];
+            if (predicate(last))
+            {
+                return last;
+            }
+            await Task.Delay(50);
+        }
+        throw new Xunit.Sdk.XunitException(
+            $"Timed out waiting for activity event '{eventType}'. Last count: {last.Count}."
+        );
+    }
+
     private sealed class FailFirstActivationLifecycle : IMonoTorrentLifecycle
     {
         private int _activationCount;
@@ -379,5 +731,160 @@ public sealed class VpnConnectionCoordinatorTests
             MonoTorrentSuspensionReason reason,
             CancellationToken cancellationToken)
             => Task.FromResult(new MonoTorrentSuspensionResult(false, true, [], DateTimeOffset.UtcNow));
+    }
+
+    private sealed class FailFirstSuspensionLifecycle : IMonoTorrentLifecycle
+    {
+        private int _activationCount;
+        private int _suspensionCount;
+
+        public int ActivationCount => Volatile.Read(ref _activationCount);
+        public int SuspensionCount => Volatile.Read(ref _suspensionCount);
+
+        public Task<TorrentEngineRecoveryResult> ActivateAsync(CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _activationCount);
+            return Task.FromResult(new TorrentEngineRecoveryResult
+            {
+                RecoveredTorrentCount = 0,
+                NormalizedTorrentCount = 0,
+                CompletedAtUtc = DateTimeOffset.UtcNow,
+                Changes = [],
+            });
+        }
+
+        public Task<MonoTorrentSuspensionResult> SuspendAsync(
+            MonoTorrentSuspensionReason reason,
+            CancellationToken cancellationToken)
+        {
+            var attempt = Interlocked.Increment(ref _suspensionCount);
+            return Task.FromResult(attempt == 1
+                ? new MonoTorrentSuspensionResult(
+                    true,
+                    false,
+                    [new MonoTorrentSuspensionFailure("dispose", "Scripted suspension failure.")],
+                    DateTimeOffset.UtcNow
+                )
+                : new MonoTorrentSuspensionResult(true, true, [], DateTimeOffset.UtcNow));
+        }
+    }
+
+    private sealed class AlwaysFailSuspensionLifecycle : IMonoTorrentLifecycle
+    {
+        private int _suspensionCount;
+        public int SuspensionCount => Volatile.Read(ref _suspensionCount);
+
+        public Task<TorrentEngineRecoveryResult> ActivateAsync(CancellationToken cancellationToken)
+            => Task.FromResult(new TorrentEngineRecoveryResult
+            {
+                RecoveredTorrentCount = 0,
+                NormalizedTorrentCount = 0,
+                CompletedAtUtc = DateTimeOffset.UtcNow,
+                Changes = [],
+            });
+
+        public Task<MonoTorrentSuspensionResult> SuspendAsync(
+            MonoTorrentSuspensionReason reason,
+            CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _suspensionCount);
+            return Task.FromResult(new MonoTorrentSuspensionResult(
+                true,
+                false,
+                [new MonoTorrentSuspensionFailure("dispose", "Scripted suspension failure.")],
+                DateTimeOffset.UtcNow
+            ));
+        }
+    }
+
+    private sealed class RecordingExpressVpnController : IExpressVpnController
+    {
+        private readonly bool _available;
+        private readonly ExpressVpnConnectionState _state;
+        private readonly object _gate = new();
+        private readonly List<string> _calls = [];
+
+        public RecordingExpressVpnController(
+            ExpressVpnConnectionState state = ExpressVpnConnectionState.Connected,
+            bool available = true)
+        {
+            _state = state;
+            _available = available;
+        }
+
+        public bool IsSupported => true;
+
+        public IReadOnlyList<string> Calls
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _calls.ToArray();
+                }
+            }
+        }
+
+        public Task<ExpressVpnControllerStateResult> GetConnectionStateAsync(
+            CancellationToken cancellationToken)
+        {
+            Record("Get");
+            return Task.FromResult(StateResult(_state, _available));
+        }
+
+        public Task<ExpressVpnControllerStateResult> WaitForConnectionStateAsync(
+            ExpressVpnConnectionState expectedState,
+            CancellationToken cancellationToken)
+        {
+            Record($"Wait:{expectedState}");
+            return Task.FromResult(StateResult(expectedState, available: true));
+        }
+
+        public Task<ExpressVpnControllerActionResult> DisconnectAsync(CancellationToken cancellationToken)
+        {
+            Record("Disconnect");
+            return Task.FromResult(ActionSuccess());
+        }
+
+        public Task<ExpressVpnControllerActionResult> ConnectAsync(CancellationToken cancellationToken)
+        {
+            Record("Connect");
+            return Task.FromResult(ActionSuccess());
+        }
+
+        public Task<ExpressVpnControllerActionResult> LaunchApplicationAsync(CancellationToken cancellationToken)
+        {
+            Record("Launch");
+            return Task.FromResult(ActionSuccess());
+        }
+
+        private void Record(string value)
+        {
+            lock (_gate)
+            {
+                _calls.Add(value);
+            }
+        }
+
+        private static ExpressVpnControllerStateResult StateResult(
+            ExpressVpnConnectionState state,
+            bool available)
+            => new()
+            {
+                IsAvailable = available,
+                State = available ? state : null,
+                TimedOut = false,
+                Duration = TimeSpan.Zero,
+                FailureSummary = available ? null : "Scripted unavailable controller.",
+            };
+
+        private static ExpressVpnControllerActionResult ActionSuccess() => new()
+        {
+            Started = true,
+            Succeeded = true,
+            TimedOut = false,
+            ExitCode = 0,
+            Duration = TimeSpan.Zero,
+        };
     }
 }

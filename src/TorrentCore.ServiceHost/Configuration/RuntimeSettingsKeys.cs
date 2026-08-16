@@ -43,5 +43,9 @@ public static class RuntimeSettingsKeys
     public const string VpnEgressRequestTimeoutSeconds = "vpn_egress_request_timeout_seconds";
     public const string VpnEgressEngineSuspensionTimeoutSeconds =
             "vpn_egress_engine_suspension_timeout_seconds";
+    public const string ExpressVpnAutomaticRecoveryMode = "expressvpn_automatic_recovery_mode";
+    public const string ExpressVpnRecoveryDelaySeconds = "expressvpn_recovery_delay_seconds";
+    public const string ExpressVpnUnavailableLaunchDelaySeconds =
+            "expressvpn_unavailable_launch_delay_seconds";
     public const string RuntimeTickDurationSummaryEnabled = "runtime_tick_duration_summary_enabled";
 }

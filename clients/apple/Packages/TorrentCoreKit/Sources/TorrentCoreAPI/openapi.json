@@ -525,6 +525,56 @@
             "format": "int32",
             "type": "integer"
           },
+          "expressVpnConnectionState": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnLastActionAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnLastActionOutcome": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnLaunchAttemptsMaximum": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "expressVpnLaunchAttemptsUsed": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "expressVpnNextActionAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnReconnectAttemptsMaximum": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "expressVpnReconnectAttemptsUsed": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "expressVpnRecoveryMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnRecoveryMode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnRecoveryPhase": {
+            "nullable": true,
+            "type": "string"
+          },
           "maxActiveDownloads": {
             "format": "int32",
             "type": "integer"
@@ -956,6 +1006,18 @@
           },
           "engineSettingsRequireRestart": {
             "type": "boolean"
+          },
+          "expressVpnAutomaticRecoveryMode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnRecoveryDelaySeconds": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "expressVpnUnavailableLaunchDelaySeconds": {
+            "format": "int32",
+            "type": "integer"
           },
           "maxActiveDownloads": {
             "format": "int32",
@@ -2149,6 +2211,20 @@
           },
           "engineMaximumUploadRateBytesPerSecond": {
             "format": "int32",
+            "type": "integer"
+          },
+          "expressVpnAutomaticRecoveryMode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expressVpnRecoveryDelaySeconds": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "expressVpnUnavailableLaunchDelaySeconds": {
+            "format": "int32",
+            "nullable": true,
             "type": "integer"
           },
           "maxActiveDownloads": {

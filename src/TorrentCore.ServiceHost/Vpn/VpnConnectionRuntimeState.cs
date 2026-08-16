@@ -21,6 +21,19 @@ public enum VpnConnectionReason
     EngineSuspensionFailed,
 }
 
+public enum ExpressVpnRecoveryPhase
+{
+    Inactive,
+    WaitingForConfirmation,
+    WaitingForRecoveryDelay,
+    WaitingForController,
+    LaunchingApplication,
+    Disconnecting,
+    Connecting,
+    Validating,
+    Exhausted,
+}
+
 public sealed record VpnConnectionRuntimeSnapshot(
     bool ValidationEnabled,
     VpnConnectionPhase Phase,
@@ -30,7 +43,15 @@ public sealed record VpnConnectionRuntimeSnapshot(
     DateTimeOffset? LastSuccessAtUtc = null,
     DateTimeOffset? NextAutomaticRetryAtUtc = null,
     string? ObservedPublicIpv4 = null,
-    string? FailureSummary = null)
+    string? FailureSummary = null,
+    ExpressVpnRecoveryPhase ExpressVpnRecoveryPhase = ExpressVpnRecoveryPhase.Inactive,
+    string? ExpressVpnConnectionState = null,
+    int ExpressVpnReconnectAttemptsUsed = 0,
+    int ExpressVpnLaunchAttemptsUsed = 0,
+    DateTimeOffset? ExpressVpnNextActionAtUtc = null,
+    DateTimeOffset? ExpressVpnLastActionAtUtc = null,
+    string? ExpressVpnLastActionOutcome = null,
+    string? ExpressVpnRecoveryMessage = null)
 {
     public bool IsTorrentProcessingAvailable => Phase is VpnConnectionPhase.Disabled or VpnConnectionPhase.Ready;
 }

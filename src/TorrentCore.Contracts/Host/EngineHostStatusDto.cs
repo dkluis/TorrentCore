@@ -69,5 +69,16 @@ public sealed class EngineHostStatusDto
     public          int?             VpnDegradedCheckIntervalSeconds         { get; init; }
     public          int?             VpnReadyCheckIntervalSeconds            { get; init; }
     public          string?          VpnFailureSummary                       { get; init; }
+    public          string?          ExpressVpnRecoveryMode                  { get; init; }
+    public          string?          ExpressVpnRecoveryPhase                 { get; init; }
+    public          string?          ExpressVpnConnectionState               { get; init; }
+    public          int?             ExpressVpnReconnectAttemptsUsed         { get; init; }
+    public          int?             ExpressVpnReconnectAttemptsMaximum      { get; init; }
+    public          int?             ExpressVpnLaunchAttemptsUsed            { get; init; }
+    public          int?             ExpressVpnLaunchAttemptsMaximum         { get; init; }
+    public          DateTimeOffset?  ExpressVpnNextActionAtUtc               { get; init; }
+    public          DateTimeOffset?  ExpressVpnLastActionAtUtc               { get; init; }
+    public          string?          ExpressVpnLastActionOutcome             { get; init; }
+    public          string?          ExpressVpnRecoveryMessage               { get; init; }
     public required DateTimeOffset   CheckedAtUtc                            { get; init; }
 }

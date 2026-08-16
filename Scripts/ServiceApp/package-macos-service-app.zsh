@@ -9,8 +9,8 @@ ICON_SOURCE="$REPO_ROOT/clients/apple/Apps/TorrentCoreMac/Assets.xcassets/AppIco
 
 PUBLISH_ROOT=""
 OUTPUT_BUNDLE=""
-VERSION="0.6.0"
-BUILD_NUMBER="12"
+VERSION="0.7.0"
+BUILD_NUMBER="13"
 GIT_SHA=""
 BUILT_AT_UTC=""
 
@@ -20,7 +20,7 @@ fail() {
 }
 
 usage() {
-    print -r -- "Usage: package-macos-service-app.zsh --publish-root <dir> --output-bundle <TorrentCoreService.app> --git-sha <40-hex> --built-at-utc <ISO-8601> [--version 0.6.0] [--build-number 12]"
+    print -r -- "Usage: package-macos-service-app.zsh --publish-root <dir> --output-bundle <TorrentCoreService.app> --git-sha <40-hex> --built-at-utc <ISO-8601> [--version 0.7.0] [--build-number 13]"
 }
 
 while (( $# > 0 )); do

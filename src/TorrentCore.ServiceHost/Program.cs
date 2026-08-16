@@ -67,6 +67,8 @@ builder.Services.AddSingleton<ServiceInstanceContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(VpnEgressProbe.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
 builder.Services.AddSingleton<IVpnEgressProbe, VpnEgressProbe>();
+builder.Services.AddSingleton<IExternalProcessRunner, ExternalProcessRunner>();
+builder.Services.AddSingleton<IExpressVpnController, ExpressVpnController>();
 builder.Services.AddSingleton<VpnConnectionRuntimeState>();
 builder.Services.AddSingleton<VpnSettingsChangeSignal>();
 builder.Services.AddSingleton<RuntimeTickDurationSummaryState>();

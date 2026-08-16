@@ -316,6 +316,9 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var supportsLiveUpdates: Bool
     public var updatedAt: Date?
     public var usesPersistedOverrides: Bool
+    public var expressVPNAutomaticRecoveryMode: String
+    public var expressVPNRecoveryDelaySeconds: Int
+    public var expressVPNUnavailableLaunchDelaySeconds: Int
     public var vpnEgressDegradedCheckIntervalSeconds: Int
     public var vpnEgressDirectIspCidrs: [String]
     public var vpnEgressReadyCheckIntervalSeconds: Int
@@ -358,6 +361,9 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var seedingStopMinutes: Int
     public var seedingStopMode: String
     public var seedingStopRatio: Double
+    public var expressVPNAutomaticRecoveryMode: String
+    public var expressVPNRecoveryDelaySeconds: Int
+    public var expressVPNUnavailableLaunchDelaySeconds: Int
     public var vpnEgressDegradedCheckIntervalSeconds: Int
     public var vpnEgressDirectIspCidrs: [String]
     public var vpnEgressReadyCheckIntervalSeconds: Int
@@ -399,6 +405,9 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         seedingStopMinutes = settings.seedingStopMinutes
         seedingStopMode = settings.seedingStopMode ?? ""
         seedingStopRatio = settings.seedingStopRatio
+        expressVPNAutomaticRecoveryMode = settings.expressVPNAutomaticRecoveryMode
+        expressVPNRecoveryDelaySeconds = settings.expressVPNRecoveryDelaySeconds
+        expressVPNUnavailableLaunchDelaySeconds = settings.expressVPNUnavailableLaunchDelaySeconds
         vpnEgressDegradedCheckIntervalSeconds = settings.vpnEgressDegradedCheckIntervalSeconds
         vpnEgressDirectIspCidrs = settings.vpnEgressDirectIspCidrs
         vpnEgressReadyCheckIntervalSeconds = settings.vpnEgressReadyCheckIntervalSeconds

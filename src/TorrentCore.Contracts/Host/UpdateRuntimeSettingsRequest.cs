@@ -40,5 +40,8 @@ public sealed class UpdateRuntimeSettingsRequest
     public          int?    VpnEgressReadyCheckIntervalSeconds           { get; init; }
     public          int?    VpnEgressRequestTimeoutSeconds               { get; init; }
     public          int?    VpnEgressEngineSuspensionTimeoutSeconds      { get; init; }
+    public          string? ExpressVpnAutomaticRecoveryMode               { get; init; }
+    public          int?    ExpressVpnRecoveryDelaySeconds                 { get; init; }
+    public          int?    ExpressVpnUnavailableLaunchDelaySeconds        { get; init; }
     public          bool?   RuntimeTickDurationSummaryEnabled            { get; init; }
 }

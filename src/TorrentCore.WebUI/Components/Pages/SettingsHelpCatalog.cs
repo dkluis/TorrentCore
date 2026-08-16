@@ -184,6 +184,24 @@ public static class SettingsHelpCatalog
         "The value must be at least one second. It applies live and does not limit activation or recovery."
     );
 
+    public static readonly SettingHelpContent ExpressVpnAutomaticRecoveryMode = new(
+        "ExpressVPN Automatic Recovery",
+        "Selects when TorrentCore may ask ExpressVPN to reconnect after VPN egress validation fails.",
+        "Disabled performs no ExpressVPN commands. Direct ISP Only requires two consecutive direct-ISP detections. Any Validation Failure allows two consecutive failed validation outcomes. MonoTorrent must be suspended first, and public-IP validation must succeed before processing resumes."
+    );
+
+    public static readonly SettingHelpContent ExpressVpnRecoveryDelaySeconds = new(
+        "ExpressVPN Recovery Delay Seconds",
+        "Sets the shared startup grace period and minimum interval between automatic reconnect cycles.",
+        "The default is 180 seconds. This delay does not permit torrent processing while egress is degraded."
+    );
+
+    public static readonly SettingHelpContent ExpressVpnUnavailableLaunchDelaySeconds = new(
+        "ExpressVPN Unavailable Launch Delay Seconds",
+        "Sets how long TorrentCore waits before asking macOS to launch an unavailable ExpressVPN application.",
+        "The default is 300 seconds. TorrentCore makes at most two launch requests per degradation episode and keeps MonoTorrent suspended until public egress validates."
+    );
+
     public static readonly SettingHelpContent RuntimeTickDurationSummaryEnabled = new(
         "Performance Timing Summaries",
         "Controls one-minute synchronization timing summaries in the Service log.",

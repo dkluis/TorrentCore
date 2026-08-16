@@ -49,6 +49,27 @@ existing installation does not change torrent processing until an operator enabl
 - must be positive and applies live
 - does not impose a separate timeout on activation or durable recovery; failures remain degraded and retry later
 
+### ExpressVPN Automatic Recovery
+
+Automatic recovery is disabled by default and is effective only when VPN egress validation is enabled on a macOS
+MonoTorrent host. It never changes ExpressVPN split-tunnel settings, regions, protocols, or application rules.
+
+- `Disabled` performs no ExpressVPN reads, launches, disconnects, or connects
+- `DirectIspOnly` permits recovery only after two consecutive checks detect a configured direct-ISP IPv4 range
+- `AnyValidationFailure` permits recovery after two consecutive eligible failures, including endpoint and response
+  failures
+- MonoTorrent must be fully suspended before TorrentCore reads or changes ExpressVPN; a suspension failure blocks every
+  provider action
+- provider status and command success are diagnostic only; MonoTorrent starts again only after TorrentCore validates a
+  non-ISP public IPv4 address
+
+The recovery delay defaults to `180` seconds. It is both the startup grace period and the minimum interval between
+disconnect/connect attempts. The unavailable launch delay defaults to `300` seconds and is measured before each of at
+most two attempts to ask macOS to launch ExpressVPN. Reconnect and launch attempts have separate fixed limits of two.
+After either category is exhausted, TorrentCore remains suspended and continues its normal degraded public-IP checks,
+so a later manual recovery can still restore processing. All three settings apply live and reject unknown modes or
+nonpositive delays.
+
 The internal probe requires a successful JSON response shaped as `{ "ip": "address" }`, accepts IPv4 only, and limits
 the body to 16 KiB. It distinguishes HTTP status, DNS, connection, TLS, HTTP protocol, and other HTTP failures for DB
 diagnostics. The first completed outcome is logged; a later row is written only when the outcome or endpoint-failure
@@ -69,6 +90,9 @@ remain available in the meantime.
 `/api/host/status` reports `Degraded` while processing is unavailable. Its additive VPN fields include validation,
 phase, reason, torrent-processing availability, operator message, last check, preserved last successful check, next
 automatic retry, observed public IPv4, configured ready/degraded intervals, and a sanitized technical failure summary.
+ExpressVPN fields separately report the selected recovery mode, recovery phase, last observed controller state,
+reconnect and launch attempt counts, next scheduled provider action, last provider action and outcome, and a concise
+recovery message.
 The current address is present only after a validated or direct-ISP result. Disabling validation clears the live check,
 success, retry, address, and failure values without deleting historical logs.
 
@@ -77,7 +101,7 @@ text stays in host status and DB logs. Their Torrents and History pages block pa
 available whenever the Service explicitly reports `torrentProcessingAvailable == false`. A missing value does not
 block either page.
 
-All seven VPN policy values are editable through the runtime-settings API and both operator Settings screens. The
+All ten VPN policy values are editable through the runtime-settings API and both operator Settings screens. The
 WebUI applies the same limits described above, saves the VPN group independently, and reconciles the form with the
 effective values returned by the Service.
 

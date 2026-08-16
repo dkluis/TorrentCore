@@ -249,6 +249,9 @@ public sealed class OpenApiContractTests
         Assert.NotNull(properties["vpnEgressReadyCheckIntervalSeconds"]);
         Assert.NotNull(properties["vpnEgressRequestTimeoutSeconds"]);
         Assert.NotNull(properties["vpnEgressEngineSuspensionTimeoutSeconds"]);
+        Assert.NotNull(properties["expressVpnAutomaticRecoveryMode"]);
+        Assert.NotNull(properties["expressVpnRecoveryDelaySeconds"]);
+        Assert.NotNull(properties["expressVpnUnavailableLaunchDelaySeconds"]);
         Assert.NotNull(properties["runtimeTickDurationSummaryEnabled"]);
     }
 
@@ -262,5 +265,16 @@ public sealed class OpenApiContractTests
         Assert.NotNull(properties["vpnDegradedCheckIntervalSeconds"]);
         Assert.NotNull(properties["vpnReadyCheckIntervalSeconds"]);
         Assert.NotNull(properties["vpnFailureSummary"]);
+        Assert.NotNull(properties["expressVpnRecoveryMode"]);
+        Assert.NotNull(properties["expressVpnRecoveryPhase"]);
+        Assert.NotNull(properties["expressVpnConnectionState"]);
+        Assert.NotNull(properties["expressVpnReconnectAttemptsUsed"]);
+        Assert.NotNull(properties["expressVpnReconnectAttemptsMaximum"]);
+        Assert.NotNull(properties["expressVpnLaunchAttemptsUsed"]);
+        Assert.NotNull(properties["expressVpnLaunchAttemptsMaximum"]);
+        Assert.NotNull(properties["expressVpnNextActionAtUtc"]);
+        Assert.NotNull(properties["expressVpnLastActionAtUtc"]);
+        Assert.NotNull(properties["expressVpnLastActionOutcome"]);
+        Assert.NotNull(properties["expressVpnRecoveryMessage"]);
     }
 }

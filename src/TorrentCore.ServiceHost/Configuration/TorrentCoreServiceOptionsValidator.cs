@@ -211,6 +211,27 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (!Enum.IsDefined(options.ExpressVpnAutomaticRecoveryMode))
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:ExpressVpnAutomaticRecoveryMode is invalid."
+            );
+        }
+
+        if (options.ExpressVpnRecoveryDelaySeconds < 1)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:ExpressVpnRecoveryDelaySeconds must be 1 or greater."
+            );
+        }
+
+        if (options.ExpressVpnUnavailableLaunchDelaySeconds < 1)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:ExpressVpnUnavailableLaunchDelaySeconds must be 1 or greater."
+            );
+        }
+
         if (options.CompletionCallbackTimeoutSeconds < 1)
         {
             failures.Add(

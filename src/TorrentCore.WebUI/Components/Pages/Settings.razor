@@ -625,6 +625,45 @@
                                                          Step="1"
                                                          Immediate="true" />
                                     </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.ExpressVpnAutomaticRecoveryMode" />
+                                        <MudSelect T="string"
+                                                   Value="_vpn.ExpressVpnAutomaticRecoveryMode"
+                                                   ValueChanged="value => UpdateVpn(value, (group, next) => group.ExpressVpnAutomaticRecoveryMode = next)"
+                                                   Variant="Variant.Outlined"
+                                                   Margin="Margin.Dense"
+                                                   Dense="true">
+                                            @foreach (var recoveryMode in ExpressVpnRecoveryModes)
+                                            {
+                                                <MudSelectItem T="string" Value="@recoveryMode.Value">@recoveryMode.Label</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.ExpressVpnRecoveryDelaySeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_vpn.ExpressVpnRecoveryDelaySeconds"
+                                                         ValueChanged="value => UpdateVpn(value, (group, next) => group.ExpressVpnRecoveryDelaySeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.ExpressVpnUnavailableLaunchDelaySeconds" />
+                                        <MudNumericField T="int"
+                                                         Value="_vpn.ExpressVpnUnavailableLaunchDelaySeconds"
+                                                         ValueChanged="value => UpdateVpn(value, (group, next) => group.ExpressVpnUnavailableLaunchDelaySeconds = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
                                 </div>
 
                                 @if (GetGroupValidationError(SettingsGroupKey.VpnEgress) is { } vpnValidationError)
@@ -1065,6 +1104,12 @@
         "PlainTextPreferred", "EncryptedPreferred", "EncryptedRequired",
     ];
     private static readonly IReadOnlyList<string> CleanupModes = ["Never", "AfterCompletedMinutes"];
+    private static readonly IReadOnlyList<(string Value, string Label)> ExpressVpnRecoveryModes =
+    [
+        ("Disabled", "Disabled"),
+        ("DirectIspOnly", "Direct ISP only"),
+        ("AnyValidationFailure", "Any validation failure"),
+    ];
 
     private StateViewMode _mode = StateViewMode.Loading;
     private bool _isRefreshing;
@@ -1607,6 +1652,9 @@
         _vpn.VpnEgressReadyCheckIntervalSeconds = _runtimeSnapshot.VpnEgressReadyCheckIntervalSeconds;
         _vpn.VpnEgressRequestTimeoutSeconds = _runtimeSnapshot.VpnEgressRequestTimeoutSeconds;
         _vpn.VpnEgressEngineSuspensionTimeoutSeconds = _runtimeSnapshot.VpnEgressEngineSuspensionTimeoutSeconds;
+        _vpn.ExpressVpnAutomaticRecoveryMode = _runtimeSnapshot.ExpressVpnAutomaticRecoveryMode;
+        _vpn.ExpressVpnRecoveryDelaySeconds = _runtimeSnapshot.ExpressVpnRecoveryDelaySeconds;
+        _vpn.ExpressVpnUnavailableLaunchDelaySeconds = _runtimeSnapshot.ExpressVpnUnavailableLaunchDelaySeconds;
     }
 
     private void ApplyDiagnosticsFromSnapshot()
@@ -1678,6 +1726,9 @@
             VpnEgressReadyCheckIntervalSeconds = _vpn.VpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds = _vpn.VpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds = _vpn.VpnEgressEngineSuspensionTimeoutSeconds,
+            ExpressVpnAutomaticRecoveryMode = _vpn.ExpressVpnAutomaticRecoveryMode,
+            ExpressVpnRecoveryDelaySeconds = _vpn.ExpressVpnRecoveryDelaySeconds,
+            ExpressVpnUnavailableLaunchDelaySeconds = _vpn.ExpressVpnUnavailableLaunchDelaySeconds,
             RuntimeTickDurationSummaryEnabled = _diagnostics.RuntimeTickDurationSummaryEnabled,
         };
     }
@@ -1816,7 +1867,11 @@
                 _vpn.VpnEgressReadyCheckIntervalSeconds != _runtimeSnapshot.VpnEgressReadyCheckIntervalSeconds ||
                 _vpn.VpnEgressRequestTimeoutSeconds != _runtimeSnapshot.VpnEgressRequestTimeoutSeconds ||
                 _vpn.VpnEgressEngineSuspensionTimeoutSeconds !=
-                    _runtimeSnapshot.VpnEgressEngineSuspensionTimeoutSeconds);
+                    _runtimeSnapshot.VpnEgressEngineSuspensionTimeoutSeconds ||
+                _vpn.ExpressVpnAutomaticRecoveryMode != _runtimeSnapshot.ExpressVpnAutomaticRecoveryMode ||
+                _vpn.ExpressVpnRecoveryDelaySeconds != _runtimeSnapshot.ExpressVpnRecoveryDelaySeconds ||
+                _vpn.ExpressVpnUnavailableLaunchDelaySeconds !=
+                    _runtimeSnapshot.ExpressVpnUnavailableLaunchDelaySeconds);
     }
 
     private bool IsDiagnosticsDirty()
@@ -1932,6 +1987,21 @@
         if (_vpn.VpnEgressEngineSuspensionTimeoutSeconds < 1)
         {
             return "VPN engine suspension timeout must be 1 or greater.";
+        }
+
+        if (!ExpressVpnRecoveryModes.Any(mode => mode.Value == _vpn.ExpressVpnAutomaticRecoveryMode))
+        {
+            return "ExpressVPN automatic recovery mode is invalid.";
+        }
+
+        if (_vpn.ExpressVpnRecoveryDelaySeconds < 1)
+        {
+            return "ExpressVPN recovery delay must be 1 or greater.";
+        }
+
+        if (_vpn.ExpressVpnUnavailableLaunchDelaySeconds < 1)
+        {
+            return "ExpressVPN unavailable launch delay must be 1 or greater.";
         }
 
         if (_vpn.VpnEgressRequestTimeoutSeconds >= _vpn.VpnEgressDegradedCheckIntervalSeconds ||
@@ -2089,6 +2159,9 @@
         public int VpnEgressReadyCheckIntervalSeconds { get; set; } = 240;
         public int VpnEgressRequestTimeoutSeconds { get; set; } = 10;
         public int VpnEgressEngineSuspensionTimeoutSeconds { get; set; } = 10;
+        public string ExpressVpnAutomaticRecoveryMode { get; set; } = "Disabled";
+        public int ExpressVpnRecoveryDelaySeconds { get; set; } = 180;
+        public int ExpressVpnUnavailableLaunchDelaySeconds { get; set; } = 300;
     }
 
     private sealed class DiagnosticsSettingsGroup

@@ -138,6 +138,17 @@ public struct TorrentCoreHostStatus: Codable, Hashable, Sendable {
     public var vpnDegradedCheckIntervalSeconds: Int?
     public var vpnReadyCheckIntervalSeconds: Int?
     public var vpnFailureSummary: String?
+    public var expressVPNRecoveryMode: String?
+    public var expressVPNRecoveryPhase: String?
+    public var expressVPNConnectionState: String?
+    public var expressVPNReconnectAttemptsUsed: Int?
+    public var expressVPNReconnectAttemptsMaximum: Int?
+    public var expressVPNLaunchAttemptsUsed: Int?
+    public var expressVPNLaunchAttemptsMaximum: Int?
+    public var expressVPNNextActionAt: Date?
+    public var expressVPNLastActionAt: Date?
+    public var expressVPNLastActionOutcome: String?
+    public var expressVPNRecoveryMessage: String?
     public var checkedAt: Date
 }
 

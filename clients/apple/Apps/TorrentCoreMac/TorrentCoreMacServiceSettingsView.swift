@@ -55,6 +55,11 @@ struct TorrentCoreMacServiceSettingsView: View {
         SettingChoice(value: "EncryptedPreferred", label: "Encrypted preferred"),
         SettingChoice(value: "EncryptedRequired", label: "Encrypted required"),
     ]
+    private static let expressVPNRecoveryModes = [
+        SettingChoice(value: "Disabled", label: "Disabled"),
+        SettingChoice(value: "DirectIspOnly", label: "Direct ISP only"),
+        SettingChoice(value: "AnyValidationFailure", label: "Any validation failure"),
+    ]
 
     enum SettingsGroup: String, CaseIterable, Identifiable {
         case downloads
@@ -577,6 +582,26 @@ struct TorrentCoreMacServiceSettingsView: View {
                         "Engine suspension timeout seconds",
                         value: draft.vpnEgressEngineSuspensionTimeoutSeconds,
                         content: TorrentCoreHelpCatalog.Settings.vpnEgressEngineSuspensionTimeoutSeconds
+                    )
+                }
+                Section("ExpressVPN Recovery") {
+                    choiceField(
+                        selection: draft.expressVPNAutomaticRecoveryMode,
+                        choices: Self.expressVPNRecoveryModes,
+                        content: TorrentCoreHelpCatalog.Settings.expressVPNAutomaticRecoveryMode,
+                        identifier: "serviceSettings.expressVPNAutomaticRecoveryMode"
+                    )
+                    integerField(
+                        "Recovery delay seconds",
+                        value: draft.expressVPNRecoveryDelaySeconds,
+                        content: TorrentCoreHelpCatalog.Settings.expressVPNRecoveryDelaySeconds,
+                        identifier: "serviceSettings.expressVPNRecoveryDelaySeconds"
+                    )
+                    integerField(
+                        "Unavailable launch delay seconds",
+                        value: draft.expressVPNUnavailableLaunchDelaySeconds,
+                        content: TorrentCoreHelpCatalog.Settings.expressVPNUnavailableLaunchDelaySeconds,
+                        identifier: "serviceSettings.expressVPNUnavailableLaunchDelaySeconds"
                     )
                 }
                 Text(
@@ -1147,6 +1172,17 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         if draft.vpnEgressEngineSuspensionTimeoutSeconds < 1 {
             return "VPN engine suspension timeout must be 1 or greater."
+        }
+        if !Self.expressVPNRecoveryModes.contains(
+            where: { $0.value == draft.expressVPNAutomaticRecoveryMode }
+        ) {
+            return "ExpressVPN automatic recovery mode is invalid."
+        }
+        if draft.expressVPNRecoveryDelaySeconds < 1 {
+            return "ExpressVPN recovery delay must be 1 or greater."
+        }
+        if draft.expressVPNUnavailableLaunchDelaySeconds < 1 {
+            return "ExpressVPN unavailable launch delay must be 1 or greater."
         }
         if draft.vpnEgressRequestTimeoutSeconds >= draft.vpnEgressDegradedCheckIntervalSeconds
             || draft.vpnEgressRequestTimeoutSeconds >= draft.vpnEgressReadyCheckIntervalSeconds

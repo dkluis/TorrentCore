@@ -43,6 +43,9 @@ public sealed class RuntimeSettingsSnapshot
     public int                                  VpnEgressReadyCheckIntervalSeconds           { get; init; } = 240;
     public int                                  VpnEgressRequestTimeoutSeconds               { get; init; } = 10;
     public int                                  VpnEgressEngineSuspensionTimeoutSeconds      { get; init; } = 10;
+    public ExpressVpnAutomaticRecoveryMode       ExpressVpnAutomaticRecoveryMode               { get; init; }
+    public int                                  ExpressVpnRecoveryDelaySeconds                 { get; init; } = 180;
+    public int                                  ExpressVpnUnavailableLaunchDelaySeconds        { get; init; } = 300;
     public bool                                 RuntimeTickDurationSummaryEnabled             { get; init; }
     public required bool                        EngineSettingsRequireRestart                 { get; init; }
     public          DateTimeOffset?             UpdatedAtUtc                                 { get; init; }

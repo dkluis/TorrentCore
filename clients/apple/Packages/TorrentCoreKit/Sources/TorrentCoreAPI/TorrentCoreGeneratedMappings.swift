@@ -81,6 +81,17 @@ extension TorrentCoreHostStatus {
         vpnDegradedCheckIntervalSeconds = value.vpnDegradedCheckIntervalSeconds.map(Int.init)
         vpnReadyCheckIntervalSeconds = value.vpnReadyCheckIntervalSeconds.map(Int.init)
         vpnFailureSummary = value.vpnFailureSummary
+        expressVPNRecoveryMode = value.expressVpnRecoveryMode
+        expressVPNRecoveryPhase = value.expressVpnRecoveryPhase
+        expressVPNConnectionState = value.expressVpnConnectionState
+        expressVPNReconnectAttemptsUsed = value.expressVpnReconnectAttemptsUsed.map(Int.init)
+        expressVPNReconnectAttemptsMaximum = value.expressVpnReconnectAttemptsMaximum.map(Int.init)
+        expressVPNLaunchAttemptsUsed = value.expressVpnLaunchAttemptsUsed.map(Int.init)
+        expressVPNLaunchAttemptsMaximum = value.expressVpnLaunchAttemptsMaximum.map(Int.init)
+        expressVPNNextActionAt = value.expressVpnNextActionAtUtc
+        expressVPNLastActionAt = value.expressVpnLastActionAtUtc
+        expressVPNLastActionOutcome = value.expressVpnLastActionOutcome
+        expressVPNRecoveryMessage = value.expressVpnRecoveryMessage
         checkedAt = value.checkedAtUtc
     }
 }

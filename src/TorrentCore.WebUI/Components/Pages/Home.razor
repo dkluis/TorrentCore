@@ -163,9 +163,45 @@
                                     <p class="dashboard-detail-label">Paused Check Interval</p>
                                     <p class="dashboard-detail-value">@VpnStatusDisplayText.Interval(_hostStatus.VpnDegradedCheckIntervalSeconds)</p>
                                 </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">ExpressVPN Recovery Mode</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Identifier(_hostStatus.ExpressVpnRecoveryMode)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Recovery Phase</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Identifier(_hostStatus.ExpressVpnRecoveryPhase)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">ExpressVPN Controller</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Identifier(_hostStatus.ExpressVpnConnectionState)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Reconnect Attempts</p>
+                                    <p class="dashboard-detail-value">@FormatAttemptCount(_hostStatus.ExpressVpnReconnectAttemptsUsed, _hostStatus.ExpressVpnReconnectAttemptsMaximum)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Launch Attempts</p>
+                                    <p class="dashboard-detail-value">@FormatAttemptCount(_hostStatus.ExpressVpnLaunchAttemptsUsed, _hostStatus.ExpressVpnLaunchAttemptsMaximum)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Next Provider Action</p>
+                                    <p class="dashboard-detail-value">@FormatVpnTimestamp(_hostStatus.ExpressVpnNextActionAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Provider Action</p>
+                                    <p class="dashboard-detail-value">@FormatVpnTimestamp(_hostStatus.ExpressVpnLastActionAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Provider Outcome</p>
+                                    <p class="dashboard-detail-value">@VpnStatusDisplayText.Identifier(_hostStatus.ExpressVpnLastActionOutcome)</p>
+                                </div>
                             </div>
 
                             <p class="@GetVpnOperatorMessageClass()">@VpnStatusDisplayText.OperatorMessage(_hostStatus)</p>
+                            @if (!string.IsNullOrWhiteSpace(_hostStatus.ExpressVpnRecoveryMessage))
+                            {
+                                <p class="@GetVpnOperatorMessageClass()">@_hostStatus.ExpressVpnRecoveryMessage</p>
+                            }
                         </OperatorCard>
 
                         <OperatorCard Class="dashboard-panel">
@@ -700,6 +736,11 @@
     private static string ValueOrDash(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? "--" : value;
+    }
+
+    private static string FormatAttemptCount(int? used, int? maximum)
+    {
+        return used is null || maximum is null ? "--" : $"{used} of {maximum}";
     }
 
     private string GetVpnOperatorMessageClass()

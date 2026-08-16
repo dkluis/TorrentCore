@@ -131,5 +131,12 @@ public sealed class VpnEgressSliceZeroFixtureTests
         Assert.Equal("vpn.egress.validation_completed", VpnEgressActivityEvents.ValidationCompleted);
         Assert.Equal("vpn.egress.state_changed", VpnEgressActivityEvents.StateChanged);
         Assert.Equal("vpn.egress.engine_transition_failed", VpnEgressActivityEvents.EngineTransitionFailed);
+        Assert.Equal(
+            "vpn.expressvpn.controller_state_changed",
+            VpnEgressActivityEvents.ExpressVpnControllerStateChanged
+        );
+        Assert.Equal("vpn.expressvpn.recovery_attempted", VpnEgressActivityEvents.ExpressVpnRecoveryAttempted);
+        Assert.Equal("vpn.expressvpn.launch_attempted", VpnEgressActivityEvents.ExpressVpnLaunchAttempted);
+        Assert.Equal("vpn.expressvpn.recovery_exhausted", VpnEgressActivityEvents.ExpressVpnRecoveryExhausted);
     }
 }

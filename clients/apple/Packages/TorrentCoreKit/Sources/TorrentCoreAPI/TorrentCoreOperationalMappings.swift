@@ -198,6 +198,11 @@ extension TorrentCoreRuntimeSettings {
         supportsLiveUpdates = value.supportsLiveUpdates
         updatedAt = value.updatedAtUtc
         usesPersistedOverrides = value.usesPersistedOverrides
+        expressVPNAutomaticRecoveryMode = value.expressVpnAutomaticRecoveryMode ?? "Disabled"
+        expressVPNRecoveryDelaySeconds = Int(value.expressVpnRecoveryDelaySeconds ?? 180)
+        expressVPNUnavailableLaunchDelaySeconds = Int(
+            value.expressVpnUnavailableLaunchDelaySeconds ?? 300
+        )
         vpnEgressDegradedCheckIntervalSeconds = Int(
             value.vpnEgressDegradedCheckIntervalSeconds ?? 60
         )
@@ -252,6 +257,11 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             engineMaximumDownloadRateBytesPerSecond: Int32(value.engineMaximumDownloadRateBytesPerSecond),
             engineMaximumHalfOpenConnections: Int32(value.engineMaximumHalfOpenConnections),
             engineMaximumUploadRateBytesPerSecond: Int32(value.engineMaximumUploadRateBytesPerSecond),
+            expressVpnAutomaticRecoveryMode: value.expressVPNAutomaticRecoveryMode,
+            expressVpnRecoveryDelaySeconds: Int32(value.expressVPNRecoveryDelaySeconds),
+            expressVpnUnavailableLaunchDelaySeconds: Int32(
+                value.expressVPNUnavailableLaunchDelaySeconds
+            ),
             maxActiveDownloads: Int32(value.maxActiveDownloads),
             maxActiveMetadataResolutions: Int32(value.maxActiveMetadataResolutions),
             metadataRefreshRestartDelaySeconds: Int32(value.metadataRefreshRestartDelaySeconds),

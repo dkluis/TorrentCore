@@ -151,6 +151,52 @@ struct TorrentCoreMacDashboardView: View {
                             value: intervalDescription(status.vpnDegradedCheckIntervalSeconds)
                         )
                     }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "ExpressVPN Recovery Mode",
+                            value: displayIdentifier(status.expressVPNRecoveryMode)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Recovery Phase",
+                            value: displayIdentifier(status.expressVPNRecoveryPhase)
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "ExpressVPN Controller",
+                            value: displayIdentifier(status.expressVPNConnectionState)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Reconnect Attempts",
+                            value: attemptDescription(
+                                used: status.expressVPNReconnectAttemptsUsed,
+                                maximum: status.expressVPNReconnectAttemptsMaximum
+                            )
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Launch Attempts",
+                            value: attemptDescription(
+                                used: status.expressVPNLaunchAttemptsUsed,
+                                maximum: status.expressVPNLaunchAttemptsMaximum
+                            )
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Next Provider Action",
+                            value: TorrentCoreDisplayFormatter.timestamp(status.expressVPNNextActionAt)
+                        )
+                    }
+                    GridRow {
+                        TorrentCoreMacDetailRow(
+                            label: "Last Provider Action",
+                            value: TorrentCoreDisplayFormatter.timestamp(status.expressVPNLastActionAt)
+                        )
+                        TorrentCoreMacDetailRow(
+                            label: "Last Provider Outcome",
+                            value: displayIdentifier(status.expressVPNLastActionOutcome)
+                        )
+                    }
                 }
                 Text(vpnOperatorMessage(status))
                     .foregroundStyle(
@@ -158,6 +204,12 @@ struct TorrentCoreMacDashboardView: View {
                             ? Color.orange
                             : Color.secondary
                     )
+                if let recoveryMessage = status.expressVPNRecoveryMessage,
+                   !recoveryMessage.isEmpty
+                {
+                    Text(recoveryMessage)
+                        .foregroundStyle(.orange)
+                }
             }
             .padding(.top, 4)
         }
@@ -175,6 +227,13 @@ struct TorrentCoreMacDashboardView: View {
             return "--"
         }
         return "\(seconds.formatted()) seconds"
+    }
+
+    private func attemptDescription(used: Int?, maximum: Int?) -> String {
+        guard let used, let maximum else {
+            return "--"
+        }
+        return "\(used) of \(maximum)"
     }
 
     private func validationDescription(_ enabled: Bool?) -> String {
