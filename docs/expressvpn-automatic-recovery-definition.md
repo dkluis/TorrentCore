@@ -5,8 +5,11 @@
 This is the active definition and sliced delivery plan for optional ExpressVPN recovery owned by
 `TorrentCore.Service`.
 
-Slices 0 through 4 are implemented and covered by isolated tests. Slice 5 remains planned. No live ExpressVPN
-mutation, TorrentCore restart, deployment, or installed-service verification was performed for slices 0 through 4.
+Slices 0 through 4 are implemented, covered by isolated tests, and deployed in the Arm64 macOS implementation.
+Slice 5 remains in progress and is intentionally not complete while the remaining live cases await natural or
+separately authorized observation. Live evidence has verified connect-only recovery, disconnect/connect recovery, and
+fail-closed startup after a Service-instance change; application launch, exhaustion, and cancellation proofs remain
+outstanding.
 
 The behavior in this document is not implemented merely because it is defined here. Until an implementation slice is
 completed and verified, the current code and the active documentation remain authoritative. Creating this definition
@@ -475,6 +478,35 @@ The WebUI and native macOS Dashboard must distinguish at least:
 
 Live disconnect/connect and application-launch tests are never ordinary automated test-suite side effects. They require
 explicit operator authorization on the target Mac.
+
+#### Live Observation Record
+
+The following observations are Slice 5 evidence, not ordinary automated-test coverage:
+
+- On August 16, 2026, the operator manually left ExpressVPN open in its disconnected state. TorrentCore suspended
+  MonoTorrent, selected connect-only recovery, confirmed ExpressVPN connected, validated process-specific egress, and
+  activated MonoTorrent only after that validation succeeded.
+- On August 18, 2026 at `08:11:06Z`, a deployed Service instance recorded a timed-out egress validation and completed
+  MonoTorrent suspension. With the controller reporting `Connected`, attempt 1 performed disconnect, confirmed
+  `Disconnected` at `08:12:19Z`, connected, and confirmed `Connected` at `08:12:22Z`. TorrentCore then validated address
+  `193.36.224.39`, recreated MonoTorrent, and reopened torrent processing. All provider commands completed without a
+  command timeout or failure. This verifies the full connected-but-degraded disconnect/connect path and the required
+  suspend-before-mutation and validate-before-activation ordering.
+- On August 18, 2026 at `08:20:32Z`, another validation timed out and MonoTorrent suspension completed. That Service
+  instance then stopped producing events before a second eligible check or provider action. A new Service instance
+  began checking at `08:30:10Z`, validated public address `136.144.19.88` at `08:30:21Z`, and activated MonoTorrent
+  afterward. The database proves a Service-instance boundary and fail-closed startup; it cannot distinguish an OS
+  reboot, Service restart, sleep, or another external cause.
+
+Repeated identical validation outcomes are intentionally change-suppressed in the activity log. In the August 18 full
+recovery, the persisted timing is consistent with the required second degraded check, but the identical second timeout
+does not have its own `vpn.egress.validation_completed` row. The subsequent recovery-attempt details and provider
+command sequence are the durable evidence that recovery became eligible.
+
+The live cases still required before Slice 5 cutover are ExpressVPN-unavailable application launch, launch and reconnect
+attempt exhaustion, Service cancellation during recovery, later manual recovery after exhaustion, and confirmation
+that the installed application identity and ExpressVPN rule remain unchanged. Until those cases and the release checks
+are complete, this definition remains active and is not moved to `docs/archive/`.
 
 ## Rollback Model
 

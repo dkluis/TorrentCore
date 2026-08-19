@@ -24,6 +24,10 @@ Representative coverage areas:
   provider read or mutation, connect-only and disconnect/connect ordering, two-attempt launch and reconnect exhaustion,
   continued degraded validation, additive host telemetry, stable activity events, and unchanged-poll log suppression;
   these tests use a fake controller and never contact the installed ExpressVPN application
+- authorized Arm64 deployment observations have verified live connect-only recovery, live connected-but-degraded
+  disconnect/connect recovery, and fail-closed validation before MonoTorrent activation after a Service-instance
+  change; application launch, attempt exhaustion, and cancellation remain pending live-integration evidence and are
+  not exercised by the ordinary suite
 - default-open execution-gate drain behavior; closed-gate persistence-only magnet admission, normal acceptance errors,
   constrained save paths, structured unavailable actions, readable diagnostics, and full-restart durability without
   initializing MonoTorrent

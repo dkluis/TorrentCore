@@ -185,6 +185,29 @@ The WebUI Dashboard's VPN Connection section shows validation, phase, processing
 observed address, check/retry timestamps, and configured intervals. Use host status or DB logs for the sanitized
 technical failure detail.
 
+For automatic ExpressVPN recovery, correlate these persistent activity events in timestamp order:
+
+- `vpn.egress.validation_completed` records a changed validation outcome or endpoint-failure reason. Identical
+  repeated results are intentionally suppressed, so two-check recovery eligibility may produce only one persisted
+  timeout or endpoint-failure row.
+- `engine.monotorrent.suspended` must precede every provider-changing action. If it is absent or suspension failed,
+  TorrentCore must not disconnect, connect, or launch ExpressVPN.
+- `vpn.expressvpn.controller_state_changed` records stable controller transitions such as `Connected` and
+  `Disconnected`.
+- `vpn.expressvpn.recovery_attempted` records the attempt number, trigger, prior controller state, provider-command
+  outcomes, and final validated-egress disposition. A prior `Disconnected` state selects connect-only recovery; a
+  prior `Connected` state selects the full disconnect/confirm/connect/confirm sequence.
+- `vpn.expressvpn.launch_attempted` and `vpn.expressvpn.recovery_exhausted` distinguish an unavailable-controller launch
+  path from reconnect exhaustion. Their absence means neither action was recorded; it does not by itself prove why an
+  interrupted Service stopped.
+- `vpn.egress.state_changed`, followed by `engine.monotorrent.ready`, confirms that validation succeeded before torrent
+  processing resumed.
+
+Compare `serviceInstanceId` values when an episode crosses a gap in activity. A changed value proves a new Service
+instance, but the database alone cannot distinguish an OS reboot, a Service restart, sleep, or another external stop.
+On a new instance, enabled validation must succeed before MonoTorrent activation; a provider recovery attempt that had
+not started before the old instance ended does not consume an attempt.
+
 The ready interval is detection latency, not immediate packet protection. ExpressVPN Network Lock remains responsible
 for blocking traffic during the interval before TorrentCore performs its next check.
 
