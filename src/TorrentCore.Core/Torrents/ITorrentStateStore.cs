@@ -9,5 +9,17 @@ public interface ITorrentStateStore
     Task<TorrentSnapshot?>               GetAsync(Guid torrentId, CancellationToken cancellationToken);
     Task                                 InsertAsync(TorrentSnapshot torrent, CancellationToken cancellationToken);
     Task                                 UpdateAsync(TorrentSnapshot torrent, CancellationToken cancellationToken);
+    Task<long?>                          AssignNextOrdinaryQueueOrderAsync(Guid torrentId,
+        CancellationToken cancellationToken);
+    Task<long?>                          AssignNextPriorityQueueOrderAsync(Guid torrentId,
+        CancellationToken cancellationToken);
+    Task<bool>                           SetQueueHeldAsync(Guid torrentId, bool isHeld,
+        CancellationToken cancellationToken);
+    Task<bool>                           ClearPriorityQueueOrderAsync(Guid torrentId,
+        CancellationToken cancellationToken);
+    Task<int>                            ReleaseQueueHoldsAsync(IReadOnlyList<Guid> torrentIds,
+        CancellationToken cancellationToken);
+    Task<TorrentSnapshot?>               ResumeWithQueueIntentAsync(Guid torrentId, TorrentQueueResumeMode mode,
+        DateTimeOffset resumedAtUtc, CancellationToken cancellationToken);
     Task                                 DeleteAsync(Guid torrentId, CancellationToken cancellationToken);
 }

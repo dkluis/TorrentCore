@@ -32,6 +32,7 @@ public struct TorrentCoreWaitReason: RawRepresentable, Codable, Hashable, Sendab
     public static let waitingForFileCompletion = Self(rawValue: "WaitingForFileCompletion")
     public static let pausedByOperator = Self(rawValue: "PausedByOperator")
     public static let blockedByError = Self(rawValue: "BlockedByError")
+    public static let heldByOperator = Self(rawValue: "HeldByOperator")
 }
 
 public struct TorrentCoreHostState: RawRepresentable, Codable, Hashable, Sendable {
@@ -206,6 +207,11 @@ public struct TorrentCoreTorrentSummary: Codable, Hashable, Sendable {
     public var canRemove: Bool
     public var canResume: Bool
     public var canRetryCompletionCallback: Bool
+    public var canMakeNext: Bool = false
+    public var canHold: Bool = false
+    public var canReleaseHold: Bool = false
+    public var canResumeNext: Bool = false
+    public var canResumeOnHold: Bool = false
     public var categoryKey: String?
     public var completedAt: Date?
     public var completionCallbackInvokedAt: Date?
@@ -220,6 +226,9 @@ public struct TorrentCoreTorrentSummary: Codable, Hashable, Sendable {
     public var name: String?
     public var progressPercent: Double
     public var queuePosition: Int?
+    public var priorityQueuePosition: Int? = nil
+    public var heldQueuePosition: Int? = nil
+    public var isQueueHeld: Bool = false
     public var state: TorrentCoreTorrentState
     public var torrentID: UUID?
     public var totalBytes: Int64?
@@ -260,6 +269,11 @@ public struct TorrentCoreTorrentDetail: Codable, Hashable, Sendable {
     public var canRemove: Bool
     public var canResume: Bool
     public var canRetryCompletionCallback: Bool
+    public var canMakeNext: Bool = false
+    public var canHold: Bool = false
+    public var canReleaseHold: Bool = false
+    public var canResumeNext: Bool = false
+    public var canResumeOnHold: Bool = false
     public var categoryKey: String?
     public var completedAt: Date?
     public var completionCallbackFeedback: TorrentCoreCompletionCallbackFeedback?
@@ -279,6 +293,9 @@ public struct TorrentCoreTorrentDetail: Codable, Hashable, Sendable {
     public var name: String?
     public var progressPercent: Double
     public var queuePosition: Int?
+    public var priorityQueuePosition: Int? = nil
+    public var heldQueuePosition: Int? = nil
+    public var isQueueHeld: Bool = false
     public var savePath: String?
     public var state: TorrentCoreTorrentState
     public var torrentID: UUID?

@@ -563,6 +563,75 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         }
     }
 
+    public Task<TorrentActionResultDto> MakeNextAsync(Guid torrentId, CancellationToken cancellationToken)
+        => RunQueueActionAsync(
+            torrentId, "torrent.queue.priority_requested", "torrent.queue.priority_failed",
+            "Made torrent next in the priority queue.", torrentEngineAdapter.MakeNextAsync, cancellationToken);
+
+    public Task<TorrentActionResultDto> HoldAsync(Guid torrentId, CancellationToken cancellationToken)
+        => RunQueueActionAsync(
+            torrentId, "torrent.queue.hold_applied", "torrent.queue.hold_failed",
+            "Placed torrent on hold in the queue.", torrentEngineAdapter.HoldAsync, cancellationToken);
+
+    public Task<TorrentActionResultDto> ReleaseHoldAsync(Guid torrentId, CancellationToken cancellationToken)
+        => RunQueueActionAsync(
+            torrentId, "torrent.queue.hold_released", "torrent.queue.release_hold_failed",
+            "Released torrent hold.", torrentEngineAdapter.ReleaseHoldAsync, cancellationToken);
+
+    public Task<TorrentActionResultDto> ResumeNextAsync(Guid torrentId, CancellationToken cancellationToken)
+        => RunQueueActionAsync(
+            torrentId, "torrent.queue.resumed_next", "torrent.queue.resume_next_failed",
+            "Resumed torrent into the priority queue.", torrentEngineAdapter.ResumeNextAsync, cancellationToken);
+
+    public Task<TorrentActionResultDto> ResumeOnHoldAsync(Guid torrentId, CancellationToken cancellationToken)
+        => RunQueueActionAsync(
+            torrentId, "torrent.queue.resumed_on_hold", "torrent.queue.resume_on_hold_failed",
+            "Resumed torrent on hold in the queue.", torrentEngineAdapter.ResumeOnHoldAsync, cancellationToken);
+
+    private async Task<TorrentActionResultDto> RunQueueActionAsync(Guid torrentId, string successEventType,
+        string failureEventType, string successMessage,
+        Func<Guid, CancellationToken, Task<TorrentActionResultDto>> action,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var before = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+            var result = await action(torrentId, cancellationToken);
+            var after = await torrentStateStore.GetAsync(torrentId, cancellationToken);
+            await TryWriteActivityLogAsync(
+                new ActivityLogWriteRequest
+                {
+                    Level = ActivityLogLevel.Information,
+                    Category = "torrent",
+                    EventType = successEventType,
+                    Message = successMessage,
+                    TorrentId = torrentId,
+                    ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                    DetailsJson = JsonSerializer.Serialize(new
+                    {
+                        result.State,
+                        Before = QueueIntentDetails(before),
+                        After = QueueIntentDetails(after),
+                    }),
+                }, cancellationToken);
+            return result;
+        }
+        catch (ServiceOperationException exception)
+        {
+            await LogFailureAsync("torrent", failureEventType, exception.Message, torrentId, cancellationToken);
+            throw;
+        }
+    }
+
+    private static object? QueueIntentDetails(TorrentSnapshot? snapshot) => snapshot is null ? null : new
+    {
+        snapshot.State,
+        snapshot.DesiredState,
+        snapshot.OrdinaryQueueOrder,
+        snapshot.PriorityQueueOrder,
+        snapshot.IsQueueHeld,
+    };
+
     public async Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken)
     {
         try

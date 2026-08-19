@@ -19,9 +19,9 @@ the active documentation, especially [architecture.md](architecture.md) and
   downloaded bytes do not advance.
 - Manually pausing unproductive downloads released combined capacity and allowed later magnets to resolve and begin
   downloading. At least one newly admitted download became productive.
-- After a Service restart, durable torrent state, queue ordering inputs, and metadata rotation clocks remained intact,
-  and queue processing continued. The UI stopped showing queue positions and metadata-slot wait information for queued
-  magnets even though the Service continued dispatching them.
+- After a Service restart, durable torrent state, queue ordering inputs, metadata rotation clocks, and queue diagnostics
+  remained intact, and queue processing continued. The apparent loss of queue information was a persisted native-table
+  customization hiding the Wait column; unhiding it restored the existing values.
 
 ## Payload-Stale Download Rotation
 
@@ -48,14 +48,14 @@ cleanup; they do not provide timely queue fairness during a large burst. See
 
 ## Restart-Safe Queue Diagnostics
 
-Restore queue-position numbers and wait-reason text after Service recovery.
+Keep queue-position numbers and wait-reason text visible after Service recovery.
 
 Observed behavior:
 
 - queued torrent rows, original submission timestamps, desired states, metadata attempt timestamps, and metadata yield
   timestamps survived restart
 - post-restart reconciliation continued yielding resolvers and starting replacement magnets
-- the UI no longer displayed a queue number or the metadata-slot wait indication for queued unresolved magnets
+- the native UI's persisted column customization had hidden the Wait column; the API and WebUI still exposed the data
 - activity logs record transitions but do not store a current numbered queue snapshot
 
 Required outcome:
@@ -67,7 +67,7 @@ Required outcome:
 
 ## Make Next Queue Control
 
-Add a TorrentCore.WebUI action that lets an operator promote a queued unresolved magnet or resolved download.
+Add native macOS and WebUI actions that let an operator promote a queued unresolved magnet or resolved download.
 
 Agreed behavior:
 
@@ -84,7 +84,7 @@ Agreed behavior:
 
 ## Hold In Queue Control
 
-Add a TorrentCore.WebUI hold toggle for queue entries that should run only after ordinary queued work has been
+Add native macOS and WebUI hold controls for queue entries that should run only after ordinary queued work has been
 admitted.
 
 Agreed behavior:

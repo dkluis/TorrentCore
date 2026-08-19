@@ -133,11 +133,20 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         detail.canPause = summary.canPause
         detail.canResume = summary.canResume
         detail.canRemove = summary.canRemove
+        detail.canMakeNext = summary.canMakeNext
+        detail.canHold = summary.canHold
+        detail.canReleaseHold = summary.canReleaseHold
+        detail.canResumeNext = summary.canResumeNext
+        detail.canResumeOnHold = summary.canResumeOnHold
         detail.progressPercent = summary.progressPercent
         detail.downloadRateBytesPerSecond = summary.downloadRateBytesPerSecond
         detail.uploadRateBytesPerSecond = summary.uploadRateBytesPerSecond
         detail.connectedPeerCount = summary.connectedPeerCount
         detail.waitReason = summary.waitReason
+        detail.queuePosition = summary.queuePosition
+        detail.priorityQueuePosition = summary.priorityQueuePosition
+        detail.heldQueuePosition = summary.heldQueuePosition
+        detail.isQueueHeld = summary.isQueueHeld
         return detail
     }
 
@@ -306,6 +315,74 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
             state: .downloading,
             torrentID: id
         )
+    }
+
+    func makeNext(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.isQueueHeld = false
+            torrent.heldQueuePosition = nil
+            torrent.priorityQueuePosition = 1
+            torrent.canMakeNext = false
+            torrent.canHold = true
+            torrent.canReleaseHold = false
+        }
+        return queueResult("make_next", id: id, state: .queued)
+    }
+
+    func hold(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.isQueueHeld = true
+            torrent.priorityQueuePosition = nil
+            torrent.heldQueuePosition = 1
+            torrent.canMakeNext = true
+            torrent.canHold = false
+            torrent.canReleaseHold = true
+            torrent.waitReason = .heldByOperator
+        }
+        return queueResult("hold", id: id, state: .queued)
+    }
+
+    func releaseHold(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.isQueueHeld = false
+            torrent.heldQueuePosition = nil
+            torrent.canHold = true
+            torrent.canReleaseHold = false
+            torrent.waitReason = .waitingForDownloadSlot
+        }
+        return queueResult("release_hold", id: id, state: .queued)
+    }
+
+    func resumeNext(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.state = .queued
+            torrent.canResume = false
+            torrent.canResumeNext = false
+            torrent.canResumeOnHold = false
+            torrent.canPause = true
+            torrent.priorityQueuePosition = 1
+            torrent.waitReason = .waitingForDownloadSlot
+        }
+        return queueResult("resume_next", id: id, state: .queued)
+    }
+
+    func resumeOnHold(id: UUID) async throws -> TorrentCoreActionResult {
+        try update(id: id) { torrent in
+            torrent.state = .queued
+            torrent.canResume = false
+            torrent.canResumeNext = false
+            torrent.canResumeOnHold = false
+            torrent.canPause = true
+            torrent.isQueueHeld = true
+            torrent.heldQueuePosition = 1
+            torrent.waitReason = .heldByOperator
+        }
+        return queueResult("resume_on_hold", id: id, state: .queued)
+    }
+
+    private func queueResult(_ action: String, id: UUID,
+        state: TorrentCoreTorrentState) -> TorrentCoreActionResult {
+        TorrentCoreActionResult(action: action, dataDeleted: nil, processedAt: Date(), state: state, torrentID: id)
     }
 
     func remove(id: UUID, deleteData: Bool) async throws -> TorrentCoreActionResult {

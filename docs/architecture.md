@@ -157,7 +157,15 @@ accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to
   metadata-to-download handoffs, live setting reconciliation, or pause/resume queue reshuffling. When an operator
   lowers the limit below current activity, reconciliation stops the existing excess before admitting replacement work.
 - Queued torrents wait inside TorrentCore until slots open.
-- Queue order is oldest added first, with torrent id as a stable tie-breaker.
+- Runnable work has a durable ordinary queue order. New magnets and normal resumes enter at the tail; migration
+  backfills older rows by added time and torrent id.
+- Make Next adds a durable global priority order across unresolved and resolved queued work. Admission consumes the
+  priority. It may yield one active metadata resolver closest to time-slice expiration, but it never displaces an
+  active download or raises the combined active-work ceiling.
+- Hold excludes queued work until no non-held runnable work remains queued. Automatic release consumes the hold and
+  preserves ordinary order. Pause remains a separate indefinite operator state and clears priority and Hold intent.
+- Incomplete paused work can Resume at the ordinary tail, Resume Next into priority order, or Resume on Hold. These
+  transitions and their queue diagnostics survive Service restart.
 - An unresolved magnet may occupy a metadata reservation for at most the configured metadata-resolution time slice
   while another unresolved magnet is waiting. Expired resolvers yield only enough slots to dispatch waiting work.
   Active non-expired attempts stay in place, never-tried magnets run before previously yielded magnets, and yielded

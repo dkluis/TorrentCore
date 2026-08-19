@@ -9,6 +9,96 @@ namespace TorrentCore.Service.Tests;
 public sealed class SqliteSchemaMigrationTests
 {
     [Fact]
+    public async Task Migration20_BackfillsStableQueueOrder_AndCanBeRepeated()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-queue-intent-migration");
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+        var addedAtUtc = DateTimeOffset.UtcNow.AddHours(-1).ToString("O");
+
+        var initialMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await initialMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+            var seedCommand = connection.CreateCommand();
+            seedCommand.CommandText = """
+                                      INSERT INTO torrents (
+                                          torrent_id, name, state, magnet_uri, info_hash, save_path,
+                                          progress_percent, downloaded_bytes, uploaded_bytes, total_bytes,
+                                          download_rate_bytes_per_second, upload_rate_bytes_per_second,
+                                          tracker_count, connected_peer_count, added_at_utc,
+                                          ordinary_queue_order
+                                      )
+                                      VALUES
+                                          ('20202020-2020-2020-2020-202020202003', 'Queue Three', 'Queued',
+                                           'magnet:?xt=urn:btih:2020202020202020202020202020202020202003',
+                                           '2020202020202020202020202020202020202003', '/tmp/queue-three',
+                                           0, 0, 0, NULL, 0, 0, 0, 0, $added_at_utc, NULL),
+                                          ('20202020-2020-2020-2020-202020202001', 'Queue One', 'Queued',
+                                           'magnet:?xt=urn:btih:2020202020202020202020202020202020202001',
+                                           '2020202020202020202020202020202020202001', '/tmp/queue-one',
+                                           0, 0, 0, NULL, 0, 0, 0, 0, $added_at_utc, NULL),
+                                          ('20202020-2020-2020-2020-202020202002', 'Queue Two', 'Queued',
+                                           'magnet:?xt=urn:btih:2020202020202020202020202020202020202002',
+                                           '2020202020202020202020202020202020202002', '/tmp/queue-two',
+                                           0, 0, 0, NULL, 0, 0, 0, 0, $added_at_utc, NULL);
+
+                                      INSERT INTO torrent_history (
+                                          torrent_id, name, magnet_uri, latest_torrent_state,
+                                          latest_progress_percent, latest_downloaded_bytes, latest_uploaded_bytes,
+                                          latest_download_rate_bytes_per_second,
+                                          latest_upload_rate_bytes_per_second, latest_tracker_count,
+                                          latest_connected_peer_count, submitted_at_utc, last_updated_at_utc,
+                                          invoke_completion_callback, data_deleted, removed_by_cleanup_policy
+                                      )
+                                      VALUES (
+                                          '20202020-2020-2020-2020-202020202001', 'Queue One',
+                                          'magnet:?xt=urn:btih:2020202020202020202020202020202020202001',
+                                          'Queued', 0, 0, 0, 0, 0, 0, 0, $added_at_utc, $added_at_utc,
+                                          0, 0, 0
+                                      );
+
+                                      DELETE FROM schema_migrations WHERE version = 20;
+                                      """;
+            seedCommand.Parameters.AddWithValue("$added_at_utc", addedAtUtc);
+            await seedCommand.ExecuteNonQueryAsync();
+        }
+
+        var backfillMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await backfillMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        var firstPass = await ReadQueueIntentRowsAsync(databaseFilePath);
+        Assert.Equal(
+            [
+                ("20202020-2020-2020-2020-202020202001", 1L, (long?)null, false),
+                ("20202020-2020-2020-2020-202020202002", 2L, (long?)null, false),
+                ("20202020-2020-2020-2020-202020202003", 3L, (long?)null, false),
+            ],
+            firstPass
+        );
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+            var resetMigrationCommand = connection.CreateCommand();
+            resetMigrationCommand.CommandText = "DELETE FROM schema_migrations WHERE version = 20;";
+            await resetMigrationCommand.ExecuteNonQueryAsync();
+        }
+
+        var repeatedMigrator = new SqliteSchemaMigrator(databaseFilePath);
+        await repeatedMigrator.ApplyMigrationsAsync(CancellationToken.None);
+
+        Assert.Equal(firstPass, await ReadQueueIntentRowsAsync(databaseFilePath));
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+        var historyCountCommand = verifyConnection.CreateCommand();
+        historyCountCommand.CommandText = "SELECT COUNT(*) FROM torrent_history;";
+        Assert.Equal(1L, await historyCountCommand.ExecuteScalarAsync());
+    }
+
+    [Fact]
     public async Task Migration17_BackfillsColdDownloadAbandonmentKind()
     {
         var rootPath = CreateTempRootPath("torrentcore-history-removal-kind");
@@ -264,7 +354,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20], versions);
 
         var torrentColumnsCommand = connection.CreateCommand();
         torrentColumnsCommand.CommandText = "PRAGMA table_info(torrents);";
@@ -279,6 +369,9 @@ public sealed class SqliteSchemaMigrationTests
         Assert.Contains("metadata_resolution_attempt_started_at_utc", torrentColumns);
         Assert.Contains("metadata_resolution_last_yielded_at_utc", torrentColumns);
         Assert.Contains("seeding_policy_applied_at_utc", torrentColumns);
+        Assert.Contains("ordinary_queue_order", torrentColumns);
+        Assert.Contains("priority_queue_order", torrentColumns);
+        Assert.Contains("is_queue_held", torrentColumns);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";
@@ -419,6 +512,9 @@ public sealed class SqliteSchemaMigrationTests
         Assert.Contains("completion_callback_pending_since_utc", columns);
         Assert.Contains("completion_callback_invoked_at_utc", columns);
         Assert.Contains("completion_callback_last_error", columns);
+        Assert.Contains("ordinary_queue_order", columns);
+        Assert.Contains("priority_queue_order", columns);
+        Assert.Contains("is_queue_held", columns);
     }
 
     [Fact]
@@ -512,5 +608,36 @@ public sealed class SqliteSchemaMigrationTests
     private static string CreateTempRootPath(string prefix)
     {
         return Path.Combine(Path.GetTempPath(), $"{prefix}-{Guid.NewGuid():N}");
+    }
+
+    private static async Task<IReadOnlyList<(string TorrentId, long OrdinaryQueueOrder,
+        long? PriorityQueueOrder, bool IsQueueHeld)>> ReadQueueIntentRowsAsync(string databaseFilePath)
+    {
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+                              SELECT
+                                  torrent_id,
+                                  ordinary_queue_order,
+                                  priority_queue_order,
+                                  is_queue_held
+                              FROM torrents
+                              ORDER BY ordinary_queue_order;
+                              """;
+
+        var rows = new List<(string, long, long?, bool)>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            rows.Add((
+                reader.GetString(0),
+                reader.GetInt64(1),
+                reader.IsDBNull(2) ? null : reader.GetInt64(2),
+                reader.GetInt64(3) != 0
+            ));
+        }
+
+        return rows;
     }
 }

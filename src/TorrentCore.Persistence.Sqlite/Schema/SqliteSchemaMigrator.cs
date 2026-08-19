@@ -742,6 +742,70 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     }
                 }
             ),
+            new SqliteMigrationDefinition(
+                20, "persist_queue_intent", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "ordinary_queue_order", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN ordinary_queue_order INTEGER NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "priority_queue_order", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN priority_queue_order INTEGER NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "is_queue_held", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN is_queue_held INTEGER NOT NULL DEFAULT 0;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    var backfillCommand = connection.CreateCommand();
+                    backfillCommand.CommandText = """
+                                                  WITH ordered AS (
+                                                      SELECT
+                                                          torrent_id,
+                                                          ROW_NUMBER() OVER (
+                                                              ORDER BY julianday(added_at_utc), added_at_utc, torrent_id
+                                                          ) AS relative_queue_order
+                                                      FROM torrents
+                                                      WHERE ordinary_queue_order IS NULL
+                                                  ),
+                                                  queue_tail AS (
+                                                      SELECT COALESCE(MAX(ordinary_queue_order), 0) AS value
+                                                      FROM torrents
+                                                  )
+                                                  UPDATE torrents
+                                                  SET ordinary_queue_order = (
+                                                      SELECT queue_tail.value + ordered.relative_queue_order
+                                                      FROM ordered, queue_tail
+                                                      WHERE ordered.torrent_id = torrents.torrent_id
+                                                  )
+                                                  WHERE ordinary_queue_order IS NULL;
+
+                                                  CREATE UNIQUE INDEX IF NOT EXISTS idx_torrents_ordinary_queue_order
+                                                      ON torrents (ordinary_queue_order)
+                                                      WHERE ordinary_queue_order IS NOT NULL;
+
+                                                  CREATE UNIQUE INDEX IF NOT EXISTS idx_torrents_priority_queue_order
+                                                      ON torrents (priority_queue_order)
+                                                      WHERE priority_queue_order IS NOT NULL;
+                                                  """;
+                    await backfillCommand.ExecuteNonQueryAsync(cancellationToken);
+                }
+            ),
         ];
     }
 

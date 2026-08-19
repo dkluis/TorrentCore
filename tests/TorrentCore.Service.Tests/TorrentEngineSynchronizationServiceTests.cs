@@ -265,6 +265,21 @@ public sealed class TorrentEngineSynchronizationServiceTests
         public Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
+        public Task<TorrentActionResultDto> MakeNextAsync(Guid torrentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<TorrentActionResultDto> HoldAsync(Guid torrentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<TorrentActionResultDto> ReleaseHoldAsync(Guid torrentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<TorrentActionResultDto> ResumeNextAsync(Guid torrentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<TorrentActionResultDto> ResumeOnHoldAsync(Guid torrentId, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
         public Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 

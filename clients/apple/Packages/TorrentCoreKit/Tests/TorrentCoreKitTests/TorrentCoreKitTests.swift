@@ -14,6 +14,36 @@ func sharedTargetsExposeTheSameProductIdentity() {
 }
 
 @Test
+func torrentListPresentationShowsWaitReasonAndQueuePosition() {
+    var summary = TorrentCorePreviewFixtures.downloadingTorrent
+    summary.waitReason = TorrentCoreWaitReason(rawValue: "WaitingForMetadataSlot")
+    summary.queuePosition = 27
+
+    let item = TorrentCoreTorrentListItem(summary: summary)
+
+    #expect(item.wait == "Waiting For Metadata Slot · #27")
+}
+
+@Test
+func torrentListPresentationShowsPriorityOrdinaryAndHeldPositions() {
+    var priority = TorrentCorePreviewFixtures.downloadingTorrent
+    priority.waitReason = .waitingForDownloadSlot
+    priority.priorityQueuePosition = 2
+    priority.queuePosition = 19
+    #expect(
+        TorrentCoreTorrentListItem(summary: priority).wait
+            == "Waiting For Download Slot · Priority #2 · Queue #19"
+    )
+
+    var held = priority
+    held.waitReason = .heldByOperator
+    held.priorityQueuePosition = nil
+    held.queuePosition = nil
+    held.heldQueuePosition = 3
+    #expect(TorrentCoreTorrentListItem(summary: held).wait == "Held By Operator · Held #3")
+}
+
+@Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
     #expect(TorrentCoreHelpCatalog.Settings.all.count == 51)
     #expect(
@@ -916,6 +946,12 @@ private enum FixturePayloads {
     {
       "addedAtUtc": "2026-07-23T10:00:00Z",
       "canPause": true,
+      "canMakeNext": false,
+      "canHold": false,
+      "canReleaseHold": false,
+      "canResumeNext": false,
+      "canResumeOnHold": false,
+      "isQueueHeld": false,
       "canRefreshMetadata": false,
       "canRemove": true,
       "canResume": false,
@@ -939,6 +975,12 @@ private enum FixturePayloads {
     {
       "addedAtUtc": "2026-07-23T10:00:00Z",
       "canPause": true,
+      "canMakeNext": false,
+      "canHold": false,
+      "canReleaseHold": false,
+      "canResumeNext": false,
+      "canResumeOnHold": false,
+      "isQueueHeld": false,
       "canRefreshMetadata": false,
       "canRemove": true,
       "canResume": false,

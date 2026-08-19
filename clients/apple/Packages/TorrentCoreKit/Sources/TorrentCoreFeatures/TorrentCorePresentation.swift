@@ -131,7 +131,14 @@ public struct TorrentCoreTorrentListItem: Identifiable, Hashable, Sendable {
     public var downloadRate: Int64 { summary.downloadRateBytesPerSecond }
     public var uploadRate: Int64 { summary.uploadRateBytesPerSecond }
     public var peers: Int { summary.connectedPeerCount }
-    public var wait: String { TorrentCoreDisplayFormatter.wait(summary.waitReason, queue: summary.queuePosition) }
+    public var wait: String {
+        TorrentCoreDisplayFormatter.wait(
+            summary.waitReason,
+            queue: summary.queuePosition,
+            priority: summary.priorityQueuePosition,
+            held: summary.heldQueuePosition
+        )
+    }
     public var addedAt: Date { summary.addedAt }
 }
 
@@ -172,15 +179,26 @@ public enum TorrentCoreDisplayFormatter {
         splitIdentifier(value.rawValue)
     }
 
-    public static func wait(_ value: TorrentCoreWaitReason?, queue: Int?) -> String {
-        guard let value else {
-            return "--"
+    public static func wait(
+        _ value: TorrentCoreWaitReason?,
+        queue: Int?,
+        priority: Int? = nil,
+        held: Int? = nil
+    ) -> String {
+        var parts: [String] = []
+        if let value {
+            parts.append(splitIdentifier(value.rawValue))
         }
-        let label = splitIdentifier(value.rawValue)
+        if let priority {
+            parts.append("Priority #\(priority)")
+        }
         if let queue {
-            return "\(label) · #\(queue)"
+            parts.append(priority == nil ? "#\(queue)" : "Queue #\(queue)")
         }
-        return label
+        if let held {
+            parts.append("Held #\(held)")
+        }
+        return parts.isEmpty ? "--" : parts.joined(separator: " · ")
     }
 
     public static func category(_ key: String?) -> String {

@@ -18,6 +18,9 @@ public sealed class TorrentDetailDto
     public required int                ConnectedPeerCount                 { get; init; }
     public          TorrentWaitReason? WaitReason                         { get; init; }
     public          int?               QueuePosition                      { get; init; }
+    public          int?               PriorityQueuePosition              { get; init; }
+    public          int?               HeldQueuePosition                  { get; init; }
+    public required bool               IsQueueHeld                        { get; init; }
     public required DateTimeOffset     AddedAtUtc                         { get; init; }
     public          DateTimeOffset?    CompletedAtUtc                     { get; init; }
     public          DateTimeOffset?    LastActivityAtUtc                  { get; init; }
@@ -33,5 +36,10 @@ public sealed class TorrentDetailDto
     public required bool               CanRetryCompletionCallback         { get; init; }
     public required bool               CanPause                           { get; init; }
     public required bool               CanResume                          { get; init; }
+    public required bool               CanMakeNext                        { get; init; }
+    public required bool               CanHold                            { get; init; }
+    public required bool               CanReleaseHold                     { get; init; }
+    public required bool               CanResumeNext                      { get; init; }
+    public required bool               CanResumeOnHold                    { get; init; }
     public required bool               CanRemove                          { get; init; }
 }

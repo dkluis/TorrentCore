@@ -136,6 +136,13 @@ current attempts without resetting their persisted start times.
 The cache audit treats files older than 90 days as review candidates only; TorrentCore does not automatically delete
 them because cached metadata can accelerate a later re-add of the same torrent.
 
+## Queue Information Is Missing In The Native Mac App
+
+The native torrent table remembers column customization. If queue numbers and wait reasons remain visible in the
+WebUI but appear absent in the native app, unhide the native table's **Wait** column before investigating Service
+recovery. The Wait column renders both the reason and its queue number. Hiding it changes only the native presentation;
+the Service continues scheduling the entries and returning the diagnostics through list and detail endpoints.
+
 ## Unexpected Service Exit
 
 Inspect `~/TorrentCore/Logs/TorrentCore.Service.launchd.err.log` for a timestamped

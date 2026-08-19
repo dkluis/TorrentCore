@@ -295,6 +295,36 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
                 throw new InvalidOperationException("TorrentCore service returned no action payload.");
     }
 
+    public Task<TorrentActionResultDto> MakeNextAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => PostTorrentActionAsync(torrentId, "make-next", cancellationToken);
+
+    public Task<TorrentActionResultDto> HoldAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => PostTorrentActionAsync(torrentId, "hold", cancellationToken);
+
+    public Task<TorrentActionResultDto> ReleaseHoldAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => PostTorrentActionAsync(torrentId, "release-hold", cancellationToken);
+
+    public Task<TorrentActionResultDto> ResumeNextAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => PostTorrentActionAsync(torrentId, "resume-next", cancellationToken);
+
+    public Task<TorrentActionResultDto> ResumeOnHoldAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => PostTorrentActionAsync(torrentId, "resume-on-hold", cancellationToken);
+
+    private async Task<TorrentActionResultDto> PostTorrentActionAsync(Guid torrentId, string action,
+        CancellationToken cancellationToken)
+    {
+        using var response = await httpClient.PostAsync(
+            BuildRequestUri($"api/torrents/{torrentId}/{action}"), null, cancellationToken
+        );
+        return await ReadResponseAsync<TorrentActionResultDto>(response, cancellationToken) ??
+               throw new InvalidOperationException("TorrentCore service returned no action payload.");
+    }
+
     public async Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId,
         CancellationToken                                               cancellationToken = default)
     {

@@ -393,6 +393,26 @@ public final class TorrentCoreFeatureSession {
             && torrent.canResume
     }
 
+    public func canMakeNext(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canMakeNext
+    }
+
+    public func canHold(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canHold
+    }
+
+    public func canReleaseHold(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canReleaseHold
+    }
+
+    public func canResumeNext(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canResumeNext
+    }
+
+    public func canResumeOnHold(_ torrent: TorrentCoreTorrentSummary) -> Bool {
+        connectionState.isConnected && torrent.canResumeOnHold
+    }
+
     public func canRemove(_ torrent: TorrentCoreTorrentSummary) -> Bool {
         connectionState.isConnected
             && hostStatus.value?.supportsRemove == true
@@ -462,6 +482,60 @@ public final class TorrentCoreFeatureSession {
         let serviceClient = try beginMutation(.resume)
         do {
             let result = try await serviceClient.resume(id: torrentID)
+            activeMutation = nil
+            await refresh()
+            return result
+        } catch {
+            activeMutation = nil
+            await handleMutationFailure(error)
+            throw error
+        }
+    }
+
+    public func makeNext(_ torrent: TorrentCoreTorrentSummary) async throws -> TorrentCoreActionResult {
+        try await performQueueAction(torrent, operation: .makeNext, allowed: canMakeNext(torrent)) {
+            try await $0.makeNext(id: $1)
+        }
+    }
+
+    public func hold(_ torrent: TorrentCoreTorrentSummary) async throws -> TorrentCoreActionResult {
+        try await performQueueAction(torrent, operation: .hold, allowed: canHold(torrent)) {
+            try await $0.hold(id: $1)
+        }
+    }
+
+    public func releaseHold(_ torrent: TorrentCoreTorrentSummary) async throws -> TorrentCoreActionResult {
+        try await performQueueAction(torrent, operation: .releaseHold, allowed: canReleaseHold(torrent)) {
+            try await $0.releaseHold(id: $1)
+        }
+    }
+
+    public func resumeNext(_ torrent: TorrentCoreTorrentSummary) async throws -> TorrentCoreActionResult {
+        try await performQueueAction(torrent, operation: .resumeNext, allowed: canResumeNext(torrent)) {
+            try await $0.resumeNext(id: $1)
+        }
+    }
+
+    public func resumeOnHold(_ torrent: TorrentCoreTorrentSummary) async throws -> TorrentCoreActionResult {
+        try await performQueueAction(torrent, operation: .resumeOnHold, allowed: canResumeOnHold(torrent)) {
+            try await $0.resumeOnHold(id: $1)
+        }
+    }
+
+    private func performQueueAction(
+        _ torrent: TorrentCoreTorrentSummary,
+        operation: TorrentCoreOperation,
+        allowed: Bool,
+        action: (any TorrentCoreServiceClientProtocol, UUID) async throws -> TorrentCoreActionResult
+    ) async throws -> TorrentCoreActionResult {
+        guard allowed, let torrentID = torrent.torrentID else {
+            throw connectionState.isConnected
+                ? TorrentCoreFeatureActionError.capabilityUnavailable
+                : TorrentCoreFeatureActionError.offline
+        }
+        let serviceClient = try beginMutation(operation)
+        do {
+            let result = try await action(serviceClient, torrentID)
             activeMutation = nil
             await refresh()
             return result

@@ -1327,16 +1327,31 @@
             "format": "date-time",
             "type": "string"
           },
+          "canHold": {
+            "type": "boolean"
+          },
+          "canMakeNext": {
+            "type": "boolean"
+          },
           "canPause": {
             "type": "boolean"
           },
           "canRefreshMetadata": {
             "type": "boolean"
           },
+          "canReleaseHold": {
+            "type": "boolean"
+          },
           "canRemove": {
             "type": "boolean"
           },
           "canResume": {
+            "type": "boolean"
+          },
+          "canResumeNext": {
+            "type": "boolean"
+          },
+          "canResumeOnHold": {
             "type": "boolean"
           },
           "canRetryCompletionCallback": {
@@ -1396,9 +1411,17 @@
             "nullable": true,
             "type": "string"
           },
+          "heldQueuePosition": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
           "infoHash": {
             "nullable": true,
             "type": "string"
+          },
+          "isQueueHeld": {
+            "type": "boolean"
           },
           "lastActivityAtUtc": {
             "format": "date-time",
@@ -1412,6 +1435,11 @@
           "name": {
             "nullable": true,
             "type": "string"
+          },
+          "priorityQueuePosition": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
           },
           "progressPercent": {
             "format": "double",
@@ -1452,14 +1480,20 @@
         },
         "required": [
           "addedAtUtc",
+          "canHold",
+          "canMakeNext",
           "canPause",
           "canRefreshMetadata",
+          "canReleaseHold",
           "canRemove",
           "canResume",
+          "canResumeNext",
+          "canResumeOnHold",
           "canRetryCompletionCallback",
           "connectedPeerCount",
           "downloadedBytes",
           "downloadRateBytesPerSecond",
+          "isQueueHeld",
           "magnetUri",
           "name",
           "progressPercent",
@@ -1924,16 +1958,31 @@
             "format": "date-time",
             "type": "string"
           },
+          "canHold": {
+            "type": "boolean"
+          },
+          "canMakeNext": {
+            "type": "boolean"
+          },
           "canPause": {
             "type": "boolean"
           },
           "canRefreshMetadata": {
             "type": "boolean"
           },
+          "canReleaseHold": {
+            "type": "boolean"
+          },
           "canRemove": {
             "type": "boolean"
           },
           "canResume": {
+            "type": "boolean"
+          },
+          "canResumeNext": {
+            "type": "boolean"
+          },
+          "canResumeOnHold": {
             "type": "boolean"
           },
           "canRetryCompletionCallback": {
@@ -1982,6 +2031,14 @@
             "nullable": true,
             "type": "string"
           },
+          "heldQueuePosition": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "isQueueHeld": {
+            "type": "boolean"
+          },
           "lastActivityAtUtc": {
             "format": "date-time",
             "nullable": true,
@@ -1990,6 +2047,11 @@
           "name": {
             "nullable": true,
             "type": "string"
+          },
+          "priorityQueuePosition": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
           },
           "progressPercent": {
             "format": "double",
@@ -2026,14 +2088,20 @@
         },
         "required": [
           "addedAtUtc",
+          "canHold",
+          "canMakeNext",
           "canPause",
           "canRefreshMetadata",
+          "canReleaseHold",
           "canRemove",
           "canResume",
+          "canResumeNext",
+          "canResumeOnHold",
           "canRetryCompletionCallback",
           "connectedPeerCount",
           "downloadedBytes",
           "downloadRateBytesPerSecond",
+          "isQueueHeld",
           "name",
           "progressPercent",
           "state",
@@ -2112,7 +2180,8 @@
           "WaitingForDownloadSlot",
           "WaitingForFileCompletion",
           "PausedByOperator",
-          "BlockedByError"
+          "BlockedByError",
+          "HeldByOperator"
         ],
         "type": "string"
       },
@@ -3321,6 +3390,128 @@
         ]
       }
     },
+    "/api/torrents/{torrentId}/hold": {
+      "post": {
+        "operationId": "Torrents_Hold",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "torrentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentActionResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Torrents"
+        ]
+      }
+    },
+    "/api/torrents/{torrentId}/make-next": {
+      "post": {
+        "operationId": "Torrents_MakeNext",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "torrentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentActionResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Torrents"
+        ]
+      }
+    },
     "/api/torrents/{torrentId}/metadata/refresh": {
       "post": {
         "operationId": "Torrents_RefreshMetadata",
@@ -3558,6 +3749,67 @@
         ]
       }
     },
+    "/api/torrents/{torrentId}/release-hold": {
+      "post": {
+        "operationId": "Torrents_ReleaseHold",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "torrentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentActionResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Torrents"
+        ]
+      }
+    },
     "/api/torrents/{torrentId}/remove": {
       "post": {
         "operationId": "Torrents_Remove",
@@ -3631,6 +3883,128 @@
     "/api/torrents/{torrentId}/resume": {
       "post": {
         "operationId": "Torrents_Resume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "torrentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentActionResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Torrents"
+        ]
+      }
+    },
+    "/api/torrents/{torrentId}/resume-next": {
+      "post": {
+        "operationId": "Torrents_ResumeNext",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "torrentId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TorrentActionResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceProblemDetailsDto"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Torrents"
+        ]
+      }
+    },
+    "/api/torrents/{torrentId}/resume-on-hold": {
+      "post": {
+        "operationId": "Torrents_ResumeOnHold",
         "parameters": [
           {
             "in": "path",

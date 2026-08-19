@@ -36,6 +36,7 @@ Current core tables:
 - restart and recovery persistence
 - persisted continuous-cold timestamp used by long-running download abandonment
 - persisted metadata-attempt start and last-yield timestamps used for fair unresolved-magnet rotation
+- durable ordinary queue order, optional priority order, and Hold intent for restart-safe operator queue controls
 - current category routing and callback state for active torrents
 
 ### `runtime_settings`
@@ -73,6 +74,9 @@ Current core tables:
 - migration 18 adds nullable metadata-resolution attempt-start and last-yield timestamps to the live `torrents` table
 - migration 19 adds the nullable live-torrent seeding-policy application timestamp used to keep policy events
   idempotent across synchronization ticks and service restarts
+- migration 20 adds ordinary queue order, optional priority queue order, and Hold state to live torrents. Existing rows
+  are backfilled by `AddedAtUtc` and torrent id; later tail allocations are serialized SQLite writes rather than
+  timestamp-derived positions. Priority and Hold are mutually exclusive, and Paused rows retain neither intent.
 
 Important history fields include:
 

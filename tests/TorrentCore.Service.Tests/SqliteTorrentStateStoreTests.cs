@@ -33,6 +33,185 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.Equal("The callback exited with code 1.", reloaded.CompletionCallbackLastError);
             Assert.Equal(torrent.DownloadColdSinceUtc, reloaded.DownloadColdSinceUtc);
             Assert.Equal(torrent.SeedingPolicyAppliedAtUtc, reloaded.SeedingPolicyAppliedAtUtc);
+            Assert.Equal(1, reloaded.OrdinaryQueueOrder);
+            Assert.Null(reloaded.PriorityQueueOrder);
+            Assert.False(reloaded.IsQueueHeld);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task QueueIntent_RoundTripsThroughFreshStore_AndNormalizesPausedIntent()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-queue-intent-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+            var store = new SqliteTorrentStateStore(databaseFilePath);
+
+            var priority = CreateSnapshot(infoHash: null);
+            priority.PriorityQueueOrder = 7;
+            var held = CreateSnapshot(infoHash: null);
+            held.IsQueueHeld = true;
+            var paused = CreateSnapshot(infoHash: null);
+            paused.State = TorrentState.Paused;
+            paused.DesiredState = TorrentDesiredState.Paused;
+            paused.PriorityQueueOrder = 8;
+            paused.IsQueueHeld = true;
+
+            await store.InsertAsync(priority, CancellationToken.None);
+            await store.InsertAsync(held, CancellationToken.None);
+            await store.InsertAsync(paused, CancellationToken.None);
+
+            var freshStore = new SqliteTorrentStateStore(databaseFilePath);
+            var reloadedPriority = await freshStore.GetAsync(priority.TorrentId, CancellationToken.None);
+            var reloadedHeld = await freshStore.GetAsync(held.TorrentId, CancellationToken.None);
+            var reloadedPaused = await freshStore.GetAsync(paused.TorrentId, CancellationToken.None);
+
+            Assert.NotNull(reloadedPriority);
+            Assert.Equal(1, reloadedPriority.OrdinaryQueueOrder);
+            Assert.Equal(7, reloadedPriority.PriorityQueueOrder);
+            Assert.False(reloadedPriority.IsQueueHeld);
+
+            Assert.NotNull(reloadedHeld);
+            Assert.Equal(2, reloadedHeld.OrdinaryQueueOrder);
+            Assert.Null(reloadedHeld.PriorityQueueOrder);
+            Assert.True(reloadedHeld.IsQueueHeld);
+
+            Assert.NotNull(reloadedPaused);
+            Assert.Equal(3, reloadedPaused.OrdinaryQueueOrder);
+            Assert.Null(reloadedPaused.PriorityQueueOrder);
+            Assert.False(reloadedPaused.IsQueueHeld);
+            Assert.Equal(TorrentDesiredState.Paused, reloadedPaused.DesiredState);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task QueueOrderAllocations_AreSerialized_AndIntentChangesAreAtomic()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-queue-allocation-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+            var store = new SqliteTorrentStateStore(databaseFilePath);
+            var first = CreateSnapshot(infoHash: null);
+            var second = CreateSnapshot(infoHash: null);
+
+            await store.InsertAsync(first, CancellationToken.None);
+            await store.InsertAsync(second, CancellationToken.None);
+            var staleFirst = await store.GetAsync(first.TorrentId, CancellationToken.None);
+            Assert.NotNull(staleFirst);
+
+            var firstPriorityRequest = store.AssignNextPriorityQueueOrderAsync(
+                first.TorrentId, CancellationToken.None);
+            var secondPriorityRequest = store.AssignNextPriorityQueueOrderAsync(
+                second.TorrentId, CancellationToken.None);
+            var priorityOrders = await Task.WhenAll(firstPriorityRequest, secondPriorityRequest);
+
+            Assert.Equal([1L, 2L], priorityOrders);
+
+            staleFirst.DownloadedBytes = 512;
+            await store.UpdateAsync(staleFirst, CancellationToken.None);
+            Assert.Equal(
+                1,
+                (await store.GetAsync(first.TorrentId, CancellationToken.None))!.PriorityQueueOrder
+            );
+
+            Assert.True(await store.SetQueueHeldAsync(first.TorrentId, true, CancellationToken.None));
+            staleFirst.DownloadedBytes = 1_024;
+            await store.UpdateAsync(staleFirst, CancellationToken.None);
+            var held = await store.GetAsync(first.TorrentId, CancellationToken.None);
+            Assert.NotNull(held);
+            Assert.True(held.IsQueueHeld);
+            Assert.Null(held.PriorityQueueOrder);
+
+            Assert.Equal(
+                3,
+                await store.AssignNextPriorityQueueOrderAsync(first.TorrentId, CancellationToken.None)
+            );
+            var reprioritized = await store.GetAsync(first.TorrentId, CancellationToken.None);
+            Assert.NotNull(reprioritized);
+            Assert.Equal(3, reprioritized.PriorityQueueOrder);
+            Assert.False(reprioritized.IsQueueHeld);
+
+            Assert.Equal(
+                3,
+                await store.AssignNextOrdinaryQueueOrderAsync(first.TorrentId, CancellationToken.None)
+            );
+            Assert.Equal(3, (await store.GetAsync(first.TorrentId, CancellationToken.None))!.OrdinaryQueueOrder);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ResumeModes_AtomicallyAllocateTailPriorityAndHoldIntent()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-queue-resume-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+            var store = new SqliteTorrentStateStore(databaseFilePath);
+            var normal = CreatePausedSnapshot();
+            var priority = CreatePausedSnapshot();
+            var held = CreatePausedSnapshot();
+            await store.InsertAsync(normal, CancellationToken.None);
+            await store.InsertAsync(priority, CancellationToken.None);
+            await store.InsertAsync(held, CancellationToken.None);
+
+            var resumedAt = DateTimeOffset.UtcNow;
+            var resumedNormal = await store.ResumeWithQueueIntentAsync(
+                normal.TorrentId, TorrentQueueResumeMode.Normal, resumedAt, CancellationToken.None);
+            var resumedPriority = await store.ResumeWithQueueIntentAsync(
+                priority.TorrentId, TorrentQueueResumeMode.Priority, resumedAt, CancellationToken.None);
+            var resumedHeld = await store.ResumeWithQueueIntentAsync(
+                held.TorrentId, TorrentQueueResumeMode.Hold, resumedAt, CancellationToken.None);
+
+            Assert.NotNull(resumedNormal);
+            Assert.NotNull(resumedPriority);
+            Assert.NotNull(resumedHeld);
+            Assert.Equal([4L, 5L, 6L], new[]
+            {
+                resumedNormal.OrdinaryQueueOrder!.Value,
+                resumedPriority.OrdinaryQueueOrder!.Value,
+                resumedHeld.OrdinaryQueueOrder!.Value,
+            });
+            Assert.Null(resumedNormal.PriorityQueueOrder);
+            Assert.Equal(1, resumedPriority.PriorityQueueOrder);
+            Assert.False(resumedPriority.IsQueueHeld);
+            Assert.Null(resumedHeld.PriorityQueueOrder);
+            Assert.True(resumedHeld.IsQueueHeld);
+
+            Assert.Equal(1, await store.ReleaseQueueHoldsAsync(
+                [held.TorrentId], CancellationToken.None));
+            Assert.False((await store.GetAsync(held.TorrentId, CancellationToken.None))!.IsQueueHeld);
         }
         finally
         {
@@ -136,7 +315,8 @@ public sealed class SqliteTorrentStateStoreTests
         }
     }
 
-    private static TorrentSnapshot CreateSnapshot(Guid? torrentId = null)
+    private static TorrentSnapshot CreateSnapshot(Guid? torrentId = null,
+        string? infoHash = "1111111111111111111111111111111111111111")
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -156,7 +336,7 @@ public sealed class SqliteTorrentStateStoreTests
             State = TorrentState.Queued,
             DesiredState = TorrentDesiredState.Runnable,
             MagnetUri = "magnet:?xt=urn:btih:1111111111111111111111111111111111111111&dn=Store%20Regression",
-            InfoHash = "1111111111111111111111111111111111111111",
+            InfoHash = infoHash,
             DownloadRootPath = "/tmp/torrentcore-tests/downloads",
             SavePath = "/tmp/torrentcore-tests/downloads/Store Regression Torrent",
             ProgressPercent = 0,
@@ -172,5 +352,13 @@ public sealed class SqliteTorrentStateStoreTests
             SeedingPolicyAppliedAtUtc = now.AddMinutes(-1),
             LastActivityAtUtc = now,
         };
+    }
+
+    private static TorrentSnapshot CreatePausedSnapshot()
+    {
+        var snapshot = CreateSnapshot(infoHash: null);
+        snapshot.State = TorrentState.Paused;
+        snapshot.DesiredState = TorrentDesiredState.Paused;
+        return snapshot;
     }
 }

@@ -354,6 +354,30 @@ public sealed class MonoTorrentLifecycleTests
                 ? Task.FromException(new IOException("Injected snapshot update failure."))
                 : Inner.UpdateAsync(torrent, cancellationToken);
 
+        public Task<long?> AssignNextOrdinaryQueueOrderAsync(Guid torrentId,
+            CancellationToken cancellationToken)
+            => Inner.AssignNextOrdinaryQueueOrderAsync(torrentId, cancellationToken);
+
+        public Task<long?> AssignNextPriorityQueueOrderAsync(Guid torrentId,
+            CancellationToken cancellationToken)
+            => Inner.AssignNextPriorityQueueOrderAsync(torrentId, cancellationToken);
+
+        public Task<bool> SetQueueHeldAsync(Guid torrentId, bool isHeld,
+            CancellationToken cancellationToken)
+            => Inner.SetQueueHeldAsync(torrentId, isHeld, cancellationToken);
+
+        public Task<bool> ClearPriorityQueueOrderAsync(Guid torrentId,
+            CancellationToken cancellationToken)
+            => Inner.ClearPriorityQueueOrderAsync(torrentId, cancellationToken);
+
+        public Task<int> ReleaseQueueHoldsAsync(IReadOnlyList<Guid> torrentIds,
+            CancellationToken cancellationToken)
+            => Inner.ReleaseQueueHoldsAsync(torrentIds, cancellationToken);
+
+        public Task<TorrentSnapshot?> ResumeWithQueueIntentAsync(Guid torrentId, TorrentQueueResumeMode mode,
+            DateTimeOffset resumedAtUtc, CancellationToken cancellationToken)
+            => Inner.ResumeWithQueueIntentAsync(torrentId, mode, resumedAtUtc, cancellationToken);
+
         public Task DeleteAsync(Guid torrentId, CancellationToken cancellationToken)
             => Inner.DeleteAsync(torrentId, cancellationToken);
     }

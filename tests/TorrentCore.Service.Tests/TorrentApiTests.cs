@@ -1862,6 +1862,101 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task QueueDiagnostics_ListAndDetailRemainStableAcrossRestartAtCombinedCapacity()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-queue-diagnostics-restart");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+        var torrentIds = new List<Guid>();
+        IReadOnlyDictionary<Guid, (TorrentWaitReason? WaitReason, int? QueuePosition,
+            int? PriorityQueuePosition, int? HeldQueuePosition, bool IsQueueHeld)> beforeRestart;
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         maxActiveMetadataResolutions: 1,
+                         maxActiveDownloads: 2,
+                         runtimeTickIntervalMilliseconds: 60_000,
+                         metadataResolutionDelayMilliseconds: 300_000,
+                         downloadProgressPercentPerTick: 0.01))
+        {
+            using var httpClient = factory.CreateClient();
+            for (var index = 0; index < 5; index++)
+            {
+                var hash = (0x81 + index).ToString("X40");
+                var response = await AddMagnetAsync(httpClient, hash, $"Restart Queue {index + 1}");
+                var torrent = await response.Content.ReadFromJsonAsync<TorrentDetailDto>();
+                torrentIds.Add(torrent!.TorrentId);
+            }
+
+            await ForceRestartQueueDiagnosticScenarioAsync(storagePath, torrentIds);
+
+            var summaries = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents");
+            AssertRestartQueueDiagnosticScenario(summaries, torrentIds);
+            beforeRestart = summaries!
+                           .Where(torrent => torrent.State == TorrentState.Queued)
+                           .ToDictionary(
+                                torrent => torrent.TorrentId,
+                                torrent => (torrent.WaitReason, torrent.QueuePosition,
+                                    torrent.PriorityQueuePosition, torrent.HeldQueuePosition, torrent.IsQueueHeld)
+                            );
+
+            foreach (var expected in beforeRestart)
+            {
+                var detail = await httpClient.GetFromJsonAsync<TorrentDetailDto>(
+                    $"api/torrents/{expected.Key}");
+                Assert.NotNull(detail);
+                Assert.Equal(expected.Value.WaitReason, detail.WaitReason);
+                Assert.Equal(expected.Value.QueuePosition, detail.QueuePosition);
+                Assert.Equal(expected.Value.PriorityQueuePosition, detail.PriorityQueuePosition);
+                Assert.Equal(expected.Value.HeldQueuePosition, detail.HeldQueuePosition);
+                Assert.Equal(expected.Value.IsQueueHeld, detail.IsQueueHeld);
+            }
+        }
+
+        await using (var factory = CreateFactory(
+                         downloadPath: downloadPath,
+                         storagePath: storagePath,
+                         maxActiveMetadataResolutions: 1,
+                         maxActiveDownloads: 2,
+                         runtimeTickIntervalMilliseconds: 60_000,
+                         metadataResolutionDelayMilliseconds: 300_000,
+                         downloadProgressPercentPerTick: 0.01))
+        {
+            using var httpClient = factory.CreateClient();
+            var summaries = await WaitForAsync(
+                async () => await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentSummaryDto>>("api/torrents"),
+                items => HasRestartQueueDiagnosticScenario(items, torrentIds),
+                timeout: TimeSpan.FromSeconds(5));
+
+            AssertRestartQueueDiagnosticScenario(summaries, torrentIds);
+            var afterRestart = summaries!
+                              .Where(torrent => torrent.State == TorrentState.Queued)
+                              .ToDictionary(
+                                   torrent => torrent.TorrentId,
+                                   torrent => (torrent.WaitReason, torrent.QueuePosition,
+                                       torrent.PriorityQueuePosition, torrent.HeldQueuePosition, torrent.IsQueueHeld)
+                               );
+            Assert.Equal(
+                beforeRestart.OrderBy(item => item.Key),
+                afterRestart.OrderBy(item => item.Key)
+            );
+
+            foreach (var expected in beforeRestart)
+            {
+                var detail = await httpClient.GetFromJsonAsync<TorrentDetailDto>(
+                    $"api/torrents/{expected.Key}");
+                Assert.NotNull(detail);
+                Assert.Equal(expected.Value.WaitReason, detail.WaitReason);
+                Assert.Equal(expected.Value.QueuePosition, detail.QueuePosition);
+                Assert.Equal(expected.Value.PriorityQueuePosition, detail.PriorityQueuePosition);
+                Assert.Equal(expected.Value.HeldQueuePosition, detail.HeldQueuePosition);
+                Assert.Equal(expected.Value.IsQueueHeld, detail.IsQueueHeld);
+            }
+        }
+    }
+
+    [Fact]
     public async Task MonoTorrentEngine_PendingFinalization_OnRecovery_WaitsForVisibilityThenInvokesCallback_AndKeepsTorrentTrackingWhenCleanupIsNever()
     {
         var rootPath = CreateTempRootPath("torrentcore-monotorrent-callback-pending");
@@ -4568,6 +4663,90 @@ public sealed class TorrentApiTests
         command.Parameters.AddWithValue("$desired_state", desiredState.ToString());
         command.Parameters.AddWithValue("$error_message", (object?)errorMessage ?? DBNull.Value);
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ForceRestartQueueDiagnosticScenarioAsync(string storagePath,
+        IReadOnlyList<Guid> torrentIds)
+    {
+        Assert.Equal(5, torrentIds.Count);
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+
+        for (var index = 0; index < torrentIds.Count; index++)
+        {
+            var isResolved = index < 3;
+            var state = index < 2 ? TorrentState.Downloading : TorrentState.Queued;
+            var command = connection.CreateCommand();
+            command.Transaction = (SqliteTransaction)transaction;
+            command.CommandText = """
+                                  UPDATE torrents
+                                  SET
+                                      state = $state,
+                                      desired_state = 'Runnable',
+                                      total_bytes = $total_bytes,
+                                      progress_percent = 0,
+                                      downloaded_bytes = 0,
+                                      download_rate_bytes_per_second = 0,
+                                      upload_rate_bytes_per_second = 0,
+                                      connected_peer_count = 0,
+                                      priority_queue_order = $priority_queue_order,
+                                      is_queue_held = $is_queue_held,
+                                      metadata_resolution_attempt_started_at_utc = NULL,
+                                      error_message = NULL
+                                  WHERE torrent_id = $torrent_id;
+                                  """;
+            command.Parameters.AddWithValue("$torrent_id", torrentIds[index].ToString());
+            command.Parameters.AddWithValue("$state", state.ToString());
+            command.Parameters.AddWithValue("$total_bytes", isResolved ? 1_048_576 : DBNull.Value);
+            command.Parameters.AddWithValue("$priority_queue_order", DBNull.Value);
+            command.Parameters.AddWithValue("$is_queue_held", index == 4 ? 1 : 0);
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        await transaction.CommitAsync();
+    }
+
+    private static bool HasRestartQueueDiagnosticScenario(IReadOnlyList<TorrentSummaryDto>? summaries,
+        IReadOnlyList<Guid> torrentIds)
+    {
+        if (summaries is null || summaries.Count != 5)
+        {
+            return false;
+        }
+
+        return summaries.Count(torrent => torrent.State == TorrentState.Downloading) == 2 &&
+               summaries.Any(torrent => torrent.TorrentId == torrentIds[2] &&
+                                        torrent.State == TorrentState.Queued &&
+                                        torrent.WaitReason == TorrentWaitReason.WaitingForDownloadSlot &&
+                                        torrent.QueuePosition == 1) &&
+               summaries.Any(torrent => torrent.TorrentId == torrentIds[3] &&
+                                        torrent.State == TorrentState.Queued &&
+                                        torrent.WaitReason == TorrentWaitReason.WaitingForMetadataSlot &&
+                                        torrent.QueuePosition == 1 &&
+                                        torrent.PriorityQueuePosition is null &&
+                                        !torrent.IsQueueHeld) &&
+               summaries.Any(torrent => torrent.TorrentId == torrentIds[4] &&
+                                        torrent.State == TorrentState.Queued &&
+                                        torrent.WaitReason == TorrentWaitReason.HeldByOperator &&
+                                        torrent.QueuePosition is null &&
+                                        torrent.HeldQueuePosition == 1 &&
+                                        torrent.IsQueueHeld);
+    }
+
+    private static void AssertRestartQueueDiagnosticScenario(IReadOnlyList<TorrentSummaryDto>? summaries,
+        IReadOnlyList<Guid> torrentIds)
+    {
+        Assert.True(HasRestartQueueDiagnosticScenario(summaries, torrentIds));
+        Assert.Contains(summaries!, torrent => torrent.TorrentId == torrentIds[0] &&
+                                                torrent.State == TorrentState.Downloading &&
+                                                torrent.WaitReason is null &&
+                                                torrent.QueuePosition is null);
+        Assert.Contains(summaries!, torrent => torrent.TorrentId == torrentIds[1] &&
+                                                torrent.State == TorrentState.Downloading &&
+                                                torrent.WaitReason is null &&
+                                                torrent.QueuePosition is null);
     }
 
     private static async Task ForceDownloadColdSinceAsync(

@@ -139,6 +139,11 @@ extension TorrentCoreTorrentSummary {
         canRemove = value.canRemove
         canResume = value.canResume
         canRetryCompletionCallback = value.canRetryCompletionCallback
+        canMakeNext = value.canMakeNext
+        canHold = value.canHold
+        canReleaseHold = value.canReleaseHold
+        canResumeNext = value.canResumeNext
+        canResumeOnHold = value.canResumeOnHold
         categoryKey = value.categoryKey
         completedAt = value.completedAtUtc
         completionCallbackInvokedAt = value.completionCallbackInvokedAtUtc
@@ -153,6 +158,9 @@ extension TorrentCoreTorrentSummary {
         name = value.name
         progressPercent = value.progressPercent
         queuePosition = value.queuePosition.map(Int.init)
+        priorityQueuePosition = value.priorityQueuePosition.map(Int.init)
+        heldQueuePosition = value.heldQueuePosition.map(Int.init)
+        isQueueHeld = value.isQueueHeld
         state = .init(rawValue: value.state)
         torrentID = UUID(uuidString: value.torrentId)
         totalBytes = value.totalBytes
@@ -197,6 +205,11 @@ extension TorrentCoreTorrentDetail {
         canRemove = value.canRemove
         canResume = value.canResume
         canRetryCompletionCallback = value.canRetryCompletionCallback
+        canMakeNext = value.canMakeNext
+        canHold = value.canHold
+        canReleaseHold = value.canReleaseHold
+        canResumeNext = value.canResumeNext
+        canResumeOnHold = value.canResumeOnHold
         categoryKey = value.categoryKey
         completedAt = value.completedAtUtc
         completionCallbackFeedback = value.completionCallbackFeedback.map(TorrentCoreCompletionCallbackFeedback.init)
@@ -216,6 +229,9 @@ extension TorrentCoreTorrentDetail {
         name = value.name
         progressPercent = value.progressPercent
         queuePosition = value.queuePosition.map(Int.init)
+        priorityQueuePosition = value.priorityQueuePosition.map(Int.init)
+        heldQueuePosition = value.heldQueuePosition.map(Int.init)
+        isQueueHeld = value.isQueueHeld
         savePath = value.savePath
         state = .init(rawValue: value.state)
         torrentID = UUID(uuidString: value.torrentId)

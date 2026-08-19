@@ -65,6 +65,11 @@ public interface ITorrentCoreApiAdapter
     Task<ServiceCallResult<TorrentDetailDto>> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> PauseAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> ResumeAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<TorrentActionResultDto>> MakeNextAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<TorrentActionResultDto>> HoldAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<TorrentActionResultDto>> ReleaseHoldAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<TorrentActionResultDto>> ResumeNextAsync(Guid torrentId, CancellationToken cancellationToken = default);
+    Task<ServiceCallResult<TorrentActionResultDto>> ResumeOnHoldAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken = default);
     Task<ServiceCallResult<TorrentActionResultDto>> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken = default);

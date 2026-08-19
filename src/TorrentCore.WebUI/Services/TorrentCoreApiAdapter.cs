@@ -139,6 +139,26 @@ public sealed class TorrentCoreApiAdapter(TorrentCoreClient client) : ITorrentCo
     )
         => ExecuteAsync(() => client.ResumeAsync(torrentId, cancellationToken));
 
+    public Task<ServiceCallResult<TorrentActionResultDto>> MakeNextAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => ExecuteAsync(() => client.MakeNextAsync(torrentId, cancellationToken));
+
+    public Task<ServiceCallResult<TorrentActionResultDto>> HoldAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => ExecuteAsync(() => client.HoldAsync(torrentId, cancellationToken));
+
+    public Task<ServiceCallResult<TorrentActionResultDto>> ReleaseHoldAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => ExecuteAsync(() => client.ReleaseHoldAsync(torrentId, cancellationToken));
+
+    public Task<ServiceCallResult<TorrentActionResultDto>> ResumeNextAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => ExecuteAsync(() => client.ResumeNextAsync(torrentId, cancellationToken));
+
+    public Task<ServiceCallResult<TorrentActionResultDto>> ResumeOnHoldAsync(Guid torrentId,
+        CancellationToken cancellationToken = default)
+        => ExecuteAsync(() => client.ResumeOnHoldAsync(torrentId, cancellationToken));
+
     public Task<ServiceCallResult<TorrentActionResultDto>> RefreshMetadataAsync(
         Guid torrentId,
         CancellationToken cancellationToken = default

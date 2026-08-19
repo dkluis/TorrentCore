@@ -19,6 +19,11 @@ public protocol TorrentCoreServiceClientProtocol: Sendable {
     func addMagnet(_ magnetURI: String, categoryKey: String?) async throws -> TorrentCoreTorrentDetail
     func pause(id: UUID) async throws -> TorrentCoreActionResult
     func resume(id: UUID) async throws -> TorrentCoreActionResult
+    func makeNext(id: UUID) async throws -> TorrentCoreActionResult
+    func hold(id: UUID) async throws -> TorrentCoreActionResult
+    func releaseHold(id: UUID) async throws -> TorrentCoreActionResult
+    func resumeNext(id: UUID) async throws -> TorrentCoreActionResult
+    func resumeOnHold(id: UUID) async throws -> TorrentCoreActionResult
     func remove(id: UUID, deleteData: Bool) async throws -> TorrentCoreActionResult
     func refreshMetadata(id: UUID) async throws -> TorrentCoreActionResult
     func resetMetadataSession(id: UUID) async throws -> TorrentCoreActionResult
@@ -37,6 +42,24 @@ public protocol TorrentCoreServiceClientProtocol: Sendable {
 }
 
 extension TorrentCoreClient: TorrentCoreServiceClientProtocol {}
+
+public extension TorrentCoreServiceClientProtocol {
+    func makeNext(id: UUID) async throws -> TorrentCoreActionResult {
+        throw TorrentCoreClientError.unexpectedResponse(statusCode: 501)
+    }
+    func hold(id: UUID) async throws -> TorrentCoreActionResult {
+        throw TorrentCoreClientError.unexpectedResponse(statusCode: 501)
+    }
+    func releaseHold(id: UUID) async throws -> TorrentCoreActionResult {
+        throw TorrentCoreClientError.unexpectedResponse(statusCode: 501)
+    }
+    func resumeNext(id: UUID) async throws -> TorrentCoreActionResult {
+        throw TorrentCoreClientError.unexpectedResponse(statusCode: 501)
+    }
+    func resumeOnHold(id: UUID) async throws -> TorrentCoreActionResult {
+        throw TorrentCoreClientError.unexpectedResponse(statusCode: 501)
+    }
+}
 
 public protocol TorrentCoreServiceClientBuilding: Sendable {
     func makeClient(baseURL: URL) throws -> any TorrentCoreServiceClientProtocol

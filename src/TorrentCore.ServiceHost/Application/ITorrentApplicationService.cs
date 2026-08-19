@@ -35,6 +35,11 @@ public interface ITorrentApplicationService
     Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> PauseAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResumeAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentActionResultDto> MakeNextAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentActionResultDto> HoldAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentActionResultDto> ReleaseHoldAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentActionResultDto> ResumeNextAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentActionResultDto> ResumeOnHoldAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RefreshMetadataAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> ResetMetadataSessionAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentActionResultDto> RetryCompletionCallbackAsync(Guid torrentId, CancellationToken cancellationToken);

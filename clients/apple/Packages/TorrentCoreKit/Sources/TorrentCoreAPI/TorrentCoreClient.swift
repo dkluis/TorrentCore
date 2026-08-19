@@ -382,6 +382,86 @@ public struct TorrentCoreClient: Sendable {
         }
     }
 
+    public func makeNext(id: UUID) async throws -> TorrentCoreActionResult {
+        try await perform(.makeNext) {
+            switch try await mutationClient.torrentsMakeNext(path: .init(torrentId: id.uuidString)) {
+            case let .ok(response): return TorrentCoreActionResult(try response.body.json)
+            case let .notFound(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .conflict(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
+    public func hold(id: UUID) async throws -> TorrentCoreActionResult {
+        try await perform(.hold) {
+            switch try await mutationClient.torrentsHold(path: .init(torrentId: id.uuidString)) {
+            case let .ok(response): return TorrentCoreActionResult(try response.body.json)
+            case let .notFound(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .conflict(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
+    public func releaseHold(id: UUID) async throws -> TorrentCoreActionResult {
+        try await perform(.releaseHold) {
+            switch try await mutationClient.torrentsReleaseHold(path: .init(torrentId: id.uuidString)) {
+            case let .ok(response): return TorrentCoreActionResult(try response.body.json)
+            case let .notFound(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .conflict(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
+    public func resumeNext(id: UUID) async throws -> TorrentCoreActionResult {
+        try await perform(.resumeNext) {
+            switch try await mutationClient.torrentsResumeNext(path: .init(torrentId: id.uuidString)) {
+            case let .ok(response): return TorrentCoreActionResult(try response.body.json)
+            case let .notFound(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .conflict(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
+    public func resumeOnHold(id: UUID) async throws -> TorrentCoreActionResult {
+        try await perform(.resumeOnHold) {
+            switch try await mutationClient.torrentsResumeOnHold(path: .init(torrentId: id.uuidString)) {
+            case let .ok(response): return TorrentCoreActionResult(try response.body.json)
+            case let .notFound(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .conflict(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .serviceUnavailable(response):
+                throw TorrentCoreClientError.service(TorrentCoreServiceProblem(try response.body.applicationProblemJson))
+            case let .undocumented(statusCode, _):
+                throw TorrentCoreClientError.unexpectedResponse(statusCode: statusCode)
+            }
+        }
+    }
+
     public func remove(id: UUID, deleteData: Bool) async throws -> TorrentCoreActionResult {
         try await perform(.remove) {
             let request = Components.Schemas.RemoveTorrentRequest(deleteData: deleteData)

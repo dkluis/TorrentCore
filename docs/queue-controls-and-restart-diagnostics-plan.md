@@ -1,9 +1,9 @@
 # Queue Controls And Restart Diagnostics Plan
 
-Status: approved for planning on August 19, 2026. No implementation has started.
+Status: Slices 0 through 7 completed on August 19, 2026. Slice 8 remains a separate cutover and recovery exercise.
 
 This plan covers durable operator queue controls, explicit pause/resume behavior, and restart-safe queue diagnostics in
-the supported `TorrentCore.WebUI`. Payload-stale download rotation is specified separately in
+the native macOS client and the supported `TorrentCore.WebUI`. Payload-stale download rotation is specified separately in
 [payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md).
 
 ## Outcomes
@@ -180,6 +180,11 @@ Status: completed on August 19, 2026.
 
 ### Slice 1: Reproduce And Repair Restart Queue Diagnostics
 
+Status: completed on August 19, 2026. The reported disappearance was traced to the native macOS torrent table's
+persisted customization hiding the Wait column. The Service, list/detail API mappings, WebUI, and native mappings all
+retained the diagnostics. Unhiding Wait restored the native display, so no runtime or client behavior was changed.
+Restart characterization now covers unresolved and resolved queues at the combined active-work ceiling.
+
 #### Work
 
 - Add a persistence/recovery characterization containing queued unresolved and resolved torrents with active work at
@@ -198,6 +203,8 @@ Status: completed on August 19, 2026.
 
 ### Slice 2: Durable Queue Intent And Migration
 
+Status: completed on August 19, 2026.
+
 #### Work
 
 - Add durable ordinary order, priority order, and Hold state to torrent snapshots and SQLite mappings.
@@ -213,6 +220,8 @@ Status: completed on August 19, 2026.
 - Same-time priority requests still retain request order.
 
 ### Slice 3: Shared Ordering And Diagnostic Policy
+
+Status: completed on August 19, 2026.
 
 #### Work
 
@@ -231,6 +240,8 @@ Status: completed on August 19, 2026.
 
 ### Slice 4: Queue-Control Contracts And Client Operations
 
+Status: completed on August 19, 2026.
+
 #### Work
 
 - Add Service/application/engine operations for Make Next, Hold, and release Hold.
@@ -246,6 +257,8 @@ Status: completed on August 19, 2026.
 - API, client, and OpenAPI contract tests agree.
 
 ### Slice 5: Runtime Make Next And Metadata Displacement
+
+Status: completed on August 19, 2026.
 
 #### Work
 
@@ -265,6 +278,8 @@ Status: completed on August 19, 2026.
 
 ### Slice 6: Hold And Explicit Resume Modes
 
+Status: completed on August 19, 2026.
+
 #### Work
 
 - Enforce Hold exclusion and automatic/manual release through the shared policy.
@@ -281,11 +296,15 @@ Status: completed on August 19, 2026.
 - Normal Resume does not displace active work or regain its historical AddedAt position.
 - Resume Next and Resume on Hold cannot transiently enter the wrong queue between writes.
 
-### Slice 7: TorrentCore.WebUI Queue Controls
+### Slice 7: Native And WebUI Queue Controls
+
+Status: completed on August 19, 2026. The native macOS client is the primary operator surface for these controls;
+the WebUI provides the same actions as a secondary surface.
 
 #### Work
 
-- Add Make Next, Hold, release Hold, Resume, Resume Next, and Resume on Hold actions using Service capabilities.
+- Add Make Next, Hold, release Hold, Resume, Resume Next, and Resume on Hold actions using Service capabilities in
+  both the native macOS client and WebUI.
 - Add priority, ordinary queue, held-order, and wait-reason indicators to rows and selected details.
 - Preserve action state correctly across polling, selection refresh, Service restart, and temporary request failure.
 - Add focused component/adapter tests using mixed queue fixtures.

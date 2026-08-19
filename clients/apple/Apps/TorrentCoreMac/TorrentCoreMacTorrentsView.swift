@@ -176,6 +176,11 @@ struct TorrentCoreMacTorrentsView: View {
                 isActing: isActing,
                 pause: pauseSelected,
                 resume: resumeSelected,
+                makeNext: makeNextSelected,
+                hold: holdSelected,
+                releaseHold: releaseHoldSelected,
+                resumeNext: resumeNextSelected,
+                resumeOnHold: resumeOnHoldSelected,
                 showPeers: { isPeersPresented = true },
                 showTrackers: { isTrackersPresented = true },
                 showHistory: {
@@ -443,6 +448,22 @@ struct TorrentCoreMacTorrentsView: View {
                             Button("Show Filtered Logs") {
                                 showLogs(torrentID)
                             }
+                        }
+                        Divider()
+                        if session.canMakeNext(item.summary) {
+                            Button("Make Next") { makeNext(item) }
+                        }
+                        if session.canHold(item.summary) {
+                            Button("Hold") { hold(item) }
+                        }
+                        if session.canReleaseHold(item.summary) {
+                            Button("Release Hold") { releaseHold(item) }
+                        }
+                        if session.canResumeNext(item.summary) {
+                            Button("Resume Next") { resumeNext(item) }
+                        }
+                        if session.canResumeOnHold(item.summary) {
+                            Button("Resume on Hold") { resumeOnHold(item) }
                         }
                     }
             }
@@ -771,6 +792,42 @@ struct TorrentCoreMacTorrentsView: View {
         }
     }
 
+    private func makeNextSelected() { selectedItem.map(makeNext) }
+    private func holdSelected() { selectedItem.map(hold) }
+    private func releaseHoldSelected() { selectedItem.map(releaseHold) }
+    private func resumeNextSelected() { selectedItem.map(resumeNext) }
+    private func resumeOnHoldSelected() { selectedItem.map(resumeOnHold) }
+
+    private func makeNext(_ item: TorrentCoreTorrentListItem) {
+        performAction(successMessage: "Made \(item.name) next.") {
+            _ = try await session.makeNext(item.summary)
+        }
+    }
+
+    private func hold(_ item: TorrentCoreTorrentListItem) {
+        performAction(successMessage: "Placed \(item.name) on hold.") {
+            _ = try await session.hold(item.summary)
+        }
+    }
+
+    private func releaseHold(_ item: TorrentCoreTorrentListItem) {
+        performAction(successMessage: "Released hold for \(item.name).") {
+            _ = try await session.releaseHold(item.summary)
+        }
+    }
+
+    private func resumeNext(_ item: TorrentCoreTorrentListItem) {
+        performAction(successMessage: "Resumed \(item.name) next.") {
+            _ = try await session.resumeNext(item.summary)
+        }
+    }
+
+    private func resumeOnHold(_ item: TorrentCoreTorrentListItem) {
+        performAction(successMessage: "Resumed \(item.name) on hold.") {
+            _ = try await session.resumeOnHold(item.summary)
+        }
+    }
+
     private func refreshSelectedMetadata() {
         guard let selectedItem else {
             return
@@ -852,6 +909,11 @@ private struct TorrentCoreMacTorrentInspector: View {
     let isActing: Bool
     let pause: () -> Void
     let resume: () -> Void
+    let makeNext: () -> Void
+    let hold: () -> Void
+    let releaseHold: () -> Void
+    let resumeNext: () -> Void
+    let resumeOnHold: () -> Void
     let showPeers: () -> Void
     let showTrackers: () -> Void
     let showHistory: () -> Void
@@ -906,6 +968,26 @@ private struct TorrentCoreMacTorrentInspector: View {
                                 .disabled(!session.canResume(selectedItem.summary) || isActing)
                                 .accessibilityIdentifier("inspector.resume")
                                 .help(TorrentCoreHelpCatalog.Torrents.resume.summary)
+                        }
+
+                        HStack {
+                            if session.canMakeNext(selectedItem.summary) {
+                                Button("Make Next", action: makeNext).disabled(isActing)
+                            }
+                            if session.canHold(selectedItem.summary) {
+                                Button("Hold", action: hold).disabled(isActing)
+                            }
+                            if session.canReleaseHold(selectedItem.summary) {
+                                Button("Release Hold", action: releaseHold).disabled(isActing)
+                            }
+                        }
+                        HStack {
+                            if session.canResumeNext(selectedItem.summary) {
+                                Button("Resume Next", action: resumeNext).disabled(isActing)
+                            }
+                            if session.canResumeOnHold(selectedItem.summary) {
+                                Button("Resume on Hold", action: resumeOnHold).disabled(isActing)
+                            }
                         }
 
                         HStack {
@@ -1046,7 +1128,9 @@ private struct TorrentCoreMacTorrentInspector: View {
                 label: "Wait",
                 value: TorrentCoreDisplayFormatter.wait(
                     detail?.waitReason ?? fallback.summary.waitReason,
-                    queue: detail?.queuePosition ?? fallback.summary.queuePosition
+                    queue: detail?.queuePosition ?? fallback.summary.queuePosition,
+                    priority: detail?.priorityQueuePosition ?? fallback.summary.priorityQueuePosition,
+                    held: detail?.heldQueuePosition ?? fallback.summary.heldQueuePosition
                 )
             )
             TorrentCoreMacDetailRow(

@@ -87,6 +87,51 @@ public sealed class TorrentsController(ITorrentApplicationService torrentApplica
         return Ok(result);
     }
 
+    [HttpPost("{torrentId:guid}/make-next")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
+    public async Task<ActionResult<TorrentActionResultDto>> MakeNext(Guid torrentId,
+        CancellationToken cancellationToken)
+        => Ok(await torrentApplicationService.MakeNextAsync(torrentId, cancellationToken));
+
+    [HttpPost("{torrentId:guid}/hold")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
+    public async Task<ActionResult<TorrentActionResultDto>> Hold(Guid torrentId,
+        CancellationToken cancellationToken)
+        => Ok(await torrentApplicationService.HoldAsync(torrentId, cancellationToken));
+
+    [HttpPost("{torrentId:guid}/release-hold")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
+    public async Task<ActionResult<TorrentActionResultDto>> ReleaseHold(Guid torrentId,
+        CancellationToken cancellationToken)
+        => Ok(await torrentApplicationService.ReleaseHoldAsync(torrentId, cancellationToken));
+
+    [HttpPost("{torrentId:guid}/resume-next")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
+    public async Task<ActionResult<TorrentActionResultDto>> ResumeNext(Guid torrentId,
+        CancellationToken cancellationToken)
+        => Ok(await torrentApplicationService.ResumeNextAsync(torrentId, cancellationToken));
+
+    [HttpPost("{torrentId:guid}/resume-on-hold")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(TorrentActionResultDto))]
+    [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(ServiceProblemDetailsDto))]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable, Type = typeof(ServiceProblemDetailsDto))]
+    public async Task<ActionResult<TorrentActionResultDto>> ResumeOnHold(Guid torrentId,
+        CancellationToken cancellationToken)
+        => Ok(await torrentApplicationService.ResumeOnHoldAsync(torrentId, cancellationToken));
+
     [HttpPost("{torrentId:guid}/metadata/refresh")]
     [ProducesResponseType(StatusCodes.Status200OK,       Type = typeof(TorrentActionResultDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(ServiceProblemDetailsDto))]

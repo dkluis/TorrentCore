@@ -237,6 +237,7 @@
                                                            InitialDirection="@(GetInitialSortDirection(SortCallback))"
                                                            SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortCallback, direction))">Callback</MudTableSortLabel>
                                     </MudTh>
+                                    <MudTh>Actions</MudTh>
                                 </HeaderContent>
                                 <RowTemplate>
                                     <MudTd DataLabel="Name" Class="operations-table-wrap">@context.Name</MudTd>
@@ -246,8 +247,35 @@
                                     <MudTd DataLabel="Down">@FormatRate(context.DownloadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Up">@FormatRate(context.UploadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Peers">@context.ConnectedPeerCount</MudTd>
-                                    <MudTd DataLabel="Wait" Class="operations-table-wrap">@FormatWaitReason(context.WaitReason, context.QueuePosition)</MudTd>
+                                    <MudTd DataLabel="Wait" Class="operations-table-wrap">@FormatQueueStatus(context.WaitReason, context.QueuePosition, context.PriorityQueuePosition, context.HeldQueuePosition)</MudTd>
                                     <MudTd DataLabel="Callback" Class="operations-table-wrap">@FormatCallbackState(context.CompletionCallbackState)</MudTd>
+                                    <MudTd DataLabel="Actions">
+                                        @if (context.CanMakeNext || context.CanHold || context.CanReleaseHold || context.CanResumeNext || context.CanResumeOnHold)
+                                        {
+                                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                                                @if (context.CanMakeNext)
+                                                {
+                                                    <MudMenuItem OnClick="@(() => QueueRowAsync(context, QueueRowAction.MakeNext))">Make Next</MudMenuItem>
+                                                }
+                                                @if (context.CanHold)
+                                                {
+                                                    <MudMenuItem OnClick="@(() => QueueRowAsync(context, QueueRowAction.Hold))">Hold</MudMenuItem>
+                                                }
+                                                @if (context.CanReleaseHold)
+                                                {
+                                                    <MudMenuItem OnClick="@(() => QueueRowAsync(context, QueueRowAction.ReleaseHold))">Release Hold</MudMenuItem>
+                                                }
+                                                @if (context.CanResumeNext)
+                                                {
+                                                    <MudMenuItem OnClick="@(() => QueueRowAsync(context, QueueRowAction.ResumeNext))">Resume Next</MudMenuItem>
+                                                }
+                                                @if (context.CanResumeOnHold)
+                                                {
+                                                    <MudMenuItem OnClick="@(() => QueueRowAsync(context, QueueRowAction.ResumeOnHold))">Resume on Hold</MudMenuItem>
+                                                }
+                                            </MudMenu>
+                                        }
+                                    </MudTd>
                                 </RowTemplate>
                                 <NoRecordsContent>
                                     <MudText Typo="Typo.body2">No torrents match the current filters.</MudText>
@@ -297,6 +325,31 @@
                                             </MudButton>
                                             <SettingHelpTrigger Content="@TorrentsHelpCatalog.Resume" IconOnly="true" />
                                         </div>
+                                    }
+                                    @if (_selectedTorrentDetail.CanMakeNext)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions" OnClick="MakeNextSelectedAsync">Make Next</MudButton>
+                                    }
+                                    @if (_selectedTorrentDetail.CanHold)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions" OnClick="HoldSelectedAsync">Hold</MudButton>
+                                    }
+                                    @if (_selectedTorrentDetail.CanReleaseHold)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions" OnClick="ReleaseHoldSelectedAsync">Release Hold</MudButton>
+                                    }
+                                    @if (_selectedTorrentDetail.CanResumeNext)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions" OnClick="ResumeNextSelectedAsync">Resume Next</MudButton>
+                                    }
+                                    @if (_selectedTorrentDetail.CanResumeOnHold)
+                                    {
+                                        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small"
+                                                   Disabled="@DisableSelectedActions" OnClick="ResumeOnHoldSelectedAsync">Resume on Hold</MudButton>
                                     }
                                     @if (_selectedTorrentDetail.CanRefreshMetadata)
                                     {
@@ -450,7 +503,7 @@
                                 </div>
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Wait</p>
-                                    <p class="dashboard-detail-value">@FormatWaitReason(_selectedTorrentDetail.WaitReason, _selectedTorrentDetail.QueuePosition)</p>
+                                    <p class="dashboard-detail-value">@FormatQueueStatus(_selectedTorrentDetail.WaitReason, _selectedTorrentDetail.QueuePosition, _selectedTorrentDetail.PriorityQueuePosition, _selectedTorrentDetail.HeldQueuePosition)</p>
                                 </div>
                                 <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Info Hash</p>
@@ -929,6 +982,35 @@
         await RunSelectedActionAsync("Resume", torrentId => Api.ResumeAsync(torrentId));
     }
 
+    private Task MakeNextSelectedAsync() =>
+        RunSelectedActionAsync("Make next", torrentId => Api.MakeNextAsync(torrentId));
+
+    private Task HoldSelectedAsync() =>
+        RunSelectedActionAsync("Hold", torrentId => Api.HoldAsync(torrentId));
+
+    private Task ReleaseHoldSelectedAsync() =>
+        RunSelectedActionAsync("Release hold", torrentId => Api.ReleaseHoldAsync(torrentId));
+
+    private Task ResumeNextSelectedAsync() =>
+        RunSelectedActionAsync("Resume next", torrentId => Api.ResumeNextAsync(torrentId));
+
+    private Task ResumeOnHoldSelectedAsync() =>
+        RunSelectedActionAsync("Resume on hold", torrentId => Api.ResumeOnHoldAsync(torrentId));
+
+    private async Task QueueRowAsync(TorrentSummaryDto torrent, QueueRowAction action)
+    {
+        _selectedTorrentId = torrent.TorrentId;
+        await (action switch
+        {
+            QueueRowAction.MakeNext => MakeNextSelectedAsync(),
+            QueueRowAction.Hold => HoldSelectedAsync(),
+            QueueRowAction.ReleaseHold => ReleaseHoldSelectedAsync(),
+            QueueRowAction.ResumeNext => ResumeNextSelectedAsync(),
+            QueueRowAction.ResumeOnHold => ResumeOnHoldSelectedAsync(),
+            _ => Task.CompletedTask,
+        });
+    }
+
     private async Task RefreshMetadataSelectedAsync()
     {
         await RunSelectedActionAsync("Refresh metadata", torrentId => Api.RefreshMetadataAsync(torrentId));
@@ -1220,6 +1302,7 @@
             TorrentWaitReason.WaitingForFileCompletion => "Waiting for file completion",
             TorrentWaitReason.PausedByOperator => "Paused by operator",
             TorrentWaitReason.BlockedByError => "Blocked by error",
+            TorrentWaitReason.HeldByOperator => "Held by operator",
             _ => string.Empty,
         };
 
@@ -1231,10 +1314,40 @@
         return queuePosition is null ? waitReasonText : $"{waitReasonText} (#{queuePosition.Value})";
     }
 
+    private static string FormatQueueStatus(TorrentWaitReason? waitReason, int? queuePosition,
+        int? priorityQueuePosition, int? heldQueuePosition)
+    {
+        var positions = new List<string>();
+        if (priorityQueuePosition is not null)
+        {
+            positions.Add($"Priority #{priorityQueuePosition.Value}");
+        }
+        if (queuePosition is not null)
+        {
+            positions.Add($"Queue #{queuePosition.Value}");
+        }
+        if (heldQueuePosition is not null)
+        {
+            positions.Add($"Held #{heldQueuePosition.Value}");
+        }
+
+        var wait = FormatWaitReason(waitReason, null);
+        return positions.Count == 0 ? wait : $"{wait} — {string.Join(", ", positions)}";
+    }
+
     private static bool CanDeleteData(TorrentDetailDto torrent)
     {
         return torrent.State is TorrentState.ResolvingMetadata or TorrentState.Queued or TorrentState.Downloading or
                 TorrentState.WaitingForFileCompletion or TorrentState.Error or TorrentState.Paused;
+    }
+
+    private enum QueueRowAction
+    {
+        MakeNext,
+        Hold,
+        ReleaseHold,
+        ResumeNext,
+        ResumeOnHold,
     }
 
     private static string FormatCallbackState(string? state)

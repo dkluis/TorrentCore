@@ -17,6 +17,11 @@ public enum TorrentCoreOperation: String, Sendable {
     case addMagnet
     case pause
     case resume
+    case makeNext
+    case hold
+    case releaseHold
+    case resumeNext
+    case resumeOnHold
     case remove
     case refreshMetadata
     case resetMetadata
@@ -33,6 +38,11 @@ public enum TorrentCoreOperation: String, Sendable {
         case .addMagnet,
              .pause,
              .resume,
+             .makeNext,
+             .hold,
+             .releaseHold,
+             .resumeNext,
+             .resumeOnHold,
              .remove,
              .refreshMetadata,
              .resetMetadata,
