@@ -149,6 +149,21 @@ torrent id, action, prior queue intent, resulting queue intent, and any displace
 
 ### Slice 0: Repository Safety Gate And Baseline
 
+Status: completed on August 19, 2026.
+
+#### Recorded Baseline
+
+- Baseline source commit: `f0f254011f49f8f23ffe1d1fe26840992c75ee60`.
+- Service version: `0.7.0`.
+- WebUI version: `0.7.0`.
+- Public API contract version: `1`.
+- Normalized committed OpenAPI SHA-256:
+  `5b296aad58910c50ca0a601bad618200024e1468bb08f92f3377bf04d6de726a`.
+- `dotnet build TorrentCore.sln`: succeeded with zero warnings and zero errors.
+- `dotnet test TorrentCore.sln --no-build`: all 319 tests passed with no failures or skips.
+- All previously outstanding recovery documentation and the approved queue/load planning documents were committed and
+  pushed to `origin/main` before implementation began.
+
 #### Work
 
 - Inspect staged, unstaged, and untracked files before any implementation change.
