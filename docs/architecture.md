@@ -176,6 +176,20 @@ accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to
   magnets retry in oldest-yielded order. A lone unresolved magnet is not rotated.
 - Metadata attempt and last-yield timestamps are durable. Recovery refresh, restart, and reset actions do not extend
   the active time slice; an operator pause releases the attempt clock.
+- An incomplete active download receives a separate durable no-payload-progress clock. Only an increase in the
+  monotonic completed-piece byte count restarts it; transfer rate, peers, tracker results, and protocol traffic do not.
+  The clock continues across Service/VPN engine recreation, while ordinary queued, Held, and Paused time is excluded.
+- When eligible runnable work is still waiting after normal admission, downloads whose payload clock exceeds
+  `DownloadNoProgressTimeSliceMinutes` may yield. Reconciliation selects the oldest no-progress start first, with
+  torrent id as the tie-breaker, and stops only enough downloads to usefully fill waiting slots. A lone stale download
+  is never stopped merely because its interval expired.
+- Automatic download yield retains runnable intent, partial payload, recovery history, and a durable last-yield time.
+  It is neither Pause nor Hold. Priority work remains first; ordinary unresolved and resolved work that has not already
+  auto-yielded runs before automatic retries; retries run in oldest-yielded order. Readmission starts a fresh full
+  interval.
+- Download rotation is fail-closed. A failed stop ends rotation for that tick without bypassing the oldest candidate.
+  The yielded state is persisted before any replacement starts. An uncertain persistence result admits no replacement
+  and is verified before the original manager can restart, preventing a falsely yielded or doubly admitted torrent.
 - Automatic recovery applies only to torrents occupying active metadata-resolution or download slots; queued and
   terminal torrents do not run recovery actions.
 - Repeated cold recovery cycles use bounded progressive backoff (`1x`, `2x`, `4x`, then `8x`) from the configured

@@ -89,11 +89,18 @@ internal static class TorrentQueuePolicy
         var queuedPriority = priorityLane.Where(item => !item.IsActive &&
                                                         item.Snapshot.State == TorrentState.Queued)
                                          .ToArray();
-        var ordinary = nonHeld.Where(item => item.Snapshot.PriorityQueueOrder is null)
-                              .OrderBy(OrdinaryOrder)
-                              .ThenBy(item => item.Snapshot.AddedAtUtc)
-                              .ThenBy(item => item.Snapshot.TorrentId)
-                              .ToArray();
+        var ordinaryNeverYielded = nonHeld
+            .Where(item => item.Snapshot.PriorityQueueOrder is null && !item.Snapshot.IsDownloadYielded)
+            .OrderBy(OrdinaryOrder)
+            .ThenBy(item => item.Snapshot.AddedAtUtc)
+            .ThenBy(item => item.Snapshot.TorrentId)
+            .ToArray();
+        var automaticallyYielded = nonHeld
+            .Where(item => item.Snapshot.PriorityQueueOrder is null && item.Snapshot.IsDownloadYielded)
+            .OrderBy(item => item.Snapshot.DownloadLastYieldedAtUtc ?? DateTimeOffset.MaxValue)
+            .ThenBy(item => item.Snapshot.TorrentId)
+            .ToArray();
+        var ordinary = ordinaryNeverYielded.Concat(automaticallyYielded).ToArray();
 
         var ordinaryMetadataLane = nonHeld.Where(item => item.WorkKind == TorrentQueueWorkKind.Metadata)
                                           .OrderBy(OrdinaryOrder)
@@ -180,7 +187,7 @@ internal static class TorrentQueuePolicy
 
         if (!priorityBlocked)
         {
-            foreach (var item in ordinary.Where(item => item.WorkKind == TorrentQueueWorkKind.Download))
+            foreach (var item in ordinaryNeverYielded.Where(item => item.WorkKind == TorrentQueueWorkKind.Download))
             {
                 if (!CanAdmit(item, activeDownloads.Count, activeMetadata.Count,
                         maxActiveMetadataResolutions, maxActiveDownloads) && displaceableMetadata.Count > 0)
@@ -200,7 +207,18 @@ internal static class TorrentQueuePolicy
                 Admit(item, activeDownloads, activeMetadata, admissionOrder, admittedIds);
             }
 
-            foreach (var item in ordinary.Where(item => item.WorkKind == TorrentQueueWorkKind.Metadata))
+            foreach (var item in ordinaryNeverYielded.Where(item => item.WorkKind == TorrentQueueWorkKind.Metadata))
+            {
+                if (!CanAdmit(item, activeDownloads.Count, activeMetadata.Count,
+                        maxActiveMetadataResolutions, maxActiveDownloads))
+                {
+                    break;
+                }
+
+                Admit(item, activeDownloads, activeMetadata, admissionOrder, admittedIds);
+            }
+
+            foreach (var item in automaticallyYielded)
             {
                 if (!CanAdmit(item, activeDownloads.Count, activeMetadata.Count,
                         maxActiveMetadataResolutions, maxActiveDownloads))

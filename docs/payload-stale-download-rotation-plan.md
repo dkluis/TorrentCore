@@ -1,6 +1,7 @@
 # Payload-Stale Download Rotation Plan
 
-Status: Slices 0 and 1 completed on August 20, 2026. Payload-clock evaluation and automatic yielding have not started.
+Status: Slices 0 through 4 completed on August 20, 2026. API/UI diagnostics, History recency, and the final load matrix
+remain in Slices 5 and 6.
 
 This plan adds fair rotation for active downloads that receive no payload while other work is waiting. The same
 workstream also corrects History recency so records are found and ordered by their latest lifecycle change instead of
@@ -165,6 +166,11 @@ historical last-yield time.
 
 ### Slice 2: Payload-Progress Clock
 
+Status: completed on August 20, 2026. Synchronized MonoTorrent and fake-runtime observations use the monotonic durable
+completed-piece byte count. First admission starts the clock, positive durable growth restarts it, zero growth preserves
+it, and peer/rate activity is ignored. Ordinary queued, Held, Paused, terminal, and seeding states do not retain an
+active clock; recovery suspension preserves an existing active attempt until reconciliation restores it.
+
 #### Work
 
 - Implement a pure transition function over prior snapshot, observed downloaded bytes, activity state, and current
@@ -180,6 +186,11 @@ historical last-yield time.
 - Pause and fresh re-admission receive the agreed clock behavior.
 
 ### Slice 3: Automatic Yield And Shared Admission
+
+Status: completed on August 20, 2026. Serialized reconciliation fills existing capacity, selects only enough stale
+active downloads to serve remaining eligible work, stops and durably marks each successful yield, then reuses the
+shared admission policy. Priority remains first, ordinary unresolved and resolved work precedes automatic retries, and
+automatic retries use oldest-yielded order. Yield never changes runnable intent to Pause or Hold.
 
 #### Work
 
@@ -198,6 +209,12 @@ historical last-yield time.
 - Multiple stale candidates yield only as many slots as can be used.
 
 ### Slice 4: Restart And Recovery Separation
+
+Status: completed on August 20, 2026. Recovery queues preserve an existing active clock and automatic-yield class,
+while explicit queue intent and ordinary capacity transitions apply their own clock semantics. Cold recovery continues
+to use its separate peer/rate-aware state. Stop failure ends rotation for the tick without bypassing the oldest stale
+candidate. Persistence failure admits no replacement and verifies durable state before deciding whether restarting the
+original manager is safe; an unverifiable outcome remains stopped for later deterministic recovery.
 
 #### Work
 

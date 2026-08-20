@@ -59,6 +59,8 @@ public sealed class SqliteTorrentStateStoreTests
             await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
             var now = DateTimeOffset.UtcNow;
             var torrent = CreateSnapshot();
+            torrent.ProgressPercent = 41.015625;
+            torrent.DownloadedBytes = 420;
             torrent.DownloadColdSinceUtc = now.AddHours(-4);
             torrent.DownloadNoProgressStartedAtUtc = now.AddMinutes(-30);
             torrent.DownloadLastYieldedAtUtc = now.AddMinutes(-5);
@@ -73,6 +75,8 @@ public sealed class SqliteTorrentStateStoreTests
 
             Assert.NotNull(reloaded);
             Assert.Equal(torrent.DownloadColdSinceUtc, reloaded.DownloadColdSinceUtc);
+            Assert.Equal(420, reloaded.DownloadedBytes);
+            Assert.Equal(torrent.ProgressPercent, reloaded.ProgressPercent);
             Assert.Equal(torrent.DownloadNoProgressStartedAtUtc, reloaded.DownloadNoProgressStartedAtUtc);
             Assert.Equal(torrent.DownloadLastYieldedAtUtc, reloaded.DownloadLastYieldedAtUtc);
             Assert.True(reloaded.IsDownloadYielded);

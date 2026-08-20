@@ -164,8 +164,15 @@ effective values returned by the Service.
 - persists as `DownloadNoProgressTimeSliceMinutes` and applies live without a Service restart
 - existing active downloads start with a fresh full interval at their first post-upgrade active observation because
   older persistence cannot prove when payload bytes last increased
-- Slice 1 persists the setting and rotation state; payload-clock evaluation and automatic download yielding are not
-  active until the later rotation slices
+- an active incomplete download becomes eligible after its monotonic durable completed-piece byte count has not
+  increased for the full interval; peers and reported transfer speed do not restart this clock
+- expiry does nothing when no eligible runnable work is waiting; when work is waiting, TorrentCore yields only enough
+  oldest-stale downloads to use the available replacements
+- automatic yield preserves partial payload and runnable intent, runs behind priority and ordinary never-yielded work,
+  and retries with other automatic yields in oldest-yielded order
+- Service/VPN engine recovery preserves an existing active clock; ordinary queued, Held, and Paused time does not count
+- a failed manager stop ends rotation for that tick, and a failed or uncertain yielded-state write admits no
+  replacement
 - currently exposed through the runtime-settings API/Swagger and preserved by the native client mapping; operator
   Settings controls are delivered with the UI slice
 

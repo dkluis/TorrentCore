@@ -62,6 +62,10 @@ Representative coverage areas:
   per rotation
 - protected priority-metadata attempts, priority-tail rotation, final ordinary-tail expiry, restart persistence, and
   the configurable future-action allowance
+- durable payload-progress clocks, including first observation, zero growth, positive completed-piece growth,
+  peer/rate independence, recovery suspension, automatic-yield readmission, and terminal-state clearing
+- stale-download selection with no-waiter protection, oldest-clock/torrent-id ordering, exact replacement counts,
+  priority/ordinary/automatic-retry ordering, and retained partial-payload state
 - data-path cleanup
 - client options and path defaults
 - normalized OpenAPI contract generation for native clients

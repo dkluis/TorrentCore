@@ -55,6 +55,26 @@ events after `TooManyOpenConnections`, verify the deployed MonoTorrent package. 
 `3.0.3-alpha.unstable.rev0049` can leak its host-wide open-connection count on failed encryption or handshake paths.
 Per-torrent stop/start recovery does not reset that host-wide counter; a complete Service process restart does.
 
+## Download Has Peers Or Speed But No Durable Progress
+
+Payload-stale rotation is separate from zero-peer/cold recovery. Its clock advances whenever an active incomplete
+download's durable completed-piece byte count does not increase. Connected peers, reported speed, announces, and
+recovery restarts do not reset that clock. Expiry does not stop a lone download; another eligible runnable torrent must
+be waiting.
+
+Useful events to inspect:
+
+- `torrent.download.rotation_yielded` confirms the stale torrent, durable byte count, interval, and intended
+  replacement
+- `torrent.download.rotation_late_progress` means durable progress arrived during the stop boundary, so TorrentCore
+  restarted the same download instead of yielding it
+- `torrent.download.rotation_stop_failed` means no replacement was admitted and the oldest candidate will retry later
+- `torrent.download.rotation_persist_failed` means no replacement was admitted; its details report whether the
+  durable yielded state could be verified and whether restarting the original manager was safe
+
+Automatically yielded work stays runnable, retains partial files, and retries after priority and ordinary
+never-yielded work. It should not appear as operator Paused or Held.
+
 ## Completion Callback Problems
 
 Remember:

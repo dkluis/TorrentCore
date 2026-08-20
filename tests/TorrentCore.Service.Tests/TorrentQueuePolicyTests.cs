@@ -163,9 +163,35 @@ public sealed class TorrentQueuePolicyTests
             result.Diagnostics[metadata[2].Snapshot.TorrentId].WaitReason);
     }
 
+    [Fact]
+    public void AutomaticallyYieldedDownloads_FollowAllOrdinaryWork_AndRetryOldestYieldFirst()
+    {
+        var ordinaryDownload = Item("ordinary-download", TorrentQueueWorkKind.Download, 4, isActive: false);
+        var ordinaryMetadata = Item("ordinary-metadata", TorrentQueueWorkKind.Metadata, 5, isActive: false);
+        var newerYield = Item("newer-yield", TorrentQueueWorkKind.Download, 1, isActive: false,
+            isDownloadYielded: true, downloadLastYieldedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-5));
+        var olderYield = Item("older-yield", TorrentQueueWorkKind.Download, 2, isActive: false,
+            isDownloadYielded: true, downloadLastYieldedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-10));
+
+        var result = TorrentQueuePolicy.Evaluate(
+            [newerYield, ordinaryMetadata, olderYield, ordinaryDownload],
+            maxActiveMetadataResolutions: 2,
+            maxActiveDownloads: 4);
+
+        Assert.Equal(
+            [
+                ordinaryDownload.Snapshot.TorrentId,
+                ordinaryMetadata.Snapshot.TorrentId,
+                olderYield.Snapshot.TorrentId,
+                newerYield.Snapshot.TorrentId,
+            ],
+            result.AdmissionOrder);
+    }
+
     private static TorrentQueuePolicyItem Item(string name, TorrentQueueWorkKind kind, long ordinaryOrder,
         bool isActive, long? priorityOrder = null, bool isHeld = false,
-        DateTimeOffset? attemptStartedAtUtc = null)
+        DateTimeOffset? attemptStartedAtUtc = null, bool isDownloadYielded = false,
+        DateTimeOffset? downloadLastYieldedAtUtc = null)
     {
         var state = isActive
             ? kind == TorrentQueueWorkKind.Metadata ? TorrentState.ResolvingMetadata : TorrentState.Downloading
@@ -190,6 +216,8 @@ public sealed class TorrentQueuePolicyTests
             OrdinaryQueueOrder = ordinaryOrder,
             PriorityQueueOrder = priorityOrder,
             IsQueueHeld = isHeld,
+            IsDownloadYielded = isDownloadYielded,
+            DownloadLastYieldedAtUtc = downloadLastYieldedAtUtc,
             MetadataResolutionAttemptStartedAtUtc = attemptStartedAtUtc,
         };
         return new TorrentQueuePolicyItem(snapshot, kind, isActive);

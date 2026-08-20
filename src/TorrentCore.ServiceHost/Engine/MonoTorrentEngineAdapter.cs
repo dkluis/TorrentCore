@@ -231,7 +231,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 try
                 {
                     var manager         = await AddOrGetManagerAsync(snapshot, cancellationToken);
-                    var updatedSnapshot = CreateUpdatedSnapshot(snapshot, manager, now);
+                    var updatedSnapshot = CreateUpdatedSnapshot(
+                        snapshot, manager, now, preserveActiveDownloadAttemptWhenStopped: true);
                     var previousState   = snapshot.State;
                     TorrentCompletionFinalizationCheckResult? finalizationResult = null;
                     var observedFiles = GetObservedFilePaths(manager);
@@ -264,7 +265,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                             updatedSnapshot.State != ContractTorrentState.Paused    &&
                             updatedSnapshot.State != ContractTorrentState.Error)
                         {
-                            updatedSnapshot = CreateQueuedSnapshot(updatedSnapshot, now);
+                            updatedSnapshot = CreateQueuedSnapshot(
+                                updatedSnapshot, now, preserveDownloadAttempt: true);
                         }
                     }
 
@@ -1689,7 +1691,55 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
-        foreach (var torrentId in policy.AdmissionOrder)
+        await AdmitQueuedTorrentsAsync(
+            managedTorrents, policy.AdmissionOrder, now, cancellationToken);
+
+        managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
+        var rotationSelection = EvaluateDownloadRotation(
+            managedTorrents, runtimeSettings, now);
+        var successfulYieldCount = 0;
+        foreach (var torrentId in rotationSelection.YieldTorrentIds)
+        {
+            var entry = managedTorrents.First(candidate => candidate.Snapshot.TorrentId == torrentId);
+            var replacementTorrentId = rotationSelection.ReplacementTorrentIds
+                .Skip(successfulYieldCount)
+                .FirstOrDefault();
+            var outcome = await TryYieldStaleDownloadAsync(
+                entry.Snapshot,
+                entry.Manager,
+                replacementTorrentId == Guid.Empty ? null : replacementTorrentId,
+                runtimeSettings,
+                now,
+                cancellationToken);
+            if (outcome == DownloadRotationYieldOutcome.StopFailed)
+            {
+                break;
+            }
+
+            if (outcome == DownloadRotationYieldOutcome.Yielded)
+            {
+                successfulYieldCount++;
+            }
+        }
+
+        if (successfulYieldCount == 0)
+        {
+            return;
+        }
+
+        managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
+        policy = EvaluateManagedQueuePolicy(managedTorrents, runtimeSettings);
+        await AdmitQueuedTorrentsAsync(
+            managedTorrents, policy.AdmissionOrder, now, cancellationToken);
+    }
+
+    private async Task AdmitQueuedTorrentsAsync(
+        IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents,
+        IReadOnlyList<Guid> admissionOrder,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        foreach (var torrentId in admissionOrder)
         {
             var (snapshot, manager) = managedTorrents.First(entry => entry.Snapshot.TorrentId == torrentId);
             var current = await torrentStateStore.GetAsync(torrentId, cancellationToken);
@@ -1715,17 +1765,231 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
     }
 
+    private async Task<DownloadRotationYieldOutcome> TryYieldStaleDownloadAsync(
+        TorrentSnapshot selectedSnapshot,
+        TorrentManager manager,
+        Guid? replacementTorrentId,
+        RuntimeSettingsSnapshot runtimeSettings,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var current = await torrentStateStore.GetAsync(selectedSnapshot.TorrentId, cancellationToken);
+        if (current is null)
+        {
+            return DownloadRotationYieldOutcome.NoLongerEligible;
+        }
+
+        var projected = CreateUpdatedSnapshot(current, manager, now);
+        if (!IsDownloadStillEligibleToYield(projected, manager, runtimeSettings, now))
+        {
+            await torrentStateStore.UpdateAsync(projected, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(projected, cancellationToken);
+            return DownloadRotationYieldOutcome.NoLongerEligible;
+        }
+
+        try
+        {
+            await EnsureManagerStoppedAsync(manager, cancellationToken, current.TorrentId);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            await WriteDownloadRotationFailureAsync(
+                "torrent.download.rotation_stop_failed",
+                $"Could not stop stale download '{current.Name}'; rotation will retry it on a later tick.",
+                current,
+                exception,
+                new
+                {
+                    current.DownloadNoProgressStartedAtUtc,
+                    IntervalMinutes = runtimeSettings.DownloadNoProgressTimeSliceMinutes,
+                    ReplacementTorrentId = replacementTorrentId,
+                });
+            return DownloadRotationYieldOutcome.StopFailed;
+        }
+
+        var stoppedProjection = CreateUpdatedSnapshot(projected, manager, now);
+        if (stoppedProjection.DownloadedBytes > projected.DownloadedBytes)
+        {
+            await RestoreDownloadAfterLateProgressAsync(
+                stoppedProjection, manager, runtimeSettings, now, cancellationToken);
+            return DownloadRotationYieldOutcome.NoLongerEligible;
+        }
+
+        var yielded = CreateQueuedSnapshot(stoppedProjection, now);
+        yielded.DownloadNoProgressStartedAtUtc = null;
+        yielded.DownloadLastYieldedAtUtc = now;
+        yielded.IsDownloadYielded = true;
+        yielded.PriorityQueueOrder = null;
+        yielded.PriorityMetadataAttemptsRemaining = null;
+
+        try
+        {
+            await torrentStateStore.UpdateAsync(yielded, cancellationToken);
+        }
+        catch (Exception persistenceException)
+        {
+            TorrentSnapshot? persistedAfterFailure = null;
+            Exception? verificationException = null;
+            try
+            {
+                persistedAfterFailure = await torrentStateStore.GetAsync(
+                    yielded.TorrentId, CancellationToken.None);
+            }
+            catch (Exception exception)
+            {
+                verificationException = exception;
+            }
+
+            var yieldWasCommitted = persistedAfterFailure is
+            {
+                State: ContractTorrentState.Queued,
+                DesiredState: TorrentDesiredState.Runnable,
+                IsDownloadYielded: true,
+            } && persistedAfterFailure.DownloadLastYieldedAtUtc == now;
+            Exception? restartException = null;
+            var restartAttempted = persistedAfterFailure is not null && !yieldWasCommitted;
+            if (restartAttempted)
+            {
+                try
+                {
+                    await EnsureManagerStartedAsync(manager, CancellationToken.None);
+                }
+                catch (Exception exception)
+                {
+                    restartException = exception;
+                }
+            }
+
+            await WriteDownloadRotationFailureAsync(
+                "torrent.download.rotation_persist_failed",
+                $"Stopped stale download '{current.Name}' but could not persist its yielded state; no replacement was admitted.",
+                current,
+                persistenceException,
+                new
+                {
+                    YieldWasCommitted = yieldWasCommitted,
+                    PersistenceVerificationError = verificationException?.Message,
+                    RestartAttempted = restartAttempted,
+                    RestartSucceeded = restartAttempted && restartException is null,
+                    RestartError = restartException?.Message,
+                    ReplacementTorrentId = replacementTorrentId,
+                });
+            throw;
+        }
+
+        await torrentHistoryService.ObserveSnapshotAsync(yielded, cancellationToken);
+        await WriteQueueRuntimeEventAsync(
+            "torrent.download.rotation_yielded",
+            $"Download '{yielded.Name}' yielded its slot after receiving no durable payload progress.",
+            yielded,
+            new
+            {
+                yielded.DownloadedBytes,
+                NoProgressStartedAtUtc = projected.DownloadNoProgressStartedAtUtc,
+                YieldedAtUtc = now,
+                NoProgressMinutes = projected.DownloadNoProgressStartedAtUtc is { } startedAt
+                    ? (now - startedAt).TotalMinutes
+                    : (double?) null,
+                IntervalMinutes = runtimeSettings.DownloadNoProgressTimeSliceMinutes,
+                PriorState = current.State,
+                ReplacementTorrentId = replacementTorrentId,
+                QueueDisposition = "automatically_yielded",
+            },
+            cancellationToken);
+        return DownloadRotationYieldOutcome.Yielded;
+    }
+
+    private async Task RestoreDownloadAfterLateProgressAsync(
+        TorrentSnapshot stoppedProjection,
+        TorrentManager manager,
+        RuntimeSettingsSnapshot runtimeSettings,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        await EnsureManagerStartedAsync(manager, cancellationToken);
+        var restored = CreateUpdatedSnapshot(stoppedProjection, manager, now);
+        restored.State = ContractTorrentState.Downloading;
+        restored.DownloadNoProgressStartedAtUtc = now;
+        restored.IsDownloadYielded = false;
+        restored.ErrorMessage = null;
+        await torrentStateStore.UpdateAsync(restored, cancellationToken);
+        await torrentHistoryService.ObserveSnapshotAsync(restored, cancellationToken);
+        await WriteQueueRuntimeEventAsync(
+            "torrent.download.rotation_late_progress",
+            $"Download '{restored.Name}' remained active because durable payload progress arrived during rotation.",
+            restored,
+            new
+            {
+                restored.DownloadedBytes,
+                IntervalMinutes = runtimeSettings.DownloadNoProgressTimeSliceMinutes,
+            },
+            cancellationToken);
+    }
+
+    private Task WriteDownloadRotationFailureAsync(
+        string eventType,
+        string message,
+        TorrentSnapshot snapshot,
+        Exception exception,
+        object details)
+        => activityLogService.TryWriteActivityLogAsync(
+            new ActivityLogWriteRequest
+            {
+                Level = ActivityLogLevel.Warning,
+                Category = "torrent",
+                EventType = eventType,
+                Message = message,
+                TorrentId = snapshot.TorrentId,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                DetailsJson = JsonSerializer.Serialize(new
+                {
+                    Error = exception.Message,
+                    ExceptionType = exception.GetType().FullName,
+                    Details = details,
+                }),
+            },
+            CancellationToken.None);
+
+    private static bool IsDownloadStillEligibleToYield(
+        TorrentSnapshot snapshot,
+        TorrentManager manager,
+        RuntimeSettingsSnapshot runtimeSettings,
+        DateTimeOffset now)
+        => snapshot.DesiredState == TorrentDesiredState.Runnable && !snapshot.IsQueueHeld &&
+           manager.HasMetadata && !manager.Complete && IsManagerRunning(manager) &&
+           snapshot.ProgressPercent < 100 && snapshot.DownloadNoProgressStartedAtUtc is { } startedAt &&
+           now - startedAt >= TimeSpan.FromMinutes(runtimeSettings.DownloadNoProgressTimeSliceMinutes);
+
     private static TorrentQueuePolicyResult EvaluateManagedQueuePolicy(
         IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents,
         RuntimeSettingsSnapshot runtimeSettings)
         => TorrentQueuePolicy.Evaluate(
-            managedTorrents.Select(entry => new TorrentQueuePolicyItem(
-                entry.Snapshot,
-                entry.Manager.HasMetadata ? TorrentQueueWorkKind.Download : TorrentQueueWorkKind.Metadata,
-                IsManagerRunning(entry.Manager),
-                entry.Manager.Complete)).ToArray(),
+            CreateManagedQueuePolicyItems(managedTorrents),
             runtimeSettings.MaxActiveMetadataResolutions,
             runtimeSettings.MaxActiveDownloads);
+
+    private static TorrentDownloadRotationSelection EvaluateDownloadRotation(
+        IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents,
+        RuntimeSettingsSnapshot runtimeSettings,
+        DateTimeOffset now)
+        => TorrentDownloadRotationPolicy.Evaluate(
+            CreateManagedQueuePolicyItems(managedTorrents),
+            runtimeSettings.MaxActiveMetadataResolutions,
+            runtimeSettings.MaxActiveDownloads,
+            TimeSpan.FromMinutes(runtimeSettings.DownloadNoProgressTimeSliceMinutes),
+            now);
+
+    private static TorrentQueuePolicyItem[] CreateManagedQueuePolicyItems(
+        IReadOnlyList<(TorrentSnapshot Snapshot, TorrentManager Manager)> managedTorrents)
+        => managedTorrents.Select(entry => new TorrentQueuePolicyItem(
+            entry.Snapshot,
+            entry.Manager.HasMetadata ? TorrentQueueWorkKind.Download : TorrentQueueWorkKind.Metadata,
+            IsManagerRunning(entry.Manager),
+            entry.Manager.Complete)).ToArray();
 
     private Task WriteQueueRuntimeEventAsync(string eventType, string message, TorrentSnapshot snapshot,
         object details, CancellationToken cancellationToken)
@@ -2356,7 +2620,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
     }
 
-    private TorrentSnapshot CreateUpdatedSnapshot(TorrentSnapshot existing, TorrentManager manager, DateTimeOffset now)
+    private TorrentSnapshot CreateUpdatedSnapshot(
+        TorrentSnapshot existing,
+        TorrentManager manager,
+        DateTimeOffset now,
+        bool preserveActiveDownloadAttemptWhenStopped = false)
     {
         var state = MapState(manager, existing.State, existing.DesiredState);
         var totalBytes = manager.HasMetadata ? manager.Torrent?.Size ?? existing.TotalBytes :
@@ -2371,6 +2639,12 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             state = manager.Complete ? ContractTorrentState.Seeding : ContractTorrentState.Downloading;
         }
+
+        var downloadActivityState = ResolveDownloadActivityState(
+            existing, manager, totalBytes, downloadedBytes,
+            preserveActiveDownloadAttemptWhenStopped);
+        var progressClock = TorrentDownloadProgressClock.Evaluate(
+            existing, downloadedBytes, downloadActivityState, now);
 
         return new TorrentSnapshot
         {
@@ -2409,9 +2683,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             SeedingStartedAtUtc = ResolveSeedingStartedAtUtc(existing.SeedingStartedAtUtc, state, now),
             SeedingPolicyAppliedAtUtc = existing.SeedingPolicyAppliedAtUtc,
             DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
-            DownloadNoProgressStartedAtUtc = existing.DownloadNoProgressStartedAtUtc,
+            DownloadNoProgressStartedAtUtc = progressClock.NoProgressStartedAtUtc,
             DownloadLastYieldedAtUtc = existing.DownloadLastYieldedAtUtc,
-            IsDownloadYielded = existing.IsDownloadYielded,
+            IsDownloadYielded = progressClock.IsDownloadYielded,
             MetadataResolutionAttemptStartedAtUtc = manager.HasMetadata ? null :
                     existing.MetadataResolutionAttemptStartedAtUtc,
             MetadataResolutionLastYieldedAtUtc = manager.HasMetadata ? null :
@@ -2514,7 +2788,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             : projectedSnapshot;
     }
 
-    private static TorrentSnapshot CreateQueuedSnapshot(TorrentSnapshot snapshot, DateTimeOffset now)
+    private static TorrentSnapshot CreateQueuedSnapshot(
+        TorrentSnapshot snapshot,
+        DateTimeOffset now,
+        bool preserveDownloadAttempt = false)
     {
         snapshot.DesiredState               = TorrentDesiredState.Runnable;
         snapshot.State                      = ContractTorrentState.Queued;
@@ -2522,7 +2799,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         snapshot.DownloadRateBytesPerSecond = 0;
         snapshot.UploadRateBytesPerSecond   = 0;
         snapshot.LastActivityAtUtc          = now;
-        TorrentQueueIntentTransitions.ClearForPause(snapshot);
+        if (!preserveDownloadAttempt)
+        {
+            snapshot.DownloadNoProgressStartedAtUtc = null;
+            snapshot.IsDownloadYielded = false;
+        }
         return snapshot;
     }
 
@@ -3605,7 +3886,38 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         var boundedProgress = Math.Clamp(progressPercent, 0, 100);
-        return (long) Math.Round(totalBytes.Value * (boundedProgress / 100d), MidpointRounding.AwayFromZero);
+        var observedDownloadedBytes =
+            (long) Math.Round(totalBytes.Value * (boundedProgress / 100d), MidpointRounding.AwayFromZero);
+        return Math.Max(existingDownloadedBytes, observedDownloadedBytes);
+    }
+
+    private static TorrentDownloadActivityState ResolveDownloadActivityState(
+        TorrentSnapshot existing,
+        TorrentManager manager,
+        long? totalBytes,
+        long downloadedBytes,
+        bool preserveActiveDownloadAttemptWhenStopped)
+    {
+        var incomplete = totalBytes is null || downloadedBytes < totalBytes.Value;
+        if (existing.DesiredState == TorrentDesiredState.Runnable && !existing.IsQueueHeld &&
+            manager.HasMetadata && !manager.Complete && incomplete)
+        {
+            if (IsManagerRunning(manager))
+            {
+                return TorrentDownloadActivityState.Active;
+            }
+
+            if ((preserveActiveDownloadAttemptWhenStopped &&
+                 existing.State == ContractTorrentState.Downloading) ||
+                (existing.DownloadNoProgressStartedAtUtc is not null && !existing.IsDownloadYielded))
+            {
+                return TorrentDownloadActivityState.Suspended;
+            }
+
+            return TorrentDownloadActivityState.Queued;
+        }
+
+        return TorrentDownloadActivityState.Inactive;
     }
 
     private static long CalculateRecoveredCompletedDownloadedBytes(TorrentSnapshot snapshot)
@@ -4406,4 +4718,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         bool EngineStopReady = true);
 
     private sealed record SeedingPolicyApplicationResult(TorrentSnapshot Snapshot, bool EngineStopReady);
+
+    private enum DownloadRotationYieldOutcome
+    {
+        Yielded,
+        NoLongerEligible,
+        StopFailed,
+    }
 }

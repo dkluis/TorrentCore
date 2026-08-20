@@ -204,7 +204,63 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
         }
 
         torrents = await torrentStateStore.ListAsync(cancellationToken);
-        foreach (var torrentId in policy.AdmissionOrder)
+        await AdmitQueuedTorrentsAsync(torrents, policy.AdmissionOrder, now, cancellationToken);
+
+        torrents = await torrentStateStore.ListAsync(cancellationToken);
+        var rotationSelection = TorrentDownloadRotationPolicy.Evaluate(
+            torrents.Select(torrent => new TorrentQueuePolicyItem(
+                torrent,
+                torrent.TotalBytes is null ? TorrentQueueWorkKind.Metadata : TorrentQueueWorkKind.Download,
+                torrent.State is TorrentState.ResolvingMetadata or TorrentState.Downloading)).ToArray(),
+            runtimeSettings.MaxActiveMetadataResolutions,
+            runtimeSettings.MaxActiveDownloads,
+            TimeSpan.FromMinutes(runtimeSettings.DownloadNoProgressTimeSliceMinutes),
+            now);
+        foreach (var torrentId in rotationSelection.YieldTorrentIds)
+        {
+            var torrent = torrents.First(candidate => candidate.TorrentId == torrentId);
+            torrent.State = TorrentState.Queued;
+            torrent.ConnectedPeerCount = 0;
+            torrent.DownloadRateBytesPerSecond = 0;
+            torrent.UploadRateBytesPerSecond = 0;
+            torrent.DownloadNoProgressStartedAtUtc = null;
+            torrent.DownloadLastYieldedAtUtc = now;
+            torrent.IsDownloadYielded = true;
+            torrent.PriorityQueueOrder = null;
+            torrent.PriorityMetadataAttemptsRemaining = null;
+            torrent.LastActivityAtUtc = now;
+            await torrentStateStore.UpdateAsync(torrent, cancellationToken);
+            await torrentHistoryService.ObserveSnapshotAsync(torrent, cancellationToken);
+            await LogTorrentEventAsync(
+                "torrent.download.rotation_yielded",
+                $"Download '{torrent.Name}' yielded its slot after receiving no durable payload progress.",
+                torrent,
+                new
+                {
+                    torrent.DownloadedBytes,
+                    YieldedAtUtc = now,
+                    IntervalMinutes = runtimeSettings.DownloadNoProgressTimeSliceMinutes,
+                    QueueDisposition = "automatically_yielded",
+                },
+                cancellationToken);
+        }
+
+        if (rotationSelection.YieldTorrentIds.Count > 0)
+        {
+            torrents = await torrentStateStore.ListAsync(cancellationToken);
+            policy = TorrentQueuePolicy.EvaluateSnapshots(
+                torrents, runtimeSettings.MaxActiveMetadataResolutions, runtimeSettings.MaxActiveDownloads);
+            await AdmitQueuedTorrentsAsync(torrents, policy.AdmissionOrder, now, cancellationToken);
+        }
+    }
+
+    private async Task AdmitQueuedTorrentsAsync(
+        IReadOnlyList<TorrentSnapshot> torrents,
+        IReadOnlyList<Guid> admissionOrder,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        foreach (var torrentId in admissionOrder)
         {
             var torrent = torrents.First(torrent => torrent.TorrentId == torrentId);
             if (torrent.State != TorrentState.Queued || torrent.DesiredState != TorrentDesiredState.Runnable ||
@@ -213,11 +269,20 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 continue;
             }
 
+            var progressClock = TorrentDownloadProgressClock.Evaluate(
+                torrent,
+                torrent.DownloadedBytes,
+                torrent.TotalBytes is null
+                    ? TorrentDownloadActivityState.Inactive
+                    : TorrentDownloadActivityState.Active,
+                now);
             torrent.State = torrent.TotalBytes is null ? TorrentState.ResolvingMetadata : TorrentState.Downloading;
             torrent.ConnectedPeerCount = torrent.TotalBytes is null ? 0 : CalculatePeerCount(torrent);
             torrent.DownloadRateBytesPerSecond = torrent.TotalBytes is null ? 0 : CalculateDownloadRate(torrent);
             torrent.UploadRateBytesPerSecond = torrent.TotalBytes is null ? 0 : CalculateUploadRate(torrent);
             torrent.MetadataResolutionAttemptStartedAtUtc = torrent.TotalBytes is null ? now : null;
+            torrent.DownloadNoProgressStartedAtUtc = progressClock.NoProgressStartedAtUtc;
+            torrent.IsDownloadYielded = progressClock.IsDownloadYielded;
             torrent.LastActivityAtUtc = now;
             torrent.ErrorMessage = null;
             await torrentStateStore.UpdateAsync(torrent, cancellationToken);
@@ -237,6 +302,8 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
         torrent.UploadRateBytesPerSecond = 0;
         torrent.MetadataResolutionAttemptStartedAtUtc = null;
         torrent.MetadataResolutionLastYieldedAtUtc = yielded ? now : torrent.MetadataResolutionLastYieldedAtUtc;
+        torrent.DownloadNoProgressStartedAtUtc = null;
+        torrent.IsDownloadYielded = false;
         torrent.LastActivityAtUtc = now;
     }
 
@@ -442,10 +509,15 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
             torrent.TotalBytes ??= CalculateTotalBytes(torrent);
 
             var nextProgress = Math.Min(100, torrent.ProgressPercent + _serviceOptions.DownloadProgressPercentPerTick);
-            torrent.ProgressPercent = nextProgress;
-            torrent.DownloadedBytes = (long) Math.Round(
+            var nextDownloadedBytes = (long) Math.Round(
                 torrent.TotalBytes.Value * (nextProgress / 100d), MidpointRounding.AwayFromZero
             );
+            var progressClock = TorrentDownloadProgressClock.Evaluate(
+                torrent, nextDownloadedBytes, TorrentDownloadActivityState.Active, now);
+            torrent.ProgressPercent = nextProgress;
+            torrent.DownloadedBytes = Math.Max(torrent.DownloadedBytes, nextDownloadedBytes);
+            torrent.DownloadNoProgressStartedAtUtc = progressClock.NoProgressStartedAtUtc;
+            torrent.IsDownloadYielded = progressClock.IsDownloadYielded;
             torrent.TrackerCount      = Math.Max(torrent.TrackerCount, CalculateTrackerCount(torrent));
             torrent.LastActivityAtUtc = now;
 
@@ -455,6 +527,8 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 if (!finalizationResult.IsReady)
                 {
                     torrent.State = TorrentState.WaitingForFileCompletion;
+                    torrent.DownloadNoProgressStartedAtUtc = null;
+                    torrent.IsDownloadYielded = false;
                     torrent.CompletedAtUtc = null;
                     torrent.SeedingStartedAtUtc = null;
                     torrent.ConnectedPeerCount = 0;
@@ -479,6 +553,8 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 {
                     var shouldRecordPolicyApplication = torrent.SeedingPolicyAppliedAtUtc is null;
                     torrent.State                      = TorrentState.Completed;
+                    torrent.DownloadNoProgressStartedAtUtc = null;
+                    torrent.IsDownloadYielded = false;
                     torrent.ConnectedPeerCount         = 0;
                     torrent.DownloadRateBytesPerSecond = 0;
                     torrent.UploadRateBytesPerSecond   = 0;
@@ -515,6 +591,8 @@ public sealed class FakeTorrentRuntimeService(ITorrentStateStore torrentStateSto
                 }
 
                 torrent.State                      = TorrentState.Seeding;
+                torrent.DownloadNoProgressStartedAtUtc = null;
+                torrent.IsDownloadYielded = false;
                 torrent.ConnectedPeerCount         = CalculatePeerCount(torrent);
                 torrent.DownloadRateBytesPerSecond = 0;
                 torrent.UploadRateBytesPerSecond   = CalculateUploadRate(torrent);

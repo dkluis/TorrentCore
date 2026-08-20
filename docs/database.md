@@ -85,6 +85,12 @@ Current core tables:
 - migration 22 adds nullable download no-progress and last-yield timestamps plus the non-null download-yielded queue
   marker. Existing rows receive null timestamps and a false marker, so an active download receives a fresh full
   interval from its first post-upgrade active observation without changing queue intent or cold-recovery history.
+- `download_no_progress_started_at_utc` is present only for an active or recovery-suspended download attempt. Durable
+  completed-piece growth restarts it; automatic yield and ordinary queue intent clear it.
+- `is_download_yielded` identifies the current automatic-retry queue class, while
+  `download_last_yielded_at_utc` retains historical yield time and orders retries. Successful readmission clears the
+  marker without discarding the historical timestamp. Stop/persistence failure never writes a false yielded marker or
+  admits replacement work ahead of the durable update.
 
 Important history fields include:
 
