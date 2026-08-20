@@ -46,6 +46,15 @@ magnets, and retry oldest-yielded first. The existing long-cold recovery and aba
 cleanup; they do not provide timely queue fairness during a large burst. See
 [payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md).
 
+## History Last-Updated Filtering
+
+Deliver the History recency correction with payload-stale download rotation. Replace Submitted with Last Updated in
+the native macOS and WebUI History tables, apply From and Through to `last_updated_at_utc` for every history record,
+and default to Last Updated descending. This lets an item submitted on an earlier day appear when it completes, receives
+callback feedback, is removed, is abandoned, or is otherwise updated during the selected range. The existing history
+timestamp is sufficient; no additional history column is needed. The delivery details and acceptance criteria are in
+[payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md#history-last-updated-view).
+
 ## Restart-Safe Queue Diagnostics
 
 Keep queue-position numbers and wait-reason text visible after Service recovery.
@@ -103,8 +112,9 @@ Agreed behavior:
 
 Paused remains separate from Held. Pause is an indefinite operator stop, while Hold is runnable work deferred until
 ordinary queued work is admitted. An incomplete paused torrent can Resume at the ordinary queue tail, Resume Next, or
-Resume on Hold. See
-[queue-controls-and-restart-diagnostics-plan.md](queue-controls-and-restart-diagnostics-plan.md).
+Resume on Hold. The implemented policy is documented in [architecture.md](architecture.md); the completed delivery
+record is in
+[archive/queue-controls-and-restart-diagnostics-plan.md](archive/queue-controls-and-restart-diagnostics-plan.md).
 
 ## Persistence Scalability
 

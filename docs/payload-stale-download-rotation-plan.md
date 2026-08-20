@@ -2,9 +2,10 @@
 
 Status: approved for planning on August 19, 2026. No implementation has started.
 
-This plan adds fair rotation for active downloads that receive no payload while other work is waiting. It depends on
-the durable ordering and shared admission policy in
-[queue-controls-and-restart-diagnostics-plan.md](queue-controls-and-restart-diagnostics-plan.md).
+This plan adds fair rotation for active downloads that receive no payload while other work is waiting. The same
+workstream also corrects History recency so records are found and ordered by their latest lifecycle change instead of
+their original submission. It depends on the durable ordering and shared admission policy documented in
+[architecture.md](architecture.md).
 
 ## Outcome
 
@@ -89,6 +90,22 @@ Summary/detail diagnostics and the WebUI must make automatic rotation observable
 Use the existing persistent logging service. One event is written when a download yields, including torrent id,
 downloaded bytes, no-progress duration, configured interval, prior state, replacement torrent when known, and resulting
 queue disposition. Do not log every no-progress tick.
+
+## History Last-Updated View
+
+The native macOS UI and WebUI History tables currently filter by submission date. That hides records submitted on an
+earlier day even when completion, callback feedback, removal, abandonment, or another lifecycle update occurred during
+the selected range.
+
+Agreed behavior:
+
+- replace the History table's Submitted column with Last Updated
+- apply the From and Through filters to `last_updated_at_utc` for every history record and outcome
+- keep the existing inclusive Service-local calendar-date semantics for From and Through
+- default the History table to Last Updated descending so the newest lifecycle changes appear first
+- apply the same behavior in the native macOS UI and WebUI
+- continue using the existing persisted `torrent_history.last_updated_at_utc`; this change requires no new history
+  timestamp or history-table migration
 
 ## Final Policy Decisions
 
@@ -183,19 +200,24 @@ queue disposition. Do not log every no-progress tick.
 - Recovery actions do not reset the payload clock without byte growth.
 - Cancellation and manager-operation failures retain a recoverable durable state and structured diagnostics.
 
-### Slice 5: API, WebUI, Logging, And Setting Help
+### Slice 5: API, Operator UIs, History Recency, Logging, And Setting Help
 
 #### Work
 
 - Expose rotation state and capabilities through summary/detail contracts and client mappings.
 - Add the setting editor/help text to TorrentCore.WebUI.
 - Display active no-progress and automatically yielded status in torrent rows/details.
+- Change History range filtering to use `last_updated_at_utc` for every record.
+- Replace Submitted with Last Updated in both History tables and make Last Updated descending the default order.
 - Add yield activity events and focused WebUI/contract tests.
 
 #### Acceptance
 
 - Operators can distinguish automatically yielded, operator-paused, held, and ordinary queued torrents.
 - UI state survives Service restart and polling refresh.
+- A record submitted on an earlier day appears when its Last Updated value is inside the selected range, regardless of
+  state or outcome.
+- Both History tables show Last Updated and initially place the most recently updated record first.
 - Setting validation errors use the existing structured error path.
 - Logs explain each yield without creating per-tick noise.
 

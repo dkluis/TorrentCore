@@ -1,10 +1,11 @@
 # Queue Controls And Restart Diagnostics Plan
 
-Status: Slices 0 through 7 completed on August 19, 2026. Slice 8 remains a separate cutover and recovery exercise.
+Status: completed on August 20, 2026. All eight slices are implemented, released, deployed, and accepted from copied
+production persistence and activity-log evidence.
 
 This plan covers durable operator queue controls, explicit pause/resume behavior, and restart-safe queue diagnostics in
 the native macOS client and the supported `TorrentCore.WebUI`. Payload-stale download rotation is specified separately in
-[payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md).
+[payload-stale-download-rotation-plan.md](../payload-stale-download-rotation-plan.md).
 
 ## Outcomes
 
@@ -318,13 +319,27 @@ the WebUI provides the same actions as a secondary surface.
 
 ### Slice 8: Recovery Matrix, Documentation, And Cutover
 
-Status: in progress on August 19, 2026. The priority-resolver admission cascade found during the first production
-exercise is repaired by retaining priority through a protected metadata attempt. Make Next and Resume Next now capture
+Status: completed on August 20, 2026. The priority-resolver admission cascade found during the first production
+exercise was repaired by retaining priority through a protected metadata attempt. Make Next and Resume Next capture
 the configurable `PriorityMetadataAttempts` allowance (default `3`, range `1` through `10`); unsuccessful attempts move
 to the priority tail and final expiry moves to the ordinary tail. Both torrent tables split Wait into Reason, Queue #,
 Priority #, and Held # with Reason filtering and compound number sorting. The native table omits Upload to remain within
-SwiftUI's ten-column limit. Source version/build are `0.8.0`/`14`. Verification passed with 336 .NET tests, 36 Swift
-tests, synchronized OpenAPI, release-script syntax checks, and the unsigned Arm64 macOS build. DMG work remains.
+SwiftUI's ten-column limit.
+
+The released source version/build are `0.8.0`/`14` at commit
+`596ce3e5f94785dcaff0428676c2d5a19482b1ee`. The Dick Arm64 release
+`torrentcore.2026.08.19.Dick.QueueControls-Patch` was accepted and stapled under Apple notarization submission
+`dd5a4890-41a3-4040-8426-4fad3de263d6`; the final DMG SHA-256 is
+`4e788c2e9fe6b7e39a875f1036fc3fb9fce8e6cd6b62ca15d9dcbfc9854ed0d9`. Its mounted layout, package checksums,
+signatures, Gatekeeper assessment, and stapler ticket passed release verification before deployment.
+
+Copied production persistence and activity logs then confirmed schema migration 21, configured limits of eight
+combined active items and four metadata resolvers, a 15-minute metadata slice, and three protected priority attempts.
+The evidence included six protected-attempt yields, three final expiries to the ordinary tail, three priority metadata
+successes, and one ordinary metadata yield. Priority-tail order was preserved across attempts; the active ceiling was
+never exceeded; eight active downloads correctly left new priority entries waiting without displacing a download; and
+held work remained held while non-held runnable work existed. The logs explained each transition without per-tick
+mutation noise.
 
 #### Work
 

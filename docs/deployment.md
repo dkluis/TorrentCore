@@ -223,6 +223,16 @@ The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 release was staged p
 checksum, Gatekeeper assessment, mounted file checksums, required root helpers, all three app signatures, and
 machine-local connection-file exclusion passed outside-sandbox verification.
 
+The Dick `torrentcore.2026.08.19.Dick.QueueControls-Patch` Arm64 release was staged permanently under
+`Deployments/TorrentCore-Deployments/Dick` from queue-controls source commit
+`596ce3e5f94785dcaff0428676c2d5a19482b1ee`. Apple accepted notarization submission
+`dd5a4890-41a3-4040-8426-4fad3de263d6`. The final stapled DMG SHA-256 is
+`4e788c2e9fe6b7e39a875f1036fc3fb9fce8e6cd6b62ca15d9dcbfc9854ed0d9`; mounted layout, package checksums, all app
+signatures, Gatekeeper assessment, and the stapler ticket passed outside-sandbox verification. Deployment and copied
+production-database validation on August 20 confirmed version `0.8.0`/build `14`, schema migration 21, durable queue
+intent, protected priority-attempt rotation and expiry, hold behavior, and enforcement of the combined active-work
+ceiling without download preemption.
+
 From the mounted DMG, begin with:
 
 ```bash
