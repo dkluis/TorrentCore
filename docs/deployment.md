@@ -233,6 +233,16 @@ production-database validation on August 20 confirmed version `0.8.0`/build `14`
 intent, protected priority-attempt rotation and expiry, hold behavior, and enforcement of the combined active-work
 ceiling without download preemption.
 
+The Dick `torrentcore.2026.08.20.Dick.PayloadStaleRotation-Patch` Arm64 release was staged permanently under
+`Deployments/TorrentCore-Deployments/Dick` from clean payload-rotation source commit
+`97d660f9fda486f76bc83fd709583d520ffcfad7`. Apple accepted notarization submission
+`5c1bc95d-a675-4f7e-a8b5-cbb853636e6a`. The final stapled DMG SHA-256 is
+`afa1ea93a07d9845c0eb9830b27cdbfdf1253784ec0d7566b72360b8fc3c651f`; version `0.8.0`/build `15`, schema migration
+22, protected machine-local WebUI connection-file exclusion, all app and DMG signatures, Gatekeeper assessment,
+stapler ticket, and disk-image checksum passed release and independent outside-sandbox verification. This release is
+the pre-Slice-6 deployment candidate for payload-stale download rotation, its durable operator diagnostics and
+settings, and Last Updated history filtering.
+
 From the mounted DMG, begin with:
 
 ```bash
