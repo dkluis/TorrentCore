@@ -358,9 +358,14 @@ public sealed class MonoTorrentLifecycleTests
             CancellationToken cancellationToken)
             => Inner.AssignNextOrdinaryQueueOrderAsync(torrentId, cancellationToken);
 
-        public Task<long?> AssignNextPriorityQueueOrderAsync(Guid torrentId,
+        public Task<long?> AssignNextPriorityQueueOrderAsync(Guid torrentId, int priorityMetadataAttempts,
             CancellationToken cancellationToken)
-            => Inner.AssignNextPriorityQueueOrderAsync(torrentId, cancellationToken);
+            => Inner.AssignNextPriorityQueueOrderAsync(
+                torrentId, priorityMetadataAttempts, cancellationToken);
+
+        public Task<bool> YieldPriorityMetadataAttemptAsync(Guid torrentId, int remainingAttempts,
+            CancellationToken cancellationToken)
+            => Inner.YieldPriorityMetadataAttemptAsync(torrentId, remainingAttempts, cancellationToken);
 
         public Task<bool> SetQueueHeldAsync(Guid torrentId, bool isHeld,
             CancellationToken cancellationToken)
@@ -375,8 +380,9 @@ public sealed class MonoTorrentLifecycleTests
             => Inner.ReleaseQueueHoldsAsync(torrentIds, cancellationToken);
 
         public Task<TorrentSnapshot?> ResumeWithQueueIntentAsync(Guid torrentId, TorrentQueueResumeMode mode,
-            DateTimeOffset resumedAtUtc, CancellationToken cancellationToken)
-            => Inner.ResumeWithQueueIntentAsync(torrentId, mode, resumedAtUtc, cancellationToken);
+            DateTimeOffset resumedAtUtc, int priorityMetadataAttempts, CancellationToken cancellationToken)
+            => Inner.ResumeWithQueueIntentAsync(
+                torrentId, mode, resumedAtUtc, priorityMetadataAttempts, cancellationToken);
 
         public Task DeleteAsync(Guid torrentId, CancellationToken cancellationToken)
             => Inner.DeleteAsync(torrentId, cancellationToken);

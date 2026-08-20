@@ -146,6 +146,15 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (options.PriorityMetadataAttempts is
+            < TorrentCoreServiceOptions.MinimumPriorityMetadataAttempts or
+            > TorrentCoreServiceOptions.MaximumPriorityMetadataAttempts)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:PriorityMetadataAttempts must be between {TorrentCoreServiceOptions.MinimumPriorityMetadataAttempts} and {TorrentCoreServiceOptions.MaximumPriorityMetadataAttempts}."
+            );
+        }
+
         if (options.AutomaticMetadataResetStuckThresholdSeconds is
             < TorrentCoreServiceOptions.MinimumAutomaticMetadataResetStuckThresholdSeconds or
             > TorrentCoreServiceOptions.MaximumAutomaticMetadataResetStuckThresholdSeconds)

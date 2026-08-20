@@ -80,11 +80,15 @@ internal static class TorrentQueuePolicy
                          .ThenBy(item => item.Snapshot.TorrentId)
                          .ToArray();
         var nonHeld = queued.Where(item => !item.Snapshot.IsQueueHeld).ToArray();
-        var priority = nonHeld.Where(item => item.Snapshot.PriorityQueueOrder is not null)
-                              .OrderBy(item => item.Snapshot.PriorityQueueOrder)
-                              .ThenBy(OrdinaryOrder)
-                              .ThenBy(item => item.Snapshot.TorrentId)
-                              .ToArray();
+        var priorityLane = eligible.Where(item => !item.Snapshot.IsQueueHeld &&
+                                                  item.Snapshot.PriorityQueueOrder is not null)
+                                   .OrderBy(item => item.Snapshot.PriorityQueueOrder)
+                                   .ThenBy(OrdinaryOrder)
+                                   .ThenBy(item => item.Snapshot.TorrentId)
+                                   .ToArray();
+        var queuedPriority = priorityLane.Where(item => !item.IsActive &&
+                                                        item.Snapshot.State == TorrentState.Queued)
+                                         .ToArray();
         var ordinary = nonHeld.Where(item => item.Snapshot.PriorityQueueOrder is null)
                               .OrderBy(OrdinaryOrder)
                               .ThenBy(item => item.Snapshot.AddedAtUtc)
@@ -139,10 +143,12 @@ internal static class TorrentQueuePolicy
             stopIds.Add(stopped.Snapshot.TorrentId);
         }
 
-        var displaceableMetadata = activeMetadata.ToList();
+        var displaceableMetadata = activeMetadata
+                                    .Where(item => item.Snapshot.PriorityQueueOrder is null)
+                                    .ToList();
         Guid? priorityDisplacementId = null;
         var priorityBlocked = false;
-        foreach (var item in priority)
+        foreach (var item in queuedPriority)
         {
             if (CanAdmit(item, activeDownloads.Count, activeMetadata.Count,
                     maxActiveMetadataResolutions, maxActiveDownloads))
@@ -216,10 +222,13 @@ internal static class TorrentQueuePolicy
             ApplyQueuedDiagnostic(diagnostics, ordinaryDownloadLane[index], index + 1, admittedIds);
         }
 
-        for (var index = 0; index < priority.Length; index++)
+        for (var index = 0; index < priorityLane.Length; index++)
         {
-            var current = diagnostics[priority[index].Snapshot.TorrentId];
-            diagnostics[priority[index].Snapshot.TorrentId] = current with { PriorityQueuePosition = index + 1 };
+            var current = diagnostics[priorityLane[index].Snapshot.TorrentId];
+            diagnostics[priorityLane[index].Snapshot.TorrentId] = current with
+            {
+                PriorityQueuePosition = index + 1,
+            };
         }
 
         for (var index = 0; index < held.Length; index++)

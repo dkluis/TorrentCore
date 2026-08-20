@@ -69,6 +69,11 @@ public enum TorrentCoreHelpCatalog {
             "Limits one unresolved magnet's turn when another magnet is waiting.",
             "After this many minutes, TorrentCore yields the metadata slot to a waiting unresolved magnet. A lone resolver keeps running, never-tried magnets run first, and yielded magnets retry oldest first. Changes apply live."
         )
+        public static let priorityMetadataAttempts = help(
+            "Priority Metadata Attempts",
+            "Sets how many protected metadata turns a Make Next or Resume Next request receives.",
+            "After an unsuccessful turn, the magnet moves to the end of the priority line. When the allowance is exhausted, it returns to the end of the ordinary metadata queue. The allowed range is 1 through 10. Changes apply only to future priority requests."
+        )
         public static let automaticMetadataResetStuckThresholdSeconds = help(
             "Automatic Reset Stuck Threshold Seconds",
             "Limits how long an automatic metadata reset may run before isolation.",
@@ -276,6 +281,7 @@ public enum TorrentCoreHelpCatalog {
             deleteLogsForCompletedTorrents, maxActiveMetadataResolutions,
             maxActiveDownloads, metadataRefreshStaleSeconds,
             metadataRefreshRestartDelaySeconds, metadataResolutionTimeSliceMinutes,
+            priorityMetadataAttempts,
             automaticMetadataResetStuckThresholdSeconds, coldDownloadRecoveryThresholdMinutes,
             coldDownloadRecoveryIntervalMinutes, coldDownloadAbandonAfterHours,
             engineConnectionFailureLogBurstLimit, engineConnectionFailureLogWindowSeconds,

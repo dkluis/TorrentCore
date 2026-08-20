@@ -5,6 +5,7 @@ public sealed class TorrentsPageState
     public string SearchText { get; set; } = string.Empty;
     public string StateFilter { get; set; } = string.Empty;
     public string CategoryFilter { get; set; } = string.Empty;
+    public string ReasonFilter { get; set; } = string.Empty;
     public string SortBy { get; set; } = string.Empty;
     public bool SortDescending { get; set; } = true;
     public int PageIndex { get; set; }

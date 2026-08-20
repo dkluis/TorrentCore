@@ -14,15 +14,17 @@ public sealed class TorrentQueueIntentTransitionsTests
         Assert.True(snapshot.IsQueueHeld);
         Assert.Null(snapshot.PriorityQueueOrder);
 
-        TorrentQueueIntentTransitions.AssignPriorityOrder(snapshot, 4);
+        TorrentQueueIntentTransitions.AssignPriorityOrder(snapshot, 4, 3);
 
         Assert.False(snapshot.IsQueueHeld);
         Assert.Equal(4, snapshot.PriorityQueueOrder);
+        Assert.Equal(3, snapshot.PriorityMetadataAttemptsRemaining);
 
         TorrentQueueIntentTransitions.SetHeld(snapshot);
 
         Assert.True(snapshot.IsQueueHeld);
         Assert.Null(snapshot.PriorityQueueOrder);
+        Assert.Null(snapshot.PriorityMetadataAttemptsRemaining);
     }
 
     [Fact]
@@ -39,7 +41,7 @@ public sealed class TorrentQueueIntentTransitionsTests
         Assert.Null(snapshot.PriorityQueueOrder);
         Assert.False(snapshot.IsQueueHeld);
         Assert.Throws<InvalidOperationException>(
-            () => TorrentQueueIntentTransitions.AssignPriorityOrder(snapshot, 1));
+            () => TorrentQueueIntentTransitions.AssignPriorityOrder(snapshot, 1, 3));
         Assert.Throws<InvalidOperationException>(() => TorrentQueueIntentTransitions.SetHeld(snapshot));
     }
 

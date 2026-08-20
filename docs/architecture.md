@@ -159,9 +159,13 @@ accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to
 - Queued torrents wait inside TorrentCore until slots open.
 - Runnable work has a durable ordinary queue order. New magnets and normal resumes enter at the tail; migration
   backfills older rows by added time and torrent id.
-- Make Next adds a durable global priority order across unresolved and resolved queued work. Admission consumes the
-  priority. It may yield one active metadata resolver closest to time-slice expiration, but it never displaces an
-  active download or raises the combined active-work ceiling.
+- Make Next adds a durable global priority order across unresolved and resolved queued work. Resolved work consumes
+  priority on download admission. Unresolved work retains priority while its protected metadata attempt is active, so
+  lower-priority work and ordinary downloads cannot immediately displace it. It never displaces an active download or
+  raises the combined active-work ceiling.
+- Make Next and Resume Next capture the current `PriorityMetadataAttempts` allowance. After each unsuccessful metadata
+  time slice, the magnet moves to the priority tail with one fewer attempt. After the final attempt it moves to the
+  ordinary metadata tail. Metadata success consumes priority. Order and remaining attempts survive restart.
 - Hold excludes queued work until no non-held runnable work remains queued. Automatic release consumes the hold and
   preserves ordinary order. Pause remains a separate indefinite operator state and clears priority and Hold intent.
 - Incomplete paused work can Resume at the ordinary tail, Resume Next into priority order, or Resume on Hold. These

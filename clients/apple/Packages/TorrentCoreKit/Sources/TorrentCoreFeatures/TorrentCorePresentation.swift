@@ -23,15 +23,18 @@ public struct TorrentCoreTorrentFilter: Equatable, Hashable, Sendable {
     public var searchText: String
     public var state: String?
     public var category: TorrentCoreTorrentCategoryFilter
+    public var waitReason: String?
 
     public init(
         searchText: String = "",
         state: String? = nil,
-        category: TorrentCoreTorrentCategoryFilter = .all
+        category: TorrentCoreTorrentCategoryFilter = .all,
+        waitReason: String? = nil
     ) {
         self.searchText = searchText
         self.state = state
         self.category = category
+        self.waitReason = waitReason
     }
 
     public func apply(
@@ -46,6 +49,13 @@ public struct TorrentCoreTorrentFilter: Equatable, Hashable, Sendable {
             }
             if let state, !state.isEmpty, torrent.state.rawValue != state {
                 return false
+            }
+            if let waitReason, !waitReason.isEmpty {
+                if waitReason == "__not_waiting" {
+                    guard torrent.waitReason == nil else { return false }
+                } else if torrent.waitReason?.rawValue != waitReason {
+                    return false
+                }
             }
             switch category {
             case .all:
@@ -131,6 +141,13 @@ public struct TorrentCoreTorrentListItem: Identifiable, Hashable, Sendable {
     public var downloadRate: Int64 { summary.downloadRateBytesPerSecond }
     public var uploadRate: Int64 { summary.uploadRateBytesPerSecond }
     public var peers: Int { summary.connectedPeerCount }
+    public var reason: String { TorrentCoreDisplayFormatter.waitReason(summary.waitReason) }
+    public var queuePosition: Int? { summary.queuePosition }
+    public var priorityQueuePosition: Int? { summary.priorityQueuePosition }
+    public var heldQueuePosition: Int? { summary.heldQueuePosition }
+    public var queueSortValue: Int { summary.queuePosition ?? .min }
+    public var priorityQueueSortValue: Int { summary.priorityQueuePosition ?? .min }
+    public var heldQueueSortValue: Int { summary.heldQueuePosition ?? .min }
     public var wait: String {
         TorrentCoreDisplayFormatter.wait(
             summary.waitReason,
@@ -199,6 +216,10 @@ public enum TorrentCoreDisplayFormatter {
             parts.append("Held #\(held)")
         }
         return parts.isEmpty ? "--" : parts.joined(separator: " · ")
+    }
+
+    public static func waitReason(_ value: TorrentCoreWaitReason?) -> String {
+        value.map { splitIdentifier($0.rawValue) } ?? "Not waiting"
     }
 
     public static func category(_ key: String?) -> String {

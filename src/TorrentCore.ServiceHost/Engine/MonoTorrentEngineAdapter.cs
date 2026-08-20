@@ -745,8 +745,10 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             TorrentSnapshot queuedSnapshot;
             if (currentSnapshot.ProgressPercent < 100)
             {
+                var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
                 queuedSnapshot = await torrentStateStore.ResumeWithQueueIntentAsync(
-                    torrentId, TorrentQueueResumeMode.Normal, now, cancellationToken)
+                    torrentId, TorrentQueueResumeMode.Normal, now,
+                    runtimeSettings.PriorityMetadataAttempts, cancellationToken)
                     ?? throw InvalidQueueState(currentSnapshot, "resume");
             }
             else
@@ -812,10 +814,11 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         await _synchronizationGate.WaitAsync(cancellationToken);
         try
         {
+            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
             var changed = queueAction switch
             {
                 QueueIntentAction.MakeNext => await torrentStateStore.AssignNextPriorityQueueOrderAsync(
-                    torrentId, cancellationToken) is not null,
+                    torrentId, runtimeSettings.PriorityMetadataAttempts, cancellationToken) is not null,
                 QueueIntentAction.Hold => await torrentStateStore.SetQueueHeldAsync(
                     torrentId, true, cancellationToken),
                 QueueIntentAction.ReleaseHold => await torrentStateStore.SetQueueHeldAsync(
@@ -854,7 +857,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         {
             ThrowIfAutomaticMetadataResetRunning(torrentId);
             var now = DateTimeOffset.UtcNow;
-            var queued = await torrentStateStore.ResumeWithQueueIntentAsync(torrentId, mode, now, cancellationToken)
+            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+            var queued = await torrentStateStore.ResumeWithQueueIntentAsync(
+                             torrentId, mode, now, runtimeSettings.PriorityMetadataAttempts, cancellationToken)
                          ?? throw InvalidQueueState(snapshot, action);
             await torrentHistoryService.ObserveSnapshotAsync(queued, cancellationToken);
             await SynchronizeCoreAsync(cancellationToken, includeAutomaticRecovery: false);
@@ -1600,18 +1605,47 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         foreach (var (snapshot, manager) in expiredMetadata)
         {
             var startedAt = snapshot.MetadataResolutionAttemptStartedAtUtc;
+            var isProtectedPriorityAttempt = snapshot.PriorityQueueOrder is not null;
+            var remainingPriorityAttempts = isProtectedPriorityAttempt
+                ? Math.Max(0, (snapshot.PriorityMetadataAttemptsRemaining ?? 1) - 1)
+                : 0;
             await EnsureManagerStoppedAsync(manager, cancellationToken);
             var queued = CreateQueuedSnapshot(CreateUpdatedSnapshot(snapshot, manager, now), now);
             queued.MetadataResolutionAttemptStartedAtUtc = null;
             queued.MetadataResolutionLastYieldedAtUtc = now;
             await torrentStateStore.UpdateAsync(queued, cancellationToken);
-            await torrentStateStore.AssignNextOrdinaryQueueOrderAsync(snapshot.TorrentId, cancellationToken);
-            await torrentHistoryService.ObserveSnapshotAsync(queued, cancellationToken);
-            await WriteQueueRuntimeEventAsync(
-                "torrent.metadata.resolution_yielded",
-                $"Metadata resolution for torrent '{snapshot.Name}' yielded its slot to queued work.", snapshot,
-                new { AttemptStartedAtUtc = startedAt, YieldedAtUtc = now,
-                    TimeSliceMinutes = runtimeSettings.MetadataResolutionTimeSliceMinutes }, cancellationToken);
+            if (isProtectedPriorityAttempt)
+            {
+                await torrentStateStore.YieldPriorityMetadataAttemptAsync(
+                    snapshot.TorrentId, remainingPriorityAttempts, cancellationToken);
+                await WriteQueueRuntimeEventAsync(
+                    remainingPriorityAttempts > 0
+                        ? "torrent.queue.priority_metadata_attempt_yielded"
+                        : "torrent.queue.priority_metadata_attempts_expired",
+                    remainingPriorityAttempts > 0
+                        ? $"Priority metadata resolution for torrent '{snapshot.Name}' exhausted an attempt and moved to the priority queue tail."
+                        : $"Priority metadata resolution for torrent '{snapshot.Name}' exhausted its final attempt and moved to the ordinary queue tail.",
+                    snapshot,
+                    new
+                    {
+                        AttemptStartedAtUtc = startedAt,
+                        YieldedAtUtc = now,
+                        TimeSliceMinutes = runtimeSettings.MetadataResolutionTimeSliceMinutes,
+                        RemainingPriorityAttempts = remainingPriorityAttempts,
+                    }, cancellationToken);
+            }
+            else
+            {
+                await torrentStateStore.AssignNextOrdinaryQueueOrderAsync(snapshot.TorrentId, cancellationToken);
+                await WriteQueueRuntimeEventAsync(
+                    "torrent.metadata.resolution_yielded",
+                    $"Metadata resolution for torrent '{snapshot.Name}' yielded its slot to queued work.", snapshot,
+                    new { AttemptStartedAtUtc = startedAt, YieldedAtUtc = now,
+                        TimeSliceMinutes = runtimeSettings.MetadataResolutionTimeSliceMinutes }, cancellationToken);
+            }
+
+            var persistedQueued = await torrentStateStore.GetAsync(snapshot.TorrentId, cancellationToken) ?? queued;
+            await torrentHistoryService.ObserveSnapshotAsync(persistedQueued, cancellationToken);
         }
 
         managedTorrents = await GetManagedTorrentsAsync(cancellationToken);
@@ -1673,7 +1707,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             updated.MetadataResolutionAttemptStartedAtUtc = manager.HasMetadata ? null : now;
             updated.ErrorMessage = null;
             await torrentStateStore.UpdateAsync(updated, cancellationToken);
-            if (current.PriorityQueueOrder is not null)
+            if (current.PriorityQueueOrder is not null && manager.HasMetadata)
             {
                 await torrentStateStore.ClearPriorityQueueOrderAsync(torrentId, cancellationToken);
             }
@@ -1942,6 +1976,17 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 entry.Key,
                 async () => await torrentStateStore.UpdateAsync(updatedSnapshot, cancellationToken)
             );
+            if (snapshot.PriorityQueueOrder is not null &&
+                snapshot.State == ContractTorrentState.ResolvingMetadata && entry.Value.HasMetadata)
+            {
+                await torrentStateStore.ClearPriorityQueueOrderAsync(entry.Key, cancellationToken);
+                await WriteQueueRuntimeEventAsync(
+                    "torrent.queue.priority_metadata_resolved",
+                    $"Priority metadata resolution succeeded for torrent '{snapshot.Name}'.",
+                    snapshot,
+                    new { snapshot.PriorityMetadataAttemptsRemaining },
+                    cancellationToken);
+            }
             await MeasureStorageOperationAsync(
                 "torrent_history_write",
                 entry.Key,

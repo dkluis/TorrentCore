@@ -211,10 +211,12 @@ public sealed class OpenApiContractTests
         var runtimeSettingsProperties =
                 document["components"]?["schemas"]?[nameof(RuntimeSettingsDto)]?["properties"];
         AssertVpnEgressSettingsShape(runtimeSettingsProperties);
+        Assert.NotNull(runtimeSettingsProperties?["priorityMetadataAttempts"]);
 
         var runtimeSettingsUpdateProperties =
                 document["components"]?["schemas"]?[nameof(UpdateRuntimeSettingsRequest)]?["properties"];
         AssertVpnEgressSettingsShape(runtimeSettingsUpdateProperties);
+        Assert.NotNull(runtimeSettingsUpdateProperties?["priorityMetadataAttempts"]);
 
         var hostStatusProperties =
                 document["components"]?["schemas"]?[nameof(EngineHostStatusDto)]?["properties"];

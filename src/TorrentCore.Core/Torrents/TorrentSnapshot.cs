@@ -36,6 +36,7 @@ public sealed class TorrentSnapshot
     public required DateTimeOffset                  AddedAtUtc                        { get; init; }
     public          long?                           OrdinaryQueueOrder                { get; set; }
     public          long?                           PriorityQueueOrder                { get; set; }
+    public          int?                            PriorityMetadataAttemptsRemaining { get; set; }
     public          bool                            IsQueueHeld                       { get; set; }
     public          DateTimeOffset?                 CompletedAtUtc                    { get; set; }
     public          DateTimeOffset?                 SeedingStartedAtUtc               { get; set; }

@@ -450,6 +450,12 @@ struct TorrentCoreMacServiceSettingsView: View {
                         identifier: "serviceSettings.metadataResolutionTimeSliceMinutes"
                     )
                     integerField(
+                        "Priority metadata attempts",
+                        value: draft.priorityMetadataAttempts,
+                        content: TorrentCoreHelpCatalog.Settings.priorityMetadataAttempts,
+                        identifier: "serviceSettings.priorityMetadataAttempts"
+                    )
+                    integerField(
                         "Reset stuck threshold seconds",
                         value: draft.automaticMetadataResetStuckThresholdSeconds,
                         content: TorrentCoreHelpCatalog.Settings.automaticMetadataResetStuckThresholdSeconds,
@@ -1107,6 +1113,9 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         if !(1...1_440).contains(draft.metadataResolutionTimeSliceMinutes) {
             return "Metadata resolution time slice must be between 1 and 1,440 minutes."
+        }
+        if !(1...10).contains(draft.priorityMetadataAttempts) {
+            return "Priority metadata attempts must be between 1 and 10."
         }
         if !(15...300).contains(draft.automaticMetadataResetStuckThresholdSeconds) {
             return "Automatic metadata reset stuck threshold must be between 15 and 300 seconds."

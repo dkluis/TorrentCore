@@ -9,9 +9,10 @@ private enum TorrentCoreMacTorrentSortField: String {
     case state
     case progress
     case download
-    case upload
     case peers
-    case wait
+    case queue
+    case priority
+    case held
 
     func comparator(descending: Bool) -> KeyPathComparator<TorrentCoreTorrentListItem> {
         let order: SortOrder = descending ? .reverse : .forward
@@ -38,16 +39,14 @@ private enum TorrentCoreMacTorrentSortField: String {
             KeyPathComparator(\TorrentCoreTorrentListItem.progress, order: order)
         case .download:
             KeyPathComparator(\TorrentCoreTorrentListItem.downloadRate, order: order)
-        case .upload:
-            KeyPathComparator(\TorrentCoreTorrentListItem.uploadRate, order: order)
         case .peers:
             KeyPathComparator(\TorrentCoreTorrentListItem.peers, order: order)
-        case .wait:
-            KeyPathComparator(
-                \TorrentCoreTorrentListItem.wait,
-                comparator: .localizedStandard,
-                order: order
-            )
+        case .queue:
+            KeyPathComparator(\TorrentCoreTorrentListItem.queueSortValue, order: order)
+        case .priority:
+            KeyPathComparator(\TorrentCoreTorrentListItem.priorityQueueSortValue, order: order)
+        case .held:
+            KeyPathComparator(\TorrentCoreTorrentListItem.heldQueueSortValue, order: order)
         }
     }
 
@@ -65,12 +64,14 @@ private enum TorrentCoreMacTorrentSortField: String {
             .progress
         case \TorrentCoreTorrentListItem.downloadRate:
             .download
-        case \TorrentCoreTorrentListItem.uploadRate:
-            .upload
         case \TorrentCoreTorrentListItem.peers:
             .peers
-        case \TorrentCoreTorrentListItem.wait:
-            .wait
+        case \TorrentCoreTorrentListItem.queueSortValue:
+            .queue
+        case \TorrentCoreTorrentListItem.priorityQueueSortValue:
+            .priority
+        case \TorrentCoreTorrentListItem.heldQueueSortValue:
+            .held
         default:
             nil
         }
@@ -82,6 +83,8 @@ struct TorrentCoreMacTorrentsView: View {
     private var storedStateFilter = ""
     @AppStorage("TorrentCore.Mac.Torrents.CategoryFilter.v1")
     private var storedCategoryFilter = ""
+    @AppStorage("TorrentCore.Mac.Torrents.ReasonFilter.v1")
+    private var storedReasonFilter = ""
     @AppStorage("TorrentCore.Mac.Torrents.PageSize.v1")
     private var storedPageSize = TorrentCoreTorrentPageSize.defaultValue.rawValue
     @AppStorage("TorrentCore.Mac.Torrents.SortField.v1")
@@ -393,16 +396,31 @@ struct TorrentCoreMacTorrentsView: View {
                 TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.Torrents.category)
             }
 
+            Picker("Reason", selection: $storedReasonFilter) {
+                Text("All Reasons").tag("")
+                ForEach(reasonFilterOptions, id: \.self) { reason in
+                    Text(reason.isEmpty ? "Not waiting" : TorrentCoreDisplayFormatter.splitIdentifier(reason))
+                        .tag(reason.isEmpty ? Self.notWaitingFilter : reason)
+                }
+            }
+            .frame(maxWidth: 230)
+            .accessibilityIdentifier("torrents.reasonFilter")
+            .onChange(of: storedReasonFilter) { _, _ in
+                pageIndex = 0
+            }
+
             Button("Clear") {
                 searchText = ""
                 storedStateFilter = ""
                 storedCategoryFilter = ""
+                storedReasonFilter = ""
                 pageIndex = 0
             }
             .disabled(
                 searchText.isEmpty
                     && storedStateFilter.isEmpty
                     && storedCategoryFilter.isEmpty
+                    && storedReasonFilter.isEmpty
             )
 
             Spacer()
@@ -498,13 +516,6 @@ struct TorrentCoreMacTorrentsView: View {
             .width(min: 90, ideal: 110)
             .customizationID("download")
 
-            TableColumn("Upload", value: \.uploadRate) { item in
-                Text(TorrentCoreDisplayFormatter.rate(item.uploadRate))
-                    .monospacedDigit()
-            }
-            .width(min: 90, ideal: 110)
-            .customizationID("upload")
-
             TableColumn("Peers", value: \.peers) { item in
                 Text(item.peers.formatted())
                     .monospacedDigit()
@@ -522,16 +533,32 @@ struct TorrentCoreMacTorrentsView: View {
             .width(min: 105, ideal: 135)
             .customizationID("category")
 
-            TableColumn(
-                "Wait",
-                value: \.wait,
-                comparator: .localizedStandard
-            ) { item in
-                Text(item.wait)
-                    .lineLimit(2)
+            TableColumn("Reason") { (item: TorrentCoreTorrentListItem) in
+                Text(item.reason)
             }
-            .width(min: 150, ideal: 210)
-            .customizationID("wait")
+            .width(min: 130, ideal: 175)
+            .customizationID("reason")
+
+            TableColumn("Queue #", value: \.queueSortValue) { item in
+                Text(item.queuePosition?.formatted() ?? "--")
+                    .monospacedDigit()
+            }
+            .width(min: 58, ideal: 68)
+            .customizationID("queuePosition")
+
+            TableColumn("Priority #", value: \.priorityQueueSortValue) { item in
+                Text(item.priorityQueuePosition?.formatted() ?? "--")
+                    .monospacedDigit()
+            }
+            .width(min: 65, ideal: 78)
+            .customizationID("priorityQueuePosition")
+
+            TableColumn("Held #", value: \.heldQueueSortValue) { item in
+                Text(item.heldQueuePosition?.formatted() ?? "--")
+                    .monospacedDigit()
+            }
+            .width(min: 52, ideal: 64)
+            .customizationID("heldQueuePosition")
         }
         .accessibilityIdentifier("torrents.table")
     }
@@ -643,11 +670,40 @@ struct TorrentCoreMacTorrentsView: View {
         let filter = TorrentCoreTorrentFilter(
             searchText: searchText,
             state: storedStateFilter.isEmpty ? nil : storedStateFilter,
-            category: categoryFilter
+            category: categoryFilter,
+            waitReason: storedReasonFilter.isEmpty ? nil : storedReasonFilter
         )
-        return filter.apply(to: allSummaries)
-            .map(TorrentCoreTorrentListItem.init)
-            .sorted(using: sortOrder)
+        let items = filter.apply(to: allSummaries).map(TorrentCoreTorrentListItem.init)
+        guard let comparator = sortOrder.first,
+              let field = TorrentCoreMacTorrentSortField.field(for: comparator.keyPath),
+              field == .queue || field == .priority || field == .held
+        else {
+            return items.sorted(using: sortOrder)
+        }
+
+        let descending = comparator.order == .reverse
+        return items.sorted { left, right in
+            let reasonOrder = left.reason.localizedStandardCompare(right.reason)
+            if reasonOrder != .orderedSame {
+                return reasonOrder == .orderedAscending
+            }
+            let leftValue = switch field {
+            case .queue: left.queueSortValue
+            case .priority: left.priorityQueueSortValue
+            case .held: left.heldQueueSortValue
+            default: 0
+            }
+            let rightValue = switch field {
+            case .queue: right.queueSortValue
+            case .priority: right.priorityQueueSortValue
+            case .held: right.heldQueueSortValue
+            default: 0
+            }
+            if leftValue != rightValue {
+                return descending ? leftValue > rightValue : leftValue < rightValue
+            }
+            return left.name.localizedStandardCompare(right.name) == .orderedAscending
+        }
     }
 
     private var currentPage: TorrentCoreTorrentPage<TorrentCoreTorrentListItem> {
@@ -715,6 +771,15 @@ struct TorrentCoreMacTorrentsView: View {
                 }
             }
             .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    private var reasonFilterOptions: [String] {
+        Set(allSummaries.map { $0.waitReason?.rawValue ?? "" })
+            .sorted { left, right in
+                let leftLabel = left.isEmpty ? "Not waiting" : left
+                let rightLabel = right.isEmpty ? "Not waiting" : right
+                return leftLabel.localizedStandardCompare(rightLabel) == .orderedAscending
+            }
     }
 
     private var resultRangeLabel: String {
@@ -894,6 +959,7 @@ struct TorrentCoreMacTorrentsView: View {
     }
 
     private static let uncategorizedFilter = "__uncategorized__"
+    private static let notWaitingFilter = "__not_waiting"
 }
 
 private extension TorrentCoreMacTorrentsView {

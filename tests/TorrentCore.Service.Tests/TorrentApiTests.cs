@@ -39,7 +39,7 @@ public sealed class TorrentApiTests
 
         Assert.NotNull(hostStatus);
         Assert.Equal(ServiceApiContract.CurrentVersion, hostStatus.ApiVersion);
-        Assert.Equal("0.7.0", hostStatus.ServiceVersion);
+        Assert.Equal("0.8.0", hostStatus.ServiceVersion);
         Assert.Matches("^[0-9a-f]{40}$", hostStatus.ServiceBuild);
         Assert.Equal("TorrentCore.Service", hostStatus.ServiceName);
         Assert.Equal("Fake", hostStatus.EngineRuntime);
@@ -465,6 +465,7 @@ public sealed class TorrentApiTests
         Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
         Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
         Assert.Equal(15, settings.MetadataResolutionTimeSliceMinutes);
+        Assert.Equal(3, settings.PriorityMetadataAttempts);
         Assert.Equal(30, settings.AutomaticMetadataResetStuckThresholdSeconds);
         Assert.Equal(120, settings.ColdDownloadRecoveryThresholdMinutes);
         Assert.Equal(60, settings.ColdDownloadRecoveryIntervalMinutes);
@@ -527,6 +528,7 @@ public sealed class TorrentApiTests
                 MaxActiveDownloads = 2,
                 MetadataRefreshStaleSeconds = 90,
                 MetadataRefreshRestartDelaySeconds = 30,
+                PriorityMetadataAttempts = 5,
                 AutomaticMetadataResetStuckThresholdSeconds = 45,
                 ColdDownloadRecoveryThresholdMinutes = 180,
                 ColdDownloadRecoveryIntervalMinutes = 45,
@@ -577,6 +579,7 @@ public sealed class TorrentApiTests
             Assert.Equal(2, settings.MaxActiveDownloads);
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+            Assert.Equal(5, settings.PriorityMetadataAttempts);
             Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
@@ -650,6 +653,7 @@ public sealed class TorrentApiTests
             Assert.Equal(2, settings.MaxActiveDownloads);
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
+            Assert.Equal(5, settings.PriorityMetadataAttempts);
             Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
@@ -790,6 +794,21 @@ public sealed class TorrentApiTests
         var response = await httpClient.PutAsJsonAsync(
             "api/host/runtime-settings",
             CreateDefaultRuntimeSettingsUpdateRequest(metadataResolutionTimeSliceMinutes: minutes));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(11)]
+    public async Task UpdateRuntimeSettings_RejectsInvalidPriorityMetadataAttempts(int attempts)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(priorityMetadataAttempts: attempts));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -4316,6 +4335,7 @@ public sealed class TorrentApiTests
         bool? engineAllowPeerExchange = false,
         int? automaticMetadataResetStuckThresholdSeconds = null,
         int? metadataResolutionTimeSliceMinutes = null,
+        int? priorityMetadataAttempts = null,
         int maxActiveDownloads = 4,
         bool? vpnEgressValidationEnabled = null,
         string? vpnEgressValidationEndpoint = null,
@@ -4350,6 +4370,7 @@ public sealed class TorrentApiTests
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
             MetadataResolutionTimeSliceMinutes = metadataResolutionTimeSliceMinutes,
+            PriorityMetadataAttempts = priorityMetadataAttempts,
             AutomaticMetadataResetStuckThresholdSeconds = automaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes = coldDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = coldDownloadRecoveryIntervalMinutes,

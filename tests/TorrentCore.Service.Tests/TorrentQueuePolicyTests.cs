@@ -78,6 +78,27 @@ public sealed class TorrentQueuePolicyTests
     }
 
     [Fact]
+    public void ActivePriorityResolver_IsProtectedUntilItsAttemptYields()
+    {
+        var protectedResolver = Item("protected", TorrentQueueWorkKind.Metadata, 1, isActive: true,
+            priorityOrder: 1, attemptStartedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-1));
+        var nextPriority = Item("next-priority", TorrentQueueWorkKind.Metadata, 2, isActive: false,
+            priorityOrder: 2);
+        var ordinaryDownload = Item("ordinary-download", TorrentQueueWorkKind.Download, 3, isActive: false);
+
+        var result = TorrentQueuePolicy.Evaluate(
+            [protectedResolver, nextPriority, ordinaryDownload],
+            maxActiveMetadataResolutions: 1,
+            maxActiveDownloads: 1
+        );
+
+        Assert.Empty(result.AdmissionOrder);
+        Assert.Empty(result.StopActiveTorrentIds);
+        Assert.Equal(1, result.Diagnostics[protectedResolver.Snapshot.TorrentId].PriorityQueuePosition);
+        Assert.Equal(2, result.Diagnostics[nextPriority.Snapshot.TorrentId].PriorityQueuePosition);
+    }
+
+    [Fact]
     public void HeldWork_ReleasesOnlyAfterNoNonHeldWorkRemainsQueued()
     {
         var ordinary = Item("ordinary", TorrentQueueWorkKind.Download, 1, isActive: false);

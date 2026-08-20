@@ -21,6 +21,7 @@ public sealed class UpdateRuntimeSettingsRequest
     public required int     MetadataRefreshStaleSeconds                  { get; init; }
     public required int     MetadataRefreshRestartDelaySeconds           { get; init; }
     public          int?    MetadataResolutionTimeSliceMinutes            { get; init; }
+    public          int?    PriorityMetadataAttempts                      { get; init; }
     public          int?    AutomaticMetadataResetStuckThresholdSeconds  { get; init; }
     public required int     ColdDownloadRecoveryThresholdMinutes         { get; init; }
     public required int     ColdDownloadRecoveryIntervalMinutes          { get; init; }

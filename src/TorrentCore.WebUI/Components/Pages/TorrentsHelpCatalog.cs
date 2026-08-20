@@ -17,7 +17,7 @@ public static class TorrentsHelpCatalog
     public static readonly SettingHelpContent Clear = new(
         "Clear",
         "Resets the local torrent filters.",
-        "Clear removes the current Name, State, and Category filters and leaves the page showing the full current torrent list from the active service endpoint."
+        "Clear removes the current Name, State, Category, and Reason filters and leaves the page showing the full current torrent list from the active service endpoint."
     );
 
     public static readonly SettingHelpContent Name = new(
@@ -46,6 +46,12 @@ public static class TorrentsHelpCatalog
         "Category",
         "Filters torrents by the stored TorrentCore category key.",
         "Use this to isolate one routing category such as TV or Movie, or choose Uncategorized to show torrents without a category assignment. Filtering is local to the currently loaded torrent list."
+    );
+
+    public static readonly SettingHelpContent Reason = new(
+        "Reason",
+        "Filters torrents by their current wait reason.",
+        "The reason describes why a torrent is waiting; queue, priority, and held positions are shown separately in the numeric columns. Filtering is local to the currently loaded torrent list."
     );
 
     public static readonly SettingHelpContent AutoRefresh = new(

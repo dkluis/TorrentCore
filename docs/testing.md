@@ -60,6 +60,8 @@ Representative coverage areas:
   MonoTorrent 20-magnet queue burst
 - durable metadata-resolution time slicing, never-tried-first rotation, oldest-yielded retry order, and one yield log
   per rotation
+- protected priority-metadata attempts, priority-tail rotation, final ordinary-tail expiry, restart persistence, and
+  the configurable future-action allowance
 - data-path cleanup
 - client options and path defaults
 - normalized OpenAPI contract generation for native clients
@@ -99,7 +101,8 @@ plus automatic History, Logs, and Service Settings loading without manual refres
 also verifies the shared settings-help catalog, native help popovers, constrained service-setting selectors, and
 show/hide behavior for the Torrents, History, and Logs inspectors. Service Settings UI coverage also verifies populated
 Downloads values and the inline category grid. Runtime-settings mapping coverage verifies that the metadata-resolution
-time slice, automatic-reset stuck threshold, all VPN egress policy fields, and Performance Timing Summaries survive
+time slice, priority metadata attempts, automatic-reset stuck threshold, all VPN egress policy fields, and Performance
+Timing Summaries survive
 draft creation, request encoding, save, and returned-value reconciliation.
 Native contract coverage also verifies that the optional full Service build commit maps through the generated client;
 older Service responses that omit it remain supported.

@@ -518,6 +518,7 @@ public enum TorrentCorePreviewFixtures {
         metadataRefreshRestartDelaySeconds: 5,
         metadataRefreshStaleSeconds: 300,
         metadataResolutionTimeSliceMinutes: 15,
+        priorityMetadataAttempts: 3,
         partialFileSuffix: ".!mt",
         partialFilesEnabled: true,
         retrievedAt: checkedAt,

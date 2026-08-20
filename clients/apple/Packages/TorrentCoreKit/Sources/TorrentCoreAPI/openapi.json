@@ -1046,6 +1046,10 @@
           "partialFilesEnabled": {
             "type": "boolean"
           },
+          "priorityMetadataAttempts": {
+            "format": "int32",
+            "type": "integer"
+          },
           "retrievedAtUtc": {
             "format": "date-time",
             "type": "string"
@@ -2313,6 +2317,11 @@
             "type": "integer"
           },
           "metadataResolutionTimeSliceMinutes": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "priorityMetadataAttempts": {
             "format": "int32",
             "nullable": true,
             "type": "integer"

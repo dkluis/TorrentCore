@@ -12,7 +12,9 @@ public interface ITorrentStateStore
     Task<long?>                          AssignNextOrdinaryQueueOrderAsync(Guid torrentId,
         CancellationToken cancellationToken);
     Task<long?>                          AssignNextPriorityQueueOrderAsync(Guid torrentId,
-        CancellationToken cancellationToken);
+        int priorityMetadataAttempts, CancellationToken cancellationToken);
+    Task<bool>                           YieldPriorityMetadataAttemptAsync(Guid torrentId,
+        int remainingAttempts, CancellationToken cancellationToken);
     Task<bool>                           SetQueueHeldAsync(Guid torrentId, bool isHeld,
         CancellationToken cancellationToken);
     Task<bool>                           ClearPriorityQueueOrderAsync(Guid torrentId,
@@ -20,6 +22,6 @@ public interface ITorrentStateStore
     Task<int>                            ReleaseQueueHoldsAsync(IReadOnlyList<Guid> torrentIds,
         CancellationToken cancellationToken);
     Task<TorrentSnapshot?>               ResumeWithQueueIntentAsync(Guid torrentId, TorrentQueueResumeMode mode,
-        DateTimeOffset resumedAtUtc, CancellationToken cancellationToken);
+        DateTimeOffset resumedAtUtc, int priorityMetadataAttempts, CancellationToken cancellationToken);
     Task                                 DeleteAsync(Guid torrentId, CancellationToken cancellationToken);
 }

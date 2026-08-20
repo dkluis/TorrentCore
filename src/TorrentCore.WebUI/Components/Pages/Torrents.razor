@@ -112,6 +112,22 @@
                                 </MudSelect>
                             </div>
 
+                            <div class="settings-field-block">
+                                <SettingHelpTrigger Content="@TorrentsHelpCatalog.Reason" />
+                                <MudSelect T="string"
+                                           Value="_state.ReasonFilter"
+                                           ValueChanged="OnReasonFilterChanged"
+                                           Variant="Variant.Outlined"
+                                           Margin="Margin.Dense"
+                                           Dense="true">
+                                    <MudSelectItem T="string" Value="@string.Empty">All</MudSelectItem>
+                                    @foreach (var reason in ReasonFilterOptions)
+                                    {
+                                        <MudSelectItem T="string" Value="@reason.Value">@reason.Label</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </div>
+
                             <div class="settings-field-block settings-field-block--toggle">
                                 <SettingHelpTrigger Content="@TorrentsHelpCatalog.AutoRefresh" />
                                 <MudCheckBox T="bool"
@@ -223,12 +239,27 @@
                                                            InitialDirection="@(GetInitialSortDirection(SortPeers))"
                                                            SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortPeers, direction))">Peers</MudTableSortLabel>
                                     </MudTh>
-                                    <MudTh>
+                                    <MudTh>Reason</MudTh>
+                                    <MudTh Class="torrents-position-column">
                                         <MudTableSortLabel T="TorrentSummaryDto"
-                                                           SortLabel="@SortWait"
-                                                           SortBy="@(torrent => (int?)torrent.WaitReason ?? -1)"
-                                                           InitialDirection="@(GetInitialSortDirection(SortWait))"
-                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortWait, direction))">Wait</MudTableSortLabel>
+                                                           SortLabel="@SortQueue"
+                                                           SortBy="@(_ => 0)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortQueue))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortQueue, direction))">Queue #</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh Class="torrents-position-column">
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortPriority"
+                                                           SortBy="@(_ => 0)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortPriority))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortPriority, direction))">Priority #</MudTableSortLabel>
+                                    </MudTh>
+                                    <MudTh Class="torrents-position-column">
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortHeld"
+                                                           SortBy="@(_ => 0)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortHeld))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortHeld, direction))">Held #</MudTableSortLabel>
                                     </MudTh>
                                     <MudTh>
                                         <MudTableSortLabel T="TorrentSummaryDto"
@@ -247,7 +278,10 @@
                                     <MudTd DataLabel="Down">@FormatRate(context.DownloadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Up">@FormatRate(context.UploadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Peers">@context.ConnectedPeerCount</MudTd>
-                                    <MudTd DataLabel="Wait" Class="operations-table-wrap">@FormatQueueStatus(context.WaitReason, context.QueuePosition, context.PriorityQueuePosition, context.HeldQueuePosition)</MudTd>
+                                    <MudTd DataLabel="Reason" Class="operations-table-wrap">@FormatWaitReason(context.WaitReason, null)</MudTd>
+                                    <MudTd DataLabel="Queue #" Class="torrents-position-column">@FormatQueuePosition(context.QueuePosition)</MudTd>
+                                    <MudTd DataLabel="Priority #" Class="torrents-position-column">@FormatQueuePosition(context.PriorityQueuePosition)</MudTd>
+                                    <MudTd DataLabel="Held #" Class="torrents-position-column">@FormatQueuePosition(context.HeldQueuePosition)</MudTd>
                                     <MudTd DataLabel="Callback" Class="operations-table-wrap">@FormatCallbackState(context.CompletionCallbackState)</MudTd>
                                     <MudTd DataLabel="Actions">
                                         @if (context.CanMakeNext || context.CanHold || context.CanReleaseHold || context.CanResumeNext || context.CanResumeOnHold)
@@ -630,6 +664,7 @@
     private const string StateKey = "torrents:list";
     private const int DefaultAutoRefreshSeconds = 15;
     private const string UncategorizedFilterValue = "__uncategorized";
+    private const string NotWaitingFilterValue = "__not_waiting";
     private const string SortName = "name";
     private const string SortCategory = "category";
     private const string SortState = "state";
@@ -637,7 +672,9 @@
     private const string SortDown = "down";
     private const string SortUp = "up";
     private const string SortPeers = "peers";
-    private const string SortWait = "wait";
+    private const string SortQueue = "queue";
+    private const string SortPriority = "priority";
+    private const string SortHeld = "held";
     private const string SortCallback = "callback";
 
     private readonly List<TorrentSummaryDto> _allTorrents = [];
@@ -699,6 +736,32 @@
                     );
             }
 
+            if (!string.IsNullOrWhiteSpace(_state.ReasonFilter))
+            {
+                query = string.Equals(_state.ReasonFilter, NotWaitingFilterValue, StringComparison.Ordinal)
+                    ? query.Where(torrent => torrent.WaitReason is null)
+                    : query.Where(torrent => string.Equals(
+                        torrent.WaitReason?.ToString(), _state.ReasonFilter, StringComparison.Ordinal));
+            }
+
+            if (_state.SortBy is SortQueue or SortPriority or SortHeld)
+            {
+                var reasonSorted = query.OrderBy(
+                    torrent => FormatWaitReason(torrent.WaitReason, null),
+                    StringComparer.OrdinalIgnoreCase);
+                Func<TorrentSummaryDto, int> position = _state.SortBy switch
+                {
+                    SortPriority => torrent => torrent.PriorityQueuePosition ?? int.MinValue,
+                    SortHeld => torrent => torrent.HeldQueuePosition ?? int.MinValue,
+                    _ => torrent => torrent.QueuePosition ?? int.MinValue,
+                };
+                return (_state.SortDescending
+                        ? reasonSorted.ThenByDescending(position)
+                        : reasonSorted.ThenBy(position))
+                    .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+            }
+
             return query
                 .OrderByDescending(torrent => torrent.AddedAtUtc)
                 .ThenBy(torrent => torrent.Name, StringComparer.OrdinalIgnoreCase)
@@ -713,6 +776,18 @@
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(static category => category, StringComparer.OrdinalIgnoreCase)
             .Cast<string>()
+            .ToArray();
+
+    private IReadOnlyList<(string Value, string Label)> ReasonFilterOptions =>
+        _allTorrents
+            .Select(torrent => torrent.WaitReason?.ToString() ?? NotWaitingFilterValue)
+            .Distinct(StringComparer.Ordinal)
+            .Select(value => (
+                Value: value,
+                Label: value == NotWaitingFilterValue
+                    ? "Not waiting"
+                    : FormatWaitReason(Enum.Parse<TorrentWaitReason>(value), null)))
+            .OrderBy(option => option.Label, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
     private bool CanShowSelectedActions => _selectedTorrentDetail is not null;
@@ -919,6 +994,7 @@
         _state.SearchText = string.Empty;
         _state.StateFilter = string.Empty;
         _state.CategoryFilter = string.Empty;
+        _state.ReasonFilter = string.Empty;
         _state.PageIndex = 0;
         PersistState();
         Feedback.Info("Filters cleared.");
@@ -930,6 +1006,14 @@
     private Task OnCategoryFilterChanged(string value)
     {
         _state.CategoryFilter = value;
+        _state.PageIndex = 0;
+        PersistState();
+        return Task.CompletedTask;
+    }
+
+    private Task OnReasonFilterChanged(string value)
+    {
+        _state.ReasonFilter = value;
         _state.PageIndex = 0;
         PersistState();
         return Task.CompletedTask;
@@ -1334,6 +1418,8 @@
         var wait = FormatWaitReason(waitReason, null);
         return positions.Count == 0 ? wait : $"{wait} — {string.Join(", ", positions)}";
     }
+
+    private static string FormatQueuePosition(int? position) => position?.ToString() ?? "--";
 
     private static bool CanDeleteData(TorrentDetailDto torrent)
     {

@@ -60,6 +60,7 @@ public sealed class SqliteTorrentStateStoreTests
 
             var priority = CreateSnapshot(infoHash: null);
             priority.PriorityQueueOrder = 7;
+            priority.PriorityMetadataAttemptsRemaining = 2;
             var held = CreateSnapshot(infoHash: null);
             held.IsQueueHeld = true;
             var paused = CreateSnapshot(infoHash: null);
@@ -80,6 +81,7 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.NotNull(reloadedPriority);
             Assert.Equal(1, reloadedPriority.OrdinaryQueueOrder);
             Assert.Equal(7, reloadedPriority.PriorityQueueOrder);
+            Assert.Equal(2, reloadedPriority.PriorityMetadataAttemptsRemaining);
             Assert.False(reloadedPriority.IsQueueHeld);
 
             Assert.NotNull(reloadedHeld);
@@ -122,9 +124,9 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.NotNull(staleFirst);
 
             var firstPriorityRequest = store.AssignNextPriorityQueueOrderAsync(
-                first.TorrentId, CancellationToken.None);
+                first.TorrentId, 3, CancellationToken.None);
             var secondPriorityRequest = store.AssignNextPriorityQueueOrderAsync(
-                second.TorrentId, CancellationToken.None);
+                second.TorrentId, 3, CancellationToken.None);
             var priorityOrders = await Task.WhenAll(firstPriorityRequest, secondPriorityRequest);
 
             Assert.Equal([1L, 2L], priorityOrders);
@@ -146,11 +148,12 @@ public sealed class SqliteTorrentStateStoreTests
 
             Assert.Equal(
                 3,
-                await store.AssignNextPriorityQueueOrderAsync(first.TorrentId, CancellationToken.None)
+                await store.AssignNextPriorityQueueOrderAsync(first.TorrentId, 3, CancellationToken.None)
             );
             var reprioritized = await store.GetAsync(first.TorrentId, CancellationToken.None);
             Assert.NotNull(reprioritized);
             Assert.Equal(3, reprioritized.PriorityQueueOrder);
+            Assert.Equal(3, reprioritized.PriorityMetadataAttemptsRemaining);
             Assert.False(reprioritized.IsQueueHeld);
 
             Assert.Equal(
@@ -158,6 +161,49 @@ public sealed class SqliteTorrentStateStoreTests
                 await store.AssignNextOrdinaryQueueOrderAsync(first.TorrentId, CancellationToken.None)
             );
             Assert.Equal(3, (await store.GetAsync(first.TorrentId, CancellationToken.None))!.OrdinaryQueueOrder);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task PriorityMetadataAttempts_YieldToPriorityTail_ThenExpireToOrdinaryTail()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-priority-attempts-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+            var store = new SqliteTorrentStateStore(databaseFilePath);
+            var first = CreateSnapshot(infoHash: null);
+            var second = CreateSnapshot(infoHash: null);
+            await store.InsertAsync(first, CancellationToken.None);
+            await store.InsertAsync(second, CancellationToken.None);
+            await store.AssignNextPriorityQueueOrderAsync(first.TorrentId, 3, CancellationToken.None);
+            await store.AssignNextPriorityQueueOrderAsync(second.TorrentId, 3, CancellationToken.None);
+
+            Assert.True(await store.YieldPriorityMetadataAttemptAsync(first.TorrentId, 2, CancellationToken.None));
+            var yielded = await new SqliteTorrentStateStore(databaseFilePath)
+                .GetAsync(first.TorrentId, CancellationToken.None);
+            Assert.NotNull(yielded);
+            Assert.Equal(3, yielded.PriorityQueueOrder);
+            Assert.Equal(2, yielded.PriorityMetadataAttemptsRemaining);
+            Assert.Equal(3, yielded.OrdinaryQueueOrder);
+
+            Assert.True(await store.YieldPriorityMetadataAttemptAsync(first.TorrentId, 0, CancellationToken.None));
+            var expired = await new SqliteTorrentStateStore(databaseFilePath)
+                .GetAsync(first.TorrentId, CancellationToken.None);
+            Assert.NotNull(expired);
+            Assert.Null(expired.PriorityQueueOrder);
+            Assert.Null(expired.PriorityMetadataAttemptsRemaining);
+            Assert.Equal(4, expired.OrdinaryQueueOrder);
         }
         finally
         {
@@ -188,11 +234,11 @@ public sealed class SqliteTorrentStateStoreTests
 
             var resumedAt = DateTimeOffset.UtcNow;
             var resumedNormal = await store.ResumeWithQueueIntentAsync(
-                normal.TorrentId, TorrentQueueResumeMode.Normal, resumedAt, CancellationToken.None);
+                normal.TorrentId, TorrentQueueResumeMode.Normal, resumedAt, 3, CancellationToken.None);
             var resumedPriority = await store.ResumeWithQueueIntentAsync(
-                priority.TorrentId, TorrentQueueResumeMode.Priority, resumedAt, CancellationToken.None);
+                priority.TorrentId, TorrentQueueResumeMode.Priority, resumedAt, 3, CancellationToken.None);
             var resumedHeld = await store.ResumeWithQueueIntentAsync(
-                held.TorrentId, TorrentQueueResumeMode.Hold, resumedAt, CancellationToken.None);
+                held.TorrentId, TorrentQueueResumeMode.Hold, resumedAt, 3, CancellationToken.None);
 
             Assert.NotNull(resumedNormal);
             Assert.NotNull(resumedPriority);

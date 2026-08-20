@@ -10,10 +10,12 @@ public static class TorrentQueueIntentTransitions
         torrent.OrdinaryQueueOrder = ordinaryQueueOrder;
     }
 
-    public static void AssignPriorityOrder(TorrentSnapshot torrent, long priorityQueueOrder)
+    public static void AssignPriorityOrder(TorrentSnapshot torrent, long priorityQueueOrder,
+        int priorityMetadataAttempts)
     {
         ArgumentNullException.ThrowIfNull(torrent);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(priorityQueueOrder);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(priorityMetadataAttempts);
 
         if (IsPaused(torrent))
         {
@@ -21,6 +23,7 @@ public static class TorrentQueueIntentTransitions
         }
 
         torrent.PriorityQueueOrder = priorityQueueOrder;
+        torrent.PriorityMetadataAttemptsRemaining = priorityMetadataAttempts;
         torrent.IsQueueHeld        = false;
     }
 
@@ -34,6 +37,7 @@ public static class TorrentQueueIntentTransitions
         }
 
         torrent.PriorityQueueOrder = null;
+        torrent.PriorityMetadataAttemptsRemaining = null;
         torrent.IsQueueHeld        = true;
     }
 
@@ -47,6 +51,7 @@ public static class TorrentQueueIntentTransitions
     {
         ArgumentNullException.ThrowIfNull(torrent);
         torrent.PriorityQueueOrder = null;
+        torrent.PriorityMetadataAttemptsRemaining = null;
         torrent.IsQueueHeld        = false;
     }
 
@@ -63,7 +68,10 @@ public static class TorrentQueueIntentTransitions
         if (torrent.PriorityQueueOrder is not null)
         {
             torrent.IsQueueHeld = false;
+            return;
         }
+
+        torrent.PriorityMetadataAttemptsRemaining = null;
     }
 
     private static bool IsPaused(TorrentSnapshot torrent)

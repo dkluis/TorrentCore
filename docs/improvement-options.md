@@ -1,7 +1,7 @@
 # Improvement Options
 
-This document records improvement options identified during the August 19, 2026 production load evaluation. It is
-not an implementation plan and does not describe current behavior. Current behavior remains defined by the code and
+This document records improvement options identified during the August 19, 2026 production load evaluation. Queue
+diagnostics, Make Next, and Hold have since been implemented; their current behavior is defined by the code and
 the active documentation, especially [architecture.md](architecture.md) and
 [operator-settings.md](operator-settings.md).
 
@@ -55,7 +55,8 @@ Observed behavior:
 - queued torrent rows, original submission timestamps, desired states, metadata attempt timestamps, and metadata yield
   timestamps survived restart
 - post-restart reconciliation continued yielding resolvers and starting replacement magnets
-- the native UI's persisted column customization had hidden the Wait column; the API and WebUI still exposed the data
+- the native UI's persisted column customization had hidden the former Wait column; current UIs expose separate
+  Reason, Queue #, Priority #, and Held # columns
 - activity logs record transitions but do not store a current numbered queue snapshot
 
 Required outcome:
@@ -65,9 +66,9 @@ Required outcome:
   reliable reconstruction from durable queue state
 - recovery must not rewrite queue priority, hold state, operator pause intent, or metadata time-slice history
 
-## Make Next Queue Control
+## Make Next Queue Control (Implemented)
 
-Add native macOS and WebUI actions that let an operator promote a queued unresolved magnet or resolved download.
+Native macOS and WebUI actions let an operator promote a queued unresolved magnet or resolved download.
 
 Agreed behavior:
 
@@ -81,11 +82,12 @@ Agreed behavior:
 - this action does not raise or bypass the configured combined active-work ceiling
 - later Make Next requests become priority 2, priority 3, and so on without replacing earlier requests
 - Make Next on a held item removes Hold before assigning priority
+- unresolved priority work keeps a protected metadata reservation for the configured number of attempts; unsuccessful
+  attempts rotate to the priority tail and final expiry moves to the ordinary tail
 
-## Hold In Queue Control
+## Hold In Queue Control (Implemented)
 
-Add native macOS and WebUI hold controls for queue entries that should run only after ordinary queued work has been
-admitted.
+Native macOS and WebUI hold controls defer queue entries until ordinary queued work has been admitted.
 
 Agreed behavior:
 

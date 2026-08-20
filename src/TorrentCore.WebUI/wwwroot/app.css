@@ -2138,6 +2138,11 @@ h1:focus {
     background: var(--tvz-surface);
 }
 
+.torrents-table .torrents-position-column {
+    width: 5.5rem;
+    white-space: nowrap;
+}
+
 .torrents-actions {
     display: flex;
     flex-wrap: wrap;

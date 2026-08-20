@@ -806,6 +806,30 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     await backfillCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
+            new SqliteMigrationDefinition(
+                21, "persist_priority_metadata_attempt_budget", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "priority_metadata_attempts_remaining", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN priority_metadata_attempts_remaining INTEGER NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    var normalizeCommand = connection.CreateCommand();
+                    normalizeCommand.CommandText = """
+                                                   UPDATE torrents
+                                                   SET priority_metadata_attempts_remaining = CASE
+                                                       WHEN priority_queue_order IS NOT NULL
+                                                           THEN COALESCE(priority_metadata_attempts_remaining, 3)
+                                                       ELSE NULL
+                                                   END;
+                                                   """;
+                    await normalizeCommand.ExecuteNonQueryAsync(cancellationToken);
+                }
+            ),
         ];
     }
 

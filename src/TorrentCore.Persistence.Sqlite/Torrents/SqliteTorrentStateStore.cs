@@ -115,6 +115,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_policy_applied_at_utc,
                                   ordinary_queue_order,
                                   priority_queue_order,
+                                  priority_metadata_attempts_remaining,
                                   is_queue_held
                               FROM torrents
                               ORDER BY added_at_utc DESC, torrent_id DESC;
@@ -168,6 +169,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_policy_applied_at_utc,
                                   ordinary_queue_order,
                                   priority_queue_order,
+                                  priority_metadata_attempts_remaining,
                                   is_queue_held
                               FROM torrents
                               WHERE torrent_id = $torrent_id
@@ -231,17 +233,99 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     }
 
     public async Task<long?> AssignNextPriorityQueueOrderAsync(Guid torrentId,
-        CancellationToken cancellationToken)
+        int priorityMetadataAttempts, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(priorityMetadataAttempts);
         await EnsureInitializedAsync(cancellationToken);
 
-        return await AssignNextQueueOrderAsync(
-            torrentId,
-            "priority_queue_order",
-            clearHeldIntent: true,
-            requiresRunnable: true,
-            cancellationToken
-        );
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+        await using var transaction =
+                (SqliteTransaction) await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                                  UPDATE torrents
+                                  SET
+                                      priority_queue_order = (
+                                          SELECT COALESCE(MAX(priority_queue_order), 0) + 1
+                                          FROM torrents
+                                      ),
+                                      priority_metadata_attempts_remaining = $priority_metadata_attempts,
+                                      is_queue_held = 0
+                                  WHERE torrent_id = $torrent_id
+                                    AND state = 'Queued'
+                                    AND desired_state = 'Runnable'
+                                  RETURNING priority_queue_order;
+                                  """;
+            command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+            command.Parameters.AddWithValue("$priority_metadata_attempts", priorityMetadataAttempts);
+            var result = await command.ExecuteScalarAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result is null || result == DBNull.Value
+                ? null
+                : Convert.ToInt64(result, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<bool> YieldPriorityMetadataAttemptAsync(Guid torrentId, int remainingAttempts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(remainingAttempts);
+        await EnsureInitializedAsync(cancellationToken);
+
+        await using var writeLease = await SqliteWriteCoordinator.AcquireAsync(databaseFilePath, cancellationToken);
+        await using var connection = await SqliteConnectionFactory.OpenAsync(databaseFilePath, cancellationToken);
+        await using var transaction =
+                (SqliteTransaction) await connection.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                                  UPDATE torrents
+                                  SET
+                                      ordinary_queue_order = (
+                                          SELECT COALESCE(MAX(ordinary_queue_order), 0) + 1
+                                          FROM torrents
+                                      ),
+                                      priority_queue_order = CASE
+                                          WHEN $remaining_attempts > 0 THEN (
+                                              SELECT COALESCE(MAX(priority_queue_order), 0) + 1
+                                              FROM torrents
+                                          )
+                                          ELSE NULL
+                                      END,
+                                      priority_metadata_attempts_remaining = CASE
+                                          WHEN $remaining_attempts > 0 THEN $remaining_attempts
+                                          ELSE NULL
+                                      END,
+                                      is_queue_held = 0
+                                  WHERE torrent_id = $torrent_id
+                                    AND state = 'Queued'
+                                    AND desired_state = 'Runnable'
+                                    AND priority_queue_order IS NOT NULL;
+                                  """;
+            command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+            command.Parameters.AddWithValue("$remaining_attempts", remainingAttempts);
+            var changed = await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+            await transaction.CommitAsync(cancellationToken);
+            return changed;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<bool> SetQueueHeldAsync(Guid torrentId, bool isHeld,
@@ -265,6 +349,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                       priority_queue_order = CASE
                                           WHEN $is_queue_held = 1 THEN NULL
                                           ELSE priority_queue_order
+                                      END,
+                                      priority_metadata_attempts_remaining = CASE
+                                          WHEN $is_queue_held = 1 THEN NULL
+                                          ELSE priority_metadata_attempts_remaining
                                       END
                                   WHERE torrent_id = $torrent_id
                                     AND state = 'Queued'
@@ -293,7 +381,9 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         var command = connection.CreateCommand();
         command.CommandText = """
                               UPDATE torrents
-                              SET priority_queue_order = NULL
+                              SET
+                                  priority_queue_order = NULL,
+                                  priority_metadata_attempts_remaining = NULL
                               WHERE torrent_id = $torrent_id
                                 AND priority_queue_order IS NOT NULL;
                               """;
@@ -346,8 +436,9 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
     }
 
     public async Task<TorrentSnapshot?> ResumeWithQueueIntentAsync(Guid torrentId, TorrentQueueResumeMode mode,
-        DateTimeOffset resumedAtUtc, CancellationToken cancellationToken)
+        DateTimeOffset resumedAtUtc, int priorityMetadataAttempts, CancellationToken cancellationToken)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(priorityMetadataAttempts);
         await EnsureInitializedAsync(cancellationToken);
         var priorityExpression = mode == TorrentQueueResumeMode.Priority
             ? "(SELECT COALESCE(MAX(priority_queue_order), 0) + 1 FROM torrents)"
@@ -376,6 +467,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                            FROM torrents
                                        ),
                                        priority_queue_order = {priorityExpression},
+                                       priority_metadata_attempts_remaining = CASE
+                                           WHEN $has_priority = 1 THEN $priority_metadata_attempts
+                                           ELSE NULL
+                                       END,
                                        is_queue_held = $is_queue_held,
                                        connected_peer_count = 0,
                                        download_rate_bytes_per_second = 0,
@@ -389,6 +484,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                    """;
             command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
             command.Parameters.AddWithValue("$is_queue_held", heldValue);
+            command.Parameters.AddWithValue("$has_priority", mode == TorrentQueueResumeMode.Priority ? 1 : 0);
+            command.Parameters.AddWithValue("$priority_metadata_attempts", priorityMetadataAttempts);
             command.Parameters.AddWithValue(
                 "$last_activity_at_utc", resumedAtUtc.ToString("O", CultureInfo.InvariantCulture));
             var changed = await command.ExecuteNonQueryAsync(cancellationToken) == 1;
@@ -485,7 +582,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                     ),
                     OrdinaryQueueOrder = reader.IsDBNull(34) ? null : reader.GetInt64(34),
                     PriorityQueueOrder = reader.IsDBNull(35) ? null : reader.GetInt64(35),
-                    IsQueueHeld = reader.GetInt64(36) != 0,
+                    PriorityMetadataAttemptsRemaining = reader.IsDBNull(36) ? null : reader.GetInt32(36),
+                    IsQueueHeld = reader.GetInt64(37) != 0,
                 }
             );
         }
@@ -536,6 +634,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   seeding_policy_applied_at_utc,
                                   ordinary_queue_order,
                                   priority_queue_order,
+                                  priority_metadata_attempts_remaining,
                                   is_queue_held
                               )
                               VALUES (
@@ -578,6 +677,7 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                       (SELECT COALESCE(MAX(ordinary_queue_order), 0) + 1 FROM torrents)
                                   ),
                                   $priority_queue_order,
+                                  $priority_metadata_attempts_remaining,
                                   $is_queue_held
                               )
                               RETURNING ordinary_queue_order;
@@ -676,6 +776,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   priority_queue_order = CASE
                                       WHEN $state = 'Paused' OR $desired_state = 'Paused' THEN NULL
                                       ELSE priority_queue_order
+                                  END,
+                                  priority_metadata_attempts_remaining = CASE
+                                      WHEN $state = 'Paused' OR $desired_state = 'Paused' THEN NULL
+                                      ELSE priority_metadata_attempts_remaining
                                   END,
                                   is_queue_held = CASE
                                       WHEN $state = 'Paused' OR $desired_state = 'Paused' THEN 0
@@ -779,6 +883,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
         );
         command.Parameters.AddWithValue(
             "$priority_queue_order", torrent.PriorityQueueOrder ?? (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$priority_metadata_attempts_remaining",
+            torrent.PriorityMetadataAttemptsRemaining ?? (object) DBNull.Value
         );
         command.Parameters.AddWithValue("$is_queue_held", torrent.IsQueueHeld ? 1 : 0);
     }

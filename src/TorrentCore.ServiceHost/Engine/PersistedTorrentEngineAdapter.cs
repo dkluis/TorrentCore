@@ -223,8 +223,10 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         var now = DateTimeOffset.UtcNow;
         if (torrent.ProgressPercent < 100)
         {
+            var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
             torrent = await torrentStateStore.ResumeWithQueueIntentAsync(
-                torrentId, TorrentQueueResumeMode.Normal, now, cancellationToken)
+                torrentId, TorrentQueueResumeMode.Normal, now,
+                runtimeSettings.PriorityMetadataAttempts, cancellationToken)
                 ?? throw InvalidQueueState(torrent, "resume");
         }
         else
@@ -281,10 +283,12 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
             throw InvalidQueueState(snapshot, action);
         }
 
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+
         var changed = queueAction switch
         {
             QueueIntentAction.MakeNext => await torrentStateStore.AssignNextPriorityQueueOrderAsync(
-                torrentId, cancellationToken) is not null,
+                torrentId, runtimeSettings.PriorityMetadataAttempts, cancellationToken) is not null,
             QueueIntentAction.Hold => await torrentStateStore.SetQueueHeldAsync(torrentId, true, cancellationToken),
             QueueIntentAction.ReleaseHold => await torrentStateStore.SetQueueHeldAsync(
                 torrentId, false, cancellationToken),
@@ -311,7 +315,9 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         }
 
         var now = DateTimeOffset.UtcNow;
-        var updated = await torrentStateStore.ResumeWithQueueIntentAsync(torrentId, mode, now, cancellationToken)
+        var runtimeSettings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        var updated = await torrentStateStore.ResumeWithQueueIntentAsync(
+                          torrentId, mode, now, runtimeSettings.PriorityMetadataAttempts, cancellationToken)
                       ?? throw InvalidQueueState(snapshot, action);
         await torrentHistoryService.ObserveSnapshotAsync(updated, cancellationToken);
         return CreateQueueActionResult(updated, action, now);

@@ -70,6 +70,12 @@ public static class SettingsHelpCatalog
         "After this many minutes, TorrentCore yields the metadata slot to a waiting unresolved magnet. A lone resolver keeps running, never-tried magnets run first, and yielded magnets retry oldest first. The allowed range is 1 through 1,440 minutes and changes apply live."
     );
 
+    public static readonly SettingHelpContent PriorityMetadataAttempts = new(
+        "Priority Metadata Attempts",
+        "Sets how many protected metadata turns a Make Next or Resume Next request receives.",
+        "After an unsuccessful protected turn, TorrentCore moves the magnet to the end of the priority line. When this allowance is exhausted, the magnet returns to the end of the ordinary metadata queue. The allowed range is 1 through 10. Changes apply only to future priority requests."
+    );
+
     public static readonly SettingHelpContent AutomaticMetadataResetStuckThresholdSeconds = new(
         "Automatic Reset Stuck Threshold Seconds",
         "Limits how long an automatic metadata reset may run before isolation.",

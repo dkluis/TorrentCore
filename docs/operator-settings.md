@@ -146,11 +146,25 @@ effective values returned by the Service.
 - metadata refresh, restart, and automatic reset actions do not restart the time-slice clock
 - applies live; configurable through the runtime-settings API/Swagger and both operator Settings screens
 
+### Priority Metadata Attempts
+
+- defaults to `3`; accepted range is `1` through `10`
+- Make Next and Resume Next copy the current value into that torrent's durable priority intent
+- an unresolved priority magnet receives a protected metadata time slice; lower-priority work and ordinary downloads
+  do not take its reservation during that attempt
+- after an unsuccessful attempt it moves to the priority tail; after the final attempt it moves to the ordinary
+  metadata tail
+- metadata success or resolved download admission consumes priority
+- changing the setting affects future Make Next and Resume Next actions, not priority requests already in the queue
+- configurable through the runtime-settings API/Swagger and both operator Settings screens
+
 Queue diagnostics currently expose:
 
 - open metadata and download slots after metadata-to-download reservations are applied
 - counts for resolving, metadata-queued, downloading, download-queued, seeding, paused, completed, and errored torrents
-- per-torrent wait reason and queue position when applicable
+- per-torrent wait reason, ordinary queue position, priority position, and held position when applicable. Both torrent
+  tables show these as separate Reason, Queue #, Priority #, and Held # columns; Reason is filterable, and each number
+  column sorts by Reason ascending followed by the selected number direction
 
 ## Metadata Recovery
 

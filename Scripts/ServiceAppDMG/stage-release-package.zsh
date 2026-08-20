@@ -19,8 +19,8 @@ PDF_ENGINE="tectonic"
 SKIP_PDF=false
 REQUIRE_PDF=false
 CLEAN=false
-COMPONENT_VERSION="0.7.0"
-BUILD_NUMBER="13"
+COMPONENT_VERSION="0.8.0"
+BUILD_NUMBER="14"
 
 fail() { print -ru2 -- "[TorrentCore package staging] ERROR: $*"; exit 1; }
 

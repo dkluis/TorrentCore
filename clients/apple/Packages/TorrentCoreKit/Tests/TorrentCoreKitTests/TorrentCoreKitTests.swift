@@ -45,7 +45,7 @@ func torrentListPresentationShowsPriorityOrdinaryAndHeldPositions() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 51)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 52)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
@@ -61,6 +61,7 @@ func sharedHelpCatalogCoversEveryServiceSetting() {
 func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     var settings = TorrentCorePreviewFixtures.runtimeSettings
     settings.metadataResolutionTimeSliceMinutes = 21
+    settings.priorityMetadataAttempts = 6
     settings.automaticMetadataResetStuckThresholdSeconds = 45
     settings.vpnEgressValidationEnabled = true
     settings.vpnEgressValidationEndpoint = "https://vpn-check.example.test/ip"
@@ -76,6 +77,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
 
     let update = TorrentCoreRuntimeSettingsUpdate(settings: settings)
     #expect(update.metadataResolutionTimeSliceMinutes == 21)
+    #expect(update.priorityMetadataAttempts == 6)
     #expect(update.automaticMetadataResetStuckThresholdSeconds == 45)
     #expect(update.vpnEgressValidationEnabled)
     #expect(update.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
@@ -89,6 +91,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     let data = try JSONEncoder().encode(request)
     let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     #expect(body["metadataResolutionTimeSliceMinutes"] as? Int == 21)
+    #expect(body["priorityMetadataAttempts"] as? Int == 6)
     #expect(body["automaticMetadataResetStuckThresholdSeconds"] as? Int == 45)
     #expect(body["vpnEgressValidationEnabled"] as? Bool == true)
     #expect(body["vpnEgressValidationEndpoint"] as? String == "https://vpn-check.example.test/ip")

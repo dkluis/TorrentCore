@@ -41,8 +41,8 @@ dotnet publish "$REPO_ROOT/src/TorrentCore.ServiceHost/TorrentCore.Service.cspro
 "$SCRIPT_DIR/package-macos-service-app.zsh" \
     --publish-root "$PUBLISH_ROOT" \
     --output-bundle "$OUTPUT_BUNDLE" \
-    --version 0.7.0 \
-    --build-number 13 \
+    --version 0.8.0 \
+    --build-number 14 \
     --git-sha "$GIT_SHA" \
     --built-at-utc "$BUILT_AT_UTC"
 

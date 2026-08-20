@@ -351,6 +351,7 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     update.maxActiveDownloads = 8
     update.engineAllowPeerExchange = true
     update.metadataResolutionTimeSliceMinutes = 20
+    update.priorityMetadataAttempts = 5
     update.automaticMetadataResetStuckThresholdSeconds = 60
     update.vpnEgressValidationEnabled = true
     update.vpnEgressValidationEndpoint = "https://vpn-check.example.test/ip"
@@ -366,6 +367,7 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     let updatedSettings = try await session.updateRuntimeSettings(update)
     #expect(updatedSettings.engineAllowPeerExchange)
     #expect(updatedSettings.metadataResolutionTimeSliceMinutes == 20)
+    #expect(updatedSettings.priorityMetadataAttempts == 5)
     #expect(updatedSettings.automaticMetadataResetStuckThresholdSeconds == 60)
     #expect(updatedSettings.vpnEgressValidationEnabled)
     #expect(updatedSettings.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
@@ -580,11 +582,13 @@ func disabledAutoRefreshLoadsTheContextOnceWithoutPolling() async throws {
 func torrentFilteringAndPaginationMatchTheOperatorGridSemantics() {
     var uncategorized = TorrentCorePreviewFixtures.pausedTorrent
     uncategorized.categoryKey = nil
+    uncategorized.waitReason = .pausedByOperator
     let values = [TorrentCorePreviewFixtures.downloadingTorrent, uncategorized]
     let filter = TorrentCoreTorrentFilter(
         searchText: "paused",
         state: TorrentCoreTorrentState.paused.rawValue,
-        category: .uncategorized
+        category: .uncategorized,
+        waitReason: TorrentCoreWaitReason.pausedByOperator.rawValue
     )
 
     let filtered = filter.apply(to: values)
@@ -1163,6 +1167,7 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         settings.engineAllowPeerExchange = update.engineAllowPeerExchange
         settings.maxActiveDownloads = update.maxActiveDownloads
         settings.metadataResolutionTimeSliceMinutes = update.metadataResolutionTimeSliceMinutes
+        settings.priorityMetadataAttempts = update.priorityMetadataAttempts
         settings.automaticMetadataResetStuckThresholdSeconds = update.automaticMetadataResetStuckThresholdSeconds
         settings.vpnEgressValidationEnabled = update.vpnEgressValidationEnabled
         settings.vpnEgressValidationEndpoint = update.vpnEgressValidationEndpoint

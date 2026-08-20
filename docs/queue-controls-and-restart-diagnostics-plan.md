@@ -318,12 +318,22 @@ the WebUI provides the same actions as a secondary surface.
 
 ### Slice 8: Recovery Matrix, Documentation, And Cutover
 
+Status: in progress on August 19, 2026. The priority-resolver admission cascade found during the first production
+exercise is repaired by retaining priority through a protected metadata attempt. Make Next and Resume Next now capture
+the configurable `PriorityMetadataAttempts` allowance (default `3`, range `1` through `10`); unsuccessful attempts move
+to the priority tail and final expiry moves to the ordinary tail. Both torrent tables split Wait into Reason, Queue #,
+Priority #, and Held # with Reason filtering and compound number sorting. The native table omits Upload to remain within
+SwiftUI's ten-column limit. Source version/build are `0.8.0`/`14`. Verification passed with 336 .NET tests, 36 Swift
+tests, synchronized OpenAPI, release-script syntax checks, and the unsigned Arm64 macOS build. DMG work remains.
+
 #### Work
 
 - Run restart tests at each important transition: ordinary queued, priority queued, held, displaced resolver, paused,
   and each resume mode.
 - Test live setting reductions, completion, removal, and VPN lifecycle recovery against queue intent.
 - Update architecture, database, operator settings, troubleshooting, and testing documentation with implemented facts.
+- Before building the final release DMG, increment the release version and build numbers consistently for the Service,
+  WebUI, native macOS UI, and generated release metadata.
 - Move this plan to `docs/archive/` only after the active documentation becomes the source of truth.
 
 #### Acceptance
@@ -332,6 +342,7 @@ the WebUI provides the same actions as a secondary surface.
 - A copied-database recovery exercise shows identical durable intent and correct recomputed positions.
 - No active ceiling is exceeded and no active download is displaced by Make Next.
 - Activity logs explain operator mutations and resolver displacement without per-tick log noise.
+- The final DMG and every packaged component report the new queue-controls version and build numbers.
 
 ## Out Of Scope
 

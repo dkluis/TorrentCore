@@ -189,6 +189,7 @@ extension TorrentCoreRuntimeSettings {
         metadataRefreshRestartDelaySeconds = Int(value.metadataRefreshRestartDelaySeconds)
         metadataRefreshStaleSeconds = Int(value.metadataRefreshStaleSeconds)
         metadataResolutionTimeSliceMinutes = Int(value.metadataResolutionTimeSliceMinutes ?? 15)
+        priorityMetadataAttempts = Int(value.priorityMetadataAttempts ?? 3)
         partialFileSuffix = value.partialFileSuffix
         partialFilesEnabled = value.partialFilesEnabled
         retrievedAt = value.retrievedAtUtc
@@ -267,6 +268,7 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             metadataRefreshRestartDelaySeconds: Int32(value.metadataRefreshRestartDelaySeconds),
             metadataRefreshStaleSeconds: Int32(value.metadataRefreshStaleSeconds),
             metadataResolutionTimeSliceMinutes: Int32(value.metadataResolutionTimeSliceMinutes),
+            priorityMetadataAttempts: Int32(value.priorityMetadataAttempts),
             runtimeTickDurationSummaryEnabled: value.runtimeTickDurationSummaryEnabled,
             seedingStopMinutes: Int32(value.seedingStopMinutes),
             seedingStopMode: value.seedingStopMode,

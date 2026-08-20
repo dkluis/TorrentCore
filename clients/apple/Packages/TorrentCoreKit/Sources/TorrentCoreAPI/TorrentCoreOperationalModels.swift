@@ -307,6 +307,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var metadataRefreshRestartDelaySeconds: Int
     public var metadataRefreshStaleSeconds: Int
     public var metadataResolutionTimeSliceMinutes: Int
+    public var priorityMetadataAttempts: Int
     public var partialFileSuffix: String?
     public var partialFilesEnabled: Bool
     public var retrievedAt: Date
@@ -358,6 +359,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var metadataRefreshRestartDelaySeconds: Int
     public var metadataRefreshStaleSeconds: Int
     public var metadataResolutionTimeSliceMinutes: Int
+    public var priorityMetadataAttempts: Int
     public var seedingStopMinutes: Int
     public var seedingStopMode: String
     public var seedingStopRatio: Double
@@ -402,6 +404,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         metadataRefreshRestartDelaySeconds = settings.metadataRefreshRestartDelaySeconds
         metadataRefreshStaleSeconds = settings.metadataRefreshStaleSeconds
         metadataResolutionTimeSliceMinutes = settings.metadataResolutionTimeSliceMinutes
+        priorityMetadataAttempts = settings.priorityMetadataAttempts
         seedingStopMinutes = settings.seedingStopMinutes
         seedingStopMode = settings.seedingStopMode ?? ""
         seedingStopRatio = settings.seedingStopRatio
