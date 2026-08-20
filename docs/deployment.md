@@ -240,8 +240,11 @@ The Dick `torrentcore.2026.08.20.Dick.PayloadStaleRotation-Patch` Arm64 release 
 `afa1ea93a07d9845c0eb9830b27cdbfdf1253784ec0d7566b72360b8fc3c651f`; version `0.8.0`/build `15`, schema migration
 22, protected machine-local WebUI connection-file exclusion, all app and DMG signatures, Gatekeeper assessment,
 stapler ticket, and disk-image checksum passed release and independent outside-sandbox verification. This release is
-the pre-Slice-6 deployment candidate for payload-stale download rotation, its durable operator diagnostics and
-settings, and Last Updated history filtering.
+the deployed payload-stale download rotation cutover, including durable operator diagnostics and settings plus Last
+Updated history filtering. Two copied production-database audits completed Slice 6 on August 20: 21 downloads yielded
+at the configured 45-minute boundary with no rotation failures, six automatic retries later re-entered active work,
+nine downloads completed, metadata and protected-priority rotation continued, the combined ceiling remained enforced,
+and final operator cleanup retained history with zero live torrents.
 
 From the mounted DMG, begin with:
 

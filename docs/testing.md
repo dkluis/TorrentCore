@@ -271,6 +271,20 @@ exclusion checks. Its SHA-256 checksum is
 `7d0e3844988ee1d74dde0e1ce9db7d4d4c668460dc1bd405db191242b756b746`. Production installation remains an operator
 action for the approved deployment window rather than an incomplete coding or release-verification step.
 
+The August 20 payload-stale rotation cutover used the signed and notarized `0.8.0`/build `15` Dick Arm64 release.
+Copied production databases at intermediate and final checkpoints passed SQLite integrity validation at migration 22.
+The final copy contained 21 successful download yields across 15 torrents, all between 45.001 and 45.018 minutes for
+the configured 45-minute interval. Six torrents returned from the automatic-retry tail and later yielded again; every
+yield named a replacement, no rotation failure or late-progress cancellation was logged, and nine downloads completed
+for 19.53 GiB. Ninety ordinary metadata yields continued during the same load. Seven priority magnets each recorded
+two protected requeues and one final expiry, proving the configured three-attempt lifecycle. Operator cleanup left
+zero live torrents and 192 retained history records.
+
+The same audit observed 197 slow tracker-announcement operations but only one slow synchronization-gate wait of two
+seconds. Tracker recovery therefore remains a documented improvement option rather than a payload-rotation acceptance
+failure. Final Slice 6 verification passed with a zero-warning solution build, all 360 .NET tests including OpenAPI
+synchronization, and all 36 shared Apple-client tests.
+
 ## Testing Rules
 
 - use real SQLite-backed tests for persistence behavior

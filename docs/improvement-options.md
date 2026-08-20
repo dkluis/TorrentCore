@@ -23,7 +23,7 @@ the active documentation, especially [architecture.md](architecture.md) and
   remained intact, and queue processing continued. The apparent loss of queue information was a persisted native-table
   customization hiding the Wait column; unhiding it restored the existing values.
 
-## Payload-Stale Download Rotation (Implemented Through Slice 5)
+## Payload-Stale Download Rotation (Implemented And Validated)
 
 Evaluate a download-yield mechanism analogous to metadata time slicing, but base eligibility on payload progress
 rather than peer presence alone.
@@ -43,12 +43,14 @@ growth is the only progress signal: peer presence and reported speed do not rese
 restart and accumulates even when nobody is waiting, but a download yields only when eligible runnable work is queued.
 Yielded downloads wait behind ordinary work that has not already been automatically yielded, including unresolved
 magnets, and retry oldest-yielded first. The existing long-cold recovery and abandonment windows serve recovery and
-cleanup; they do not provide timely queue fairness during a large burst. See
-[payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md).
+cleanup; they do not provide timely queue fairness during a large burst. See the completed delivery record in
+[archive/payload-stale-download-rotation-plan.md](archive/payload-stale-download-rotation-plan.md).
 
 The Service now persists and enforces that policy. Both Settings screens expose the live interval; torrent details in
 both UIs expose the durable clock, last yield, and current automatic-retry status, while WebUI also provides a compact
-sortable No Progress column. The final copied-database load matrix and cutover remain in Slice 6.
+sortable No Progress column. The August 20 copied-database cutover audit confirmed 21 successful yields across 15
+torrents, six retry-tail readmissions followed by second yields, no rotation failures, and nine completed downloads
+totaling 19.53 GiB.
 
 ## History Last-Updated Filtering (Implemented)
 
@@ -57,7 +59,7 @@ the native macOS and WebUI History tables, apply From and Through to `last_updat
 and default to Last Updated descending. This lets an item submitted on an earlier day appear when it completes, receives
 callback feedback, is removed, is abandoned, or is otherwise updated during the selected range. The existing history
 timestamp is sufficient; no additional history column is needed. The delivery details and acceptance criteria are in
-[payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md#history-last-updated-view).
+[archive/payload-stale-download-rotation-plan.md](archive/payload-stale-download-rotation-plan.md#history-last-updated-view).
 
 ## Restart-Safe Queue Diagnostics
 
@@ -142,7 +144,11 @@ Evaluate enforcing the configured recovery tracker-announce timeout as a real wa
 announces continued for approximately 43 to 45 seconds despite receiving a ten-second cancellation token.
 
 These operations run in deduplicated background work and did not block synchronization, but their extended lifetime
-can retain resources and makes the timeout diagnostic misleading.
+can retain resources and makes the timeout diagnostic misleading. The final payload-rotation load audit observed 197
+slow tracker announcements: 119 failed after averaging 41.5 seconds and 78 succeeded after averaging 38.5 seconds; the
+maximum was 88.2 seconds. Rotation still occurred at the configured boundary, nine downloads completed, and only one
+two-second synchronization-gate wait was slow. Treat this as non-blocking unless it recurs with healthy current
+torrents, causes sustained CPU or memory growth, delays queue reconciliation, or continues after stale work is gone.
 
 ## Diagnostic Quality
 

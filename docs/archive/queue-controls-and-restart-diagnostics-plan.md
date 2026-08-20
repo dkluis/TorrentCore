@@ -5,7 +5,7 @@ production persistence and activity-log evidence.
 
 This plan covers durable operator queue controls, explicit pause/resume behavior, and restart-safe queue diagnostics in
 the native macOS client and the supported `TorrentCore.WebUI`. Payload-stale download rotation is specified separately in
-[payload-stale-download-rotation-plan.md](../payload-stale-download-rotation-plan.md).
+[payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md).
 
 ## Outcomes
 

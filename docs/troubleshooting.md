@@ -55,6 +55,13 @@ events after `TooManyOpenConnections`, verify the deployed MonoTorrent package. 
 `3.0.3-alpha.unstable.rev0049` can leak its host-wide open-connection count on failed encryption or handshake paths.
 Per-torrent stop/start recovery does not reset that host-wide counter; a complete Service process restart does.
 
+Forced recovery announces return control to scheduling after their bounded wait and do not hold serialized
+synchronization, but an underlying MonoTorrent tracker operation can finish later and therefore report a longer
+`runtime.operation.slow` duration. The August 20 payload-rotation load exercise recorded many 38-to-42-second average
+tracker operations without delaying the configured rotation boundary. Treat this as background noise for old or cold
+swarms unless it also occurs with healthy current torrents, causes sustained resource growth, delays queue
+reconciliation, or continues after the stale work is removed.
+
 ## Download Has Peers Or Speed But No Durable Progress
 
 Payload-stale rotation is separate from zero-peer/cold recovery. Its clock advances whenever an active incomplete

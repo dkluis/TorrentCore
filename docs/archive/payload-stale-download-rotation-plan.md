@@ -1,11 +1,12 @@
 # Payload-Stale Download Rotation Plan
 
-Status: Slices 0 through 5 completed on August 20, 2026. The final load matrix and cutover remain in Slice 6.
+Status: completed on August 20, 2026. All six slices, production cutover, and copied-database load validation are
+complete.
 
 This plan adds fair rotation for active downloads that receive no payload while other work is waiting. The same
 workstream also corrects History recency so records are found and ordered by their latest lifecycle change instead of
 their original submission. It depends on the durable ordering and shared admission policy documented in
-[architecture.md](architecture.md).
+[architecture.md](../architecture.md).
 
 ## Outcome
 
@@ -260,6 +261,22 @@ Hold.
 - Logs explain each yield without creating per-tick noise.
 
 ### Slice 6: Load Matrix, Documentation, And Cutover
+
+Status: completed on August 20, 2026. The operator deployed the signed `0.8.0`/build `15` Arm64 release and exercised
+the mixed queue under a combined active-work ceiling of six, a metadata-resolution limit of four, a 15-minute metadata
+slice, three protected priority attempts, and a 45-minute download no-progress slice. Two copied-database audits
+confirmed 21 successful download yields across 15 torrents, including six later retry-tail readmissions and second
+yields. All yields occurred between 45.001 and 45.018 minutes and recorded a replacement; no rotation stop failure,
+persistence failure, or late-progress cancellation occurred. The run also recorded 90 ordinary metadata yields,
+exactly three protected attempts for each of seven priority magnets, and nine completed downloads totaling 19.53 GiB.
+Operator cleanup left zero live torrents while retaining 192 history records.
+
+Tracker recovery was noisy but non-blocking: 197 slow tracker-announcement operations were observed, while only one
+two-second synchronization-gate wait occurred and queue rotation remained on time. This is retained as a future
+improvement rather than a cutover blocker.
+
+Final verification passed with a zero-warning solution build, all 360 .NET tests including OpenAPI synchronization,
+and all 36 shared Apple-client tests.
 
 #### Work
 
