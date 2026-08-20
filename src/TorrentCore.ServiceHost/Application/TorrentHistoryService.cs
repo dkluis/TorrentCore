@@ -51,7 +51,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         var take = request.Take is > 0 ? request.Take.Value : int.MaxValue;
 
         return filtered
-            .OrderByDescending(record => record.SubmittedAtUtc)
+            .OrderByDescending(record => record.LastUpdatedAtUtc)
             .ThenByDescending(record => record.TorrentId)
             .Take(take)
             .Select(MapSummary)
@@ -553,12 +553,12 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
 
         if (request.FromDate is not null)
         {
-            query = query.Where(record => ToLocalDate(record.SubmittedAtUtc) >= request.FromDate.Value);
+            query = query.Where(record => ToLocalDate(record.LastUpdatedAtUtc) >= request.FromDate.Value);
         }
 
         if (request.ToDate is not null)
         {
-            query = query.Where(record => ToLocalDate(record.SubmittedAtUtc) <= request.ToDate.Value);
+            query = query.Where(record => ToLocalDate(record.LastUpdatedAtUtc) <= request.ToDate.Value);
         }
 
         return query;

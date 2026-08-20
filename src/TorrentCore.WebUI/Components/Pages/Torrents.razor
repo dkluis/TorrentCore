@@ -239,6 +239,13 @@
                                                            InitialDirection="@(GetInitialSortDirection(SortPeers))"
                                                            SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortPeers, direction))">Peers</MudTableSortLabel>
                                     </MudTh>
+                                    <MudTh>
+                                        <MudTableSortLabel T="TorrentSummaryDto"
+                                                           SortLabel="@SortNoProgress"
+                                                           SortBy="@(torrent => torrent.DownloadNoProgressStartedAtUtc ?? DateTimeOffset.MaxValue)"
+                                                           InitialDirection="@(GetInitialSortDirection(SortNoProgress))"
+                                                           SortDirectionChanged="@((SortDirection direction) => OnSortDirectionChanged(SortNoProgress, direction))">No Progress</MudTableSortLabel>
+                                    </MudTh>
                                     <MudTh>Reason</MudTh>
                                     <MudTh Class="torrents-position-column">
                                         <MudTableSortLabel T="TorrentSummaryDto"
@@ -278,6 +285,7 @@
                                     <MudTd DataLabel="Down">@FormatRate(context.DownloadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Up">@FormatRate(context.UploadRateBytesPerSecond)</MudTd>
                                     <MudTd DataLabel="Peers">@context.ConnectedPeerCount</MudTd>
+                                    <MudTd DataLabel="No Progress">@FormatNoProgressElapsed(context.DownloadNoProgressStartedAtUtc, context.State)</MudTd>
                                     <MudTd DataLabel="Reason" Class="operations-table-wrap">@FormatWaitReason(context.WaitReason, null)</MudTd>
                                     <MudTd DataLabel="Queue #" Class="torrents-position-column">@FormatQueuePosition(context.QueuePosition)</MudTd>
                                     <MudTd DataLabel="Priority #" Class="torrents-position-column">@FormatQueuePosition(context.PriorityQueuePosition)</MudTd>
@@ -540,6 +548,18 @@
                                     <p class="dashboard-detail-value">@FormatQueueStatus(_selectedTorrentDetail.WaitReason, _selectedTorrentDetail.QueuePosition, _selectedTorrentDetail.PriorityQueuePosition, _selectedTorrentDetail.HeldQueuePosition)</p>
                                 </div>
                                 <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">No Progress Since</p>
+                                    <p class="dashboard-detail-value">@FormatTimestamp(_selectedTorrentDetail.DownloadNoProgressStartedAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Last Automatic Yield</p>
+                                    <p class="dashboard-detail-value">@FormatTimestamp(_selectedTorrentDetail.DownloadLastYieldedAtUtc)</p>
+                                </div>
+                                <div class="dashboard-detail-item">
+                                    <p class="dashboard-detail-label">Automatic Retry Queue</p>
+                                    <p class="dashboard-detail-value">@(_selectedTorrentDetail.IsDownloadYielded ? "Yes" : "No")</p>
+                                </div>
+                                <div class="dashboard-detail-item">
                                     <p class="dashboard-detail-label">Info Hash</p>
                                     <p class="dashboard-detail-value">@(_selectedTorrentDetail.InfoHash ?? "N/A")</p>
                                 </div>
@@ -672,6 +692,7 @@
     private const string SortDown = "down";
     private const string SortUp = "up";
     private const string SortPeers = "peers";
+    private const string SortNoProgress = "no-progress";
     private const string SortQueue = "queue";
     private const string SortPriority = "priority";
     private const string SortHeld = "held";
@@ -1387,6 +1408,7 @@
             TorrentWaitReason.PausedByOperator => "Paused by operator",
             TorrentWaitReason.BlockedByError => "Blocked by error",
             TorrentWaitReason.HeldByOperator => "Held by operator",
+            TorrentWaitReason.AutomaticallyYieldedDownload => "Automatically yielded",
             _ => string.Empty,
         };
 
@@ -1420,6 +1442,37 @@
     }
 
     private static string FormatQueuePosition(int? position) => position?.ToString() ?? "--";
+
+    private static string FormatNoProgressElapsed(DateTimeOffset? startedAtUtc, TorrentState state)
+    {
+        if (startedAtUtc is null || state != TorrentState.Downloading)
+        {
+            return "--";
+        }
+
+        var elapsed = DateTimeOffset.UtcNow - startedAtUtc.Value;
+        if (elapsed < TimeSpan.Zero)
+        {
+            elapsed = TimeSpan.Zero;
+        }
+
+        if (elapsed < TimeSpan.FromMinutes(1))
+        {
+            return "<1m";
+        }
+
+        if (elapsed < TimeSpan.FromHours(1))
+        {
+            return $"{(int)elapsed.TotalMinutes}m";
+        }
+
+        if (elapsed < TimeSpan.FromDays(1))
+        {
+            return $"{(int)elapsed.TotalHours}h {elapsed.Minutes}m";
+        }
+
+        return $"{(int)elapsed.TotalDays}d {elapsed.Hours}h";
+    }
 
     private static bool CanDeleteData(TorrentDetailDto torrent)
     {

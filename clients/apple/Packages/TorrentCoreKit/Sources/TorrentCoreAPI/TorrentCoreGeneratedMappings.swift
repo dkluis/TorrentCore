@@ -151,6 +151,8 @@ extension TorrentCoreTorrentSummary {
         completionCallbackPendingSince = value.completionCallbackPendingSinceUtc
         completionCallbackState = value.completionCallbackState
         connectedPeerCount = Int(value.connectedPeerCount)
+        downloadLastYieldedAt = value.downloadLastYieldedAtUtc
+        downloadNoProgressStartedAt = value.downloadNoProgressStartedAtUtc
         downloadRateBytesPerSecond = value.downloadRateBytesPerSecond
         downloadedBytes = value.downloadedBytes
         errorMessage = value.errorMessage
@@ -161,6 +163,7 @@ extension TorrentCoreTorrentSummary {
         priorityQueuePosition = value.priorityQueuePosition.map(Int.init)
         heldQueuePosition = value.heldQueuePosition.map(Int.init)
         isQueueHeld = value.isQueueHeld
+        isDownloadYielded = value.isDownloadYielded
         state = .init(rawValue: value.state)
         torrentID = UUID(uuidString: value.torrentId)
         totalBytes = value.totalBytes
@@ -220,6 +223,8 @@ extension TorrentCoreTorrentDetail {
         completionCallbackPendingSince = value.completionCallbackPendingSinceUtc
         completionCallbackState = value.completionCallbackState
         connectedPeerCount = Int(value.connectedPeerCount)
+        downloadLastYieldedAt = value.downloadLastYieldedAtUtc
+        downloadNoProgressStartedAt = value.downloadNoProgressStartedAtUtc
         downloadRateBytesPerSecond = value.downloadRateBytesPerSecond
         downloadedBytes = value.downloadedBytes
         errorMessage = value.errorMessage
@@ -232,6 +237,7 @@ extension TorrentCoreTorrentDetail {
         priorityQueuePosition = value.priorityQueuePosition.map(Int.init)
         heldQueuePosition = value.heldQueuePosition.map(Int.init)
         isQueueHeld = value.isQueueHeld
+        isDownloadYielded = value.isDownloadYielded
         savePath = value.savePath
         state = .init(rawValue: value.state)
         torrentID = UUID(uuidString: value.torrentId)

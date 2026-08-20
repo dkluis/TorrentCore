@@ -66,6 +66,10 @@ Representative coverage areas:
   peer/rate independence, recovery suspension, automatic-yield readmission, and terminal-state clearing
 - stale-download selection with no-waiter protection, oldest-clock/torrent-id ordering, exact replacement counts,
   priority/ordinary/automatic-retry ordering, and retained partial-payload state
+- summary/detail OpenAPI coverage for durable rotation diagnostics, Apple generated-client decoding, both-UI settings
+  validation, and distinct automatic-yield presentation
+- History service coverage proving Last Updated ordering and inclusive filtering across outcomes, including a record
+  submitted before the requested range but updated inside it
 - data-path cleanup
 - client options and path defaults
 - normalized OpenAPI contract generation for native clients

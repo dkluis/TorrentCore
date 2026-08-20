@@ -17,4 +17,5 @@ public enum TorrentWaitReason
     PausedByOperator        = 5,
     BlockedByError          = 6,
     HeldByOperator          = 7,
+    AutomaticallyYieldedDownload = 8,
 }

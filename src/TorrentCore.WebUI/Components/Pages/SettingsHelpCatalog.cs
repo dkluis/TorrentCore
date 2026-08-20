@@ -76,6 +76,12 @@ public static class SettingsHelpCatalog
         "After an unsuccessful protected turn, TorrentCore moves the magnet to the end of the priority line. When this allowance is exhausted, the magnet returns to the end of the ordinary metadata queue. The allowed range is 1 through 10. Changes apply only to future priority requests."
     );
 
+    public static readonly SettingHelpContent DownloadNoProgressTimeSliceMinutes = new(
+        "Download No-Progress Time Slice Minutes",
+        "Limits an active download's turn when its durable payload has stopped advancing and other work is waiting.",
+        "Only completed-piece byte growth restarts this clock; peers and reported speed do not. TorrentCore yields only enough oldest-stale downloads to admit waiting work, preserves partial files, and retries yielded downloads after priority and ordinary never-yielded work. The allowed range is 1 through 60 minutes and changes apply live."
+    );
+
     public static readonly SettingHelpContent AutomaticMetadataResetStuckThresholdSeconds = new(
         "Automatic Reset Stuck Threshold Seconds",
         "Limits how long an automatic metadata reset may run before isolation.",

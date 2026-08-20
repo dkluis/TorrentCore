@@ -1218,6 +1218,25 @@ private struct TorrentCoreMacTorrentInspector: View {
                 )
             )
             TorrentCoreMacDetailRow(
+                label: "No Progress Since",
+                value: TorrentCoreDisplayFormatter.timestamp(
+                    detail?.downloadNoProgressStartedAt
+                        ?? fallback.summary.downloadNoProgressStartedAt
+                )
+            )
+            TorrentCoreMacDetailRow(
+                label: "Last Automatic Yield",
+                value: TorrentCoreDisplayFormatter.timestamp(
+                    detail?.downloadLastYieldedAt
+                        ?? fallback.summary.downloadLastYieldedAt
+                )
+            )
+            TorrentCoreMacDetailRow(
+                label: "Automatic Retry Queue",
+                value: (detail?.isDownloadYielded
+                    ?? fallback.summary.isDownloadYielded) ? "Yes" : "No"
+            )
+            TorrentCoreMacDetailRow(
                 label: "Info Hash",
                 value: detail?.infoHash ?? "--"
             )

@@ -22,6 +22,13 @@ func torrentListPresentationShowsWaitReasonAndQueuePosition() {
     let item = TorrentCoreTorrentListItem(summary: summary)
 
     #expect(item.wait == "Waiting For Metadata Slot · #27")
+
+    summary.waitReason = .automaticallyYieldedDownload
+    summary.queuePosition = 8
+    #expect(
+        TorrentCoreTorrentListItem(summary: summary).wait
+            == "Automatically Yielded · #8"
+    )
 }
 
 @Test
@@ -45,7 +52,7 @@ func torrentListPresentationShowsPriorityOrdinaryAndHeldPositions() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 52)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 53)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
@@ -53,6 +60,7 @@ func sharedHelpCatalogCoversEveryServiceSetting() {
     #expect(TorrentCoreHelpCatalog.Settings.seedingStopMode.detail.contains("live"))
     #expect(TorrentCoreHelpCatalog.Settings.engineEncryptionMode.detail.contains("restart"))
     #expect(TorrentCoreHelpCatalog.Settings.metadataResolutionTimeSliceMinutes.detail.contains("lone resolver"))
+    #expect(TorrentCoreHelpCatalog.Settings.downloadNoProgressTimeSliceMinutes.detail.contains("completed-piece"))
     #expect(TorrentCoreHelpCatalog.Settings.automaticMetadataResetStuckThresholdSeconds.detail.contains("quarantines"))
     #expect(TorrentCoreHelpCatalog.Settings.categoryDownloadRootPath.detail.contains("Existing"))
 }
@@ -200,7 +208,11 @@ func initialSliceBuildsDeterministicRequestsAndDecodesFixtures() async throws {
     #expect(host.serviceBuild == "0123456789abcdef0123456789abcdef01234567")
     #expect(lifecycle.recentEvents.count == 1)
     #expect(torrents.first?.state.rawValue == "FutureTorrentState")
+    #expect(torrents.first?.isDownloadYielded == true)
+    #expect(torrents.first?.downloadNoProgressStartedAt != nil)
+    #expect(torrents.first?.downloadLastYieldedAt != nil)
     #expect(detail.torrentID == torrentID)
+    #expect(detail.isDownloadYielded == true)
     #expect(categories.first?.key == "tv")
     #expect(added.magnetURI == "magnet:?xt=urn:btih:ABC")
     #expect(paused.state == .paused)
@@ -958,6 +970,9 @@ private enum FixturePayloads {
       "canResumeNext": false,
       "canResumeOnHold": false,
       "isQueueHeld": false,
+      "isDownloadYielded": true,
+      "downloadNoProgressStartedAtUtc": "2026-07-23T10:15:00Z",
+      "downloadLastYieldedAtUtc": "2026-07-23T10:30:00Z",
       "canRefreshMetadata": false,
       "canRemove": true,
       "canResume": false,
@@ -987,6 +1002,9 @@ private enum FixturePayloads {
       "canResumeNext": false,
       "canResumeOnHold": false,
       "isQueueHeld": false,
+      "isDownloadYielded": true,
+      "downloadNoProgressStartedAtUtc": "2026-07-23T10:15:00Z",
+      "downloadLastYieldedAtUtc": "2026-07-23T10:30:00Z",
       "canRefreshMetadata": false,
       "canRemove": true,
       "canResume": false,

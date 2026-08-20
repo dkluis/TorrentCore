@@ -212,6 +212,18 @@ seconds until it succeeds or the service shuts down. Manual metadata reset remai
 - a timed-out manager remains quarantined until the underlying MonoTorrent operation actually finishes
 - the circuit breaker remains open for a fixed five minutes, then permits one half-open probe
 
+### Download No-Progress Time Slice Minutes
+
+- defaults to `30`; accepted range is `1` through `60`
+- applies live and is configurable through the runtime-settings API and both operator Settings screens
+- measures an active incomplete download from its last durable completed-piece byte increase; peers, reported speed,
+  tracker activity, and recovery activity do not restart the clock
+- when eligible work is waiting, TorrentCore yields only enough oldest-stale downloads to admit that work
+- yielded downloads retain their partial payload and runnable intent, then retry after priority and ordinary
+  never-yielded work
+- the active clock, last automatic-yield time, and current automatic-retry class survive Service restart and are
+  exposed in torrent summary/detail diagnostics
+
 ### Long-Cold Threshold Minutes
 
 - continuous zero-peer and zero-progress duration before an active download enters long-cold recovery
@@ -234,7 +246,8 @@ seconds until it succeeds or the service shuts down. Manual metadata reset remai
 - the completion callback is not invoked
 - the durable history row is retained with the cleanup reason and deleted-data outcome
 - history records the structured `ColdDownloadAbandonment` removal kind
-- the History page displays an abandonment alert and provides an Abandoned outcome filter that is not constrained by submitted date
+- the History page displays an abandonment alert and provides an Abandoned outcome filter; any selected date range is
+  applied to Last Updated just as it is for every other outcome
 - torrent-scoped activity logs are deleted after successful removal; a service-scoped abandonment summary remains
 - the cold timestamp is persisted across service restarts and excludes time waiting in the runnable queue
 - applies live

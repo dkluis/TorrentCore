@@ -324,8 +324,11 @@ public sealed class TorrentApiTests
         var may20 = new DateTimeOffset(2026, 5, 20, 9, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 20, 9, 0, 0)));
         var may21 = new DateTimeOffset(2026, 5, 21, 10, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 21, 10, 0, 0)));
         var may22 = new DateTimeOffset(2026, 5, 22, 11, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 22, 11, 0, 0)));
+        var may23 = new DateTimeOffset(2026, 5, 23, 12, 0, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 5, 23, 12, 0, 0)));
 
-        await UpdateHistoryRowAsync(databaseFilePath, firstTorrent.TorrentId, may20, "Completed", removedAtUtc: null);
+        await UpdateHistoryRowAsync(
+            databaseFilePath, firstTorrent.TorrentId, may20, "Completed", removedAtUtc: null,
+            lastUpdatedAtUtc: may23);
         await UpdateHistoryRowAsync(databaseFilePath, secondTorrent.TorrentId, may21, "Seeding", removedAtUtc: null);
         await UpdateHistoryRowAsync(
             databaseFilePath,
@@ -339,9 +342,11 @@ public sealed class TorrentApiTests
         var allHistory = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history");
 
         Assert.NotNull(allHistory);
-        Assert.Equal([thirdTorrent.TorrentId, secondTorrent.TorrentId, firstTorrent.TorrentId], allHistory.Select(item => item.TorrentId).ToArray());
-        Assert.Equal(TorrentHistoryOutcome.Abandoned, allHistory[0].Outcome);
-        Assert.Equal(TorrentRemovalKind.ColdDownloadAbandonment, allHistory[0].RemovalKind);
+        Assert.Equal([firstTorrent.TorrentId, thirdTorrent.TorrentId, secondTorrent.TorrentId], allHistory.Select(item => item.TorrentId).ToArray());
+        Assert.Equal(may23, allHistory[0].LastUpdatedAt);
+        Assert.Equal(may20, allHistory[0].SubmittedAt);
+        Assert.Equal(TorrentHistoryOutcome.Abandoned, allHistory[1].Outcome);
+        Assert.Equal(TorrentRemovalKind.ColdDownloadAbandonment, allHistory[1].RemovalKind);
 
         var byName = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?torrentName=alpha");
         Assert.NotNull(byName);
@@ -379,10 +384,15 @@ public sealed class TorrentApiTests
         Assert.NotNull(byDate);
         Assert.Equal([thirdTorrent.TorrentId, secondTorrent.TorrentId], byDate.Select(item => item.TorrentId).ToArray());
 
+        var updatedOnMay23 = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>(
+            "api/history?fromDate=2026-05-23&toDate=2026-05-23");
+        Assert.NotNull(updatedOnMay23);
+        Assert.Equal([firstTorrent.TorrentId], updatedOnMay23.Select(item => item.TorrentId).ToArray());
+
         var limited = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?take=1");
         Assert.NotNull(limited);
         Assert.Single(limited);
-        Assert.Equal(thirdTorrent.TorrentId, limited[0].TorrentId);
+        Assert.Equal(firstTorrent.TorrentId, limited[0].TorrentId);
 
         var filterOptions =
                 await httpClient.GetFromJsonAsync<TorrentHistoryFilterOptionsDto>("api/history/filter-options");
@@ -3860,6 +3870,81 @@ public sealed class TorrentApiTests
     }
 
     [Fact]
+    public async Task FakeRuntime_ExposesAndLogsAutomaticDownloadYield()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-download-rotation-api");
+        var downloadPath = Path.Combine(rootPath, "downloads");
+        var storagePath = Path.Combine(rootPath, "storage");
+
+        await using var factory = CreateFactory(
+            downloadPath: downloadPath,
+            storagePath: storagePath,
+            maxActiveMetadataResolutions: 1,
+            maxActiveDownloads: 1,
+            downloadNoProgressTimeSliceMinutes: 1,
+            runtimeTickIntervalMilliseconds: 50,
+            metadataResolutionDelayMilliseconds: 0,
+            downloadProgressPercentPerTick: 0.000000000001);
+        using var httpClient = factory.CreateClient();
+
+        var firstResponse = await AddMagnetAsync(
+            httpClient,
+            "7171717171717171717171717171717171717171",
+            "Automatic Yield One");
+        var first = await firstResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(first);
+
+        await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{first.TorrentId}"),
+            torrent => torrent?.State == TorrentState.Downloading &&
+                       torrent.DownloadNoProgressStartedAtUtc is not null,
+            timeout: TimeSpan.FromSeconds(5));
+
+        var secondResponse = await AddMagnetAsync(
+            httpClient,
+            "7272727272727272727272727272727272727272",
+            "Automatic Yield Two");
+        var second = await secondResponse.Content.ReadFromJsonAsync<TorrentDetailDto>();
+        Assert.NotNull(second);
+
+        await ForceDownloadNoProgressStartedAsync(
+            storagePath,
+            first.TorrentId,
+            DateTimeOffset.UtcNow.AddMinutes(-2));
+
+        var yielded = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<TorrentDetailDto>($"api/torrents/{first.TorrentId}"),
+            torrent => torrent is
+            {
+                State: TorrentState.Queued,
+                IsDownloadYielded: true,
+                WaitReason: TorrentWaitReason.AutomaticallyYieldedDownload,
+                DownloadLastYieldedAtUtc: not null,
+            },
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(yielded);
+        Assert.Null(yielded.DownloadNoProgressStartedAtUtc);
+
+        var logs = await WaitForAsync(
+            async () => await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>(
+                $"api/logs?take=100&torrentId={first.TorrentId}"),
+            entries => entries?.Any(entry =>
+                entry.EventType == "torrent.download.rotation_yielded") == true,
+            timeout: TimeSpan.FromSeconds(5));
+
+        Assert.NotNull(logs);
+        Assert.Single(logs, entry => entry.EventType == "torrent.download.rotation_yielded");
+        Assert.Contains("automatically_yielded", logs.Single(entry =>
+            entry.EventType == "torrent.download.rotation_yielded").DetailsJson, StringComparison.Ordinal);
+
+        var replacement = await httpClient.GetFromJsonAsync<TorrentDetailDto>(
+            $"api/torrents/{second.TorrentId}");
+        Assert.NotNull(replacement);
+        Assert.Contains(replacement.State, new[] { TorrentState.ResolvingMetadata, TorrentState.Downloading });
+    }
+
+    [Fact]
     public async Task TorrentState_SurvivesRestart()
     {
         var rootPath = CreateTempRootPath("torrentcore-phase2-restart");
@@ -4210,6 +4295,7 @@ public sealed class TorrentApiTests
         int? maxActiveMetadataResolutions = null,
         int? maxActiveDownloads = null,
         int? metadataResolutionTimeSliceMinutes = null,
+        int? downloadNoProgressTimeSliceMinutes = null,
         int? runtimeTickIntervalMilliseconds = null,
         int? metadataResolutionDelayMilliseconds = null,
         double? downloadProgressPercentPerTick = null,
@@ -4325,6 +4411,12 @@ public sealed class TorrentApiTests
                     {
                         settings[$"{TorrentCoreServiceOptions.SectionName}:MetadataResolutionTimeSliceMinutes"] =
                                 metadataResolutionTimeSliceMinutes.Value.ToString();
+                    }
+
+                    if (downloadNoProgressTimeSliceMinutes is not null)
+                    {
+                        settings[$"{TorrentCoreServiceOptions.SectionName}:DownloadNoProgressTimeSliceMinutes"] =
+                                downloadNoProgressTimeSliceMinutes.Value.ToString();
                     }
 
                     if (runtimeTickIntervalMilliseconds is not null)
@@ -4835,6 +4927,27 @@ public sealed class TorrentApiTests
         Assert.Equal(1, await command.ExecuteNonQueryAsync());
     }
 
+    private static async Task ForceDownloadNoProgressStartedAsync(
+        string storagePath,
+        Guid torrentId,
+        DateTimeOffset startedAtUtc)
+    {
+        var databaseFilePath = Path.Combine(storagePath, "torrentcore.db");
+        await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            UPDATE torrents
+            SET download_no_progress_started_at_utc = $started_at_utc
+            WHERE torrent_id = $torrent_id;
+            """;
+        command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
+        command.Parameters.AddWithValue("$started_at_utc", startedAtUtc.ToString("O"));
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
     private static async Task UpdateHistoryRowAsync(
         string databaseFilePath,
         Guid torrentId,
@@ -4842,7 +4955,8 @@ public sealed class TorrentApiTests
         string latestTorrentState,
         DateTimeOffset? removedAtUtc,
         string? removalReason = null,
-        TorrentRemovalKind? removalKind = null)
+        TorrentRemovalKind? removalKind = null,
+        DateTimeOffset? lastUpdatedAtUtc = null)
     {
         await using var connection = new SqliteConnection($"Data Source={databaseFilePath}");
         await connection.OpenAsync();
@@ -4863,7 +4977,9 @@ public sealed class TorrentApiTests
             """;
         command.Parameters.AddWithValue("$torrent_id", torrentId.ToString());
         command.Parameters.AddWithValue("$submitted_at_utc", submittedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
-        command.Parameters.AddWithValue("$last_updated_at_utc", submittedAtUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue(
+            "$last_updated_at_utc",
+            (lastUpdatedAtUtc ?? submittedAtUtc).ToString("O", System.Globalization.CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$latest_torrent_state", latestTorrentState);
         command.Parameters.AddWithValue("$removed_at_utc", removedAtUtc?.ToString("O", System.Globalization.CultureInfo.InvariantCulture) ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$removal_reason", (object?)removalReason ?? DBNull.Value);

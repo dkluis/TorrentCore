@@ -295,6 +295,19 @@
                                     </div>
 
                                     <div class="settings-field-block">
+                                        <SettingHelpTrigger Content="@SettingsHelpCatalog.DownloadNoProgressTimeSliceMinutes" />
+                                        <MudNumericField T="int"
+                                                         Value="_queue.DownloadNoProgressTimeSliceMinutes"
+                                                         ValueChanged="value => UpdateQueue(value, (group, next) => group.DownloadNoProgressTimeSliceMinutes = next)"
+                                                         Variant="Variant.Outlined"
+                                                         Margin="Margin.Dense"
+                                                         Min="1"
+                                                         Max="60"
+                                                         Step="1"
+                                                         Immediate="true" />
+                                    </div>
+
+                                    <div class="settings-field-block">
                                         <SettingHelpTrigger Content="@SettingsHelpCatalog.AutomaticMetadataResetStuckThresholdSeconds" />
                                         <MudNumericField T="int"
                                                          Value="_queue.AutomaticMetadataResetStuckThresholdSeconds"
@@ -1628,6 +1641,7 @@
         _queue.MetadataRefreshRestartDelaySeconds = _runtimeSnapshot.MetadataRefreshRestartDelaySeconds;
         _queue.MetadataResolutionTimeSliceMinutes = _runtimeSnapshot.MetadataResolutionTimeSliceMinutes;
         _queue.PriorityMetadataAttempts = _runtimeSnapshot.PriorityMetadataAttempts;
+        _queue.DownloadNoProgressTimeSliceMinutes = _runtimeSnapshot.DownloadNoProgressTimeSliceMinutes;
         _queue.AutomaticMetadataResetStuckThresholdSeconds =
             _runtimeSnapshot.AutomaticMetadataResetStuckThresholdSeconds;
         _queue.ColdDownloadRecoveryThresholdMinutes = _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes;
@@ -1722,6 +1736,7 @@
             MetadataRefreshRestartDelaySeconds = _queue.MetadataRefreshRestartDelaySeconds,
             MetadataResolutionTimeSliceMinutes = _queue.MetadataResolutionTimeSliceMinutes,
             PriorityMetadataAttempts = _queue.PriorityMetadataAttempts,
+            DownloadNoProgressTimeSliceMinutes = _queue.DownloadNoProgressTimeSliceMinutes,
             AutomaticMetadataResetStuckThresholdSeconds = _queue.AutomaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes = _queue.ColdDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = _queue.ColdDownloadRecoveryIntervalMinutes,
@@ -1851,6 +1866,8 @@
                 _queue.MetadataRefreshRestartDelaySeconds != _runtimeSnapshot.MetadataRefreshRestartDelaySeconds ||
                 _queue.MetadataResolutionTimeSliceMinutes != _runtimeSnapshot.MetadataResolutionTimeSliceMinutes ||
                 _queue.PriorityMetadataAttempts != _runtimeSnapshot.PriorityMetadataAttempts ||
+                _queue.DownloadNoProgressTimeSliceMinutes !=
+                    _runtimeSnapshot.DownloadNoProgressTimeSliceMinutes ||
                 _queue.AutomaticMetadataResetStuckThresholdSeconds !=
                     _runtimeSnapshot.AutomaticMetadataResetStuckThresholdSeconds ||
                 _queue.ColdDownloadRecoveryThresholdMinutes != _runtimeSnapshot.ColdDownloadRecoveryThresholdMinutes ||
@@ -1951,6 +1968,11 @@
             if (_queue.PriorityMetadataAttempts is < 1 or > 10)
             {
                 return "Priority metadata attempts must be between 1 and 10.";
+            }
+
+            if (_queue.DownloadNoProgressTimeSliceMinutes is < 1 or > 60)
+            {
+                return "Download no-progress time slice must be between 1 and 60 minutes.";
             }
 
             if (_queue.AutomaticMetadataResetStuckThresholdSeconds is < 15 or > 300)
@@ -2154,6 +2176,7 @@
         public int MetadataRefreshRestartDelaySeconds { get; set; } = 30;
         public int MetadataResolutionTimeSliceMinutes { get; set; } = 15;
         public int PriorityMetadataAttempts { get; set; } = 3;
+        public int DownloadNoProgressTimeSliceMinutes { get; set; } = 30;
         public int AutomaticMetadataResetStuckThresholdSeconds { get; set; } = 30;
         public int ColdDownloadRecoveryThresholdMinutes { get; set; } = 120;
         public int ColdDownloadRecoveryIntervalMinutes { get; set; } = 60;

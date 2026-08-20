@@ -1,7 +1,6 @@
 # Payload-Stale Download Rotation Plan
 
-Status: Slices 0 through 4 completed on August 20, 2026. API/UI diagnostics, History recency, and the final load matrix
-remain in Slices 5 and 6.
+Status: Slices 0 through 5 completed on August 20, 2026. The final load matrix and cutover remain in Slice 6.
 
 This plan adds fair rotation for active downloads that receive no payload while other work is waiting. The same
 workstream also corrects History recency so records are found and ordered by their latest lifecycle change instead of
@@ -233,11 +232,19 @@ original manager is safe; an unverifiable outcome remains stopped for later dete
 
 ### Slice 5: API, Operator UIs, History Recency, Logging, And Setting Help
 
+Status: completed on August 20, 2026. Summary/detail contracts and generated Apple mappings expose the durable
+no-progress start, last automatic yield, and current automatic-retry state. Both Settings screens edit the live
+1-through-60-minute value. WebUI shows a compact sortable No Progress column plus exact details; the native macOS UI
+keeps its existing ten table columns and shows exact rotation diagnostics in the inspector. Both History tables now
+show and default-sort by Last Updated, and all History date filters use Last Updated for every outcome. The distinct
+automatic-yield wait reason and one-event-per-yield logging make rotation visible without presenting it as Pause or
+Hold.
+
 #### Work
 
 - Expose rotation state and capabilities through summary/detail contracts and client mappings.
-- Add the setting editor/help text to TorrentCore.WebUI.
-- Display active no-progress and automatically yielded status in torrent rows/details.
+- Add the setting editor/help text to both operator UIs.
+- Display active no-progress and automatically yielded status in WebUI rows and both UIs' details.
 - Change History range filtering to use `last_updated_at_utc` for every record.
 - Replace Submitted with Last Updated in both History tables and make Last Updated descending the default order.
 - Add yield activity events and focused WebUI/contract tests.

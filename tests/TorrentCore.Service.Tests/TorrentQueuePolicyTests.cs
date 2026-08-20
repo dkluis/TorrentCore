@@ -188,6 +188,24 @@ public sealed class TorrentQueuePolicyTests
             result.AdmissionOrder);
     }
 
+    [Fact]
+    public void WaitingAutomaticallyYieldedDownload_HasDistinctWaitReason()
+    {
+        var active = Item("active", TorrentQueueWorkKind.Download, 1, isActive: true);
+        var yielded = Item("yielded", TorrentQueueWorkKind.Download, 2, isActive: false,
+            isDownloadYielded: true, downloadLastYieldedAtUtc: DateTimeOffset.UtcNow.AddMinutes(-5));
+
+        var result = TorrentQueuePolicy.Evaluate(
+            [active, yielded],
+            maxActiveMetadataResolutions: 1,
+            maxActiveDownloads: 1);
+
+        Assert.Equal(
+            TorrentWaitReason.AutomaticallyYieldedDownload,
+            result.Diagnostics[yielded.Snapshot.TorrentId].WaitReason);
+        Assert.Empty(result.AdmissionOrder);
+    }
+
     private static TorrentQueuePolicyItem Item(string name, TorrentQueueWorkKind kind, long ordinaryOrder,
         bool isActive, long? priorityOrder = null, bool isHeld = false,
         DateTimeOffset? attemptStartedAtUtc = null, bool isDownloadYielded = false,

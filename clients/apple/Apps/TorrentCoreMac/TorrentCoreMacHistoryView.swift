@@ -36,7 +36,7 @@ private struct TorrentCoreMacHistoryTableItem: Identifiable {
     let summary: TorrentCoreHistorySummary
 
     var id: String { summary.id }
-    var submitted: Date { summary.submittedAt }
+    var lastUpdated: Date { summary.lastUpdatedAt }
     var name: String { summary.name ?? "Unnamed Torrent" }
     var category: String { TorrentCoreDisplayFormatter.category(summary.categoryKey) }
     var state: String { TorrentCoreDisplayFormatter.operatorValue(summary.latestTorrentState) }
@@ -54,7 +54,7 @@ private struct TorrentCoreMacHistoryTableItem: Identifiable {
 }
 
 private enum TorrentCoreMacHistorySortField: String {
-    case submitted
+    case lastUpdated
     case name
     case category
     case state
@@ -69,8 +69,8 @@ private enum TorrentCoreMacHistorySortField: String {
     func comparator(descending: Bool) -> KeyPathComparator<TorrentCoreMacHistoryTableItem> {
         let order: SortOrder = descending ? .reverse : .forward
         return switch self {
-        case .submitted:
-            KeyPathComparator(\.submitted, order: order)
+        case .lastUpdated:
+            KeyPathComparator(\.lastUpdated, order: order)
         case .name:
             KeyPathComparator(\.name, comparator: .localizedStandard, order: order)
         case .category:
@@ -98,7 +98,7 @@ private enum TorrentCoreMacHistorySortField: String {
         for keyPath: PartialKeyPath<TorrentCoreMacHistoryTableItem>
     ) -> Self? {
         switch keyPath {
-        case \TorrentCoreMacHistoryTableItem.submitted: .submitted
+        case \TorrentCoreMacHistoryTableItem.lastUpdated: .lastUpdated
         case \TorrentCoreMacHistoryTableItem.name: .name
         case \TorrentCoreMacHistoryTableItem.category: .category
         case \TorrentCoreMacHistoryTableItem.state: .state
@@ -133,8 +133,8 @@ struct TorrentCoreMacHistoryView: View {
     let showTorrent: (UUID) -> Void
 
     @AppStorage("TorrentCore.Mac.History.PageSize.v1") private var pageSize = 50
-    @AppStorage("TorrentCore.Mac.History.Sort.v2")
-    private var storedSortField = TorrentCoreMacHistorySortField.submitted.rawValue
+    @AppStorage("TorrentCore.Mac.History.Sort.v3")
+    private var storedSortField = TorrentCoreMacHistorySortField.lastUpdated.rawValue
     @AppStorage("TorrentCore.Mac.History.SortDescending.v1")
     private var storedSortDescending = true
     @AppStorage("TorrentCore.Mac.History.Columns.v1")
@@ -185,10 +185,10 @@ struct TorrentCoreMacHistoryView: View {
         )
         let defaults = UserDefaults.standard
         let storedField = defaults.string(
-            forKey: "TorrentCore.Mac.History.Sort.v2"
+            forKey: "TorrentCore.Mac.History.Sort.v3"
         )
         let field = TorrentCoreMacHistorySortField(rawValue: storedField ?? "")
-            ?? .submitted
+            ?? .lastUpdated
         let descending = defaults.object(
             forKey: "TorrentCore.Mac.History.SortDescending.v1"
         ) as? Bool ?? true
@@ -397,12 +397,12 @@ struct TorrentCoreMacHistoryView: View {
             sortOrder: $sortOrder,
             columnCustomization: $columnCustomization
         ) {
-            TableColumn("Submitted", value: \.submitted) {
-                Text(TorrentCoreDisplayFormatter.timestamp($0.summary.submittedAt))
+            TableColumn("Last Updated", value: \.lastUpdated) {
+                Text(TorrentCoreDisplayFormatter.timestamp($0.summary.lastUpdatedAt))
                     .monospacedDigit()
             }
             .width(min: 85, ideal: 165)
-            .customizationID("submitted")
+            .customizationID("lastUpdated")
 
             TableColumn("Name", value: \.name, comparator: .localizedStandard) { item in
                 Text(item.name)

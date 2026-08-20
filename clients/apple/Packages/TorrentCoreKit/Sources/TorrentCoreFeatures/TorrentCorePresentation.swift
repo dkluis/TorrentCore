@@ -204,7 +204,7 @@ public enum TorrentCoreDisplayFormatter {
     ) -> String {
         var parts: [String] = []
         if let value {
-            parts.append(splitIdentifier(value.rawValue))
+            parts.append(waitReason(value))
         }
         if let priority {
             parts.append("Priority #\(priority)")
@@ -219,7 +219,10 @@ public enum TorrentCoreDisplayFormatter {
     }
 
     public static func waitReason(_ value: TorrentCoreWaitReason?) -> String {
-        value.map { splitIdentifier($0.rawValue) } ?? "Not waiting"
+        guard let value else { return "Not waiting" }
+        return value == .automaticallyYieldedDownload
+            ? "Automatically Yielded"
+            : splitIdentifier(value.rawValue)
     }
 
     public static func category(_ key: String?) -> String {

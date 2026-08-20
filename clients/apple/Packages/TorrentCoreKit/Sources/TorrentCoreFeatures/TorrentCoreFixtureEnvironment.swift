@@ -142,11 +142,14 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         detail.downloadRateBytesPerSecond = summary.downloadRateBytesPerSecond
         detail.uploadRateBytesPerSecond = summary.uploadRateBytesPerSecond
         detail.connectedPeerCount = summary.connectedPeerCount
+        detail.downloadLastYieldedAt = summary.downloadLastYieldedAt
+        detail.downloadNoProgressStartedAt = summary.downloadNoProgressStartedAt
         detail.waitReason = summary.waitReason
         detail.queuePosition = summary.queuePosition
         detail.priorityQueuePosition = summary.priorityQueuePosition
         detail.heldQueuePosition = summary.heldQueuePosition
         detail.isQueueHeld = summary.isQueueHeld
+        detail.isDownloadYielded = summary.isDownloadYielded
         return detail
     }
 
@@ -173,6 +176,19 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
         if let removed = query.removed {
             values = values.filter { ($0.removedAt != nil) == removed }
         }
+        let dateFormatter = DateFormatter()
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        if let fromDate = query.fromDate.flatMap(dateFormatter.date(from:)) {
+            values = values.filter { $0.lastUpdatedAt >= fromDate }
+        }
+        if let toDate = query.toDate.flatMap(dateFormatter.date(from:)),
+           let exclusiveEnd = dateFormatter.calendar.date(byAdding: .day, value: 1, to: toDate)
+        {
+            values = values.filter { $0.lastUpdatedAt < exclusiveEnd }
+        }
+        values.sort { $0.lastUpdatedAt > $1.lastUpdatedAt }
         if let take = query.take {
             values = Array(values.prefix(max(0, take)))
         }

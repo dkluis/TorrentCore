@@ -8,6 +8,7 @@ using TorrentCore.Contracts;
 using TorrentCore.Contracts.Diagnostics;
 using TorrentCore.Contracts.History;
 using TorrentCore.Contracts.Host;
+using TorrentCore.Contracts.Torrents;
 using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Tests;
@@ -207,6 +208,18 @@ public sealed class OpenApiContractTests
                 document["components"]?["schemas"]?[nameof(TorrentHistorySummaryDto)]?["properties"];
         Assert.NotNull(historySummaryProperties);
         Assert.NotNull(historySummaryProperties["completionCallbackFinalResult"]);
+
+        var torrentSummaryProperties =
+                document["components"]?["schemas"]?[nameof(TorrentSummaryDto)]?["properties"];
+        Assert.NotNull(torrentSummaryProperties?["downloadNoProgressStartedAtUtc"]);
+        Assert.NotNull(torrentSummaryProperties?["downloadLastYieldedAtUtc"]);
+        Assert.NotNull(torrentSummaryProperties?["isDownloadYielded"]);
+
+        var torrentDetailProperties =
+                document["components"]?["schemas"]?[nameof(TorrentDetailDto)]?["properties"];
+        Assert.NotNull(torrentDetailProperties?["downloadNoProgressStartedAtUtc"]);
+        Assert.NotNull(torrentDetailProperties?["downloadLastYieldedAtUtc"]);
+        Assert.NotNull(torrentDetailProperties?["isDownloadYielded"]);
 
         var runtimeSettingsProperties =
                 document["components"]?["schemas"]?[nameof(RuntimeSettingsDto)]?["properties"];

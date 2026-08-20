@@ -20,7 +20,7 @@ GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 BUILT_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 dotnet publish "$REPO_ROOT/src/TorrentCore.WebUI/TorrentCore.WebUI.csproj" --configuration Release --runtime osx-arm64 --self-contained false --no-restore --disable-build-servers --maxcpucount:1 --output "$PUBLISH_ROOT"
 [[ ! -e "$PUBLISH_ROOT/Config/service-connection.json" ]] || { print -ru2 -- "Machine-local service connection leaked into publish output."; exit 1; }
-"$SCRIPT_DIR/package-macos-webui-app.zsh" --publish-root "$PUBLISH_ROOT" --output-bundle "$OUTPUT_BUNDLE" --version 0.8.0 --build-number 14 --git-sha "$GIT_SHA" --built-at-utc "$BUILT_AT_UTC"
+"$SCRIPT_DIR/package-macos-webui-app.zsh" --publish-root "$PUBLISH_ROOT" --output-bundle "$OUTPUT_BUNDLE" --version 0.8.0 --build-number 15 --git-sha "$GIT_SHA" --built-at-utc "$BUILT_AT_UTC"
 if [[ -n "$SIGNING_IDENTITY" ]]; then
     "$SCRIPT_DIR/sign-macos-webui-app.zsh" --bundle "$OUTPUT_BUNDLE" --signing-identity "$SIGNING_IDENTITY"
     "$SCRIPT_DIR/verify-macos-webui-app.zsh" --bundle "$OUTPUT_BUNDLE" --require-signed

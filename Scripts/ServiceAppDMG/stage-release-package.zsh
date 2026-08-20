@@ -20,7 +20,7 @@ SKIP_PDF=false
 REQUIRE_PDF=false
 CLEAN=false
 COMPONENT_VERSION="0.8.0"
-BUILD_NUMBER="14"
+BUILD_NUMBER="15"
 
 fail() { print -ru2 -- "[TorrentCore package staging] ERROR: $*"; exit 1; }
 

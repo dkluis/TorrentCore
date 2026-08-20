@@ -187,6 +187,9 @@ accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to
   It is neither Pause nor Hold. Priority work remains first; ordinary unresolved and resolved work that has not already
   auto-yielded runs before automatic retries; retries run in oldest-yielded order. Readmission starts a fresh full
   interval.
+- Torrent summary/detail contracts expose the durable no-progress start, most recent automatic-yield time, current
+  automatic-retry class, and the distinct `AutomaticallyYieldedDownload` wait reason. Both operator UIs render these
+  values directly, so polling and Service restart do not require client-side inference.
 - Download rotation is fail-closed. A failed stop ends rotation for that tick without bypassing the oldest candidate.
   The yielded state is persisted before any replacement starts. An uncertain persistence result admits no replacement
   and is verified before the original manager can restart, preventing a falsely yielded or doubly admitted torrent.
@@ -201,8 +204,9 @@ accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to
 - The continuous cold timestamp is persisted across service restarts. When the configured abandonment window expires,
   TorrentCore removes the torrent and partial payload without invoking completion processing, prunes torrent-scoped
   logs, and retains the cleanup reason in torrent history.
-- History stores a structured cold-abandonment removal kind. The operator UI surfaces retained abandonments through a
-  dedicated outcome filter and summary that do not depend on the original submission date.
+- History stores a structured cold-abandonment removal kind. History queries apply inclusive local From/Through dates
+  to `last_updated_at_utc` for every outcome and return newest updates first. Both operator tables show Last Updated;
+  detail views retain Submitted and the other lifecycle timestamps.
 - Incomplete content is distinguished from completed content by explicit policy and engine-observed file state, not by guesswork.
 - Torrent list and detail reads do not wait behind serialized MonoTorrent lifecycle work. They project from a
   concurrency-safe manager snapshot and use persisted state when a manager is temporarily absent during a transition.

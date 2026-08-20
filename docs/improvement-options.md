@@ -23,7 +23,7 @@ the active documentation, especially [architecture.md](architecture.md) and
   remained intact, and queue processing continued. The apparent loss of queue information was a persisted native-table
   customization hiding the Wait column; unhiding it restored the existing values.
 
-## Payload-Stale Download Rotation
+## Payload-Stale Download Rotation (Implemented Through Slice 5)
 
 Evaluate a download-yield mechanism analogous to metadata time slicing, but base eligibility on payload progress
 rather than peer presence alone.
@@ -46,7 +46,11 @@ magnets, and retry oldest-yielded first. The existing long-cold recovery and aba
 cleanup; they do not provide timely queue fairness during a large burst. See
 [payload-stale-download-rotation-plan.md](payload-stale-download-rotation-plan.md).
 
-## History Last-Updated Filtering
+The Service now persists and enforces that policy. Both Settings screens expose the live interval; torrent details in
+both UIs expose the durable clock, last yield, and current automatic-retry status, while WebUI also provides a compact
+sortable No Progress column. The final copied-database load matrix and cutover remain in Slice 6.
+
+## History Last-Updated Filtering (Implemented)
 
 Deliver the History recency correction with payload-stale download rotation. Replace Submitted with Last Updated in
 the native macOS and WebUI History tables, apply From and Through to `last_updated_at_utc` for every history record,

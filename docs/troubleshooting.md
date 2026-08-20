@@ -39,9 +39,9 @@ After `Abandon Cold Download After Hours` of continuous inactivity, TorrentCore 
 partial payload and torrent-scoped logs, skips the completion callback, and retains the removal reason in history.
 The default is 72 hours; `0` disables abandonment.
 The History page shows a persistent abandonment summary when retained abandoned downloads exist. Use its
-`View abandoned downloads` action or the `Abandoned` outcome filter; this search intentionally ignores submitted-date
-fields because an abandoned torrent may have been submitted days earlier. The grid keeps the last engine state in the
-State column and shows `Abandoned` separately in Outcome.
+`View abandoned downloads` action to clear the date range and show all abandoned records, or use the `Abandoned`
+outcome filter with an explicit Last Updated range. The grid keeps the last engine state in the State column and shows
+`Abandoned` separately in Outcome.
 
 Useful checks:
 
@@ -73,7 +73,8 @@ Useful events to inspect:
   durable yielded state could be verified and whether restarting the original manager was safe
 
 Automatically yielded work stays runnable, retains partial files, and retries after priority and ordinary
-never-yielded work. It should not appear as operator Paused or Held.
+never-yielded work. It should not appear as operator Paused or Held. Torrent rows expose a compact No Progress duration;
+the torrent inspector exposes the exact clock start, most recent automatic yield, and current automatic-retry status.
 
 ## Completion Callback Problems
 

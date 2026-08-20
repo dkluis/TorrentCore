@@ -5,7 +5,7 @@ public static class HistoryHelpCatalog
     public static readonly SettingHelpContent Filters = new(
         "Filters",
         "Controls which history rows TorrentCore.WebUI requests from the service.",
-        "Search sends the current History filter fields to TorrentCore.Service. The Abandoned outcome retrieves all abandoned downloads without applying submitted-date fields. Clear resets every filter field and reloads the unfiltered history list."
+        "Search sends the current History filter fields to TorrentCore.Service. Date fields apply to the last time each history record changed, for every outcome. Clear resets every filter field and reloads the unfiltered history list."
     );
 
     public static readonly SettingHelpContent Refresh = new(
@@ -17,19 +17,19 @@ public static class HistoryHelpCatalog
     public static readonly SettingHelpContent Clear = new(
         "Clear Filters",
         "Resets every History filter field and reloads the unfiltered list.",
-        "This clears Submitted From, Submitted To, Torrent Name, Category, State, and Outcome."
+        "This clears Last Updated From, Last Updated To, Torrent Name, Category, State, and Outcome."
     );
 
     public static readonly SettingHelpContent FromDate = new(
-        "Submitted From Date",
-        "Limits history rows to torrents submitted on or after this local date.",
-        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive start date. Abandoned outcome searches ignore this field."
+        "Last Updated From Date",
+        "Limits history rows to records last updated on or after this local date.",
+        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive start date to every history outcome."
     );
 
     public static readonly SettingHelpContent ToDate = new(
-        "Submitted To Date",
-        "Limits history rows to torrents submitted on or before this local date.",
-        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive end date. Abandoned outcome searches ignore this field."
+        "Last Updated To Date",
+        "Limits history rows to records last updated on or before this local date.",
+        "Use the local yyyy-MM-dd format. TorrentCore applies this as an inclusive end date to every history outcome."
     );
 
     public static readonly SettingHelpContent TorrentName = new(
@@ -53,13 +53,13 @@ public static class HistoryHelpCatalog
     public static readonly SettingHelpContent Outcome = new(
         "Outcome",
         "Filters history by active, removed, or abandoned lifecycle outcome.",
-        "Abandoned identifies cold downloads removed by the automatic abandonment policy and retrieves them without a submitted-date restriction."
+        "Abandoned identifies cold downloads removed by the automatic abandonment policy. Last-updated date filters apply consistently to every outcome."
     );
 
     public static readonly SettingHelpContent HistoryResults = new(
         "History Results",
         "Shows the current history result set with local sorting and paging.",
-        "Search loads rows from the service using the filter form. After that, sort from grid headers and page locally in the browser."
+        "Search loads rows from the service using the filter form. Rows default to newest Last Updated first; after that, sort from grid headers and page locally in the browser."
     );
 
     public static readonly SettingHelpContent SelectedHistoryEntry = new(

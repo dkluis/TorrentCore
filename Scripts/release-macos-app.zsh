@@ -9,7 +9,7 @@ readonly SCHEME="TorrentCoreMac"
 readonly PRODUCT_NAME="TorrentCore"
 
 VERSION="0.8.0"
-BUILD_NUMBER="14"
+BUILD_NUMBER="15"
 OUTPUT_DIR="/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs"
 NOTARY_PROFILE="TorrentCore-notary"
 SIGNING_IDENTITY=""
@@ -25,7 +25,7 @@ Build, Developer ID sign, notarize, staple, and verify the TorrentCore macOS DMG
 
 Options:
   --version <version>              Marketing version (default: 0.8.0)
-  --build <number>                 Positive integer build number (default: 14)
+  --build <number>                 Positive integer build number (default: 15)
   --output-dir <absolute-path>     DMG destination directory
   --notary-profile <name>          notarytool Keychain profile
                                    (default: TorrentCore-notary)

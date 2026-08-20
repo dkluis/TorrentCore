@@ -337,6 +337,8 @@ internal static class TorrentQueuePolicy
             TorrentQueueWorkKind.Metadata => TorrentWaitReason.WaitingForMetadataSlot,
             TorrentQueueWorkKind.Download when admittedIds.Contains(item.Snapshot.TorrentId)
                 => TorrentWaitReason.PendingDownloadDispatch,
+            TorrentQueueWorkKind.Download when item.Snapshot.IsDownloadYielded
+                => TorrentWaitReason.AutomaticallyYieldedDownload,
             _ => TorrentWaitReason.WaitingForDownloadSlot,
         };
         diagnostics[item.Snapshot.TorrentId] = new TorrentQueueDiagnostic(

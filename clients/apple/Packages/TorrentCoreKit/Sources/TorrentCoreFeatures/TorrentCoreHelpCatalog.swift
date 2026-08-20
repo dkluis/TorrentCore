@@ -74,6 +74,11 @@ public enum TorrentCoreHelpCatalog {
             "Sets how many protected metadata turns a Make Next or Resume Next request receives.",
             "After an unsuccessful turn, the magnet moves to the end of the priority line. When the allowance is exhausted, it returns to the end of the ordinary metadata queue. The allowed range is 1 through 10. Changes apply only to future priority requests."
         )
+        public static let downloadNoProgressTimeSliceMinutes = help(
+            "Download No-Progress Time Slice Minutes",
+            "Limits an active download's turn when its durable payload has stopped advancing and other work is waiting.",
+            "Only completed-piece byte growth restarts this clock; peers and reported speed do not. TorrentCore yields only enough oldest-stale downloads to admit waiting work, preserves partial files, and retries yielded downloads after priority and ordinary never-yielded work. The allowed range is 1 through 60 minutes and changes apply live."
+        )
         public static let automaticMetadataResetStuckThresholdSeconds = help(
             "Automatic Reset Stuck Threshold Seconds",
             "Limits how long an automatic metadata reset may run before isolation.",
@@ -281,7 +286,7 @@ public enum TorrentCoreHelpCatalog {
             deleteLogsForCompletedTorrents, maxActiveMetadataResolutions,
             maxActiveDownloads, metadataRefreshStaleSeconds,
             metadataRefreshRestartDelaySeconds, metadataResolutionTimeSliceMinutes,
-            priorityMetadataAttempts,
+            priorityMetadataAttempts, downloadNoProgressTimeSliceMinutes,
             automaticMetadataResetStuckThresholdSeconds, coldDownloadRecoveryThresholdMinutes,
             coldDownloadRecoveryIntervalMinutes, coldDownloadAbandonAfterHours,
             engineConnectionFailureLogBurstLimit, engineConnectionFailureLogWindowSeconds,
@@ -396,17 +401,17 @@ public enum TorrentCoreHelpCatalog {
         public static let filters = help(
             "Filters",
             "Controls which history rows TorrentCore requests.",
-            "Search applies the submitted date, torrent name, category, state, and outcome fields. Clear reloads unfiltered history."
+            "Search applies the last-updated date, torrent name, category, state, and outcome fields. Clear reloads unfiltered history."
         )
         public static let fromDate = help(
-            "Submitted From Date",
-            "Includes torrents submitted on or after this date.",
-            "The start date is inclusive. Abandoned-outcome searches intentionally ignore submitted-date bounds."
+            "Last Updated From Date",
+            "Includes history records last updated on or after this date.",
+            "The start date is inclusive and applies to every history outcome."
         )
         public static let toDate = help(
-            "Submitted To Date",
-            "Includes torrents submitted on or before this date.",
-            "The end date is inclusive. Abandoned-outcome searches intentionally ignore submitted-date bounds."
+            "Last Updated To Date",
+            "Includes history records last updated on or before this date.",
+            "The end date is inclusive and applies to every history outcome."
         )
         public static let torrentName = help(
             "Torrent Name",
@@ -426,12 +431,12 @@ public enum TorrentCoreHelpCatalog {
         public static let outcome = help(
             "Outcome",
             "Filters active, removed, or abandoned history.",
-            "Use Removed for manually removed history regardless of its last lifecycle state. Abandoned identifies cold downloads removed automatically and ignores submitted-date bounds."
+            "Use Removed for manually removed history regardless of its last lifecycle state. Abandoned identifies cold downloads removed automatically; last-updated date bounds apply to every outcome."
         )
         public static let results = help(
             "History Results",
             "Shows the current history result set.",
-            "Sort with table headers, page through results, and select one row to inspect its stored lifecycle record."
+            "Rows default to newest Last Updated first. Sort with table headers, page through results, and select one row to inspect its stored lifecycle record."
         )
         public static let selectedEntry = help(
             "Selected History Entry",

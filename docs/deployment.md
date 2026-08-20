@@ -9,7 +9,7 @@ Managed components:
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
 
-Current source Service, WebUI, and native macOS UI version: `0.8.0`, build `14`.
+Current source Service, WebUI, and native macOS UI version: `0.8.0`, build `15`.
 
 Launch agent labels:
 
@@ -213,7 +213,7 @@ The package `release.json` records both managed-app checksums, the short change 
 `/Applications/TorrentCore.app` target.
 
 The current combined-package tooling defaults `TorrentCoreService.app`, `TorrentCoreWebUI.app`, and `TorrentCore.app`
-to source version `0.8.0`, build `14`.
+to source version `0.8.0`, build `15`.
 
 The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 release was staged permanently under
 `Deployments/TorrentCore-Deployments/Dick`, reviewed and approved by the operator, and then built from clean commit

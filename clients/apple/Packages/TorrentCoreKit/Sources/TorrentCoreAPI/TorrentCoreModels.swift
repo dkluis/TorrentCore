@@ -33,6 +33,7 @@ public struct TorrentCoreWaitReason: RawRepresentable, Codable, Hashable, Sendab
     public static let pausedByOperator = Self(rawValue: "PausedByOperator")
     public static let blockedByError = Self(rawValue: "BlockedByError")
     public static let heldByOperator = Self(rawValue: "HeldByOperator")
+    public static let automaticallyYieldedDownload = Self(rawValue: "AutomaticallyYieldedDownload")
 }
 
 public struct TorrentCoreHostState: RawRepresentable, Codable, Hashable, Sendable {
@@ -219,6 +220,8 @@ public struct TorrentCoreTorrentSummary: Codable, Hashable, Sendable {
     public var completionCallbackPendingSince: Date?
     public var completionCallbackState: String?
     public var connectedPeerCount: Int
+    public var downloadLastYieldedAt: Date? = nil
+    public var downloadNoProgressStartedAt: Date? = nil
     public var downloadRateBytesPerSecond: Int64
     public var downloadedBytes: Int64
     public var errorMessage: String?
@@ -229,6 +232,7 @@ public struct TorrentCoreTorrentSummary: Codable, Hashable, Sendable {
     public var priorityQueuePosition: Int? = nil
     public var heldQueuePosition: Int? = nil
     public var isQueueHeld: Bool = false
+    public var isDownloadYielded: Bool = false
     public var state: TorrentCoreTorrentState
     public var torrentID: UUID?
     public var totalBytes: Int64?
@@ -284,6 +288,8 @@ public struct TorrentCoreTorrentDetail: Codable, Hashable, Sendable {
     public var completionCallbackPendingSince: Date?
     public var completionCallbackState: String?
     public var connectedPeerCount: Int
+    public var downloadLastYieldedAt: Date? = nil
+    public var downloadNoProgressStartedAt: Date? = nil
     public var downloadRateBytesPerSecond: Int64
     public var downloadedBytes: Int64
     public var errorMessage: String?
@@ -296,6 +302,7 @@ public struct TorrentCoreTorrentDetail: Codable, Hashable, Sendable {
     public var priorityQueuePosition: Int? = nil
     public var heldQueuePosition: Int? = nil
     public var isQueueHeld: Bool = false
+    public var isDownloadYielded: Bool = false
     public var savePath: String?
     public var state: TorrentCoreTorrentState
     public var torrentID: UUID?

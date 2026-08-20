@@ -42,7 +42,7 @@ dotnet publish "$REPO_ROOT/src/TorrentCore.ServiceHost/TorrentCore.Service.cspro
     --publish-root "$PUBLISH_ROOT" \
     --output-bundle "$OUTPUT_BUNDLE" \
     --version 0.8.0 \
-    --build-number 14 \
+    --build-number 15 \
     --git-sha "$GIT_SHA" \
     --built-at-utc "$BUILT_AT_UTC"
 

@@ -21,6 +21,9 @@ public sealed class TorrentDetailDto
     public          int?               PriorityQueuePosition              { get; init; }
     public          int?               HeldQueuePosition                  { get; init; }
     public required bool               IsQueueHeld                        { get; init; }
+    public          DateTimeOffset?    DownloadNoProgressStartedAtUtc     { get; init; }
+    public          DateTimeOffset?    DownloadLastYieldedAtUtc           { get; init; }
+    public required bool               IsDownloadYielded                  { get; init; }
     public required DateTimeOffset     AddedAtUtc                         { get; init; }
     public          DateTimeOffset?    CompletedAtUtc                     { get; init; }
     public          DateTimeOffset?    LastActivityAtUtc                  { get; init; }

@@ -462,6 +462,14 @@ struct TorrentCoreMacServiceSettingsView: View {
                         identifier: "serviceSettings.automaticMetadataResetStuckThresholdSeconds"
                     )
                 }
+                Section("Download Rotation") {
+                    integerField(
+                        "No-progress time slice minutes",
+                        value: draft.downloadNoProgressTimeSliceMinutes,
+                        content: TorrentCoreHelpCatalog.Settings.downloadNoProgressTimeSliceMinutes,
+                        identifier: "serviceSettings.downloadNoProgressTimeSliceMinutes"
+                    )
+                }
                 Section("Cold Download Recovery") {
                     integerField(
                         "Recovery threshold minutes",
@@ -1116,6 +1124,9 @@ struct TorrentCoreMacServiceSettingsView: View {
         }
         if !(1...10).contains(draft.priorityMetadataAttempts) {
             return "Priority metadata attempts must be between 1 and 10."
+        }
+        if !(1...60).contains(draft.downloadNoProgressTimeSliceMinutes) {
+            return "Download no-progress time slice must be between 1 and 60 minutes."
         }
         if !(15...300).contains(draft.automaticMetadataResetStuckThresholdSeconds) {
             return "Automatic metadata reset stuck threshold must be between 15 and 300 seconds."
