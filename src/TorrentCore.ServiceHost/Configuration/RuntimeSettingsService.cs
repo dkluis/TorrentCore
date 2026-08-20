@@ -211,6 +211,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 currentSettings.MetadataResolutionTimeSliceMinutes;
         var priorityMetadataAttempts = request.PriorityMetadataAttempts ??
                 currentSettings.PriorityMetadataAttempts;
+        var downloadNoProgressTimeSliceMinutes = request.DownloadNoProgressTimeSliceMinutes ??
+                currentSettings.DownloadNoProgressTimeSliceMinutes;
         var engineAllowPeerExchange = request.EngineAllowPeerExchange ?? currentSettings.EngineAllowPeerExchange;
         var completionCallbackEnabled = request.CompletionCallbackEnabled ?? currentSettings.CompletionCallbackEnabled;
         var completionCallbackCommandPath = request.CompletionCallbackCommandPath is null ?
@@ -369,6 +371,18 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             );
         }
 
+        if (downloadNoProgressTimeSliceMinutes is
+            < TorrentCoreServiceOptions.MinimumDownloadNoProgressTimeSliceMinutes or
+            > TorrentCoreServiceOptions.MaximumDownloadNoProgressTimeSliceMinutes)
+        {
+            throw new Application.ServiceOperationException(
+                "invalid_runtime_settings",
+                $"DownloadNoProgressTimeSliceMinutes must be between {TorrentCoreServiceOptions.MinimumDownloadNoProgressTimeSliceMinutes} and {TorrentCoreServiceOptions.MaximumDownloadNoProgressTimeSliceMinutes}.",
+                StatusCodes.Status400BadRequest,
+                nameof(request.DownloadNoProgressTimeSliceMinutes)
+            );
+        }
+
         if (completionCallbackTimeoutSeconds < 1)
         {
             throw new Application.ServiceOperationException(
@@ -435,6 +449,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             metadataResolutionTimeSliceMinutes.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.PriorityMetadataAttempts] =
                             priorityMetadataAttempts.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.DownloadNoProgressTimeSliceMinutes] =
+                            downloadNoProgressTimeSliceMinutes.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.AutomaticMetadataResetStuckThresholdSeconds] =
                             automaticMetadataResetStuckThresholdSeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.ColdDownloadRecoveryThresholdMinutes] =
@@ -519,6 +535,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             request.MaxActiveDownloads,
                             request.MetadataRefreshStaleSeconds,
                             request.MetadataRefreshRestartDelaySeconds,
+                            downloadNoProgressTimeSliceMinutes,
                             automaticMetadataResetStuckThresholdSeconds,
                             request.ColdDownloadRecoveryThresholdMinutes,
                             request.ColdDownloadRecoveryIntervalMinutes,
@@ -756,6 +773,20 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
         {
             priorityMetadataAttempts = parsedPriorityMetadataAttempts;
         }
+        var downloadNoProgressTimeSliceMinutes = baseOptions.DownloadNoProgressTimeSliceMinutes;
+        if (values.TryGetValue(
+                RuntimeSettingsKeys.DownloadNoProgressTimeSliceMinutes,
+                out var downloadNoProgressTimeSliceMinutesValue
+            ) && int.TryParse(
+                downloadNoProgressTimeSliceMinutesValue,
+                CultureInfo.InvariantCulture,
+                out var parsedDownloadNoProgressTimeSliceMinutes
+            ) && parsedDownloadNoProgressTimeSliceMinutes is
+                >= TorrentCoreServiceOptions.MinimumDownloadNoProgressTimeSliceMinutes and
+                <= TorrentCoreServiceOptions.MaximumDownloadNoProgressTimeSliceMinutes)
+        {
+            downloadNoProgressTimeSliceMinutes = parsedDownloadNoProgressTimeSliceMinutes;
+        }
         if (values.TryGetValue(
                 RuntimeSettingsKeys.AutomaticMetadataResetStuckThresholdSeconds,
                 out var automaticMetadataResetStuckThresholdSecondsValue
@@ -989,6 +1020,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             MetadataRefreshRestartDelaySeconds           = metadataRefreshRestartDelaySeconds,
             MetadataResolutionTimeSliceMinutes           = metadataResolutionTimeSliceMinutes,
             PriorityMetadataAttempts                     = priorityMetadataAttempts,
+            DownloadNoProgressTimeSliceMinutes           = downloadNoProgressTimeSliceMinutes,
             AutomaticMetadataResetStuckThresholdSeconds  = automaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes         = coldDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes          = coldDownloadRecoveryIntervalMinutes,
@@ -1054,6 +1086,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             MetadataRefreshRestartDelaySeconds           = settings.MetadataRefreshRestartDelaySeconds,
             MetadataResolutionTimeSliceMinutes           = settings.MetadataResolutionTimeSliceMinutes,
             PriorityMetadataAttempts                     = settings.PriorityMetadataAttempts,
+            DownloadNoProgressTimeSliceMinutes           = settings.DownloadNoProgressTimeSliceMinutes,
             AutomaticMetadataResetStuckThresholdSeconds  = settings.AutomaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes         = settings.ColdDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes          = settings.ColdDownloadRecoveryIntervalMinutes,

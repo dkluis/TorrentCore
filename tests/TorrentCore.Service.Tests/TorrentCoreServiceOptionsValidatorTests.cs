@@ -91,6 +91,7 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             MaxActiveDownloads = 0,
             AutomaticMetadataResetStuckThresholdSeconds = 14,
             MetadataResolutionTimeSliceMinutes = 0,
+            DownloadNoProgressTimeSliceMinutes = 0,
             ColdDownloadRecoveryThresholdMinutes = 0,
             ColdDownloadRecoveryIntervalMinutes = 0,
             ColdDownloadAbandonAfterHours = -1,
@@ -135,6 +136,8 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             failure => failure.Contains("AutomaticMetadataResetStuckThresholdSeconds", StringComparison.Ordinal));
         Assert.Contains(result.Failures,
             failure => failure.Contains("MetadataResolutionTimeSliceMinutes", StringComparison.Ordinal));
+        Assert.Contains(result.Failures,
+            failure => failure.Contains("DownloadNoProgressTimeSliceMinutes", StringComparison.Ordinal));
         Assert.Contains(result.Failures,
             failure => failure.Contains("ColdDownloadRecoveryThresholdMinutes", StringComparison.Ordinal));
         Assert.Contains(result.Failures,

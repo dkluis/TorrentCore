@@ -830,6 +830,37 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     await normalizeCommand.ExecuteNonQueryAsync(cancellationToken);
                 }
             ),
+            new SqliteMigrationDefinition(
+                22, "persist_download_rotation_state", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "download_no_progress_started_at_utc", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN download_no_progress_started_at_utc TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "download_last_yielded_at_utc", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN download_last_yielded_at_utc TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+
+                    if (!await ColumnExistsAsync(
+                            connection, "torrents", "is_download_yielded", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText =
+                                "ALTER TABLE torrents ADD COLUMN is_download_yielded INTEGER NOT NULL DEFAULT 0;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
         ];
     }
 

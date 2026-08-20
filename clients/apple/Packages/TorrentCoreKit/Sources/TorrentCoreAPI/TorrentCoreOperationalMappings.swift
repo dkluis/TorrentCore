@@ -190,6 +190,7 @@ extension TorrentCoreRuntimeSettings {
         metadataRefreshStaleSeconds = Int(value.metadataRefreshStaleSeconds)
         metadataResolutionTimeSliceMinutes = Int(value.metadataResolutionTimeSliceMinutes ?? 15)
         priorityMetadataAttempts = Int(value.priorityMetadataAttempts ?? 3)
+        downloadNoProgressTimeSliceMinutes = Int(value.downloadNoProgressTimeSliceMinutes ?? 30)
         partialFileSuffix = value.partialFileSuffix
         partialFilesEnabled = value.partialFilesEnabled
         retrievedAt = value.retrievedAtUtc
@@ -250,6 +251,7 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             completionCallbackTimeoutSeconds: Int32(value.completionCallbackTimeoutSeconds),
             completionCallbackWorkingDirectory: value.completionCallbackWorkingDirectory,
             deleteLogsForCompletedTorrents: value.deleteLogsForCompletedTorrents,
+            downloadNoProgressTimeSliceMinutes: Int32(value.downloadNoProgressTimeSliceMinutes),
             engineAllowPeerExchange: value.engineAllowPeerExchange,
             engineConnectionFailureLogBurstLimit: Int32(value.engineConnectionFailureLogBurstLimit),
             engineConnectionFailureLogWindowSeconds: Int32(value.engineConnectionFailureLogWindowSeconds),

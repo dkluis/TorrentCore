@@ -969,6 +969,10 @@
           "deleteLogsForCompletedTorrents": {
             "type": "boolean"
           },
+          "downloadNoProgressTimeSliceMinutes": {
+            "format": "int32",
+            "type": "integer"
+          },
           "engineAllowPeerExchange": {
             "type": "boolean"
           },
@@ -2253,6 +2257,11 @@
           },
           "deleteLogsForCompletedTorrents": {
             "type": "boolean"
+          },
+          "downloadNoProgressTimeSliceMinutes": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
           },
           "engineAllowPeerExchange": {
             "nullable": true,

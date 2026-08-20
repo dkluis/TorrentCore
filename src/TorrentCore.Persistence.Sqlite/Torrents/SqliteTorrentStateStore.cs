@@ -116,7 +116,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   ordinary_queue_order,
                                   priority_queue_order,
                                   priority_metadata_attempts_remaining,
-                                  is_queue_held
+                                  is_queue_held,
+                                  download_no_progress_started_at_utc,
+                                  download_last_yielded_at_utc,
+                                  is_download_yielded
                               FROM torrents
                               ORDER BY added_at_utc DESC, torrent_id DESC;
                               """;
@@ -170,7 +173,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   ordinary_queue_order,
                                   priority_queue_order,
                                   priority_metadata_attempts_remaining,
-                                  is_queue_held
+                                  is_queue_held,
+                                  download_no_progress_started_at_utc,
+                                  download_last_yielded_at_utc,
+                                  is_download_yielded
                               FROM torrents
                               WHERE torrent_id = $torrent_id
                               LIMIT 1;
@@ -255,7 +261,9 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                           FROM torrents
                                       ),
                                       priority_metadata_attempts_remaining = $priority_metadata_attempts,
-                                      is_queue_held = 0
+                                      is_queue_held = 0,
+                                      download_no_progress_started_at_utc = NULL,
+                                      is_download_yielded = 0
                                   WHERE torrent_id = $torrent_id
                                     AND state = 'Queued'
                                     AND desired_state = 'Runnable'
@@ -353,6 +361,14 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                       priority_metadata_attempts_remaining = CASE
                                           WHEN $is_queue_held = 1 THEN NULL
                                           ELSE priority_metadata_attempts_remaining
+                                      END,
+                                      download_no_progress_started_at_utc = CASE
+                                          WHEN $is_queue_held = 1 THEN NULL
+                                          ELSE download_no_progress_started_at_utc
+                                      END,
+                                      is_download_yielded = CASE
+                                          WHEN $is_queue_held = 1 THEN 0
+                                          ELSE is_download_yielded
                                       END
                                   WHERE torrent_id = $torrent_id
                                     AND state = 'Queued'
@@ -476,6 +492,8 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                        download_rate_bytes_per_second = 0,
                                        upload_rate_bytes_per_second = 0,
                                        metadata_resolution_attempt_started_at_utc = NULL,
+                                       download_no_progress_started_at_utc = NULL,
+                                       is_download_yielded = 0,
                                        last_activity_at_utc = $last_activity_at_utc,
                                        error_message = NULL
                                    WHERE torrent_id = $torrent_id
@@ -584,6 +602,13 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                     PriorityQueueOrder = reader.IsDBNull(35) ? null : reader.GetInt64(35),
                     PriorityMetadataAttemptsRemaining = reader.IsDBNull(36) ? null : reader.GetInt32(36),
                     IsQueueHeld = reader.GetInt64(37) != 0,
+                    DownloadNoProgressStartedAtUtc = reader.IsDBNull(38) ? null : DateTimeOffset.Parse(
+                        reader.GetString(38), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    DownloadLastYieldedAtUtc = reader.IsDBNull(39) ? null : DateTimeOffset.Parse(
+                        reader.GetString(39), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind
+                    ),
+                    IsDownloadYielded = reader.GetInt64(40) != 0,
                 }
             );
         }
@@ -635,7 +660,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   ordinary_queue_order,
                                   priority_queue_order,
                                   priority_metadata_attempts_remaining,
-                                  is_queue_held
+                                  is_queue_held,
+                                  download_no_progress_started_at_utc,
+                                  download_last_yielded_at_utc,
+                                  is_download_yielded
                               )
                               VALUES (
                                   $torrent_id,
@@ -678,7 +706,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                   ),
                                   $priority_queue_order,
                                   $priority_metadata_attempts_remaining,
-                                  $is_queue_held
+                                  $is_queue_held,
+                                  $download_no_progress_started_at_utc,
+                                  $download_last_yielded_at_utc,
+                                  $is_download_yielded
                               )
                               RETURNING ordinary_queue_order;
                               """;
@@ -785,6 +816,15 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
                                       WHEN $state = 'Paused' OR $desired_state = 'Paused' THEN 0
                                       ELSE is_queue_held
                                   END,
+                                  download_no_progress_started_at_utc = CASE
+                                      WHEN $state = 'Paused' OR $desired_state = 'Paused' THEN NULL
+                                      ELSE $download_no_progress_started_at_utc
+                                  END,
+                                  download_last_yielded_at_utc = $download_last_yielded_at_utc,
+                                  is_download_yielded = CASE
+                                      WHEN $state = 'Paused' OR $desired_state = 'Paused' THEN 0
+                                      ELSE $is_download_yielded
+                                  END,
                                   seeding_policy_applied_at_utc = COALESCE(
                                       seeding_policy_applied_at_utc,
                                       $seeding_policy_applied_at_utc
@@ -889,6 +929,17 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             torrent.PriorityMetadataAttemptsRemaining ?? (object) DBNull.Value
         );
         command.Parameters.AddWithValue("$is_queue_held", torrent.IsQueueHeld ? 1 : 0);
+        command.Parameters.AddWithValue(
+            "$download_no_progress_started_at_utc",
+            torrent.DownloadNoProgressStartedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ??
+            (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$download_last_yielded_at_utc",
+            torrent.DownloadLastYieldedAtUtc?.ToString("O", CultureInfo.InvariantCulture) ??
+            (object) DBNull.Value
+        );
+        command.Parameters.AddWithValue("$is_download_yielded", torrent.IsDownloadYielded ? 1 : 0);
     }
 
     private async Task<long?> AssignNextQueueOrderAsync(Guid torrentId, string columnName, bool clearHeldIntent,

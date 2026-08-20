@@ -352,6 +352,7 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     update.engineAllowPeerExchange = true
     update.metadataResolutionTimeSliceMinutes = 20
     update.priorityMetadataAttempts = 5
+    update.downloadNoProgressTimeSliceMinutes = 17
     update.automaticMetadataResetStuckThresholdSeconds = 60
     update.vpnEgressValidationEnabled = true
     update.vpnEgressValidationEndpoint = "https://vpn-check.example.test/ip"
@@ -368,6 +369,7 @@ func operationalMutationsRemainSingleItemAndRefreshAuthoritativeState() async th
     #expect(updatedSettings.engineAllowPeerExchange)
     #expect(updatedSettings.metadataResolutionTimeSliceMinutes == 20)
     #expect(updatedSettings.priorityMetadataAttempts == 5)
+    #expect(updatedSettings.downloadNoProgressTimeSliceMinutes == 17)
     #expect(updatedSettings.automaticMetadataResetStuckThresholdSeconds == 60)
     #expect(updatedSettings.vpnEgressValidationEnabled)
     #expect(updatedSettings.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
@@ -1168,6 +1170,7 @@ private actor FakeServiceClient: TorrentCoreServiceClientProtocol {
         settings.maxActiveDownloads = update.maxActiveDownloads
         settings.metadataResolutionTimeSliceMinutes = update.metadataResolutionTimeSliceMinutes
         settings.priorityMetadataAttempts = update.priorityMetadataAttempts
+        settings.downloadNoProgressTimeSliceMinutes = update.downloadNoProgressTimeSliceMinutes
         settings.automaticMetadataResetStuckThresholdSeconds = update.automaticMetadataResetStuckThresholdSeconds
         settings.vpnEgressValidationEnabled = update.vpnEgressValidationEnabled
         settings.vpnEgressValidationEndpoint = update.vpnEgressValidationEndpoint

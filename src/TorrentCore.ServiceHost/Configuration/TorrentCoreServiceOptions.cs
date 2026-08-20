@@ -9,6 +9,8 @@ public sealed class TorrentCoreServiceOptions
     public const int MaximumMetadataResolutionTimeSliceMinutes = 1_440;
     public const int MinimumPriorityMetadataAttempts = 1;
     public const int MaximumPriorityMetadataAttempts = 10;
+    public const int MinimumDownloadNoProgressTimeSliceMinutes = 1;
+    public const int MaximumDownloadNoProgressTimeSliceMinutes = 60;
     public TorrentEngineMode EngineMode { get; init; } = TorrentEngineMode.MonoTorrent;
     public TorrentEncryptionMode EngineEncryptionMode { get; init; } = TorrentEncryptionMode.EncryptedPreferred;
     public int EngineListenPort { get; init; } = 55_123;
@@ -37,6 +39,7 @@ public sealed class TorrentCoreServiceOptions
     public int MetadataRefreshRestartDelaySeconds { get; init; } = 30;
     public int MetadataResolutionTimeSliceMinutes { get; init; } = 15;
     public int PriorityMetadataAttempts { get; init; } = 3;
+    public int DownloadNoProgressTimeSliceMinutes { get; init; } = 30;
     public int AutomaticMetadataResetStuckThresholdSeconds { get; init; } = 30;
     public int ColdDownloadRecoveryThresholdMinutes { get; init; } = 120;
     public int ColdDownloadRecoveryIntervalMinutes { get; init; } = 60;

@@ -9,10 +9,14 @@ public sealed class TorrentQueueIntentTransitionsTests
     public void PriorityAndHoldTransitions_AreMutuallyExclusive()
     {
         var snapshot = CreateSnapshot();
+        snapshot.DownloadNoProgressStartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-30);
+        snapshot.IsDownloadYielded = true;
         TorrentQueueIntentTransitions.SetHeld(snapshot);
 
         Assert.True(snapshot.IsQueueHeld);
         Assert.Null(snapshot.PriorityQueueOrder);
+        Assert.Null(snapshot.DownloadNoProgressStartedAtUtc);
+        Assert.False(snapshot.IsDownloadYielded);
 
         TorrentQueueIntentTransitions.AssignPriorityOrder(snapshot, 4, 3);
 
@@ -35,11 +39,15 @@ public sealed class TorrentQueueIntentTransitionsTests
         snapshot.DesiredState = TorrentDesiredState.Paused;
         snapshot.PriorityQueueOrder = 9;
         snapshot.IsQueueHeld = true;
+        snapshot.DownloadNoProgressStartedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-30);
+        snapshot.IsDownloadYielded = true;
 
         TorrentQueueIntentTransitions.Normalize(snapshot);
 
         Assert.Null(snapshot.PriorityQueueOrder);
         Assert.False(snapshot.IsQueueHeld);
+        Assert.Null(snapshot.DownloadNoProgressStartedAtUtc);
+        Assert.False(snapshot.IsDownloadYielded);
         Assert.Throws<InvalidOperationException>(
             () => TorrentQueueIntentTransitions.AssignPriorityOrder(snapshot, 1, 3));
         Assert.Throws<InvalidOperationException>(() => TorrentQueueIntentTransitions.SetHeld(snapshot));

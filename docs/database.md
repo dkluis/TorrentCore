@@ -38,6 +38,8 @@ Current core tables:
 - persisted metadata-attempt start and last-yield timestamps used for fair unresolved-magnet rotation
 - durable ordinary queue order, optional priority order, remaining protected priority-metadata attempts, and Hold
   intent for restart-safe operator queue controls
+- durable payload no-progress start, most recent automatic download-yield time, and current download-yield queue class
+  for restart-safe stale-download rotation
 - current category routing and callback state for active torrents
 
 ### `runtime_settings`
@@ -80,6 +82,9 @@ Current core tables:
   timestamp-derived positions. Priority and Hold are mutually exclusive, and Paused rows retain neither intent.
 - migration 21 adds the nullable remaining protected priority-metadata-attempt count. Existing priority rows receive
   the default allowance of three; nonpriority rows remain null.
+- migration 22 adds nullable download no-progress and last-yield timestamps plus the non-null download-yielded queue
+  marker. Existing rows receive null timestamps and a false marker, so an active download receives a fresh full
+  interval from its first post-upgrade active observation without changing queue intent or cold-recovery history.
 
 Important history fields include:
 

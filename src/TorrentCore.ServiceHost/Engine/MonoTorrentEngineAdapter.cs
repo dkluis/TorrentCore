@@ -2409,6 +2409,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             SeedingStartedAtUtc = ResolveSeedingStartedAtUtc(existing.SeedingStartedAtUtc, state, now),
             SeedingPolicyAppliedAtUtc = existing.SeedingPolicyAppliedAtUtc,
             DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
+            DownloadNoProgressStartedAtUtc = existing.DownloadNoProgressStartedAtUtc,
+            DownloadLastYieldedAtUtc = existing.DownloadLastYieldedAtUtc,
+            IsDownloadYielded = existing.IsDownloadYielded,
             MetadataResolutionAttemptStartedAtUtc = manager.HasMetadata ? null :
                     existing.MetadataResolutionAttemptStartedAtUtc,
             MetadataResolutionLastYieldedAtUtc = manager.HasMetadata ? null :
@@ -2481,6 +2484,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             SeedingStartedAtUtc = existing.SeedingStartedAtUtc,
             SeedingPolicyAppliedAtUtc = existing.SeedingPolicyAppliedAtUtc,
             DownloadColdSinceUtc = existing.DownloadColdSinceUtc,
+            DownloadNoProgressStartedAtUtc = existing.DownloadNoProgressStartedAtUtc,
+            DownloadLastYieldedAtUtc = existing.DownloadLastYieldedAtUtc,
+            IsDownloadYielded = existing.IsDownloadYielded,
             MetadataResolutionAttemptStartedAtUtc = existing.MetadataResolutionAttemptStartedAtUtc,
             MetadataResolutionLastYieldedAtUtc = existing.MetadataResolutionLastYieldedAtUtc,
             LastActivityAtUtc = existing.LastActivityAtUtc,
@@ -3718,6 +3724,9 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
             CompletedAtUtc                    = snapshot.CompletedAtUtc,
             SeedingStartedAtUtc               = snapshot.SeedingStartedAtUtc,
             SeedingPolicyAppliedAtUtc         = snapshot.SeedingPolicyAppliedAtUtc ?? now,
+            DownloadNoProgressStartedAtUtc    = snapshot.DownloadNoProgressStartedAtUtc,
+            DownloadLastYieldedAtUtc           = snapshot.DownloadLastYieldedAtUtc,
+            IsDownloadYielded                  = snapshot.IsDownloadYielded,
             LastActivityAtUtc                 = now,
             ErrorMessage                      = snapshot.ErrorMessage,
         };

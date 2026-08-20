@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Persistence.Sqlite.Schema;
@@ -36,6 +37,53 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.Equal(1, reloaded.OrdinaryQueueOrder);
             Assert.Null(reloaded.PriorityQueueOrder);
             Assert.False(reloaded.IsQueueHeld);
+        }
+        finally
+        {
+            if (Directory.Exists(rootPath))
+            {
+                Directory.Delete(rootPath, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task DownloadRotationState_RoundTripsIndependentlyFromRecoveryAndMetadataState()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"torrentcore-download-rotation-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(rootPath);
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+
+        try
+        {
+            await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+            var now = DateTimeOffset.UtcNow;
+            var torrent = CreateSnapshot();
+            torrent.DownloadColdSinceUtc = now.AddHours(-4);
+            torrent.DownloadNoProgressStartedAtUtc = now.AddMinutes(-30);
+            torrent.DownloadLastYieldedAtUtc = now.AddMinutes(-5);
+            torrent.IsDownloadYielded = true;
+            torrent.MetadataResolutionAttemptStartedAtUtc = now.AddHours(-2);
+            torrent.MetadataResolutionLastYieldedAtUtc = now.AddHours(-1);
+
+            await new SqliteTorrentStateStore(databaseFilePath).InsertAsync(torrent, CancellationToken.None);
+
+            var reloaded = await new SqliteTorrentStateStore(databaseFilePath)
+                .GetAsync(torrent.TorrentId, CancellationToken.None);
+
+            Assert.NotNull(reloaded);
+            Assert.Equal(torrent.DownloadColdSinceUtc, reloaded.DownloadColdSinceUtc);
+            Assert.Equal(torrent.DownloadNoProgressStartedAtUtc, reloaded.DownloadNoProgressStartedAtUtc);
+            Assert.Equal(torrent.DownloadLastYieldedAtUtc, reloaded.DownloadLastYieldedAtUtc);
+            Assert.True(reloaded.IsDownloadYielded);
+            Assert.Equal(
+                torrent.MetadataResolutionAttemptStartedAtUtc,
+                reloaded.MetadataResolutionAttemptStartedAtUtc
+            );
+            Assert.Equal(
+                torrent.MetadataResolutionLastYieldedAtUtc,
+                reloaded.MetadataResolutionLastYieldedAtUtc
+            );
         }
         finally
         {
@@ -232,6 +280,23 @@ public sealed class SqliteTorrentStateStoreTests
             await store.InsertAsync(priority, CancellationToken.None);
             await store.InsertAsync(held, CancellationToken.None);
 
+            var priorYieldAtUtc = DateTimeOffset.UtcNow.AddMinutes(-10);
+            await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+            {
+                await connection.OpenAsync();
+                var command = connection.CreateCommand();
+                command.CommandText = """
+                                      UPDATE torrents
+                                      SET
+                                          download_no_progress_started_at_utc = $started_at_utc,
+                                          download_last_yielded_at_utc = $yielded_at_utc,
+                                          is_download_yielded = 1;
+                                      """;
+                command.Parameters.AddWithValue("$started_at_utc", priorYieldAtUtc.AddMinutes(-20).ToString("O"));
+                command.Parameters.AddWithValue("$yielded_at_utc", priorYieldAtUtc.ToString("O"));
+                await command.ExecuteNonQueryAsync();
+            }
+
             var resumedAt = DateTimeOffset.UtcNow;
             var resumedNormal = await store.ResumeWithQueueIntentAsync(
                 normal.TorrentId, TorrentQueueResumeMode.Normal, resumedAt, 3, CancellationToken.None);
@@ -254,6 +319,15 @@ public sealed class SqliteTorrentStateStoreTests
             Assert.False(resumedPriority.IsQueueHeld);
             Assert.Null(resumedHeld.PriorityQueueOrder);
             Assert.True(resumedHeld.IsQueueHeld);
+            Assert.All(
+                new[] { resumedNormal, resumedPriority, resumedHeld },
+                resumed =>
+                {
+                    Assert.Null(resumed.DownloadNoProgressStartedAtUtc);
+                    Assert.False(resumed.IsDownloadYielded);
+                    Assert.Equal(priorYieldAtUtc, resumed.DownloadLastYieldedAtUtc);
+                }
+            );
 
             Assert.Equal(1, await store.ReleaseQueueHoldsAsync(
                 [held.TorrentId], CancellationToken.None));

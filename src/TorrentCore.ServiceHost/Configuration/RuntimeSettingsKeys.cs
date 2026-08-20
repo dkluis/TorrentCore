@@ -22,6 +22,7 @@ public static class RuntimeSettingsKeys
     public const string MetadataRefreshRestartDelaySeconds      = "metadata_refresh_restart_delay_seconds";
     public const string MetadataResolutionTimeSliceMinutes      = "metadata_resolution_time_slice_minutes";
     public const string PriorityMetadataAttempts                = "priority_metadata_attempts";
+    public const string DownloadNoProgressTimeSliceMinutes      = "download_no_progress_time_slice_minutes";
     public const string AutomaticMetadataResetStuckThresholdSeconds =
             "automatic_metadata_reset_stuck_threshold_seconds";
     public const string ColdDownloadRecoveryThresholdMinutes    = "cold_download_recovery_threshold_minutes";

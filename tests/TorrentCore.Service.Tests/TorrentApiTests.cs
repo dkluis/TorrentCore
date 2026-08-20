@@ -466,6 +466,7 @@ public sealed class TorrentApiTests
         Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
         Assert.Equal(15, settings.MetadataResolutionTimeSliceMinutes);
         Assert.Equal(3, settings.PriorityMetadataAttempts);
+        Assert.Equal(30, settings.DownloadNoProgressTimeSliceMinutes);
         Assert.Equal(30, settings.AutomaticMetadataResetStuckThresholdSeconds);
         Assert.Equal(120, settings.ColdDownloadRecoveryThresholdMinutes);
         Assert.Equal(60, settings.ColdDownloadRecoveryIntervalMinutes);
@@ -529,6 +530,7 @@ public sealed class TorrentApiTests
                 MetadataRefreshStaleSeconds = 90,
                 MetadataRefreshRestartDelaySeconds = 30,
                 PriorityMetadataAttempts = 5,
+                DownloadNoProgressTimeSliceMinutes = 17,
                 AutomaticMetadataResetStuckThresholdSeconds = 45,
                 ColdDownloadRecoveryThresholdMinutes = 180,
                 ColdDownloadRecoveryIntervalMinutes = 45,
@@ -580,6 +582,7 @@ public sealed class TorrentApiTests
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
             Assert.Equal(5, settings.PriorityMetadataAttempts);
+            Assert.Equal(17, settings.DownloadNoProgressTimeSliceMinutes);
             Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
@@ -654,6 +657,7 @@ public sealed class TorrentApiTests
             Assert.Equal(90, settings.MetadataRefreshStaleSeconds);
             Assert.Equal(30, settings.MetadataRefreshRestartDelaySeconds);
             Assert.Equal(5, settings.PriorityMetadataAttempts);
+            Assert.Equal(17, settings.DownloadNoProgressTimeSliceMinutes);
             Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
             Assert.Equal(180, settings.ColdDownloadRecoveryThresholdMinutes);
             Assert.Equal(45, settings.ColdDownloadRecoveryIntervalMinutes);
@@ -717,7 +721,8 @@ public sealed class TorrentApiTests
             "api/host/runtime-settings",
             CreateDefaultRuntimeSettingsUpdateRequest(
                 engineAllowPeerExchange: true,
-                automaticMetadataResetStuckThresholdSeconds: 45)
+                automaticMetadataResetStuckThresholdSeconds: 45,
+                downloadNoProgressTimeSliceMinutes: 17)
         );
         enableResponse.EnsureSuccessStatusCode();
 
@@ -731,6 +736,7 @@ public sealed class TorrentApiTests
         Assert.NotNull(settings);
         Assert.True(settings.EngineAllowPeerExchange);
         Assert.Equal(45, settings.AutomaticMetadataResetStuckThresholdSeconds);
+        Assert.Equal(17, settings.DownloadNoProgressTimeSliceMinutes);
         Assert.False(settings.AppliedEngineAllowPeerExchange);
         Assert.True(settings.EngineSettingsRequireRestart);
     }
@@ -811,6 +817,24 @@ public sealed class TorrentApiTests
             CreateDefaultRuntimeSettingsUpdateRequest(priorityMetadataAttempts: attempts));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(61)]
+    public async Task UpdateRuntimeSettings_RejectsInvalidDownloadNoProgressTimeSlice(int minutes)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+
+        var response = await httpClient.PutAsJsonAsync(
+            "api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(downloadNoProgressTimeSliceMinutes: minutes));
+
+        var error = await response.Content.ReadFromJsonAsync<ServiceProblemDetailsDto>();
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("invalid_runtime_settings", error?.Code);
+        Assert.Equal(nameof(UpdateRuntimeSettingsRequest.DownloadNoProgressTimeSliceMinutes), error?.Target);
     }
 
     [Theory]
@@ -4336,6 +4360,7 @@ public sealed class TorrentApiTests
         int? automaticMetadataResetStuckThresholdSeconds = null,
         int? metadataResolutionTimeSliceMinutes = null,
         int? priorityMetadataAttempts = null,
+        int? downloadNoProgressTimeSliceMinutes = null,
         int maxActiveDownloads = 4,
         bool? vpnEgressValidationEnabled = null,
         string? vpnEgressValidationEndpoint = null,
@@ -4371,6 +4396,7 @@ public sealed class TorrentApiTests
             MetadataRefreshRestartDelaySeconds = 30,
             MetadataResolutionTimeSliceMinutes = metadataResolutionTimeSliceMinutes,
             PriorityMetadataAttempts = priorityMetadataAttempts,
+            DownloadNoProgressTimeSliceMinutes = downloadNoProgressTimeSliceMinutes,
             AutomaticMetadataResetStuckThresholdSeconds = automaticMetadataResetStuckThresholdSeconds,
             ColdDownloadRecoveryThresholdMinutes = coldDownloadRecoveryThresholdMinutes,
             ColdDownloadRecoveryIntervalMinutes = coldDownloadRecoveryIntervalMinutes,

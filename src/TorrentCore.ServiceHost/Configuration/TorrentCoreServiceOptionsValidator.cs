@@ -155,6 +155,15 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (options.DownloadNoProgressTimeSliceMinutes is
+            < TorrentCoreServiceOptions.MinimumDownloadNoProgressTimeSliceMinutes or
+            > TorrentCoreServiceOptions.MaximumDownloadNoProgressTimeSliceMinutes)
+        {
+            failures.Add(
+                $"{TorrentCoreServiceOptions.SectionName}:DownloadNoProgressTimeSliceMinutes must be between {TorrentCoreServiceOptions.MinimumDownloadNoProgressTimeSliceMinutes} and {TorrentCoreServiceOptions.MaximumDownloadNoProgressTimeSliceMinutes}."
+            );
+        }
+
         if (options.AutomaticMetadataResetStuckThresholdSeconds is
             < TorrentCoreServiceOptions.MinimumAutomaticMetadataResetStuckThresholdSeconds or
             > TorrentCoreServiceOptions.MaximumAutomaticMetadataResetStuckThresholdSeconds)

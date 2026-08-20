@@ -158,6 +158,17 @@ effective values returned by the Service.
 - changing the setting affects future Make Next and Resume Next actions, not priority requests already in the queue
 - configurable through the runtime-settings API/Swagger and both operator Settings screens
 
+### Download No-Progress Time Slice Minutes
+
+- defaults to `30`; accepted range is `1` through `60`, with no disabled value
+- persists as `DownloadNoProgressTimeSliceMinutes` and applies live without a Service restart
+- existing active downloads start with a fresh full interval at their first post-upgrade active observation because
+  older persistence cannot prove when payload bytes last increased
+- Slice 1 persists the setting and rotation state; payload-clock evaluation and automatic download yielding are not
+  active until the later rotation slices
+- currently exposed through the runtime-settings API/Swagger and preserved by the native client mapping; operator
+  Settings controls are delivered with the UI slice
+
 Queue diagnostics currently expose:
 
 - open metadata and download slots after metadata-to-download reservations are applied

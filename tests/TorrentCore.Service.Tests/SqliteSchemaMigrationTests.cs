@@ -9,6 +9,76 @@ namespace TorrentCore.Service.Tests;
 public sealed class SqliteSchemaMigrationTests
 {
     [Fact]
+    public async Task Migration22_AddsEmptyDownloadRotationState_WithoutChangingExistingIntent()
+    {
+        var rootPath = CreateTempRootPath("torrentcore-download-rotation-migration");
+        var databaseFilePath = Path.Combine(rootPath, "torrentcore.db");
+        await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+        var coldSinceUtc = DateTimeOffset.UtcNow.AddHours(-2).ToString("O");
+
+        await using (var connection = new SqliteConnection($"Data Source={databaseFilePath}"))
+        {
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = """
+                                  INSERT INTO torrents (
+                                      torrent_id, name, state, desired_state, magnet_uri, info_hash, save_path,
+                                      progress_percent, downloaded_bytes, uploaded_bytes, total_bytes,
+                                      download_rate_bytes_per_second, upload_rate_bytes_per_second,
+                                      tracker_count, connected_peer_count, added_at_utc, download_cold_since_utc,
+                                      ordinary_queue_order, priority_queue_order, priority_metadata_attempts_remaining,
+                                      is_queue_held
+                                  )
+                                  VALUES (
+                                      '23232323-2323-2323-2323-232323232323', 'Existing Download',
+                                      'Downloading', 'Runnable',
+                                      'magnet:?xt=urn:btih:2323232323232323232323232323232323232323',
+                                      '2323232323232323232323232323232323232323', '/tmp/existing-download',
+                                      42, 420, 0, 1000, 0, 0, 2, 1, $added_at_utc, $cold_since_utc,
+                                      1, 1, 2, 0
+                                  );
+                                  DELETE FROM schema_migrations WHERE version = 22;
+                                  """;
+            command.Parameters.AddWithValue("$added_at_utc", DateTimeOffset.UtcNow.AddDays(-1).ToString("O"));
+            command.Parameters.AddWithValue("$cold_since_utc", coldSinceUtc);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await new SqliteSchemaMigrator(databaseFilePath).ApplyMigrationsAsync(CancellationToken.None);
+
+        await using var verifyConnection = new SqliteConnection($"Data Source={databaseFilePath}");
+        await verifyConnection.OpenAsync();
+        var verifyCommand = verifyConnection.CreateCommand();
+        verifyCommand.CommandText = """
+                                    SELECT
+                                        state,
+                                        desired_state,
+                                        download_cold_since_utc,
+                                        ordinary_queue_order,
+                                        priority_queue_order,
+                                        priority_metadata_attempts_remaining,
+                                        is_queue_held,
+                                        download_no_progress_started_at_utc,
+                                        download_last_yielded_at_utc,
+                                        is_download_yielded
+                                    FROM torrents
+                                    WHERE torrent_id = '23232323-2323-2323-2323-232323232323';
+                                    """;
+        await using var reader = await verifyCommand.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("Downloading", reader.GetString(0));
+        Assert.Equal("Runnable", reader.GetString(1));
+        Assert.Equal(coldSinceUtc, reader.GetString(2));
+        Assert.Equal(1, reader.GetInt64(3));
+        Assert.Equal(1, reader.GetInt64(4));
+        Assert.Equal(2, reader.GetInt32(5));
+        Assert.Equal(0, reader.GetInt64(6));
+        Assert.True(reader.IsDBNull(7));
+        Assert.True(reader.IsDBNull(8));
+        Assert.Equal(0, reader.GetInt64(9));
+    }
+
+    [Fact]
     public async Task Migration21_BackfillsPriorityAttemptBudget_AndCanBeRepeated()
     {
         var rootPath = CreateTempRootPath("torrentcore-priority-attempt-migration");
@@ -403,7 +473,7 @@ public sealed class SqliteSchemaMigrationTests
             versions.Add(reader.GetInt32(0));
         }
 
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21], versions);
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22], versions);
 
         var torrentColumnsCommand = connection.CreateCommand();
         torrentColumnsCommand.CommandText = "PRAGMA table_info(torrents);";
@@ -422,6 +492,9 @@ public sealed class SqliteSchemaMigrationTests
         Assert.Contains("priority_queue_order", torrentColumns);
         Assert.Contains("priority_metadata_attempts_remaining", torrentColumns);
         Assert.Contains("is_queue_held", torrentColumns);
+        Assert.Contains("download_no_progress_started_at_utc", torrentColumns);
+        Assert.Contains("download_last_yielded_at_utc", torrentColumns);
+        Assert.Contains("is_download_yielded", torrentColumns);
 
         var historyColumnsCommand = connection.CreateCommand();
         historyColumnsCommand.CommandText = "PRAGMA table_info(torrent_history);";

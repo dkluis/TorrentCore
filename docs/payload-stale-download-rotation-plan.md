@@ -1,6 +1,6 @@
 # Payload-Stale Download Rotation Plan
 
-Status: approved for planning on August 19, 2026. No implementation has started.
+Status: Slices 0 and 1 completed on August 20, 2026. Payload-clock evaluation and automatic yielding have not started.
 
 This plan adds fair rotation for active downloads that receive no payload while other work is waiting. The same
 workstream also corrects History recency so records are found and ordered by their latest lifecycle change instead of
@@ -38,7 +38,7 @@ Peer connections and reported transfer rate do not count as payload progress.
 
 ## Durable State
 
-The next additive SQLite migration used by this workstream must represent:
+Migration 22 represents:
 
 - the start of the current active no-payload-progress interval
 - the most recent automatic download-yield time
@@ -76,9 +76,9 @@ downloaded-byte growth. A small positive byte increase is progress under the agr
 
 ## Runtime Setting And Diagnostics
 
-The planned setting is `DownloadNoProgressTimeSliceMinutes`; naming may be refined to match existing conventions
-without combining it with metadata time slicing or cold recovery. It applies live. Updating it re-evaluates eligibility
-on the next reconciliation without restarting the Service.
+The runtime setting is `DownloadNoProgressTimeSliceMinutes`, separate from metadata time slicing and cold recovery. It
+applies live. Once payload-clock evaluation is implemented, updating it re-evaluates eligibility on the next
+reconciliation without restarting the Service.
 
 Summary/detail diagnostics and the WebUI must make automatic rotation observable without presenting it as Pause:
 
@@ -116,10 +116,17 @@ Agreed behavior:
 - Accumulate no-progress time while active even when nobody is waiting. Yield only when eligible runnable work is
   waiting, but allow immediate yield when that work arrives after the interval has already expired.
 - Validate the setting from 1 through 60 minutes, default it to 30 minutes, and do not use zero as a disable value.
+- When migration 22 upgrades an existing active download, leave its new no-progress start null and begin a fresh full
+  interval at the first post-upgrade active observation. Do not infer payload timing from general activity timestamps.
 
 ## Sliced Delivery Plan
 
 ### Slice 0: Shared Safety Gate And Characterization
+
+Status: completed on August 20, 2026 from clean, pushed baseline
+`4b8e81cd591b19dad0adce543ec51e20b3725254`. Six controllable-clock characterizations record connected-peer,
+reported-rate, zero-peer/zero-rate, pause/resume, restart, and no-waiting-work behavior without adding a production
+yield path.
 
 #### Work
 
@@ -135,6 +142,13 @@ Agreed behavior:
 - No production rotation behavior exists yet.
 
 ### Slice 1: Setting And Durable Rotation State
+
+Status: completed on August 20, 2026. `DownloadNoProgressTimeSliceMinutes` now defaults to 30, validates from 1 through
+60, persists through the additive runtime-settings store, survives restart, and is mapped through the Service and
+native client contracts. Migration 22 adds `download_no_progress_started_at_utc`,
+`download_last_yielded_at_utc`, and `is_download_yielded`; existing rows begin null/null/false. Queue-intent
+normalization clears active/yielded state for Pause, priority, Hold, and explicit Resume transitions while preserving
+historical last-yield time.
 
 #### Work
 

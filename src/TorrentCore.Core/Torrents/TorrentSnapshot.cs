@@ -42,6 +42,9 @@ public sealed class TorrentSnapshot
     public          DateTimeOffset?                 SeedingStartedAtUtc               { get; set; }
     public          DateTimeOffset?                 SeedingPolicyAppliedAtUtc         { get; set; }
     public          DateTimeOffset?                 DownloadColdSinceUtc              { get; set; }
+    public          DateTimeOffset?                 DownloadNoProgressStartedAtUtc    { get; set; }
+    public          DateTimeOffset?                 DownloadLastYieldedAtUtc           { get; set; }
+    public          bool                            IsDownloadYielded                  { get; set; }
     public          DateTimeOffset?                 MetadataResolutionAttemptStartedAtUtc { get; set; }
     public          DateTimeOffset?                 MetadataResolutionLastYieldedAtUtc { get; set; }
     public          DateTimeOffset?                 LastActivityAtUtc                 { get; set; }

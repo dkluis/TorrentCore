@@ -25,6 +25,7 @@ public sealed class RuntimeSettingsSnapshot
     public required int                         MetadataRefreshRestartDelaySeconds           { get; init; }
     public int                                  MetadataResolutionTimeSliceMinutes           { get; init; } = 15;
     public int                                  PriorityMetadataAttempts                     { get; init; } = 3;
+    public int                                  DownloadNoProgressTimeSliceMinutes           { get; init; } = 30;
     public int                                  AutomaticMetadataResetStuckThresholdSeconds  { get; init; } = 30;
     public int                                  ColdDownloadRecoveryThresholdMinutes         { get; init; } = 120;
     public int                                  ColdDownloadRecoveryIntervalMinutes          { get; init; } = 60;
