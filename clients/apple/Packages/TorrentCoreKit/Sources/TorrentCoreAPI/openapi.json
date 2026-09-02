@@ -2611,6 +2611,14 @@
         "parameters": [
           {
             "in": "query",
+            "name": "TorrentId",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "TorrentName",
             "schema": {
               "type": "string"

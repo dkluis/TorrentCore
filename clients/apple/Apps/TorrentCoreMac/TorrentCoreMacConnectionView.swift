@@ -7,6 +7,7 @@ struct TorrentCoreMacConnectionView: View {
     @State private var selectedProfileID: UUID?
     @State private var name = ""
     @State private var address = ""
+    @State private var environment = TorrentCoreConnectionEnvironment.unclassified
     @State private var isCreating = false
     @State private var isWorking = false
     @State private var feedback: Feedback?
@@ -19,6 +20,10 @@ struct TorrentCoreMacConnectionView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(profile.name)
+                            Text(profile.environment.displayName)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(environmentColor(profile.environment))
                             Text(profile.baseURL.absoluteString)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -79,6 +84,17 @@ struct TorrentCoreMacConnectionView: View {
                     Text("Enter an HTTP or HTTPS hostname or IP address with an optional port. The connection can be saved while its LAN or VPN is unavailable.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    Picker("Environment", selection: $environment) {
+                        ForEach(TorrentCoreConnectionEnvironment.allCases) { environment in
+                            Text(environment.displayName).tag(environment)
+                        }
+                    }
+                    .accessibilityIdentifier("connection.environment")
+                    if environment == .unclassified {
+                        Text("Choose Production or Test before saving this connection.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } header: {
                     TorrentCoreMacHelpSectionTitle(
                         title: "TorrentCore Connection",
@@ -127,6 +143,7 @@ struct TorrentCoreMacConnectionView: View {
                             isWorking
                                 || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                 || address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                || environment == .unclassified
                         )
                         .accessibilityIdentifier("connection.save")
                         .help(TorrentCoreHelpCatalog.Connection.save.summary)
@@ -238,6 +255,7 @@ struct TorrentCoreMacConnectionView: View {
         isCreating = false
         name = profile.name
         address = profile.baseURL.absoluteString
+        environment = profile.environment
         feedback = nil
     }
 
@@ -246,6 +264,7 @@ struct TorrentCoreMacConnectionView: View {
         isCreating = true
         name = ""
         address = ""
+        environment = .unclassified
         feedback = nil
     }
 
@@ -281,13 +300,15 @@ struct TorrentCoreMacConnectionView: View {
                     profile = try await session.updateProfile(
                         id: selectedProfileID,
                         name: name,
-                        address: address
+                        address: address,
+                        environment: environment
                     )
                     try await session.selectProfile(id: profile.id)
                 } else {
                     profile = try await session.addProfile(
                         name: name,
                         address: address,
+                        environment: environment,
                         makeActive: true
                     )
                 }
@@ -365,6 +386,16 @@ struct TorrentCoreMacConnectionView: View {
                     isError: true
                 )
             }
+        }
+    }
+
+    private func environmentColor(
+        _ environment: TorrentCoreConnectionEnvironment
+    ) -> Color {
+        switch environment {
+        case .production: .blue
+        case .test: .red
+        case .unclassified: .gray
         }
     }
 }

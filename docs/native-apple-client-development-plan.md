@@ -502,33 +502,29 @@ supported operator UI.
 
 ### macOS UI Refinement Workstream
 
-Status: in progress. The operator chose to continue improving the macOS presentation before beginning iPad adaptation.
-Preserve Service and WebUI behavior and keep reusable, non-UI behavior in the iOS-capable `TorrentCoreKit` package.
+Status: complete September 2, 2026. The operator accepted the debug macOS UI on CA-Desktop running macOS 26.6.2
+against the deployed CA-Server Test service and directed that future findings be handled as patches. The completed
+macOS UI is version 1.0.0 build 16. This workstream did not perform packaging or production deployment and did not
+change the existing native-client support status.
 
-Accepted first refinement slice:
+Accepted result:
 
-- replace the title-bar connection item with a noninteractive status bar at the bottom of the content area, showing
-  connection name, service address, and textual connection status
-- let destination content use the full width available to the right of the main sidebar and align content to that edge
-- retain the Torrents table pattern and convert History and Logs from simulated grids to native sortable tables
-- use dropdown filters for bounded values, free-text fields only for wildcard searches and exact identifiers, and
-  native date controls for date ranges
-- populate Log Category and Event Type dropdowns from loaded values while preserving an active selection
-- use the full WebUI-equivalent History column set and add local 25/50/100/250-row pagination to Logs
-- make Peer and Tracker headers sortable, add 10/25/50/100-row pagination, and size their pop-ups to show all columns
-  without horizontal scrolling when display space permits
-- size coded-value columns to remain readable, reserve flexible width for names and messages, keep numeric columns
-  compact, and retain native column resizing
-- add local Copy actions for Torrent ID and Service Instance ID in inspectors where those identifiers are present
-- keep Dashboard metric layouts, forms, connection lists, sidebar lists, and the editable category-maintenance surface
-  outside the sortable-table requirement
-
-Next confirmed refinement:
-
-- Peer and Tracker pop-up sections still open with horizontal scrolling instead of sizing to expose all columns when
-  display space permits.
-- User-adjusted Peer and Tracker column widths do not appear to persist. Confirm the native table customization
-  behavior and implement durable width restoration without assuming that visibility customization also saves widths.
+- saved connection profiles carry an explicit device-local Production or Test classification, with backward-compatible
+  Unclassified migration and a persistent titlebar warning bar while retaining the bottom connection status bar
+- Torrents, History, Logs, Peers, and Trackers use consistent native tables with persisted ordered multi-sort, column
+  visibility and reset controls, full-record export, and shared 25/50/100/250-row pagination
+- Torrents uses the operator-approved default columns and State-ascending/Progress-descending sort; History and Logs
+  retain their accepted defaults and use consistent compact filter controls, Search labels, and date-aware reset/clear
+  behavior
+- Torrents, History, and Logs retain single selection and use persisted resizable trailing inspectors; clicking blank
+  table space closes an open inspector
+- Peer and Tracker windows remain resizable and retain their accepted default sizes, without row selection, inspectors,
+  or new service actions
+- History lookup from a selected torrent uses the operator-authorized additive exact Torrent ID query filter before the
+  service result limit; WebUI, SQLite, and unrelated Service behavior are unchanged
+- final verification passed all 360 .NET tests, all 38 shared Swift tests, the macOS build-for-testing and unit target,
+  and an unsigned iOS Simulator build; visual behavior was accepted through operator-controlled testing against real
+  Test data
 
 ### Milestone 6: iPad Adaptation
 

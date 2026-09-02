@@ -508,9 +508,9 @@ final class TorrentCoreMacUITests: XCTestCase {
         XCTAssertTrue(torrentsNavigation.waitForExistence(timeout: 10))
         torrentsNavigation.click()
 
-        let clearFiltersButton = app.buttons["Clear"]
-        if clearFiltersButton.waitForExistence(timeout: 5), clearFiltersButton.isEnabled {
-            clearFiltersButton.click()
+        let resetFiltersButton = app.buttons["torrents.resetFilters"]
+        if resetFiltersButton.waitForExistence(timeout: 5), resetFiltersButton.isEnabled {
+            resetFiltersButton.click()
         }
         XCTAssertTrue(
             app.descendants(matching: .any)["torrents.table"]

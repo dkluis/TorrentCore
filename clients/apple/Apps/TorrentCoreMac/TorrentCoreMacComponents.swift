@@ -155,6 +155,77 @@ struct TorrentCoreMacDetailRow: View {
 
 private struct TorrentCoreMacTrailingOverlayModifier<OverlayContent: View>: ViewModifier {
     let isPresented: Bool
+    @Binding var width: Double
+    let overlayContent: () -> OverlayContent
+    @State private var dragStartWidth: Double?
+    @State private var liveWidth: Double?
+    @State private var isResizeHandleHovered = false
+
+    private var displayedWidth: Double {
+        TorrentCoreMacTableSupport.clampedOverlayWidth(liveWidth ?? width)
+    }
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .trailing) {
+            if isPresented {
+                overlayContent()
+                    .frame(width: displayedWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(.regularMaterial)
+                    .overlay(alignment: .leading) {
+                        Rectangle()
+                            .fill(
+                                isResizeHandleHovered
+                                    ? Color.accentColor.opacity(0.14)
+                                    : .clear
+                            )
+                            .frame(width: 12)
+                            .contentShape(Rectangle())
+                            .overlay(alignment: .leading) { Divider() }
+                            .onContinuousHover { phase in
+                                switch phase {
+                                case .active:
+                                    isResizeHandleHovered = true
+                                    NSCursor.resizeLeftRight.set()
+                                case .ended:
+                                    isResizeHandleHovered = false
+                                    NSCursor.arrow.set()
+                                }
+                            }
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        if dragStartWidth == nil {
+                                            dragStartWidth = width
+                                        }
+                                        liveWidth = TorrentCoreMacTableSupport
+                                            .clampedOverlayWidth(
+                                                (dragStartWidth ?? width)
+                                                    - value.translation.width
+                                            )
+                                    }
+                                    .onEnded { _ in
+                                        if let liveWidth {
+                                            width = TorrentCoreMacTableSupport
+                                                .clampedOverlayWidth(liveWidth)
+                                        }
+                                        liveWidth = nil
+                                        dragStartWidth = nil
+                                    }
+                            )
+                            .help("Drag to resize details")
+                    }
+                    .shadow(color: .black.opacity(0.18), radius: 12, x: -4)
+                    .contentShape(Rectangle())
+                    .zIndex(1)
+                    .onDisappear { NSCursor.arrow.set() }
+            }
+        }
+    }
+}
+
+private struct TorrentCoreMacFixedTrailingOverlayModifier<OverlayContent: View>: ViewModifier {
+    let isPresented: Bool
     let width: CGFloat
     let overlayContent: () -> OverlayContent
 
@@ -165,9 +236,7 @@ private struct TorrentCoreMacTrailingOverlayModifier<OverlayContent: View>: View
                     .frame(width: width)
                     .frame(maxHeight: .infinity)
                     .background(.regularMaterial)
-                    .overlay(alignment: .leading) {
-                        Divider()
-                    }
+                    .overlay(alignment: .leading) { Divider() }
                     .shadow(color: .black.opacity(0.18), radius: 12, x: -4)
                     .contentShape(Rectangle())
                     .zIndex(1)
@@ -179,11 +248,25 @@ private struct TorrentCoreMacTrailingOverlayModifier<OverlayContent: View>: View
 extension View {
     func torrentCoreTrailingOverlay<OverlayContent: View>(
         isPresented: Bool,
-        width: CGFloat,
+        width: Binding<Double>,
         @ViewBuilder content: @escaping () -> OverlayContent
     ) -> some View {
         modifier(
             TorrentCoreMacTrailingOverlayModifier(
+                isPresented: isPresented,
+                width: width,
+                overlayContent: content
+            )
+        )
+    }
+
+    func torrentCoreTrailingOverlay<OverlayContent: View>(
+        isPresented: Bool,
+        width: CGFloat,
+        @ViewBuilder content: @escaping () -> OverlayContent
+    ) -> some View {
+        modifier(
+            TorrentCoreMacFixedTrailingOverlayModifier(
                 isPresented: isPresented,
                 width: width,
                 overlayContent: content

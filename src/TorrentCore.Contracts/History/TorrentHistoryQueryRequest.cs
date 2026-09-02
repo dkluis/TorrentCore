@@ -2,6 +2,7 @@ namespace TorrentCore.Contracts.History;
 
 public sealed class TorrentHistoryQueryRequest
 {
+    public Guid?                  TorrentId   { get; init; }
     public string?                TorrentName { get; init; }
     public string?                CategoryKey { get; init; }
     public string?                State       { get; init; }

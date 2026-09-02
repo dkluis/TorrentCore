@@ -94,6 +94,11 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
     {
         var query = new List<string>();
 
+        if (request.TorrentId is not null)
+        {
+            query.Add($"torrentId={request.TorrentId.Value:D}");
+        }
+
         if (!string.IsNullOrWhiteSpace(request.TorrentName))
         {
             query.Add($"torrentName={Uri.EscapeDataString(request.TorrentName)}");

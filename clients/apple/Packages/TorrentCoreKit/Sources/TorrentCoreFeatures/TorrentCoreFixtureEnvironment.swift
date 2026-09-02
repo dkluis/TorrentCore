@@ -159,6 +159,9 @@ private actor TorrentCoreFixtureServiceClient: TorrentCoreServiceClientProtocol 
 
     func history(query: TorrentCoreHistoryQuery) async throws -> [TorrentCoreHistorySummary] {
         var values = historyValues
+        if let torrentID = query.torrentID {
+            values = values.filter { $0.torrentID == torrentID }
+        }
         if let name = query.torrentName, !name.isEmpty {
             values = values.filter {
                 $0.name?.localizedCaseInsensitiveContains(name) == true

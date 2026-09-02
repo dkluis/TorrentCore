@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import TorrentCoreAPI
 import TorrentCoreFeatures
@@ -261,6 +262,9 @@ struct TorrentCoreMacContentView: View {
 
         }
         .frame(minWidth: 1_000, minHeight: 650)
+        .background {
+            TorrentCoreMacEnvironmentBarAccessoryView(profile: session.activeProfile)
+        }
         .focusedSceneValue(\.torrentCoreDestination, destinationSelection)
         .focusedSceneValue(\.torrentCoreInspectorCommand, inspectorCommand)
         .focusedSceneValue(\.torrentCoreSidebarCommand, sidebarCommand)
@@ -737,7 +741,7 @@ struct TorrentCoreMacContentView: View {
     }
 
     private func showHistory(_ torrentID: UUID) {
-        historyQuery = TorrentCoreHistoryQuery(take: 500)
+        historyQuery = TorrentCoreHistoryQuery(torrentID: torrentID, take: 500)
         selectedHistoryTorrentID = torrentID
         isHistoryInspectorPresented = true
         destination = .history
@@ -748,6 +752,163 @@ struct TorrentCoreMacContentView: View {
         selectedLogID = nil
         isLogInspectorPresented = false
         destination = .logs
+    }
+}
+
+private struct TorrentCoreMacEnvironmentBar: View {
+    let profile: TorrentCoreConnectionProfile?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: environmentSymbol)
+            Text(environmentTitle.uppercased())
+                .fontWeight(.bold)
+            Text("•")
+            Text(profile?.name ?? "No Connection")
+                .fontWeight(.semibold)
+                .lineLimit(1)
+            Spacer()
+        }
+        .font(.callout)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(environmentColor, ignoresSafeAreaEdges: [])
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(environmentTitle) environment, \(profile?.name ?? "No Connection")"
+        )
+        .accessibilityIdentifier("main.environmentBar")
+    }
+
+    private var environment: TorrentCoreConnectionEnvironment {
+        profile?.environment ?? .unclassified
+    }
+
+    private var environmentTitle: String {
+        environment.displayName
+    }
+
+    private var environmentSymbol: String {
+        switch environment {
+        case .production: "checkmark.shield.fill"
+        case .test: "exclamationmark.triangle.fill"
+        case .unclassified: "questionmark.circle.fill"
+        }
+    }
+
+    private var environmentColor: Color {
+        switch environment {
+        case .production: .blue
+        case .test: .red
+        case .unclassified: .gray
+        }
+    }
+}
+
+private struct TorrentCoreMacEnvironmentBarAccessoryView: NSViewRepresentable {
+    let profile: TorrentCoreConnectionProfile?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(profile: profile)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            context.coordinator.attach(to: view.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.update(profile: profile)
+        DispatchQueue.main.async {
+            context.coordinator.attach(to: nsView.window)
+        }
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    @MainActor
+    final class Coordinator {
+        private weak var window: NSWindow?
+        private let accessoryController: NSTitlebarAccessoryViewController
+        private let containerView: EnvironmentBarContainerView
+
+        init(profile: TorrentCoreConnectionProfile?) {
+            containerView = EnvironmentBarContainerView(profile: profile)
+            accessoryController = NSTitlebarAccessoryViewController()
+            accessoryController.layoutAttribute = .bottom
+            accessoryController.view = containerView
+        }
+
+        func update(profile: TorrentCoreConnectionProfile?) {
+            containerView.update(profile: profile)
+        }
+
+        func attach(to newWindow: NSWindow?) {
+            guard let newWindow, window !== newWindow else { return }
+            detach()
+            window = newWindow
+            containerView.frame = NSRect(
+                x: 0,
+                y: 0,
+                width: newWindow.frame.width,
+                height: EnvironmentBarContainerView.height
+            )
+            newWindow.addTitlebarAccessoryViewController(accessoryController)
+        }
+
+        func detach() {
+            guard let window,
+                  let index = window.titlebarAccessoryViewControllers.firstIndex(where: {
+                      $0 === accessoryController
+                  }) else {
+                self.window = nil
+                return
+            }
+            window.removeTitlebarAccessoryViewController(at: index)
+            self.window = nil
+        }
+    }
+
+    @MainActor
+    final class EnvironmentBarContainerView: NSView {
+        static let height: CGFloat = 34
+
+        private let hostingView: NSHostingView<TorrentCoreMacEnvironmentBar>
+
+        init(profile: TorrentCoreConnectionProfile?) {
+            hostingView = NSHostingView(
+                rootView: TorrentCoreMacEnvironmentBar(profile: profile)
+            )
+            super.init(frame: NSRect(x: 0, y: 0, width: 1, height: Self.height))
+
+            hostingView.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(hostingView)
+            NSLayoutConstraint.activate([
+                hostingView.leadingAnchor.constraint(equalTo: leadingAnchor),
+                hostingView.trailingAnchor.constraint(equalTo: trailingAnchor),
+                hostingView.topAnchor.constraint(equalTo: topAnchor),
+                hostingView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            ])
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override var intrinsicContentSize: NSSize {
+            NSSize(width: NSView.noIntrinsicMetric, height: Self.height)
+        }
+
+        func update(profile: TorrentCoreConnectionProfile?) {
+            hostingView.rootView = TorrentCoreMacEnvironmentBar(profile: profile)
+        }
     }
 }
 

@@ -13,10 +13,12 @@ func profileAddressesAndDevicePreferencesAreNormalizedAndPersisted() async throw
 
     let profile = try TorrentCoreConnectionProfile(
         name: "  CA-Desktop  ",
-        address: "TorrentCore.Local:7033/"
+        address: "TorrentCore.Local:7033/",
+        environment: .test
     )
     #expect(profile.name == "CA-Desktop")
     #expect(profile.baseURL.absoluteString == "http://torrentcore.local:7033")
+    #expect(profile.environment == .test)
     #expect(TorrentCoreRefreshInterval.defaultValue == .fifteenSeconds)
     #expect(TorrentCoreRefreshInterval.allCases.map(\.rawValue) == [5, 10, 15])
 
@@ -32,6 +34,38 @@ func profileAddressesAndDevicePreferencesAreNormalizedAndPersisted() async throw
     #expect(reloaded == preferences)
     #expect(reloaded.activeProfile == profile)
     #expect(reloaded.autoRefreshEnabled)
+}
+
+@Test
+func olderProfileWithoutEnvironmentDecodesIntactAsUnclassified() throws {
+    let id = UUID()
+    let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let updatedAt = Date(timeIntervalSince1970: 1_700_000_100)
+    let current = try TorrentCoreConnectionProfile(
+        id: id,
+        name: "Existing",
+        address: "http://existing.test:7033",
+        environment: .production,
+        createdAt: createdAt,
+        updatedAt: updatedAt
+    )
+    let encoded = try JSONEncoder().encode(current)
+    var object = try #require(
+        JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+    )
+    object.removeValue(forKey: "environment")
+
+    let decoded = try JSONDecoder().decode(
+        TorrentCoreConnectionProfile.self,
+        from: JSONSerialization.data(withJSONObject: object)
+    )
+
+    #expect(decoded.id == id)
+    #expect(decoded.name == "Existing")
+    #expect(decoded.baseURL == current.baseURL)
+    #expect(decoded.environment == .unclassified)
+    #expect(decoded.createdAt == createdAt)
+    #expect(decoded.updatedAt == updatedAt)
 }
 
 @Test
@@ -92,7 +126,24 @@ func profileValidationRejectsUnsafeAndDuplicateAddresses() async throws {
         profileStore: MemoryProfileStore(),
         clientFactory: FakeClientFactory(clients: [:])
     )
-    _ = try await session.addProfile(name: "First", address: "torrentcore.local:7033")
+    let first = try await session.addProfile(
+        name: "First",
+        address: "torrentcore.local:7033"
+    )
+    #expect(first.environment == .unclassified)
+    let classified = try await session.updateProfile(
+        id: first.id,
+        name: "First",
+        address: "torrentcore.local:7033",
+        environment: .production
+    )
+    let renamed = try await session.updateProfile(
+        id: first.id,
+        name: "First Renamed",
+        address: "torrentcore.local:7033"
+    )
+    #expect(classified.environment == .production)
+    #expect(renamed.environment == .production)
     await #expect(throws: TorrentCoreConnectionProfileError.duplicateAddress) {
         try await session.addProfile(name: "Second", address: "HTTP://TORRENTCORE.LOCAL:7033/")
     }

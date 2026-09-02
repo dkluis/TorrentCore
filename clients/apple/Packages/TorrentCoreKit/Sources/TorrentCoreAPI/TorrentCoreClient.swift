@@ -164,6 +164,7 @@ public struct TorrentCoreClient: Sendable {
     ) async throws -> [TorrentCoreHistorySummary] {
         try await perform(.history) {
             let generatedQuery = Operations.HistoryGetAll.Input.Query(
+                torrentId: query.torrentID?.uuidString,
                 torrentName: query.torrentName,
                 categoryKey: query.categoryKey,
                 state: query.state,

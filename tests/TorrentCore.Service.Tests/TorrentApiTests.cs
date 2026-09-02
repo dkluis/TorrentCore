@@ -348,6 +348,12 @@ public sealed class TorrentApiTests
         Assert.Equal(TorrentHistoryOutcome.Abandoned, allHistory[1].Outcome);
         Assert.Equal(TorrentRemovalKind.ColdDownloadAbandonment, allHistory[1].RemovalKind);
 
+        var byTorrentId = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>(
+            $"api/history?torrentId={secondTorrent.TorrentId:D}");
+        Assert.NotNull(byTorrentId);
+        Assert.Single(byTorrentId);
+        Assert.Equal(secondTorrent.TorrentId, byTorrentId[0].TorrentId);
+
         var byName = await httpClient.GetFromJsonAsync<IReadOnlyList<TorrentHistorySummaryDto>>("api/history?torrentName=alpha");
         Assert.NotNull(byName);
         Assert.Equal(2, byName.Count);

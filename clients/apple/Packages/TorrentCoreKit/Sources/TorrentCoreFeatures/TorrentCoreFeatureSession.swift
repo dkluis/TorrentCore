@@ -164,9 +164,15 @@ public final class TorrentCoreFeatureSession {
     public func addProfile(
         name: String,
         address: String,
+        environment: TorrentCoreConnectionEnvironment = .unclassified,
         makeActive: Bool = true
     ) async throws -> TorrentCoreConnectionProfile {
-        let profile = try TorrentCoreConnectionProfile(name: name, address: address, createdAt: now())
+        let profile = try TorrentCoreConnectionProfile(
+            name: name,
+            address: address,
+            environment: environment,
+            createdAt: now()
+        )
         try ensureUniqueAddress(profile.baseURL, excluding: nil)
 
         var updatedPreferences = preferences
@@ -191,7 +197,8 @@ public final class TorrentCoreFeatureSession {
     public func updateProfile(
         id: UUID,
         name: String,
-        address: String
+        address: String,
+        environment: TorrentCoreConnectionEnvironment? = nil
     ) async throws -> TorrentCoreConnectionProfile {
         guard let index = preferences.profiles.firstIndex(where: { $0.id == id }) else {
             throw TorrentCoreConnectionProfileError.profileNotFound
@@ -202,6 +209,7 @@ public final class TorrentCoreFeatureSession {
             id: existing.id,
             name: name,
             address: address,
+            environment: environment ?? existing.environment,
             createdAt: existing.createdAt,
             updatedAt: now()
         )

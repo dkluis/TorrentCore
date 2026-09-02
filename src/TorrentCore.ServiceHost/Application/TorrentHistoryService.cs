@@ -514,6 +514,11 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
     {
         var query = records;
 
+        if (request.TorrentId is not null)
+        {
+            query = query.Where(record => record.TorrentId == request.TorrentId.Value);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.TorrentName))
         {
             query = query.Where(record => record.Name.Contains(request.TorrentName.Trim(), StringComparison.OrdinalIgnoreCase));

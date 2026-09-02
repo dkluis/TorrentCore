@@ -23,10 +23,27 @@ extension TorrentCoreConnectionProfileError: LocalizedError {
     }
 }
 
+public enum TorrentCoreConnectionEnvironment: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
+    case unclassified
+    case production
+    case test
+
+    public var id: Self { self }
+
+    public var displayName: String {
+        switch self {
+        case .unclassified: "Unclassified"
+        case .production: "Production"
+        case .test: "Test"
+        }
+    }
+}
+
 public struct TorrentCoreConnectionProfile: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
     public var baseURL: URL
+    public var environment: TorrentCoreConnectionEnvironment
     public let createdAt: Date
     public var updatedAt: Date
 
@@ -34,6 +51,7 @@ public struct TorrentCoreConnectionProfile: Codable, Hashable, Identifiable, Sen
         id: UUID = UUID(),
         name: String,
         address: String,
+        environment: TorrentCoreConnectionEnvironment = .unclassified,
         createdAt: Date = Date(),
         updatedAt: Date? = nil
     ) throws {
@@ -52,8 +70,31 @@ public struct TorrentCoreConnectionProfile: Codable, Hashable, Identifiable, Sen
         self.id = id
         self.name = trimmedName
         self.baseURL = normalizedURL
+        self.environment = environment
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case baseURL
+        case environment
+        case createdAt
+        case updatedAt
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        baseURL = try container.decode(URL.self, forKey: .baseURL)
+        environment = try container.decodeIfPresent(
+            TorrentCoreConnectionEnvironment.self,
+            forKey: .environment
+        ) ?? .unclassified
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
     }
 }
 

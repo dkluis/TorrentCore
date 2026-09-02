@@ -26,6 +26,7 @@ public struct TorrentCoreRemovalKind: RawRepresentable, Codable, Hashable, Senda
 }
 
 public struct TorrentCoreHistoryQuery: Hashable, Sendable {
+    public var torrentID: UUID?
     public var torrentName: String?
     public var categoryKey: String?
     public var state: String?
@@ -36,6 +37,7 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
     public var take: Int?
 
     public init(
+        torrentID: UUID? = nil,
         torrentName: String? = nil,
         categoryKey: String? = nil,
         state: String? = nil,
@@ -45,6 +47,7 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
         toDate: String? = nil,
         take: Int? = nil
     ) {
+        self.torrentID = torrentID
         self.torrentName = torrentName
         self.categoryKey = categoryKey
         self.state = state

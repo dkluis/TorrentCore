@@ -284,6 +284,30 @@ func logLevelQueriesMatchServiceContract() async throws {
 }
 
 @Test
+func historyTorrentIDQueryMatchesServiceContract() async throws {
+    let recorder = RequestRecorder()
+    let transport = FixtureTransport(recorder: recorder)
+    let client = try TorrentCoreClient(
+        baseURL: #require(URL(string: "http://torrentcore.test:7033")),
+        healthTransport: transport,
+        readTransport: transport,
+        mutationTransport: transport
+    )
+    let torrentID = try #require(UUID(uuidString: FixturePayloads.torrentID))
+
+    _ = try await client.history(query: .init(torrentID: torrentID, take: 500))
+
+    let requests = await recorder.entries
+    let request = try #require(requests.only)
+    #expect(request.operationID == "History_GetAll")
+    let path = try #require(request.path)
+    let components = try #require(URLComponents(string: "http://torrentcore.test\(path)"))
+    let queryItems = components.queryItems ?? []
+    #expect(queryItems.first(where: { $0.name == "TorrentId" })?.value == torrentID.uuidString)
+    #expect(queryItems.first(where: { $0.name == "Take" })?.value == "500")
+}
+
+@Test
 func filterOptionsUseDedicatedUnfilteredEndpoints() async throws {
     let recorder = RequestRecorder()
     let transport = FixtureTransport(recorder: recorder)
@@ -826,6 +850,8 @@ private enum FixturePayloads {
         case "Categories_GetAll":
             (200, "[\(category)]")
         case "Logs_GetRecent":
+            (200, "[]")
+        case "History_GetAll":
             (200, "[]")
         case "History_GetFilterOptions":
             (200, historyFilterOptions)

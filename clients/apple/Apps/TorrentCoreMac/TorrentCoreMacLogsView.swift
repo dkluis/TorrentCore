@@ -12,16 +12,43 @@ private struct TorrentCoreMacLogTableItem: Identifiable {
     var category: String { log.category ?? "--" }
     var eventType: String { log.eventType ?? "--" }
     var message: String { log.message ?? "--" }
+    var logEntryID: Int64 { log.logEntryID }
+    var torrentID: String { log.torrentID?.uuidString ?? "" }
+    var serviceInstanceID: String { log.serviceInstanceID?.uuidString ?? "" }
+    var traceID: String { log.traceID ?? "" }
+    var detailsJSON: String { log.detailsJSON ?? "" }
 }
 
-private enum TorrentCoreMacLogSortField: String {
+enum TorrentCoreMacLogSortField: String, CaseIterable, Codable, Identifiable {
     case occurredAt
     case level
     case category
     case eventType
     case message
+    case logEntryID
+    case torrentID
+    case serviceInstanceID
+    case traceID
+    case detailsJSON
 
-    func comparator(descending: Bool) -> KeyPathComparator<TorrentCoreMacLogTableItem> {
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .occurredAt: "When"
+        case .level: "Level"
+        case .category: "Category"
+        case .eventType: "Event"
+        case .message: "Message"
+        case .logEntryID: "Log ID"
+        case .torrentID: "Torrent ID"
+        case .serviceInstanceID: "Service Instance ID"
+        case .traceID: "Trace ID"
+        case .detailsJSON: "Details JSON"
+        }
+    }
+
+    fileprivate func comparator(descending: Bool) -> KeyPathComparator<TorrentCoreMacLogTableItem> {
         let order: SortOrder = descending ? .reverse : .forward
         return switch self {
         case .occurredAt:
@@ -34,17 +61,62 @@ private enum TorrentCoreMacLogSortField: String {
             KeyPathComparator(\.eventType, comparator: .localizedStandard, order: order)
         case .message:
             KeyPathComparator(\.message, comparator: .localizedStandard, order: order)
+        case .logEntryID:
+            KeyPathComparator(\.logEntryID, order: order)
+        case .torrentID:
+            KeyPathComparator(\.torrentID, comparator: .localizedStandard, order: order)
+        case .serviceInstanceID:
+            KeyPathComparator(\.serviceInstanceID, comparator: .localizedStandard, order: order)
+        case .traceID:
+            KeyPathComparator(\.traceID, comparator: .localizedStandard, order: order)
+        case .detailsJSON:
+            KeyPathComparator(\.detailsJSON, comparator: .localizedStandard, order: order)
         }
     }
 
-    static func field(for keyPath: PartialKeyPath<TorrentCoreMacLogTableItem>) -> Self? {
+    fileprivate static func field(for keyPath: PartialKeyPath<TorrentCoreMacLogTableItem>) -> Self? {
         switch keyPath {
         case \TorrentCoreMacLogTableItem.occurredAt: .occurredAt
         case \TorrentCoreMacLogTableItem.level: .level
         case \TorrentCoreMacLogTableItem.category: .category
         case \TorrentCoreMacLogTableItem.eventType: .eventType
         case \TorrentCoreMacLogTableItem.message: .message
+        case \TorrentCoreMacLogTableItem.logEntryID: .logEntryID
+        case \TorrentCoreMacLogTableItem.torrentID: .torrentID
+        case \TorrentCoreMacLogTableItem.serviceInstanceID: .serviceInstanceID
+        case \TorrentCoreMacLogTableItem.traceID: .traceID
+        case \TorrentCoreMacLogTableItem.detailsJSON: .detailsJSON
         default: nil
+        }
+    }
+}
+
+private enum TorrentCoreMacLogColumn: String, CaseIterable, Identifiable {
+    case when, level, category, event, message
+    case logEntryID, torrentID, serviceInstanceID, traceID, detailsJSON
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .when: "When"
+        case .level: "Level"
+        case .category: "Category"
+        case .event: "Event"
+        case .message: "Message"
+        case .logEntryID: "Log ID"
+        case .torrentID: "Torrent ID"
+        case .serviceInstanceID: "Service Instance ID"
+        case .traceID: "Trace ID"
+        case .detailsJSON: "Details JSON"
+        }
+    }
+    var canHide: Bool { self != .message }
+    var isDefaultVisible: Bool {
+        switch self {
+        case .when, .level, .category, .event, .message:
+            true
+        default:
+            false
         }
     }
 }
@@ -60,14 +132,13 @@ struct TorrentCoreMacLogsView: View {
     let showTorrent: (UUID) -> Void
     let showHistory: (UUID) -> Void
 
-    @AppStorage("TorrentCore.Mac.Logs.PageSize.v1") private var pageSize = 50
-    @AppStorage("TorrentCore.Mac.Logs.SortField.v1")
-    private var storedSortField = TorrentCoreMacLogSortField.occurredAt.rawValue
-    @AppStorage("TorrentCore.Mac.Logs.SortDescending.v1")
-    private var storedSortDescending = true
+    @AppStorage("TorrentCore.Mac.Logs.PageSize.v1")
+    private var storedPageSize = TorrentCoreMacTableSupport.defaultPageSize
+    @AppStorage("TorrentCore.Mac.Logs.Sort.v2") private var storedSort = ""
     @AppStorage("TorrentCore.Mac.Logs.Columns.v1")
     private var columnCustomization =
         TableColumnCustomization<TorrentCoreMacLogTableItem>()
+    @AppStorage("TorrentCore.Mac.Logs.OverlayWidth.v1") private var overlayWidth = 420.0
 
     @State private var searchText = ""
     @State private var levelFilter: TorrentCoreActivityLogLevel?
@@ -83,7 +154,11 @@ struct TorrentCoreMacLogsView: View {
     @State private var actionMessage: String?
     @State private var actionError: String?
     @State private var pageIndex = 0
-    @State private var sortOrder: [KeyPathComparator<TorrentCoreMacLogTableItem>]
+    @State private var sortDescriptors: [
+        TorrentCoreMacSortDescriptor<TorrentCoreMacLogSortField>
+    ]
+    @State private var isSortEditorPresented = false
+    @State private var notice: TorrentCoreMacNotice?
 
     init(
         session: TorrentCoreFeatureSession,
@@ -114,13 +189,19 @@ struct TorrentCoreMacLogsView: View {
         _fromDate = State(initialValue: initial.fromUTC ?? Date())
         _toDate = State(initialValue: initial.toUTC ?? Date())
         let defaults = UserDefaults.standard
+        let stored = defaults.string(forKey: "TorrentCore.Mac.Logs.Sort.v2") ?? ""
         let storedField = defaults.string(forKey: "TorrentCore.Mac.Logs.SortField.v1")
         let field = TorrentCoreMacLogSortField(rawValue: storedField ?? "")
             ?? .occurredAt
         let descending = defaults.object(
             forKey: "TorrentCore.Mac.Logs.SortDescending.v1"
         ) as? Bool ?? true
-        _sortOrder = State(initialValue: [field.comparator(descending: descending)])
+        _sortDescriptors = State(
+            initialValue: TorrentCoreMacSortStorage.decode(
+                stored,
+                as: TorrentCoreMacLogSortField.self
+            ) ?? [.init(field: field, descending: descending)]
+        )
     }
 
     var body: some View {
@@ -171,32 +252,45 @@ struct TorrentCoreMacLogsView: View {
                 paginationBar
             }
         }
+        .toolbar {
+            ToolbarItem { sortButton }
+            ToolbarItem { columnsMenu }
+            ToolbarItem { exportMenu }
+        }
         .torrentCoreTrailingOverlay(
             isPresented: isInspectorPresented,
-            width: 420
+            width: $overlayWidth
         ) {
             logInspector
         }
+        .torrentCoreToast(notice: $notice)
         .onChange(of: selectedLogID) { _, value in
-            if value != nil {
-                isInspectorPresented = true
-            }
+            isInspectorPresented = value != nil
         }
         .onChange(of: searchText) { _, _ in
             pageIndex = 0
+            reconcileSelectionWithCurrentPage()
         }
-        .onChange(of: pageSize) { _, _ in
-            pageIndex = 0
-        }
-        .onChange(of: sortOrder) { _, newValue in
-            guard let comparator = newValue.first,
-                  let field = TorrentCoreMacLogSortField.field(for: comparator.keyPath)
-            else {
-                return
+        .onAppear {
+            if storedSort.isEmpty {
+                storedSort = TorrentCoreMacSortStorage.encode(sortDescriptors)
             }
-            storedSortField = field.rawValue
-            storedSortDescending = comparator.order == .reverse
+            if !TorrentCoreMacTableSupport.pageSizes.contains(storedPageSize) {
+                storedPageSize = TorrentCoreMacTableSupport.defaultPageSize
+            }
+            overlayWidth = TorrentCoreMacTableSupport.clampedOverlayWidth(overlayWidth)
+            clampPageAndReconcileSelection()
+        }
+        .onChange(of: pageIndex) { _, _ in
+            reconcileSelectionWithCurrentPage()
+        }
+        .onChange(of: session.logs.value) { _, _ in
+            clampPageAndReconcileSelection()
+        }
+        .onChange(of: sortDescriptors) { _, descriptors in
+            storedSort = TorrentCoreMacSortStorage.encode(descriptors)
             pageIndex = 0
+            reconcileSelectionWithCurrentPage()
         }
         .confirmationDialog(
             "Delete Orphaned Torrent Logs?",
@@ -242,8 +336,8 @@ struct TorrentCoreMacLogsView: View {
     }
 
     private var filterBar: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     TorrentCoreMacHelpLabel(
                         "Search",
@@ -251,7 +345,7 @@ struct TorrentCoreMacLogsView: View {
                     )
                     TextField("Search loaded logs", text: $searchText)
                         .textFieldStyle(.roundedBorder)
-                        .frame(minWidth: 190)
+                        .frame(width: 180)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.level)
@@ -302,13 +396,27 @@ struct TorrentCoreMacLogsView: View {
                     .labelsHidden()
                     .frame(width: 130)
                 }
+
+                Button("Search", action: applyFilters)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.return, modifiers: [])
+                    .accessibilityIdentifier("logs.search")
+
+                Button("Clear Filters", action: clearFilters)
+                    .accessibilityIdentifier("logs.clearFilters")
+
+                Button("Reset Filters", action: resetFilters)
+                    .accessibilityIdentifier("logs.resetFilters")
+
+                Spacer(minLength: 0)
             }
 
-            HStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     TorrentCoreMacHelpLabel(content: TorrentCoreHelpCatalog.Logs.torrentID)
                     TextField("Torrent ID", text: $torrentIDFilter)
                         .textFieldStyle(.roundedBorder)
+                        .frame(width: 200)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     TorrentCoreMacHelpLabel(
@@ -316,6 +424,7 @@ struct TorrentCoreMacLogsView: View {
                     )
                     TextField("Service instance ID", text: $serviceInstanceIDFilter)
                         .textFieldStyle(.roundedBorder)
+                        .frame(width: 200)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -348,9 +457,6 @@ struct TorrentCoreMacLogsView: View {
                     }
                 }
 
-                Button("Apply", action: applyFilters)
-                    .accessibilityIdentifier("logs.apply")
-
                 Button(role: .destructive) {
                     isDeleteConfirmationPresented = true
                 } label: {
@@ -358,41 +464,47 @@ struct TorrentCoreMacLogsView: View {
                 }
                 .disabled(!session.connectionState.isConnected || session.activeMutation != nil)
                 .help(TorrentCoreHelpCatalog.Logs.deleteOrphaned.summary)
+
+                Spacer(minLength: 0)
             }
         }
         .padding(12)
+        .tint(.orange)
     }
 
     private var logTable: some View {
         Table(
             currentPage,
             selection: $selectedLogID,
-            sortOrder: $sortOrder,
+            sortOrder: tableSortOrder,
             columnCustomization: $columnCustomization
         ) {
-            TableColumn("When", value: \.occurredAt) {
+            TableColumn(sortHeaderTitle(.occurredAt), value: \.occurredAt) {
                 Text(TorrentCoreDisplayFormatter.timestamp($0.log.occurredAt))
                     .monospacedDigit()
             }
             .width(min: 155, ideal: 175)
+            .defaultVisibility(.visible)
             .customizationID("when")
 
-            TableColumn("Level", value: \.level, comparator: .localizedStandard) {
+            TableColumn(sortHeaderTitle(.level), value: \.level, comparator: .localizedStandard) {
                 Text($0.level)
                     .foregroundStyle(color(for: $0.log.level))
                     .accessibilityIdentifier("logs.row")
             }
             .width(min: 95, ideal: 110)
+            .defaultVisibility(.visible)
             .customizationID("level")
 
-            TableColumn("Category", value: \.category, comparator: .localizedStandard) {
+            TableColumn(sortHeaderTitle(.category), value: \.category, comparator: .localizedStandard) {
                 Text($0.category)
             }
             .width(min: 125, ideal: 155)
+            .defaultVisibility(.visible)
             .customizationID("category")
 
             TableColumn(
-                "Event",
+                sortHeaderTitle(.eventType),
                 value: \.eventType,
                 comparator: .localizedStandard
             ) { item in
@@ -413,47 +525,169 @@ struct TorrentCoreMacLogsView: View {
                     }
             }
             .width(min: 180, ideal: 230)
+            .defaultVisibility(.visible)
             .customizationID("event")
 
-            TableColumn("Message", value: \.message, comparator: .localizedStandard) {
+            TableColumn(sortHeaderTitle(.message), value: \.message, comparator: .localizedStandard) {
                 Text($0.message)
                     .lineLimit(2)
             }
             .width(min: 300, ideal: 520)
+            .defaultVisibility(.visible)
+            .disabledCustomizationBehavior(.visibility)
             .customizationID("message")
+
+            TableColumn(sortHeaderTitle(.logEntryID), value: \.logEntryID) {
+                Text($0.logEntryID.formatted()).monospacedDigit()
+            }
+            .width(min: 80, ideal: 100)
+            .defaultVisibility(.hidden)
+            .customizationID("logEntryID")
+
+            TableColumn(sortHeaderTitle(.torrentID), value: \.torrentID, comparator: .localizedStandard) {
+                Text(TorrentCoreDisplayFormatter.operatorValue($0.log.torrentID?.uuidString))
+            }
+            .width(min: 220, ideal: 285)
+            .defaultVisibility(.hidden)
+            .customizationID("torrentID")
+
+            TableColumn(
+                sortHeaderTitle(.serviceInstanceID),
+                value: \.serviceInstanceID,
+                comparator: .localizedStandard
+            ) {
+                Text(TorrentCoreDisplayFormatter.operatorValue($0.log.serviceInstanceID?.uuidString))
+            }
+            .width(min: 220, ideal: 285)
+            .defaultVisibility(.hidden)
+            .customizationID("serviceInstanceID")
+
+            TableColumn(sortHeaderTitle(.traceID), value: \.traceID, comparator: .localizedStandard) {
+                Text(TorrentCoreDisplayFormatter.operatorValue($0.log.traceID))
+            }
+            .width(min: 160, ideal: 240)
+            .defaultVisibility(.hidden)
+            .customizationID("traceID")
+
+            TableColumn(sortHeaderTitle(.detailsJSON), value: \.detailsJSON, comparator: .localizedStandard) {
+                Text(TorrentCoreDisplayFormatter.operatorValue($0.log.detailsJSON))
+                    .font(.body.monospaced())
+                    .lineLimit(2)
+            }
+            .width(min: 220, ideal: 420)
+            .defaultVisibility(.hidden)
+            .customizationID("detailsJSON")
         }
         .accessibilityIdentifier("logs.table")
     }
 
     private var paginationBar: some View {
-        HStack {
-            Text(resultRangeLabel)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Picker("Rows", selection: $pageSize) {
-                ForEach([25, 50, 100, 250], id: \.self) {
-                    Text("\($0)").tag($0)
+        TorrentCoreMacPaginationBar(
+            resultCount: sortedLogItems.count,
+            pageIndex: $pageIndex,
+            pageSize: pageSizeBinding,
+            accessibilityPrefix: "logs"
+        )
+    }
+
+    private var sortButton: some View {
+        Button("Sort", systemImage: "arrow.up.arrow.down") {
+            isSortEditorPresented.toggle()
+        }
+        .popover(isPresented: $isSortEditorPresented, arrowEdge: .top) {
+            TorrentCoreMacSortEditor(
+                descriptors: $sortDescriptors,
+                defaultDescriptors: Self.defaultSortDescriptors,
+                fieldTitle: { $0.title },
+                done: { isSortEditorPresented = false }
+            )
+        }
+        .accessibilityIdentifier("logs.sort")
+    }
+
+    private var columnsMenu: some View {
+        Menu("Columns", systemImage: "rectangle.3.group") {
+            ForEach(TorrentCoreMacLogColumn.allCases) { column in
+                if column.canHide {
+                    Toggle(column.title, isOn: columnVisibility(column))
                 }
             }
-            .frame(width: 120)
-            Button {
-                pageIndex = max(0, pageIndex - 1)
-            } label: {
-                Label("Previous", systemImage: "chevron.left")
+            Divider()
+            Button("Show All Columns") {
+                for column in TorrentCoreMacLogColumn.allCases {
+                    columnCustomization[visibility: column.id] = .visible
+                }
             }
-            .disabled(pageIndex == 0)
-            .accessibilityIdentifier("logs.previousPage")
-            Button {
-                pageIndex = min(maxPageIndex, pageIndex + 1)
-            } label: {
-                Label("Next", systemImage: "chevron.right")
+            Button("Restore Default Columns") {
+                for column in TorrentCoreMacLogColumn.allCases {
+                    columnCustomization[visibility: column.id] = .automatic
+                }
             }
-            .disabled(pageIndex >= maxPageIndex)
-            .accessibilityIdentifier("logs.nextPage")
-            Text("Page \(min(pageIndex, maxPageIndex) + 1) of \(maxPageIndex + 1)")
-                .foregroundStyle(.secondary)
+            Divider()
+            Button("Reset Table Layout") {
+                columnCustomization = .init()
+            }
         }
-        .padding(10)
+        .accessibilityIdentifier("logs.columns")
+    }
+
+    private var exportMenu: some View {
+        Menu("Export", systemImage: "square.and.arrow.up") {
+            Button(selectedLog == nil ? "Export Selected Row" : "Export Selected Row (1)") {
+                export(.selected)
+            }
+            .disabled(selectedLog == nil)
+            Button("Export All Results (\(sortedLogItems.count.formatted()))") {
+                export(.all)
+            }
+            .disabled(sortedLogItems.isEmpty)
+        }
+        .accessibilityIdentifier("logs.export")
+    }
+
+    private func sortHeaderTitle(_ field: TorrentCoreMacLogSortField) -> String {
+        guard let index = sortDescriptors.firstIndex(where: { $0.field == field }) else {
+            return field.title
+        }
+        return "\(field.title) \(sortDescriptors[index].descending ? "↓" : "↑")\(index + 1)"
+    }
+
+    private func columnVisibility(_ column: TorrentCoreMacLogColumn) -> Binding<Bool> {
+        Binding(
+            get: {
+                let visibility = columnCustomization[visibility: column.id]
+                return visibility == .visible
+                    || (visibility == .automatic && column.isDefaultVisible)
+            },
+            set: { visible in
+                guard column.canHide else { return }
+                columnCustomization[visibility: column.id] = visible ? .visible : .hidden
+            }
+        )
+    }
+
+    private func export(_ scope: TorrentCoreMacExportScope) {
+        let logs = scope.rows(
+            selected: selectedLog,
+            all: sortedLogItems.map(\.log)
+        )
+        guard !logs.isEmpty else { return }
+        do {
+            let fileURL = try TorrentCoreMacTableExport.write(
+                headers: Self.exportHeaders,
+                rows: logs.map(Self.exportRow),
+                fileName: "logs-\(scope.rawValue)-\(TorrentCoreMacTableExport.timestamp()).csv"
+            )
+            notice = .init(
+                kind: .success,
+                message: "Exported \(logs.count.formatted()) row\(logs.count == 1 ? "" : "s") to Downloads/\(fileURL.lastPathComponent)."
+            )
+        } catch {
+            notice = .init(
+                kind: .error,
+                message: "Export failed: \(TorrentCoreMacErrorPresenter.message(error))"
+            )
+        }
     }
 
     private var logInspector: some View {
@@ -467,6 +701,7 @@ struct TorrentCoreMacLogsView: View {
                             content: TorrentCoreHelpCatalog.Logs.selectedEntry
                         )
                     }
+                    .padding(.trailing, 36)
                     Text(log.message ?? "No message")
                         .textSelection(.enabled)
                     Divider()
@@ -515,6 +750,14 @@ struct TorrentCoreMacLogsView: View {
             }
         }
         .accessibilityIdentifier("logs.inspector.content")
+        .overlay(alignment: .topTrailing) {
+            Button("Close", systemImage: "xmark") {
+                isInspectorPresented = false
+            }
+            .labelStyle(.iconOnly)
+            .padding(12)
+            .accessibilityIdentifier("logs.inspector.close")
+        }
     }
 
     private var limitBinding: Binding<Int> {
@@ -554,31 +797,69 @@ struct TorrentCoreMacLogsView: View {
     private var sortedLogItems: [TorrentCoreMacLogTableItem] {
         filteredLogs
             .map { TorrentCoreMacLogTableItem(log: $0) }
-            .sorted(using: sortOrder)
+            .sorted(using: comparatorOrder)
     }
 
     private var currentPage: [TorrentCoreMacLogTableItem] {
-        let safeIndex = min(pageIndex, maxPageIndex)
-        let start = safeIndex * pageSize
-        guard start < sortedLogItems.count else {
-            return []
-        }
-        return Array(
-            sortedLogItems[start..<min(sortedLogItems.count, start + pageSize)]
+        TorrentCoreMacTableSupport.page(
+            sortedLogItems,
+            index: pageIndex,
+            size: pageSize
         )
     }
 
-    private var maxPageIndex: Int {
-        max(0, (sortedLogItems.count - 1) / max(1, pageSize))
+    private var comparatorOrder: [KeyPathComparator<TorrentCoreMacLogTableItem>] {
+        sortDescriptors.map { $0.field.comparator(descending: $0.descending) }
     }
 
-    private var resultRangeLabel: String {
-        guard !sortedLogItems.isEmpty else {
-            return "0 logs"
+    private var tableSortOrder: Binding<[KeyPathComparator<TorrentCoreMacLogTableItem>]> {
+        Binding(
+            get: { comparatorOrder },
+            set: { proposed in
+                guard let comparator = proposed.first,
+                      let field = TorrentCoreMacLogSortField.field(for: comparator.keyPath)
+                else { return }
+                sortDescriptors = [
+                    .init(field: field, descending: comparator.order == .reverse),
+                ]
+            }
+        )
+    }
+
+    private var pageSize: Int {
+        TorrentCoreMacTableSupport.pageSizes.contains(storedPageSize)
+            ? storedPageSize
+            : TorrentCoreMacTableSupport.defaultPageSize
+    }
+
+    private var pageSizeBinding: Binding<Int> {
+        Binding(
+            get: { pageSize },
+            set: { newValue in
+                guard TorrentCoreMacTableSupport.pageSizes.contains(newValue) else { return }
+                storedPageSize = newValue
+                pageIndex = 0
+                reconcileSelectionWithCurrentPage()
+            }
+        )
+    }
+
+    private func clampPageAndReconcileSelection() {
+        pageIndex = TorrentCoreMacTableSupport.clampedPageIndex(
+            pageIndex,
+            count: sortedLogItems.count,
+            size: pageSize
+        )
+        reconcileSelectionWithCurrentPage()
+    }
+
+    private func reconcileSelectionWithCurrentPage() {
+        guard let selectedLogID else { return }
+        guard currentPage.contains(where: { $0.logEntryID == selectedLogID }) else {
+            self.selectedLogID = nil
+            isInspectorPresented = false
+            return
         }
-        let start = min(pageIndex, maxPageIndex) * pageSize + 1
-        let end = start + currentPage.count - 1
-        return "\(start.formatted())–\(end.formatted()) of \(sortedLogItems.count.formatted())"
     }
 
     private var logCategoryOptions: [String] {
@@ -671,6 +952,33 @@ struct TorrentCoreMacLogsView: View {
         contextChanged()
     }
 
+    private func clearFilters() {
+        searchText = ""
+        levelFilter = nil
+        categoryFilter = ""
+        eventTypeFilter = ""
+        torrentIDFilter = ""
+        serviceInstanceIDFilter = ""
+        includesFromDate = false
+        includesToDate = false
+        applyFilters()
+    }
+
+    private func resetFilters() {
+        searchText = ""
+        levelFilter = Self.defaultQuery.level
+        categoryFilter = Self.defaultQuery.category ?? ""
+        eventTypeFilter = Self.defaultQuery.eventType ?? ""
+        torrentIDFilter = Self.defaultQuery.torrentID?.uuidString ?? ""
+        serviceInstanceIDFilter = Self.defaultQuery.serviceInstanceID?.uuidString ?? ""
+        includesFromDate = Self.defaultQuery.fromUTC != nil
+        includesToDate = Self.defaultQuery.toUTC != nil
+        fromDate = Self.defaultQuery.fromUTC ?? Date()
+        toDate = Self.defaultQuery.toUTC ?? Date()
+        query = Self.defaultQuery
+        applyFilters()
+    }
+
     private func normalized(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
@@ -685,6 +993,41 @@ struct TorrentCoreMacLogsView: View {
                 actionError = TorrentCoreMacErrorPresenter.message(error)
             }
         }
+    }
+
+    static let defaultSortDescriptors = [
+        TorrentCoreMacSortDescriptor(
+            field: TorrentCoreMacLogSortField.occurredAt,
+            descending: true
+        ),
+    ]
+
+    static let exportHeaders = [
+        "Category",
+        "Details JSON",
+        "Event Type",
+        "Level",
+        "Log Entry ID",
+        "Message",
+        "Occurred At",
+        "Service Instance ID",
+        "Torrent ID",
+        "Trace ID",
+    ]
+
+    static func exportRow(_ value: TorrentCoreActivityLogEntry) -> [String] {
+        [
+            value.category ?? "",
+            value.detailsJSON ?? "",
+            value.eventType ?? "",
+            value.level ?? "",
+            String(value.logEntryID),
+            value.message ?? "",
+            TorrentCoreMacTableExport.isoTimestamp(value.occurredAt),
+            value.serviceInstanceID?.uuidString ?? "",
+            value.torrentID?.uuidString ?? "",
+            value.traceID ?? "",
+        ]
     }
 
     private func color(for level: String?) -> Color {
