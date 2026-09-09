@@ -18,14 +18,14 @@ fail() { print -ru2 -- "[TorrentCore package DMG] ERROR: $*"; exit 1; }
 
 usage() {
     cat <<'EOF'
-Usage: build-package-dmg.zsh --package-root <persistent-package-directory> [options]
+Usage: build-package-dmg.zsh --package-root <staged-package-directory> [options]
 
 Options:
   --dmg-path <path>            Defaults to Deployments/DMGs/<package-name>.dmg.
   --volume-name <name>         Defaults to the package directory name.
   --signing-identity <name>    Exact Developer ID Application identity.
   --notary-profile <name>      Defaults to TorrentCore-notary.
-  --clean                      Replace an existing DMG.
+  --clean                      Replace existing DMG and package archive outputs after verification.
   --check                      Validate release credentials and tools only.
 EOF
 }
@@ -49,6 +49,8 @@ done
 PACKAGE_ROOT="${PACKAGE_ROOT:A}"
 PACKAGE_NAME="${PACKAGE_ROOT:t}"
 [[ -f "$PACKAGE_ROOT/release.json" ]] || fail "Package release manifest is missing."
+ARCHIVER="$SCRIPT_DIR/archive_release_package.py"
+[[ -f "$ARCHIVER" ]] || fail "Release package archiver is missing: $ARCHIVER"
 [[ -n "$VOLUME_NAME" ]] || VOLUME_NAME="$PACKAGE_NAME"
 [[ -n "$DMG_PATH" ]] || DMG_PATH="$DEPLOYMENTS_ROOT/DMGs/$PACKAGE_NAME.dmg"
 mkdir -p "${DMG_PATH:h}"
@@ -188,4 +190,8 @@ xcrun stapler validate -v "$DMG_PATH"
 hdiutil verify "$DMG_PATH"
 spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG_PATH"
 shasum -a 256 "$DMG_PATH"
+archive_args=(--package-root "$PACKAGE_ROOT" --dmg-path "$DMG_PATH" --apply)
+[[ "$CLEAN" != true ]] || archive_args+=(--replace-existing)
+python3 "$ARCHIVER" "${archive_args[@]}"
 print -r -- "created: $DMG_PATH"
+print -r -- "package archive: $PACKAGE_ROOT.zip"

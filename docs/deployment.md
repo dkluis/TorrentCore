@@ -176,10 +176,10 @@ native UI.
 
 Artifacts follow the established naming convention, for example
 `TorrentCore-torrentcore.2026.08.13.Dick.WebUIAlignment` for a specific installation or
-`TorrentCore-torrentcore.2026.08.14.deploy-patches` for Shared. A release is always staged first as a complete,
-persistent directory under `Deployments/TorrentCore-Deployments/<installation>`. The saved directory contains `README.md`,
+`TorrentCore-torrentcore.2026.08.14.deploy-patches` for Shared. A release is always staged first as a complete
+directory under `Deployments/TorrentCore-Deployments/<installation>`. The staged directory contains `README.md`,
 `README.pdf`, `Runbook.md`, `Runbook.pdf`, `plan.zsh`, `dry-run.zsh`, `backup.zsh`, `apply.zsh`, `verify.zsh`,
-`release.json`, the two managed app payloads, and the native UI app. It remains in place after DMG construction.
+`release.json`, the two managed app payloads, and the native UI app. A stage-only command retains it for inspection.
 
 From clean committed source, stage the release package first:
 
@@ -200,8 +200,18 @@ Inspect that saved directory before building its DMG. After approval, create the
   --package-root /Volumes/CA-Desktop-HD-2/Development/Deployments/TorrentCore-Deployments/Shared/TorrentCore-torrentcore.2026.08.14.deploy-patches
 ```
 
+After a DMG passes signing, notarization, stapling, final-path signature, Gatekeeper, image, and checksum verification,
+the builder creates and verifies the sibling `<package-root>.zip` and then removes the staged directory. A failure
+before archive verification leaves the directory intact; if directory removal fails, the verified ZIP remains
+recoverable. An existing archive causes a collision failure and remains untouched unless the operator supplied
+`--clean`; replacement then occurs atomically only after the new temporary archive verifies. Restore the ZIP to its
+original package directory before using the standalone builder to rebuild a DMG, and supply `--clean` to replace the
+prior verified ZIP. For one-time cleanup of an older inactive staging directory without a DMG, use the local
+`archive_release_package.py --package-root <path> --archive-staging-only --apply`; release builders do not use that
+maintenance mode.
+
 `release-service-app-dmg.zsh` remains the normal all-in-one driver when prior inspection is not required. It performs
-those same two steps and never uses or deletes a temporary package root. Use `--installation Dick`,
+the same staging, verified DMG creation, and package archiving. Use `--installation Dick`,
 `--installation Tom`, or `--installation Shared` with `--cpu arm` as appropriate. `--cpu intel` is explicitly refused
 by the current Arm-only tooling.
 

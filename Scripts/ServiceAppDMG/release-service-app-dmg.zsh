@@ -28,13 +28,14 @@ usage() {
     cat <<'EOF'
 Usage: release-service-app-dmg.zsh --installation <Dick|Tom|Shared> --cpu arm --release-name <name> --notes <summary> [options]
 
-This is the established two-step TorrentCore release driver. It first saves the complete release package under
-TorrentCore-Deployments/<installation>, then creates the DMG from that saved package.
+This is the established two-step TorrentCore release driver. It stages the complete release package under
+TorrentCore-Deployments/<installation>, creates and verifies the DMG, then replaces the staged directory with its
+verified sibling ZIP archive.
 
 Options:
   --date <YYYY.MM.DD>          Release date. Defaults to today.
   --package-dir <path>         Installation package parent directory.
-  --package-root <path>        Exact persistent package directory.
+  --package-root <path>        Exact staged package directory; archived after verified DMG creation.
   --dmg-dir <path>             DMG output directory.
   --output-dir <path>          Compatibility alias for --dmg-dir.
   --dmg-path <path>            Exact DMG path.
@@ -45,7 +46,7 @@ Options:
   --pdf-engine <engine>        Defaults to tectonic.
   --skip-pdf                   Generate Markdown only.
   --require-pdf                Fail if either PDF cannot be generated.
-  --clean                      Replace an existing package directory and DMG.
+  --clean                      Replace existing package, DMG, and verified package archive outputs.
 EOF
 }
 
@@ -137,5 +138,5 @@ zsh "$SCRIPT_DIR/build-package-dmg.zsh" "${build_args[@]}"
 
 print -r -- ""
 print -r -- "TorrentCore release DMG complete."
-print -r -- "Package root: $PACKAGE_ROOT"
+print -r -- "Package archive: $PACKAGE_ROOT.zip"
 print -r -- "DMG path:     $DMG_PATH"
