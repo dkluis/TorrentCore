@@ -1,0 +1,103 @@
+@implements IAsyncDisposable
+@inject BrowserPreferences Preferences
+@inject BrowserSession Session
+@inject IJSRuntime JS
+
+<MudThemeProvider Theme="@_theme" IsDarkMode="@IsDark" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+
+@if (_ready)
+{
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Page not found</PageTitle>
+        <main class="client-error" role="alert">
+            <h1>Page not found</h1>
+            <p>The requested page is unavailable.</p>
+        </main>
+    </NotFound>
+</Router>
+}
+else
+{
+    <div class="client-loading">@(_error ?? "Loading connection settings…")
+    @if (_error is not null) { <MudButton OnClick="InitializeAsync">Retry</MudButton> }
+    </div>
+}
+
+@code {
+    private bool _ready, _systemDark;
+    private string? _error;
+    private DotNetObjectReference<App>? _self;
+    private bool IsDark => Preferences.Appearance == "dark" || Preferences.Appearance == "system" && _systemDark;
+    protected override void OnInitialized() => Preferences.Changed += SettingsChanged;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        await InitializeAsync();
+    }
+    private async Task InitializeAsync()
+    {
+        _error = null;
+        try
+        {
+            _systemDark = await JS.InvokeAsync<bool>("tcBrowser.watchAppearance", _self);
+            await Preferences.LoadAsync();
+            await Session.InitializeAsync();
+            _ready = true;
+        }
+        catch (Exception exception) { _error = exception.Message; }
+        StateHasChanged();
+    }
+    [JSInvokable] public Task SystemAppearanceChanged(bool dark) { _systemDark = dark; return InvokeAsync(StateHasChanged); }
+    [JSInvokable] public async Task PreferencesChanged() => await Preferences.LoadAsync();
+    private void SettingsChanged() => _ = InvokeAsync(StateHasChanged);
+    public async ValueTask DisposeAsync() { Preferences.Changed -= SettingsChanged; await JS.InvokeVoidAsync("tcBrowser.unwatchAppearance"); _self?.Dispose(); }
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#a84d20",
+            Secondary = "#335c67",
+            Background = "#f2ede1",
+            Surface = "#fffaf2",
+            AppbarBackground = "#12202a",
+            AppbarText = "#f8f4ec",
+            DrawerBackground = "#15252f",
+            DrawerText = "#f2ede1",
+            DrawerIcon = "#d7c6ad",
+            TextPrimary = "#16232d",
+            TextSecondary = "#5a6770",
+            LinesDefault = "rgba(21, 37, 47, 0.12)",
+            TableLines = "rgba(21, 37, 47, 0.12)",
+            TableStriped = "rgba(247, 240, 228, 0.74)",
+            TableHover = "rgba(247, 240, 228, 0.86)",
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#e6a377",
+            Secondary = "#8bb9c2",
+            Background = "#121c22",
+            Surface = "#1d2a31",
+            AppbarBackground = "#101a20",
+            AppbarText = "#f6f0e8",
+            DrawerBackground = "#15252f",
+            DrawerText = "#f2ede1",
+            DrawerIcon = "#d7c6ad",
+            TextPrimary = "#f2eee8",
+            TextSecondary = "#b7c2c5",
+            LinesDefault = "rgba(230, 235, 232, 0.17)",
+            TableLines = "rgba(230, 235, 232, 0.17)",
+            TableStriped = "rgba(255, 255, 255, 0.035)",
+            TableHover = "rgba(255, 255, 255, 0.065)",
+        }
+    };
+}

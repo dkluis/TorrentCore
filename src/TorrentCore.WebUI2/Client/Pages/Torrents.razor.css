@@ -1,0 +1,24 @@
+.tc-torrents { box-sizing: border-box; display: flex; flex-direction: column; gap: 1rem; height: 100%; min-height: 0; min-width: 0; overflow: hidden; padding: 16px; }
+.tc-torrents-workflow { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; gap: 1rem; min-height: 0; min-width: 0; overflow: hidden; }
+.tc-torrents-workflow ::deep .operator-table { flex: 1 1 auto; height: auto; min-height: 0; }
+.tc-phase-banner { opacity: .7; font-size: .85rem; }
+.tc-torrents-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.tc-torrents-heading h1 { margin: 0; }
+.tc-torrents-heading p { margin: .25rem 0 0; opacity: .75; }
+.tc-torrent-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; }
+.tc-torrent-filters > :first-child { min-width: 12rem; max-width: 20rem; flex: 1 1 14rem; }
+.tc-torrent-filters > :not(:first-child) { min-width: 10rem; }
+.tc-torrent-inspector { display: grid; gap: .8rem; text-align: left; }
+.tc-inspector-state { opacity: .75; }
+.tc-inspector-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .35rem; }
+.tc-torrent-inspector h3 { margin: .8rem 0 0; font-size: 1rem; }
+.tc-torrent-details { display: grid; grid-template-columns: minmax(7rem, 40%) minmax(0, 1fr); margin: .4rem 0; gap: .4rem .6rem; }
+.tc-torrent-details dt { opacity: .75; }
+.tc-torrent-details dd { margin: 0; overflow-wrap: anywhere; }
+.tc-torrent-context { display: grid; gap: .1rem; }
+.tc-torrent-context button { display: block; width: 100%; padding: .45rem .65rem; background: transparent; border: 0; border-radius: .25rem; color: inherit; text-align: left; cursor: pointer; }
+.tc-torrent-context button:hover, .tc-torrent-context button:focus-visible { background: var(--mud-palette-action-default-hover); }
+.tc-processing-overlay { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; min-height: 24rem; padding: 1rem; background: color-mix(in srgb, var(--mud-palette-background) 88%, transparent); backdrop-filter: blur(9px); text-align: center; }
+.tc-processing-overlay-content { display: grid; justify-items: center; gap: .7rem; max-width: 34rem; }
+.tc-processing-overlay-content h2, .tc-processing-overlay-content p { margin: 0; }
+.tc-processing-icon { font-size: 2.5rem; color: var(--mud-palette-warning); }

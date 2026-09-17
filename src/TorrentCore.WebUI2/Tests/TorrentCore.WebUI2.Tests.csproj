@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <TorrentCoreSourceRoot Condition="'$(TorrentCoreSourceRoot)' == ''">../..</TorrentCoreSourceRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" PrivateAssets="all" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Shared/TorrentCore.WebUI2.Shared.csproj" />
+    <ProjectReference Include="$(TorrentCoreSourceRoot)/TorrentCore.Client/TorrentCore.Client.csproj" />
+    <Compile Include="../Client/Services/RuntimeSettingsDraft.cs" Link="Services/RuntimeSettingsDraft.cs" />
+    <Compile Include="../Client/Services/RuntimeSettingsValidation.cs" Link="Services/RuntimeSettingsValidation.cs" />
+    <Compile Include="../Client/Services/BrowserSession.cs" Link="Services/BrowserSession.cs" />
+    <Compile Include="../Client/Services/OperatorDateTime.cs" Link="Services/OperatorDateTime.cs" />
+    <Compile Include="../Host/ServiceRoutes.cs" Link="Services/ServiceRoutes.cs" />
+    <Compile Include="../Host/ServiceGateway.cs" Link="Services/ServiceGateway.cs" />
+    <Compile Include="../Host/ConnectionStore.cs" Link="Services/ConnectionStore.cs" />
+    <Using Include="Xunit" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+  </ItemGroup>
+</Project>

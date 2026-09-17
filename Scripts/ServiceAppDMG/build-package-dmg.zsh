@@ -87,6 +87,8 @@ if v.get('sourceTreeDirty') is not False: raise SystemExit('release package was 
 print(v['managedApps']['service']['path']); print(v['managedApps']['service']['sha256'])
 print(v['managedApps']['webUi']['path']); print(v['managedApps']['webUi']['sha256'])
 print(v['nativeUi']['path']); print(v['nativeUi']['sha256'])
+webui2=v['managedApps'].get('webUi2')
+print(webui2['path'] if webui2 else '-'); print(webui2['sha256'] if webui2 else '-')
 PY
 )}")
 SERVICE_APP="$PACKAGE_ROOT/${VALUES[1]}"
@@ -95,11 +97,45 @@ WEBUI_APP="$PACKAGE_ROOT/${VALUES[3]}"
 WEBUI_SHA="${VALUES[4]}"
 UI_APP="$PACKAGE_ROOT/${VALUES[5]}"
 UI_SHA="${VALUES[6]}"
+WEBUI2_APP="${VALUES[7]}"
+WEBUI2_SHA="${VALUES[8]}"
+HAS_WEBUI2=false
+if [[ "$WEBUI2_APP" != "-" ]]; then
+    HAS_WEBUI2=true
+    WEBUI2_APP="$PACKAGE_ROOT/$WEBUI2_APP"
+fi
 SERVICE_VERIFIER="$REPO_ROOT/Scripts/ServiceApp/verify-macos-service-app.zsh"
 WEBUI_VERIFIER="$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-app.zsh"
 STATIC_VERIFIER="$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh"
+WEBUI2_VERIFIER="$REPO_ROOT/Scripts/WebUI2App/verify-macos-webui2-app.zsh"
+WEBUI2_STATIC_VERIFIER="$REPO_ROOT/Scripts/WebUI2App/verify-macos-webui2-static-assets.zsh"
 [[ -d "$SERVICE_APP" && -d "$WEBUI_APP" && -d "$UI_APP" ]] || fail "The staged app payload is incomplete."
 [[ -x "$SCRIPT_DIR/install.zsh" && -x "$SERVICE_VERIFIER" && -x "$WEBUI_VERIFIER" && -x "$STATIC_VERIFIER" ]] || fail "DMG installer resources are incomplete."
+if [[ "$HAS_WEBUI2" == true ]]; then
+    [[ -d "$WEBUI2_APP" && -x "$WEBUI2_VERIFIER" && -x "$WEBUI2_STATIC_VERIFIER" ]] || fail "WebUI2 app or verifier is missing."
+    [[ -d "$PACKAGE_ROOT/RuntimeScripts" ]] || fail "WebUI2 release is missing RuntimeScripts."
+    for helper in ManageTorrentCoreLaunchAgents.zsh agentstatus.zsh install-launch-agents.zsh torrentcore.env.example com.torrentcore.service.plist com.torrentcore.webui.plist lib/torrentcore-common.zsh; do
+        [[ -f "$PACKAGE_ROOT/RuntimeScripts/$helper" ]] || fail "RuntimeScript is missing: $helper"
+    done
+    [[ ! -e "$PACKAGE_ROOT/RuntimeScripts/torrentcore.env" ]] || fail "Machine-local torrentcore.env was packaged."
+    python3 - "$PACKAGE_ROOT/RuntimeScripts" <<'PY'
+import pathlib, sys
+root = pathlib.Path(sys.argv[1])
+expected = {
+    'ManageTorrentCoreLaunchAgents.zsh', 'agentstatus.zsh', 'install-launch-agents.zsh',
+    'lib/torrentcore-common.zsh', 'torrentcore.env.example',
+    'com.torrentcore.service.plist', 'com.torrentcore.webui.plist',
+}
+paths = list(root.rglob('*'))
+if any(path.is_symlink() for path in paths):
+    raise SystemExit('RuntimeScripts contains a symbolic link')
+actual = {path.relative_to(root).as_posix() for path in paths if path.is_file()}
+if actual != expected:
+    raise SystemExit(f'RuntimeScripts helper set differs: missing={sorted(expected-actual)}, unexpected={sorted(actual-expected)}')
+PY
+else
+    [[ ! -e "$PACKAGE_ROOT/RuntimeScripts" ]] || fail "Two-app package unexpectedly includes RuntimeScripts."
+fi
 
 tree_sha256() {
 python3 - "$1" <<'PY'
@@ -120,12 +156,22 @@ PY
 [[ "$(tree_sha256 "$SERVICE_APP")" == "$SERVICE_SHA" ]] || fail "Service app checksum differs from release.json."
 [[ "$(tree_sha256 "$WEBUI_APP")" == "$WEBUI_SHA" ]] || fail "WebUI app checksum differs from release.json."
 [[ "$(tree_sha256 "$UI_APP")" == "$UI_SHA" ]] || fail "Native UI checksum differs from release.json."
+if [[ "$HAS_WEBUI2" == true ]]; then
+    [[ "$(tree_sha256 "$WEBUI2_APP")" == "$WEBUI2_SHA" ]] || fail "WebUI2 app checksum differs from release.json."
+fi
 "$SERVICE_VERIFIER" --bundle "$SERVICE_APP" --require-signed
 "$WEBUI_VERIFIER" --bundle "$WEBUI_APP" --require-signed
 "$STATIC_VERIFIER" "$WEBUI_APP"
+if [[ "$HAS_WEBUI2" == true ]]; then
+    "$WEBUI2_VERIFIER" --bundle "$WEBUI2_APP" --require-signed
+    "$WEBUI2_STATIC_VERIFIER" "$WEBUI2_APP"
+fi
 codesign --verify --deep --strict --verbose=2 "$UI_APP"
 if find "$PACKAGE_ROOT" -path '*/Config/service-connection.json' -print -quit | grep -q .; then
     fail "Machine-local Config/service-connection.json was found in the package."
+fi
+if find "$PACKAGE_ROOT" \( -name torrentcore.env -o -path '*/browser-connections/*' \) -print -quit | grep -q .; then
+    fail "Machine-local WebUI2 connections or torrentcore.env were found in the package."
 fi
 
 if [[ -e "$DMG_PATH" ]]; then
@@ -144,6 +190,10 @@ ditto --noqtn "$SCRIPT_DIR/torrentcore_service_app_deploy.py" "$IMAGE_ROOT/Tools
 ditto --noqtn "$SERVICE_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-service-app.zsh"
 ditto --noqtn "$WEBUI_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-webui-app.zsh"
 ditto --noqtn "$STATIC_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-webui-static-assets.zsh"
+if [[ "$HAS_WEBUI2" == true ]]; then
+    ditto --noqtn "$WEBUI2_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-webui2-app.zsh"
+    ditto --noqtn "$WEBUI2_STATIC_VERIFIER" "$IMAGE_ROOT/Tools/verify-macos-webui2-static-assets.zsh"
+fi
 chmod +x "$IMAGE_ROOT/install.zsh" "$IMAGE_ROOT/Tools/"*
 ln -s /Applications "$IMAGE_ROOT/Applications"
 

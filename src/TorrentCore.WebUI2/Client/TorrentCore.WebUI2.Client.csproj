@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+    <TorrentCoreSourceRoot Condition="'$(TorrentCoreSourceRoot)' == ''">../..</TorrentCoreSourceRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.1" />
+    <PackageReference Include="MudBlazor" Version="8.15.0" />
+    <ProjectReference Include="../Shared/TorrentCore.WebUI2.Shared.csproj" />
+    <ProjectReference Include="$(TorrentCoreSourceRoot)/TorrentCore.Client/TorrentCore.Client.csproj" />
+  </ItemGroup>
+</Project>

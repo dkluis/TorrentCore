@@ -1,0 +1,153 @@
+@page "/connection"
+@implements IDisposable
+@using TorrentCore.WebUI2.Client.Components.Torrents
+@inject BrowserSession Session
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Connection</PageTitle>
+<div class="connection-page">
+    <h1>Connection</h1>
+    <div class="connection-columns">
+        <section class="connection-list">
+            @foreach (var profile in Session.State.Profiles)
+            {
+                <button class="connection-row @(profile.Id == _selectedId ? "selected" : "")" disabled="@_busy" @onclick="() => Select(profile)">
+                    <strong>@profile.Name</strong>
+                    <span class="@profile.Environment.ToLowerInvariant()">@profile.Environment</span>
+                    <span>@profile.Address</span>
+                    @if (profile.Id == Session.State.ActiveProfileId) { <span class="connection-active" aria-label="Active connection">✓</span> }
+                </button>
+            }
+            <div class="connection-list-actions">
+                <MudButton StartIcon="@Icons.Material.Filled.Add" Disabled="@_busy" OnClick="NewConnection">New Connection</MudButton>
+                <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" Disabled="@(_busy || _selectedId is null)" OnClick="DeleteAsync">Delete</MudButton>
+            </div>
+        </section>
+        <section class="connection-editor">
+            <h2>TorrentCore Connection</h2>
+            <div class="connection-fields">
+                <label for="connection-name">Name</label><input id="connection-name" @bind="_name" disabled="@_busy" />
+                <label for="connection-address">Service Address</label><input id="connection-address" type="url" @bind="_address" disabled="@_busy" />
+                <label for="connection-environment">Environment</label>
+                <select id="connection-environment" @bind="_environment" disabled="@_busy">
+                    <option>Unclassified</option><option>Production</option><option>Test</option>
+                </select>
+            </div>
+            <p class="connection-help">Enter an HTTP or HTTPS hostname or IP address with an optional port. The connection can be saved while its LAN or VPN is unavailable.</p>
+            @if (_environment == "Unclassified") { <p class="connection-help">Choose Production or Test before saving this connection.</p> }
+            <div class="connection-status" role="status">
+                <strong class="@(_connected ? "connected" : "")">@(_busy ? "Connecting…" : _connected ? "Connected" : _attemptedAt.HasValue ? "Offline" : Session.ActiveProfile is null ? "No active connection" : "Not connected")</strong>
+                @if (_message is not null) { <p>@_message</p> }
+                @if (_attemptedAt.HasValue) { <small>Last attempted @OperatorDateTime.Local(_attemptedAt)</small> }
+            </div>
+            <div class="connection-actions">
+                <MudButton Variant="Variant.Outlined" Disabled="@(_busy || string.IsNullOrWhiteSpace(_address))" OnClick="TestAsync">Test Connection</MudButton>
+                <MudButton Variant="Variant.Outlined" Disabled="@(_busy || _selectedId is null)" OnClick="UseAsync">Use Connection</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_busy || string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_address) || _environment == "Unclassified")" OnClick="SaveAsync">Save &amp; Connect</MudButton>
+            </div>
+        </section>
+    </div>
+</div>
+
+@code {
+    private Guid? _selectedId;
+    private string _name = "", _address = "", _environment = "Unclassified";
+    private bool _busy, _connected, _disposed, _syncAfterBusy;
+    private string? _message;
+    private DateTimeOffset? _attemptedAt;
+    protected override void OnInitialized()
+    {
+        Session.Changed += SessionChanged;
+        var profile = Session.ActiveProfile ?? Session.State.Profiles.FirstOrDefault();
+        if (profile is not null) Select(profile);
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.ActiveProfile is not null) await RunAsync(() => ProbeAsync(Session.ActiveProfile.Address));
+    }
+    private void SessionChanged() => _ = InvokeAsync(() =>
+    {
+        if (_busy) _syncAfterBusy = true;
+        else SyncEditor();
+        StateHasChanged();
+    });
+    private void SyncEditor()
+    {
+        var profile = Session.ActiveProfile;
+        if (profile is null)
+        {
+            _connected = false; _attemptedAt = null;
+            NewConnection();
+            return;
+        }
+        var sameAddress = _selectedId == profile.Id && _address == profile.Address;
+        var statusMessage = sameAddress ? _message : null;
+        if (!sameAddress)
+        {
+            _connected = false; _attemptedAt = null;
+        }
+        Select(profile);
+        if (sameAddress) _message = statusMessage;
+    }
+    private void Select(ConnectionProfile profile) { _selectedId = profile.Id; _name = profile.Name; _address = profile.Address; _environment = profile.Environment; _message = null; }
+    private void NewConnection() { _selectedId = null; _name = _address = ""; _environment = "Unclassified"; _message = null; }
+    private Task TestAsync() => RunAsync(() => ProbeAsync(_address));
+    private Task UseAsync() => RunAsync(async () =>
+    {
+        if (_selectedId is not { } id) return;
+        await Session.UseAsync(id);
+        if (Session.ActiveProfile is { } profile) await ProbeAsync(profile.Address);
+    });
+    private Task SaveAsync() => RunAsync(async () =>
+    {
+        await Session.SaveAsync(new(_selectedId, _name, _address, _environment, Session.Revision));
+        if (Session.ActiveProfile is not { } profile) return;
+        Select(profile);
+        await ProbeAsync(profile.Address);
+        Snackbar.Add(_connected ? $"Saved and connected to {profile.Name}." : "The connection was saved, but the service is currently unavailable.", _connected ? Severity.Success : Severity.Error);
+    });
+    private async Task ProbeAsync(string address)
+    {
+        var revision = Session.Revision;
+        var result = await Session.TestAsync(address);
+        if (_disposed || Session.Revision != revision) return;
+        _attemptedAt = DateTimeOffset.Now; _connected = result.Connected; _message = result.Message;
+    }
+    private async Task DeleteAsync()
+    {
+        var profile = Session.State.Profiles.Find(x => x.Id == _selectedId);
+        if (profile is null) return;
+        var revision = Session.Revision;
+        var dialog = await Dialogs.ShowAsync<TorrentConfirmationDialog>("Delete Connection?", new DialogParameters
+        {
+            ["Message"] = $"Delete “{profile.Name}” from this browser? TorrentCore.Service is not changed.",
+            ["ConfirmText"] = "Delete Connection"
+        }, new DialogOptions { CloseOnEscapeKey = true, BackdropClick = false });
+        if ((await dialog.Result)?.Canceled != false || revision != Session.Revision) return;
+        await RunAsync(async () =>
+        {
+            await Session.DeleteAsync(profile.Id);
+            if (Session.ActiveProfile is { } active) Select(active); else NewConnection();
+            _connected = false; _attemptedAt = null;
+            Snackbar.Add($"Deleted {profile.Name} from this browser.", Severity.Success);
+        });
+    }
+    private async Task RunAsync(Func<Task> action)
+    {
+        if (_busy) return;
+        _busy = true; _message = null;
+        try { await action(); }
+        catch (Exception exception) { _connected = false; _message = exception.Message; Snackbar.Add(exception.Message, Severity.Error); }
+        finally
+        {
+            _busy = false;
+            if (_syncAfterBusy && !_disposed)
+            {
+                _syncAfterBusy = false;
+                SyncEditor();
+            }
+        }
+    }
+    public void Dispose() { _disposed = true; Session.Changed -= SessionChanged; }
+}

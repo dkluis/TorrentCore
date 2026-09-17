@@ -77,6 +77,15 @@ exec {arguments}
 
 def render_readme(release: dict[str, Any]) -> str:
     managed = release["managedApps"]
+    has_webui2 = "webUi2" in managed
+    webui2_scope = "- `TorrentCoreWebUI2.app`\n" if has_webui2 else ""
+    webui2_managed = (f"- WebUI2: `{managed['webUi2']['path']}` (`{managed['webUi2']['bundleIdentifier']}`, "
+                      f"version `{managed['webUi2']['version']}`, build `{managed['webUi2']['build']}`)\n") if has_webui2 else ""
+    webui2_layout = f"- `payload/{release['runtime']}/TorrentCoreWebUI2.app`\n- `RuntimeScripts/` (managed helper scripts and templates)\n" if has_webui2 else ""
+    webui2_rules = ("- WebUI2 is installed alongside the existing WebUI on LAN port `7510`; the old WebUI stays on `7053`.\n"
+                    "- `WebUI2/Config/browser-connections/` remains host-local and is preserved in full.\n") if has_webui2 else ""
+    managed_names = "Service, WebUI, and WebUI2" if has_webui2 else "Service and WebUI"
+    working_directories = "`Service`, `WebUI`, and `WebUI2`" if has_webui2 else "`Service` and `WebUI`"
     protected = "\n".join(f"- `{item}`" for item in release.get("protectedFiles", []))
     if release["installation"] == "Shared":
         scope = "This reusable package deploys the complete managed TorrentCore runtime on a compatible Arm64 host:"
@@ -107,7 +116,7 @@ Generated: `{local_time()}`
 
 - `TorrentCoreService.app`
 - `TorrentCoreWebUI.app`
-- both LaunchAgents and their deployment helpers
+{webui2_scope}- the managed LaunchAgents and their deployment helpers
 
 The package also includes `TorrentCore.app` for the established manual drag to `/Applications`. The managed installer
 does not install, replace, back up, or control the native UI.
@@ -120,6 +129,7 @@ Target home:
 
 - Service: `{managed['service']['path']}` (`{managed['service']['bundleIdentifier']}`, version `{managed['service']['version']}`, build `{managed['service']['build']}`)
 - WebUI: `{managed['webUi']['path']}` (`{managed['webUi']['bundleIdentifier']}`, version `{managed['webUi']['version']}`, build `{managed['webUi']['build']}`)
+{webui2_managed}
 
 ## Protected Host-Local Files
 
@@ -129,8 +139,9 @@ These files are preserved and are not packaged as live runtime state:
 
 ## Important Rules
 
-- Service and WebUI are always planned, backed up, installed, and verified together.
-- Existing `Service` and `WebUI` working directories are preserved in full.
+- {managed_names} are always planned, backed up, installed, and verified together.
+{webui2_rules}- The app installers render their LaunchAgents from signed bundle templates.
+- Existing {working_directories} working directories are preserved in full.
 - `Scripts/torrentcore.env` remains host-local and is never overwritten by this package.
 - `WebUI/Config/service-connection.json` is excluded from the package and preserved byte-for-byte when present.
 - VPN `Disabled`, `Ready`, and `Degraded` are valid after installation when Service API health succeeds and WebUI is reachable.
@@ -139,13 +150,16 @@ These files are preserved and are not packaged as live runtime state:
 
 - `payload/{release['runtime']}/TorrentCoreService.app`
 - `payload/{release['runtime']}/TorrentCoreWebUI.app`
-- `TorrentCore.app`
+{webui2_layout}- `TorrentCore.app`
 
 Open `Runbook.md` or `Runbook.pdf` for the manual deployment procedure for this package.
 """
 
 
 def render_runbook(release: dict[str, Any]) -> str:
+    has_webui2 = "webUi2" in release["managedApps"]
+    webui2_note = ("- WebUI2 runs in parallel at `http://<torrentcore-host>:7510`; its browser connection profiles "
+                   "stay under `WebUI2/Config/browser-connections/` across deployment; recovery restores the backed-up profiles.\n") if has_webui2 else ""
     if release["installation"] == "Shared":
         mount_instruction = "Mount this DMG on the target compatible Arm64 Mac."
     else:
@@ -224,6 +238,7 @@ Service.
 - The Service health endpoint is `GET /api/health`.
 - `torrentcore.env` and the complete Service/WebUI working directories are preserved.
 - `WebUI/Config/service-connection.json` never comes from the release machine.
+{webui2_note}
 """
 
 

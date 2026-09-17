@@ -21,12 +21,14 @@ fi
 : "${TORRENTCORE_ASPNETCORE_ENVIRONMENT:=Production}"
 : "${TORRENTCORE_SERVICE_URLS:=http://127.0.0.1:7033}"
 : "${TORRENTCORE_WEBUI_URLS:=http://127.0.0.1:7053}"
+: "${TORRENTCORE_WEBUI2_URLS:=http://0.0.0.0:7510}"
 : "${TORRENTCORE_WEBUI_SERVICE_BASE_URL:=http://127.0.0.1:7033/}"
 : "${TORRENTCORE_ARTIFACT_SEGMENT:=intel}"
 : "${TORRENTCORE_LAUNCH_AGENT_TARGET_DIR:=${HOME}/Library/LaunchAgents}"
 : "${TORRENTCORE_LAUNCH_AGENT_LOG_DIR:=${TORRENTCORE_BASE_DIR}/Logs}"
 : "${TORRENTCORE_SERVICE_LAUNCH_LABEL:=com.torrentcore.service}"
 : "${TORRENTCORE_WEBUI_LAUNCH_LABEL:=com.torrentcore.webui}"
+: "${TORRENTCORE_WEBUI2_LAUNCH_LABEL:=com.torrentcore.webui2}"
 
 tc_timestamp() {
   date '+%Y-%m-%d %H:%M:%S'
@@ -112,11 +114,30 @@ tc_launchd_domain() {
 }
 
 tc_service_program_path() {
+  local managed="${HOME}/Applications/TorrentCore/TorrentCoreService.app/Contents/MacOS/TorrentCoreService"
+  if [[ -x "${managed}" ]]; then
+    print -- "${managed}"
+    return
+  fi
   print -- "${TORRENTCORE_BASE_DIR}/Service/TorrentCoreService"
 }
 
 tc_webui_program_path() {
+  local managed="${HOME}/Applications/TorrentCore/TorrentCoreWebUI.app/Contents/MacOS/TorrentCoreWebUI"
+  if [[ -x "${managed}" ]]; then
+    print -- "${managed}"
+    return
+  fi
   print -- "${TORRENTCORE_BASE_DIR}/WebUI/TorrentCore.WebUI"
+}
+
+tc_webui2_program_path() {
+  local managed="${HOME}/Applications/TorrentCore/TorrentCoreWebUI2.app/Contents/MacOS/TorrentCoreWebUI2"
+  if [[ -x "${managed}" ]]; then
+    print -- "${managed}"
+    return
+  fi
+  print -- "${TORRENTCORE_BASE_DIR}/WebUI2/TorrentCore.WebUI2"
 }
 
 tc_warn_if_target_env_file_missing() {
@@ -299,6 +320,33 @@ tc_sync_directory() {
   tc_require_command rsync
   mkdir -p "${target_dir}"
   rsync -a --delete "${source_dir}/" "${target_dir}/"
+}
+
+tc_sync_webui2_directory() {
+  setopt local_options null_glob
+  local source_dir="$1"
+  local target_dir="$2"
+  local settings_file
+
+  if [[ -e "${source_dir}/Config" || -L "${source_dir}/Config" ]]; then
+    tc_log_error "Machine-local WebUI2 Config found in publish output: ${source_dir}/Config"
+    return 1
+  fi
+
+  tc_require_command rsync
+  mkdir -p "${target_dir}"
+  rsync -a --delete \
+    --filter 'P /Config/***' \
+    --filter 'P /appsettings*.json' \
+    --exclude '/Config/***' \
+    --exclude '/appsettings*.json' \
+    "${source_dir}/" "${target_dir}/"
+
+  for settings_file in "${source_dir}"/appsettings*.json(N); do
+    if [[ ! -e "${target_dir}/${settings_file:t}" && ! -L "${target_dir}/${settings_file:t}" ]]; then
+      cp -p "${settings_file}" "${target_dir}/${settings_file:t}"
+    fi
+  done
 }
 
 tc_create_macos_app_bundle() {

@@ -1,0 +1,159 @@
+@namespace TorrentCore.WebUI2.Client.Components.Torrents
+@implements IAsyncDisposable
+@using TorrentCore.Contracts.Torrents
+@using TorrentCore.WebUI2.Client.Components.Tables
+@inject TorrentCore.WebUI2.Client.Services.BrowserSession Session
+@inject TorrentCore.WebUI2.Client.Services.BrowserPreferences Preferences
+@inject IJSRuntime JS
+
+<MudDialog Class="tc-diagnostics-dialog">
+    <DialogContent>
+        <div class="tc-diagnostics-body">
+        <header class="tc-diagnostics-heading">
+            <div><h2>@(IsPeers ? "Peers" : "Trackers")</h2><p>@TorrentName</p></div>
+            <MudButton Variant="Variant.Outlined" Disabled="@_busy" OnClick="RefreshAsync">Refresh</MudButton>
+        </header>
+        @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        <OperatorTable Items="@Rows" Columns="@Columns" DefaultSorts="@DefaultSorts"
+                       StorageKey="@(IsPeers ? "torrentcore.webui2.peers.v1" : "torrentcore.webui2.trackers.v1")"
+                       Busy="@_busy" MultiSelect="false" DetailOpen="false" EmptyText="@(IsPeers ? "No connected peers." : "No trackers for this torrent.")"
+                       ExportPrefix="@(IsPeers ? "peers" : "trackers")" ExportScopeName="results" />
+        </div>
+    </DialogContent>
+    <DialogActions><MudButton Variant="Variant.Outlined" OnClick="Done">Done</MudButton></DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public Guid TorrentId { get; set; }
+    [Parameter] public string TorrentName { get; set; } = string.Empty;
+    [Parameter] public bool IsPeers { get; set; }
+    private IReadOnlyList<TorrentPeerDto> _peers = [];
+    private IReadOnlyList<TorrentTrackerDto> _trackers = [];
+    private string? _error;
+    private bool _busy, _disposed;
+    private long _revision;
+    private CancellationTokenSource _cts = new();
+    private Task? _pollTask;
+    private bool Current(CancellationToken token) => !_disposed && !token.IsCancellationRequested &&
+        _cts.Token == token && _revision == Session.Revision;
+    private static readonly IReadOnlyList<OperatorColumn> PeerColumns = [
+        new("endpoint", "Endpoint", 190, CanHide: false), new("client", "Client", 155),
+        new("direction", "Direction", 100), new("connected", "Connected", 100), new("seeder", "Seeder", 85),
+        new("down", "Down", 105), new("up", "Up", 105), new("downloaded", "Downloaded", 115, false),
+        new("uploaded", "Uploaded", 115, false), new("encryption", "Encryption", 130, false)
+    ];
+    private static readonly IReadOnlyList<OperatorColumn> TrackerColumns = [
+        new("tier", "Tier", 70), new("number", "Tracker", 95, CanHide: false),
+        new("active", "Active", 85), new("status", "Status", 150), new("announce", "Announce", 110),
+        new("scrape", "Scrape", 90), new("sinceAnnounce", "Since Announce", 140, false),
+        new("announceOk", "Announce OK", 125, false), new("sinceScrape", "Since Scrape", 120, false),
+        new("scrapeOk", "Scrape OK", 105, false), new("failure", "Failure", 240, false), new("warning", "Warning", 240, false)
+    ];
+    private static readonly IReadOnlyList<OperatorSort> PeerSorts = [new("endpoint", false)];
+    private static readonly IReadOnlyList<OperatorSort> TrackerSorts = [new("tier", false), new("number", false)];
+    private IReadOnlyList<OperatorColumn> Columns => IsPeers ? PeerColumns : TrackerColumns;
+    private IReadOnlyList<OperatorSort> DefaultSorts => IsPeers ? PeerSorts : TrackerSorts;
+    private IReadOnlyList<OperatorRow> Rows => IsPeers
+        ? _peers.Select((peer, index) => PeerRow(peer, index)).ToArray()
+        : _trackers.Select((tracker, index) => TrackerRow(tracker, index)).ToArray();
+
+    protected override void OnInitialized()
+    {
+        _revision = Session.Revision;
+        Session.Changed += SessionChanged;
+        _pollTask = PollAsync(_cts.Token);
+    }
+    private void SessionChanged() => _ = InvokeAsync(() => {
+        if (Session.Revision != _revision) { _cts.Cancel(); _busy = false; _error = "Service connection changed. Close and reopen diagnostics."; StateHasChanged(); }
+    });
+
+    private async Task PollAsync(CancellationToken token)
+    {
+        await InvokeAsync(() => LoadAsync(token));
+        while (!token.IsCancellationRequested)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(Preferences.RefreshSeconds, 5, 15)), token); }
+            catch (OperationCanceledException) { break; }
+            if (!Preferences.AutoRefresh) continue;
+            bool visible;
+            try { visible = await JS.InvokeAsync<bool>("tcBrowser.isVisible", token); }
+            catch (JSException) { continue; }
+            catch (OperationCanceledException) { break; }
+            if (visible) await InvokeAsync(() => LoadAsync(token));
+        }
+    }
+    private Task RefreshAsync() => LoadAsync(_cts.Token);
+    private async Task LoadAsync(CancellationToken token)
+    {
+        if (_busy || !Current(token)) return;
+        _busy = true;
+        try
+        {
+            var client = Session.CreateClient(_revision);
+            if (IsPeers)
+            {
+                var result = await client.GetTorrentPeersAsync(TorrentId, token);
+                if (Current(token)) _peers = result;
+            }
+            else
+            {
+                var result = await client.GetTorrentTrackersAsync(TorrentId, token);
+                if (Current(token)) _trackers = result;
+            }
+            if (Current(token)) _error = null;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (Current(token)) _error = ex.Message; }
+        finally { if (Current(token)) { _busy = false; await InvokeAsync(StateHasChanged); } }
+    }
+
+    private static OperatorRow PeerRow(TorrentPeerDto p, int index)
+    {
+        var id = $"{index}:{p.Endpoint}|{p.Client}|{p.Direction}";
+        return new(id, new Dictionary<string, string> {
+            ["endpoint"] = p.Endpoint, ["client"] = p.Client, ["direction"] = p.Direction,
+            ["connected"] = YesNo(p.IsConnected), ["seeder"] = YesNo(p.IsSeeder),
+            ["down"] = Rate(p.DownloadRateBytesPerSecond), ["up"] = Rate(p.UploadRateBytesPerSecond),
+            ["downloaded"] = Bytes(p.DownloadedBytes), ["uploaded"] = Bytes(p.UploadedBytes), ["encryption"] = p.Encryption
+        }, new Dictionary<string, IComparable?> {
+            ["connected"] = p.IsConnected, ["seeder"] = p.IsSeeder, ["down"] = p.DownloadRateBytesPerSecond,
+            ["up"] = p.UploadRateBytesPerSecond, ["downloaded"] = p.DownloadedBytes, ["uploaded"] = p.UploadedBytes
+        });
+    }
+    private static OperatorRow TrackerRow(TorrentTrackerDto t, int index)
+    {
+        var id = $"{t.TierNumber}.{t.TrackerNumber}";
+        return new($"{index}:{id}", new Dictionary<string, string> {
+            ["tier"] = t.TierNumber.ToString("N0"), ["number"] = id, ["active"] = YesNo(t.IsActive),
+            ["status"] = t.Status, ["announce"] = NullableYesNo(t.CanAnnounce), ["scrape"] = YesNo(t.CanScrape),
+            ["sinceAnnounce"] = Duration(t.TimeSinceLastAnnounceSeconds), ["announceOk"] = NullableYesNo(t.LastAnnounceSucceeded),
+            ["sinceScrape"] = Duration(t.TimeSinceLastScrapeSeconds), ["scrapeOk"] = NullableYesNo(t.LastScrapeSucceeded),
+            ["failure"] = Text(t.FailureMessage), ["warning"] = Text(t.WarningMessage)
+        }, new Dictionary<string, IComparable?> {
+            ["tier"] = t.TierNumber, ["number"] = t.TrackerNumber, ["active"] = t.IsActive,
+            ["announce"] = t.CanAnnounce.HasValue ? (t.CanAnnounce.Value ? 2 : 1) : 0,
+            ["scrape"] = t.CanScrape, ["sinceAnnounce"] = t.TimeSinceLastAnnounceSeconds,
+            ["announceOk"] = t.LastAnnounceSucceeded.HasValue ? (t.LastAnnounceSucceeded.Value ? 2 : 1) : 0,
+            ["sinceScrape"] = t.TimeSinceLastScrapeSeconds,
+            ["scrapeOk"] = t.LastScrapeSucceeded.HasValue ? (t.LastScrapeSucceeded.Value ? 2 : 1) : 0
+        });
+    }
+
+    private static string Text(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    private static string YesNo(bool value) => value ? "Yes" : "No";
+    private static string NullableYesNo(bool? value) => value.HasValue ? YesNo(value.Value) : "--";
+    private static string Duration(long? seconds) => seconds.HasValue ? TimeSpan.FromSeconds(seconds.Value).ToString(@"d\.hh\:mm\:ss") : "--";
+    private static string Bytes(long bytes)
+    {
+        double size = bytes; string[] units = ["B", "KB", "MB", "GB", "TB"]; var i = 0;
+        while (Math.Abs(size) >= 1024 && i < units.Length - 1) { size /= 1024; i++; }
+        return $"{size:N1} {units[i]}";
+    }
+    private static string Rate(long bytes) => $"{Bytes(bytes)}/s";
+    private void Done() => Dialog.Close();
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true; Session.Changed -= SessionChanged; _cts.Cancel(); _cts.Dispose(); return ValueTask.CompletedTask;
+    }
+}

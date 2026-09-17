@@ -8,26 +8,33 @@ Managed components:
 
 - `TorrentCoreService`
 - `TorrentCore.WebUI`
+- `TorrentCore.WebUI2` (parallel desktop browser UI)
 
-Current source Service, WebUI, and native macOS UI version: `0.8.0`, build `15`.
+Current source Service, WebUI, WebUI2, and native macOS UI version: `0.8.0`, build `15`.
 
 Launch agent labels:
 
 - `com.torrentcore.service`
 - `com.torrentcore.webui`
+- `com.torrentcore.webui2`
 
 Installed plists:
 
 - `~/Library/LaunchAgents/com.torrentcore.service.plist`
 - `~/Library/LaunchAgents/com.torrentcore.webui.plist`
+- `~/Library/LaunchAgents/com.torrentcore.webui2.plist`
 
 Managed app launchers:
 
 - `~/Applications/TorrentCore/TorrentCoreService.app/Contents/MacOS/TorrentCoreService`
 - `~/Applications/TorrentCore/TorrentCoreWebUI.app/Contents/MacOS/TorrentCoreWebUI`
+- `~/Applications/TorrentCore/TorrentCoreWebUI2.app/Contents/MacOS/TorrentCoreWebUI2`
 
 The immutable framework-dependent runtimes live inside those bundles. Mutable configuration and state remain under
-`~/TorrentCore/Service` and `~/TorrentCore/WebUI`; retained legacy runtime files there are inactive after app cutover.
+`~/TorrentCore/Service`, `~/TorrentCore/WebUI`, and `~/TorrentCore/WebUI2`; retained legacy runtime files in the first
+two directories are inactive after app cutover. WebUI2 stores browser connection profiles under
+`~/TorrentCore/WebUI2/Config/browser-connections/`; deployments preserve that entire directory and an
+existing `~/TorrentCore/WebUI2/appsettings.json` byte-for-byte. Recovery restores their backed-up state.
 
 ## Target Layout
 
@@ -40,6 +47,10 @@ The immutable framework-dependent runtimes live inside those bundles. Mutable co
 │   ├── appsettings.json
 │   ├── Config/
 │   │   └── service-connection.json   # optional machine-local override
+│   └── version.json
+├── WebUI2/
+│   ├── appsettings.json
+│   ├── Config/browser-connections/   # host-local browser profiles
 │   └── version.json
 ├── Scripts/
 │   ├── install-launch-agents.zsh
@@ -69,6 +80,12 @@ Rules:
 - deploy scripts are repo-side publish-and-copy scripts
 - runtime scripts should be executed on the machine actually hosting TorrentCore
 - `--restart` is only valid when the deploy command runs on the same host as the runtime
+
+The Test environment uses `deploy-all-intel.zsh` to publish and copy Service, the existing WebUI, and WebUI2 for
+`osx-x64`. WebUI2 is copied to the target `WebUI2` directory; its `Config` directory and existing `appsettings*.json`
+are preserved. New settings files are supplied only when absent. With `--restart` on the Test host, the existing
+install-and-restart sequence also includes `com.torrentcore.webui2`, using the flat `WebUI2/TorrentCore.WebUI2`
+executable and port `7510` unless overridden in `torrentcore.env`. This does not add Intel support to the combined DMG.
 
 Platform defaults:
 
@@ -169,8 +186,8 @@ The combined DMG builder and managed-app deployer live under `Scripts/ServiceApp
 TVMaze repository and require no machine `live.json` manifest. Generation requires an installation target (`Dick`,
 `Tom`, or `Shared`) and a CPU choice. Dick and Tom retain installation-specific artifact names. Shared packages are
 reusable and omit the installation segment from the artifact name. No hostname catalog is packaged: installation paths
-come from the current user's home, and apply requires the existing `~/TorrentCore` and `~/TorrentCore/Service` structure. Releases contain
-the Service and WebUI payloads under `payload/osx-arm64`, the signed native UI at the mounted root as `TorrentCore.app`,
+come from the current user's home, and apply requires the existing `~/TorrentCore` and `~/TorrentCore/Service` structure. New releases contain
+the Service, WebUI, and WebUI2 payloads under `payload/osx-arm64`, the signed native UI at the mounted root as `TorrentCore.app`,
 and an `Applications` link to `/Applications`. The deployer refuses non-Arm64 hosts and never installs or controls the
 native UI.
 
@@ -179,7 +196,7 @@ Artifacts follow the established naming convention, for example
 `TorrentCore-torrentcore.2026.08.14.deploy-patches` for Shared. A release is always staged first as a complete
 directory under `Deployments/TorrentCore-Deployments/<installation>`. The staged directory contains `README.md`,
 `README.pdf`, `Runbook.md`, `Runbook.pdf`, `plan.zsh`, `dry-run.zsh`, `backup.zsh`, `apply.zsh`, `verify.zsh`,
-`release.json`, the two managed app payloads, and the native UI app. A stage-only command retains it for inspection.
+`release.json`, the three managed app payloads, package-root `RuntimeScripts/` helpers, and the native UI app. A stage-only command retains it for inspection.
 
 From clean committed source, stage the release package first:
 
@@ -219,11 +236,17 @@ The default DMG output directory is `/Volumes/CA-Desktop-HD-2/Development/Deploy
 the DMG, submits it through the existing `TorrentCore-notary` profile, staples it, and performs signature, entitlement,
 Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification outside the filesystem sandbox.
 `TorrentCore.app/Contents/Resources/version.json` records native UI version, build, Git SHA, build time, and runtime.
-The package `release.json` records both managed-app checksums, the short change description, and the manual
+The package `release.json` records all managed-app checksums, the short change description, and the manual
 `/Applications/TorrentCore.app` target.
 
-The current combined-package tooling defaults `TorrentCoreService.app`, `TorrentCoreWebUI.app`, and `TorrentCore.app`
+The current combined-package tooling defaults `TorrentCoreService.app`, `TorrentCoreWebUI.app`, `TorrentCoreWebUI2.app`, and `TorrentCore.app`
 to source version `0.8.0`, build `15`.
+
+WebUI2 is a third managed app alongside the existing WebUI. The existing WebUI remains on port `7053`; WebUI2 binds to
+LAN port `7510` by default. `TORRENTCORE_WEBUI2_URLS` in the host-local `Scripts/torrentcore.env` can override that binding.
+New releases include updated operator helpers under package-root `RuntimeScripts/`, which the managed installer backs up
+and installs without replacing `torrentcore.env`. WebUI2's bundled installer renders its LaunchAgent. Older two-app
+release packages without `managedApps.webUi2` remain valid for standalone rebuild.
 
 The Dick `torrentcore.2026.08.13.Dick.WebUIAlignment` Arm64 release was staged permanently under
 `Deployments/TorrentCore-Deployments/Dick`, reviewed and approved by the operator, and then built from clean commit
@@ -267,9 +290,10 @@ From the mounted DMG, begin with:
 ```
 
 Plan and dry-run do not write files or deployment state and do not control launchd. `apply.zsh` supplies the required
-confirmation argument. It verifies both source apps before stopping anything, creates one compressed backup
-under `~/TorrentCore/.backups`, stages and replaces both apps, preserves every existing file under both working
-directories, installs both LaunchAgents, and verifies Service API health/version plus WebUI reachability. VPN Disabled,
+confirmation argument. For new releases it verifies all three source apps before stopping anything, creates one
+compressed backup under `~/TorrentCore/.backups`, stages and replaces all three managed apps, preserves the external
+working directories and browser connection profiles, installs their LaunchAgents and operator helpers, and verifies
+Service API health/version plus both WebUI endpoints. VPN Disabled,
 Ready, and Degraded are valid outcomes when API health is successful. Deployment state and history live under
 `~/TorrentCore/DeploymentState`.
 
@@ -278,13 +302,12 @@ After combined verify succeeds, quit an existing TorrentCore UI, drag the mounte
 the Service. This manual drag is the only native UI installation path in the combined DMG. The managed installer does
 not copy, replace, back up, roll back, or verify `/Applications/TorrentCore.app`.
 
-Legacy Service and WebUI runtime files and current legacy scripts remain in place but inactive after app cutover. Do
-not use the legacy `install-launch-agents.zsh` after app cutover because it still describes the retained flat-runtime
-layout.
+Legacy Service and WebUI runtime files remain in place but inactive after app cutover. The updated
+`install-launch-agents.zsh` delegates to the bundled app installers when managed apps are present.
 
 ## Launch-Agent Management
 
-Install both agents:
+Install managed agents (WebUI2 is included when its app is installed):
 
 ```bash
 cd ~/TorrentCore/Scripts
@@ -296,6 +319,7 @@ Install only one:
 ```bash
 ./install-launch-agents.zsh service
 ./install-launch-agents.zsh webui
+./install-launch-agents.zsh webui2
 ```
 
 Explicit control:

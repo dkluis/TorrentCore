@@ -1,0 +1,114 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@using TorrentCore.WebUI2.Client.Components.Torrents
+@inject BrowserSession Session
+@inject BrowserPreferences Preferences
+@inject NavigationManager Navigation
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<div class="desktop-shell" style="@($"--nav-width:{(_open ? _width : 0)}px")">
+    <header class="appbar @EnvironmentClass">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="() => _open = !_open" aria-label="Toggle navigation" />
+        <strong>TorrentCore</strong>
+        <span class="appbar-spacer"></span>
+        <MudButton Variant="Variant.Outlined" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Add" Disabled="@(!_canAdd)" OnClick="AddMagnetAsync">Add Magnet</MudButton>
+        <MudIconButton Icon="@Icons.Material.Filled.Settings" Color="Color.Inherit" Href="settings" aria-label="App Settings" />
+        <a class="active-connection" href="connection"><strong>@(Session.ActiveProfile?.Environment ?? "Unclassified")</strong><span>@(Session.ActiveProfile?.Name ?? "No connection")</span></a>
+    </header>
+    @if (_open)
+    {
+        <aside class="sidebar" @ref="_sidebar">
+            <MudNavMenu>
+                <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard" Match="NavLinkMatch.All">Dashboard</MudNavLink>
+                <MudNavLink Href="torrents" Icon="@Icons.Material.Filled.Download" Match="NavLinkMatch.All">Torrents</MudNavLink>
+                <MudNavLink Href="history" Icon="@Icons.Material.Filled.History" Match="NavLinkMatch.All">History</MudNavLink>
+                <MudNavLink Href="logs" Icon="@Icons.Material.Filled.Article" Match="NavLinkMatch.All">Logs</MudNavLink>
+                <MudNavLink Href="service-settings" Icon="@Icons.Material.Filled.Tune" Match="NavLinkMatch.All">Service Settings</MudNavLink>
+                <MudNavLink Href="connection" Icon="@Icons.Material.Filled.Lan" Match="NavLinkMatch.All">Connection</MudNavLink>
+            </MudNavMenu>
+            <div class="sidebar-resize" role="separator" aria-label="Resize navigation" aria-orientation="vertical"></div>
+        </aside>
+    }
+    <main class="shell-content">@Body</main>
+</div>
+
+@code {
+    private bool _open = true, _canAdd, _disposed;
+    private int _width = 220;
+    private ElementReference _sidebar;
+    private DotNetObjectReference<MainLayout>? _self;
+    private readonly CancellationTokenSource _lifetime = new();
+    private Task? _poll;
+    private string EnvironmentClass => Session.ActiveProfile?.Environment switch { "Production" => "production", "Test" => "test", _ => "unclassified" };
+    protected override void OnInitialized()
+    {
+        Session.Changed += ConnectionChanged;
+        _poll = PollAsync();
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            var saved = await JS.InvokeAsync<int?>("tcBrowser.load", "torrentcore.webui2.navigationWidth");
+            if (saved.HasValue) _width = Math.Clamp(saved.Value, 180, 360);
+            StateHasChanged();
+        }
+        if (_open) await JS.InvokeVoidAsync("tcBrowser.attachSidebar", _sidebar, _self);
+    }
+    [JSInvokable] public async Task SetSidebarWidth(int width)
+    {
+        _width = Math.Clamp(width, 180, 360);
+        await JS.InvokeVoidAsync("tcBrowser.store", "torrentcore.webui2.navigationWidth", _width);
+        StateHasChanged();
+    }
+    private void ConnectionChanged() => _ = InvokeAsync(async () => { _canAdd = false; StateHasChanged(); await RefreshCapabilitiesAsync(); });
+    private async Task RefreshCapabilitiesAsync()
+    {
+        var revision = Session.Revision;
+        if (Session.ActiveProfile is null) { _canAdd = false; return; }
+        try
+        {
+            var status = await Session.CreateClient(revision).GetHostStatusAsync(_lifetime.Token);
+            if (!_disposed && revision == Session.Revision) _canAdd = status?.SupportsMagnetAdds == true;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch { if (revision == Session.Revision) _canAdd = false; }
+        if (!_disposed) await InvokeAsync(StateHasChanged);
+    }
+    private async Task PollAsync()
+    {
+        try
+        {
+            await RefreshCapabilitiesAsync();
+            while (!_lifetime.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(Preferences.RefreshSeconds), _lifetime.Token);
+                if (Preferences.AutoRefresh && await JS.InvokeAsync<bool>("tcBrowser.isVisible")) await RefreshCapabilitiesAsync();
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+    }
+    private async Task AddMagnetAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<AddMagnetDialog>("Add Magnet", new DialogParameters { ["Revision"] = Session.Revision },
+            new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, BackdropClick = false, FullWidth = true, MaxWidth = MaxWidth.Medium });
+        var result = await dialog.Result;
+        if (result?.Canceled == false && result.Data is true)
+        {
+            Snackbar.Add("Magnet submitted.", Severity.Success);
+            await Session.ReloadAsync();
+            Navigation.NavigateTo("torrents");
+        }
+    }
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true; Session.Changed -= ConnectionChanged;
+        await _lifetime.CancelAsync();
+        if (_poll is not null) await _poll;
+        await JS.InvokeVoidAsync("tcBrowser.detachSidebar");
+        _self?.Dispose(); _lifetime.Dispose();
+    }
+}

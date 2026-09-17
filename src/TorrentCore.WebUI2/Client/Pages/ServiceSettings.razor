@@ -1,0 +1,176 @@
+@page "/service-settings"
+@using TorrentCore.WebUI2.Client.Services
+@using TorrentCore.WebUI2.Client.Components.Settings
+@implements IDisposable
+
+<PageTitle>Service Settings</PageTitle>
+<NavigationLock OnBeforeInternalNavigation="OnBeforeNavigate" />
+<div class="service-settings">
+    <nav aria-label="Settings groups">
+        @foreach (var group in Groups)
+        {
+            <button type="button" class="@(selectedGroup == group ? "selected" : "")" disabled="@(busy || loading)" @onclick="() => SelectGroupAsync(group)">@Title(group)</button>
+        }
+    </nav>
+    <main>
+        <header>
+            <div><h1>@Title(selectedGroup)</h1><p>@(selectedGroup == Group.Cleanup ? "Cleanup actions permanently delete eligible records from the connected TorrentCore installation." : "Changes are saved to the connected TorrentCore installation.")</p></div>
+            <div class="actions">
+                <button type="button" @onclick="RequestRefreshAsync" disabled="@(loading || busy || Session.ActiveProfile is null)">Refresh</button>
+                @if (selectedGroup != Group.Cleanup)
+                {
+                    <button type="button" @onclick="Revert" disabled="@(!IsDirty || busy)">Revert</button>
+                    <button type="button" @onclick="async () => { await SaveAsync(); }" disabled="@(!IsDirty || ValidationError is not null || busy || Session.ActiveProfile is null)">Save</button>
+                }
+                <button type="button" @onclick="ConfirmRestartAsync" disabled="@(IsDirty || busy || Session.ActiveProfile is null)">Restart Service</button>
+            </div>
+        </header>
+
+        @if (loading) { <p role="status">Loading Service Settings…</p> }
+        else if (Session.ActiveProfile is null) { <p>Create or select a connection before loading service settings.</p> }
+        else if (error is not null && draft is null) { <p role="alert">@error</p><button @onclick="LoadAsync">Retry</button> }
+        else if (draft is not null)
+        {
+            @if (message is not null) { <p class="success" role="status">@message</p> }
+            @if (error is not null) { <p class="error" role="alert">@error</p> }
+            @if (ValidationError is not null && selectedGroup != Group.Cleanup) { <p class="error" role="alert">@ValidationError</p> }
+
+            <fieldset class="settings-editor" disabled="@(busy || loading)">
+
+            @if (selectedGroup == Group.Downloads)
+            {
+                <section><h2>Concurrency</h2>
+                    <label><span>Active downloads <SettingsHelpIcon Key="MaxActiveDownloads" /></span><input type="number" min="1" @bind="draft.MaxActiveDownloads" /></label>
+                    <label><span>Active metadata resolutions <SettingsHelpIcon Key="MaxActiveMetadataResolutions" /></span><input type="number" min="1" @bind="draft.MaxActiveMetadataResolutions" /></label>
+                </section>
+            }
+            else if (selectedGroup == Group.SeedingCleanup)
+            {
+                <section><h2>Seeding Stop Policy</h2>
+                    <label><span>Mode <SettingsHelpIcon Key="SeedingStopMode" /></span><select @bind="draft.SeedingStopMode"><option value="Unlimited">Unlimited</option><option value="StopImmediately">Stop immediately</option><option value="StopAfterRatio">Stop after ratio</option><option value="StopAfterTime">Stop after time</option><option value="StopAfterRatioOrTime">Stop after ratio or time</option></select></label>
+                    <label><span>Ratio <SettingsHelpIcon Key="SeedingStopRatio" /></span><input type="number" step="any" min="0.01" @bind="draft.SeedingStopRatio" disabled="@(draft.SeedingStopMode is not ("StopAfterRatio" or "StopAfterRatioOrTime"))" /></label>
+                    <label><span>Minutes <SettingsHelpIcon Key="SeedingStopMinutes" /></span><input type="number" min="1" @bind="draft.SeedingStopMinutes" disabled="@(draft.SeedingStopMode is not ("StopAfterTime" or "StopAfterRatioOrTime"))" /></label>
+                </section>
+                <section><h2>Completed Torrent Cleanup</h2>
+                    <label><span>Mode <SettingsHelpIcon Key="CompletedTorrentCleanupMode" /></span><select @bind="draft.CompletedTorrentCleanupMode"><option value="Never">Never</option><option value="AfterCompletedMinutes">After completion delay</option></select></label>
+                    <label><span>Minutes <SettingsHelpIcon Key="CompletedTorrentCleanupMinutes" /></span><input type="number" min="0" @bind="draft.CompletedTorrentCleanupMinutes" disabled="@(draft.CompletedTorrentCleanupMode != "AfterCompletedMinutes")" /></label>
+                    <label class="check"><input type="checkbox" @bind="draft.DeleteLogsForCompletedTorrents" /> Delete logs for completed torrents <SettingsHelpIcon Key="DeleteLogsForCompletedTorrents" /></label>
+                </section>
+            }
+            else if (selectedGroup == Group.MetadataRecovery)
+            {
+                <section><h2>Metadata Refresh</h2>
+                    <label><span>Stale after seconds <SettingsHelpIcon Key="MetadataRefreshStaleSeconds" /></span><input type="number" min="1" @bind="draft.MetadataRefreshStaleSeconds" /></label>
+                    <label><span>Restart delay seconds <SettingsHelpIcon Key="MetadataRefreshRestartDelaySeconds" /></span><input type="number" min="1" @bind="draft.MetadataRefreshRestartDelaySeconds" /></label>
+                </section>
+                <section><h2>Metadata Resolution</h2>
+                    <label><span>Time slice minutes <SettingsHelpIcon Key="MetadataResolutionTimeSliceMinutes" /></span><input type="number" min="1" max="1440" @bind="draft.MetadataResolutionTimeSliceMinutes" /></label>
+                    <label><span>Priority metadata attempts <SettingsHelpIcon Key="PriorityMetadataAttempts" /></span><input type="number" min="1" max="10" @bind="draft.PriorityMetadataAttempts" /></label>
+                    <label><span>Reset stuck threshold seconds <SettingsHelpIcon Key="AutomaticMetadataResetStuckThresholdSeconds" /></span><input type="number" min="15" max="300" @bind="draft.AutomaticMetadataResetStuckThresholdSeconds" /></label>
+                </section>
+                <section><h2>Download Rotation</h2>
+                    <label><span>No-progress time slice minutes <SettingsHelpIcon Key="DownloadNoProgressTimeSliceMinutes" /></span><input type="number" min="1" max="60" @bind="draft.DownloadNoProgressTimeSliceMinutes" /></label>
+                </section>
+                <section><h2>Cold Download Recovery</h2>
+                    <label><span>Recovery threshold minutes <SettingsHelpIcon Key="ColdDownloadRecoveryThresholdMinutes" /></span><input type="number" min="1" @bind="draft.ColdDownloadRecoveryThresholdMinutes" /></label>
+                    <label><span>Recovery interval minutes <SettingsHelpIcon Key="ColdDownloadRecoveryIntervalMinutes" /></span><input type="number" min="1" @bind="draft.ColdDownloadRecoveryIntervalMinutes" /></label>
+                    <label><span>Abandon after hours <SettingsHelpIcon Key="ColdDownloadAbandonAfterHours" /></span><input type="number" min="0" @bind="draft.ColdDownloadAbandonAfterHours" /></label>
+                </section>
+            }
+            else if (selectedGroup == Group.Engine)
+            {
+                <section><h2>MonoTorrent Engine</h2>
+                    <label class="check"><input type="checkbox" @bind="draft.EngineAllowPeerExchange" /> Allow Peer Exchange (PEX) <SettingsHelpIcon Key="EngineAllowPeerExchange" /></label>
+                    <label><span>Encryption mode <SettingsHelpIcon Key="EngineEncryptionMode" /></span><select @bind="draft.EngineEncryptionMode"><option value="PlainTextPreferred">Plain text preferred</option><option value="EncryptedPreferred">Encrypted preferred</option><option value="EncryptedRequired">Encrypted required</option></select></label>
+                    <label><span>Maximum connections <SettingsHelpIcon Key="EngineMaximumConnections" /></span><input type="number" min="1" @bind="draft.EngineMaximumConnections" /></label>
+                    <label><span>Maximum half-open connections <SettingsHelpIcon Key="EngineMaximumHalfOpenConnections" /></span><input type="number" min="1" @bind="draft.EngineMaximumHalfOpenConnections" /></label>
+                    <label><span>Maximum download bytes/second (0 = unlimited) <SettingsHelpIcon Key="EngineMaximumDownloadRateBytesPerSecond" /></span><input type="number" min="0" @bind="draft.EngineMaximumDownloadRateBytesPerSecond" /></label>
+                    <label><span>Maximum upload bytes/second (0 = unlimited) <SettingsHelpIcon Key="EngineMaximumUploadRateBytesPerSecond" /></span><input type="number" min="0" @bind="draft.EngineMaximumUploadRateBytesPerSecond" /></label>
+                </section>
+                <section><h2>Connection Failure Logging</h2>
+                    <label><span>Burst limit <SettingsHelpIcon Key="EngineConnectionFailureLogBurstLimit" /></span><input type="number" min="1" @bind="draft.EngineConnectionFailureLogBurstLimit" /></label>
+                    <label><span>Window seconds <SettingsHelpIcon Key="EngineConnectionFailureLogWindowSeconds" /></span><input type="number" min="1" @bind="draft.EngineConnectionFailureLogWindowSeconds" /></label>
+                </section>
+                @if (snapshot?.EngineSettingsRequireRestart == true) { <p>Current engine settings require a service restart.</p> }
+                <p>Applied peer exchange: @(snapshot?.AppliedEngineAllowPeerExchange == true ? "Enabled" : "Disabled")</p>
+            }
+            else if (selectedGroup == Group.VpnEgress)
+            {
+                <section><h2>Validation</h2>
+                    <label class="check"><input type="checkbox" @bind="draft.VpnEgressValidationEnabled" /> Enabled <SettingsHelpIcon Key="VpnEgressValidationEnabled" /></label>
+                    <label><span>Public IP endpoint <SettingsHelpIcon Key="VpnEgressValidationEndpoint" /></span><input type="url" @bind="draft.VpnEgressValidationEndpoint" /></label>
+                    <label><span>Direct ISP IPv4 CIDRs <SettingsHelpIcon Key="VpnEgressDirectIspCidrs" /></span><input type="text" @bind="draft.VpnEgressDirectIspCidrs" /></label>
+                </section>
+                <section><h2>Check Intervals</h2>
+                    <label><span>Degraded seconds <SettingsHelpIcon Key="VpnEgressDegradedCheckIntervalSeconds" /></span><input type="number" min="1" @bind="draft.VpnEgressDegradedCheckIntervalSeconds" /></label>
+                    <label><span>Ready seconds <SettingsHelpIcon Key="VpnEgressReadyCheckIntervalSeconds" /></span><input type="number" min="1" @bind="draft.VpnEgressReadyCheckIntervalSeconds" /></label>
+                    <label><span>Request timeout seconds <SettingsHelpIcon Key="VpnEgressRequestTimeoutSeconds" /></span><input type="number" min="1" @bind="draft.VpnEgressRequestTimeoutSeconds" /></label>
+                    <label><span>Engine suspension timeout seconds <SettingsHelpIcon Key="VpnEgressEngineSuspensionTimeoutSeconds" /></span><input type="number" min="1" @bind="draft.VpnEgressEngineSuspensionTimeoutSeconds" /></label>
+                </section>
+                <section><h2>VPN Recovery</h2>
+                    <label><span>Provider</span><select @bind="draft.VpnRecoveryProvider"><option value="ExpressVPN">ExpressVPN</option><option value="PIA">PIA</option></select></label>
+                    @if (draft.VpnRecoveryProvider == "PIA") { <p>PIA background mode must be enabled on the Service host. Recovery preserves your PIA connection settings.</p> }
+                    <label><span>Automatic recovery mode <SettingsHelpIcon Key="ExpressVpnAutomaticRecoveryMode" /></span><select @bind="draft.ExpressVpnAutomaticRecoveryMode"><option value="Disabled">Disabled</option><option value="DirectIspOnly">Direct ISP only</option><option value="AnyValidationFailure">Any validation failure</option></select></label>
+                    <label><span>Recovery delay seconds <SettingsHelpIcon Key="ExpressVpnRecoveryDelaySeconds" /></span><input type="number" min="1" @bind="draft.ExpressVpnRecoveryDelaySeconds" /></label>
+                    @if (draft.VpnRecoveryProvider == "ExpressVPN") { <label><span>Unavailable launch delay seconds <SettingsHelpIcon Key="ExpressVpnUnavailableLaunchDelaySeconds" /></span><input type="number" min="1" @bind="draft.ExpressVpnUnavailableLaunchDelaySeconds" /></label> }
+                </section>
+                <p>These values apply live. Interval edits take effect at the next scheduled check without resetting the current countdown.</p>
+            }
+            else if (selectedGroup == Group.Diagnostics)
+            {
+                <section><h2>Performance Logging</h2>
+                    <label class="check"><input type="checkbox" @bind="draft.RuntimeTickDurationSummaryEnabled" /> Performance Timing Summaries <SettingsHelpIcon Key="RuntimeTickDurationSummaryEnabled" /></label>
+                </section>
+                <p>This controls only the one-minute synchronization timing summary written to the Service log.</p>
+            }
+            else if (selectedGroup == Group.CompletionCallback)
+            {
+                <section><h2>Callback</h2>
+                    <label class="check"><input type="checkbox" @bind="draft.CompletionCallbackEnabled" /> Enabled <SettingsHelpIcon Key="CompletionCallbackEnabled" /></label>
+                    <label><span>Command path <SettingsHelpIcon Key="CompletionCallbackCommandPath" /></span><input type="text" @bind="draft.CompletionCallbackCommandPath" /></label>
+                    <label><span>Arguments <SettingsHelpIcon Key="CompletionCallbackArguments" /></span><input type="text" @bind="draft.CompletionCallbackArguments" /></label>
+                    <label><span>Working directory <SettingsHelpIcon Key="CompletionCallbackWorkingDirectory" /></span><input type="text" @bind="draft.CompletionCallbackWorkingDirectory" /></label>
+                    <label><span>API base URL override <SettingsHelpIcon Key="CompletionCallbackApiBaseUrlOverride" /></span><input type="text" @bind="draft.CompletionCallbackApiBaseUrlOverride" /></label>
+                    <label><span>API key override <SettingsHelpIcon Key="CompletionCallbackApiKeyOverride" /></span><input type="password" autocomplete="off" @bind="draft.CompletionCallbackApiKeyOverride" /></label>
+                    <label><span>Timeout seconds <SettingsHelpIcon Key="CompletionCallbackTimeoutSeconds" /></span><input type="number" min="1" @bind="draft.CompletionCallbackTimeoutSeconds" /></label>
+                    <label><span>Finalization timeout seconds <SettingsHelpIcon Key="CompletionCallbackFinalizationTimeoutSeconds" /></span><input type="number" min="1" @bind="draft.CompletionCallbackFinalizationTimeoutSeconds" /></label>
+                </section>
+                <p>The API key is sent to TorrentCore when you save. This app does not store it in browser preferences or write it to a browser log.</p>
+            }
+            else if (selectedGroup == Group.Categories)
+            {
+                <section><h2>Existing Categories</h2><p>Edit any category in place, then save all changed rows together.</p>
+                    <div class="category-scroll"><table><thead><tr><th>Key</th><th>Display name <SettingsHelpIcon Key="CategoryDisplayName" /></th><th>Download root path <SettingsHelpIcon Key="CategoryDownloadRootPath" /></th><th>Callback label <SettingsHelpIcon Key="CategoryCallbackLabel" /></th><th>Enabled <SettingsHelpIcon Key="CategoryEnabled" /></th><th>Completion callback <SettingsHelpIcon Key="CategoryInvokeCompletionCallback" /></th><th>Sort order <SettingsHelpIcon Key="CategorySortOrder" /></th></tr></thead><tbody>
+                        @foreach (var category in categories)
+                        {
+                            var item = categoryDrafts[category.Key];
+                            <tr><td>@category.Key</td>
+                                <td><input aria-label="@($"{category.Key} display name")" @bind="item.DisplayName" /></td>
+                                <td><input aria-label="@($"{category.Key} download root path")" @bind="item.DownloadRootPath" /></td>
+                                <td><input aria-label="@($"{category.Key} callback label")" @bind="item.CallbackLabel" /></td>
+                                <td><input aria-label="@($"{category.Key} enabled")" type="checkbox" @bind="item.Enabled" /></td>
+                                <td><input aria-label="@($"{category.Key} completion callback")" type="checkbox" @bind="item.InvokeCompletionCallback" /></td>
+                                <td><input aria-label="@($"{category.Key} sort order")" type="number" min="0" @bind="item.SortOrder" /></td>
+                            </tr>
+                        }
+                    </tbody></table></div>
+                </section>
+            }
+            else
+            {
+                <section><h2>Log Entries <SettingsHelpIcon Key="CleanupLogEntries" /></h2><p>Delete log entries strictly before Service-local 00:00:00 on the selected date. Logs for live torrents are protected.</p>
+                    <label>Up To Date<input type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="logDate" @bind:format="yyyy-MM-dd" /></label>
+                    <button type="button" disabled="@(busy || logDate.Date > DateTime.Today)" @onclick="() => ConfirmCleanupAsync(CleanupKind.Logs)">Delete Log Entries</button>
+                </section>
+                <section><h2>History Records <SettingsHelpIcon Key="CleanupHistoryRecords" /></h2><p>Delete records last updated strictly before Service-local 00:00:00 on the selected date. History for live torrents is protected.</p>
+                    <label>Up To Date<input type="date" max="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="historyDate" @bind:format="yyyy-MM-dd" /></label>
+                    <button type="button" disabled="@(busy || historyDate.Date > DateTime.Today)" @onclick="() => ConfirmCleanupAsync(CleanupKind.History)">Delete History Records</button>
+                </section>
+                <section><h2>Orphaned Torrent Logs <SettingsHelpIcon Key="CleanupOrphanedTorrentLogs" /></h2><p>Delete torrent-scoped logs whose Torrent ID is no longer present in the live torrent table.</p>
+                    <button type="button" disabled="@busy" @onclick="() => ConfirmCleanupAsync(CleanupKind.Orphans)">Delete Orphan Logs</button>
+                </section>
+            }
+            </fieldset>
+        }
+    </main>
+</div>

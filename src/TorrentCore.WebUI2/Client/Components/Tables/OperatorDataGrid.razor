@@ -1,0 +1,282 @@
+@namespace TorrentCore.WebUI2.Client.Components.Tables
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<div class="vendor-grid-frame" @ref="_frame">
+    <MudDataGrid T="OperatorRow"
+                 @key="_gridGeneration"
+                 Items="@Items"
+                 Dense="true"
+                 Hover="true"
+                 Bordered="true"
+                 Striped="true"
+                 ReadOnly="true"
+                 Breakpoint="Breakpoint.None"
+                 SortMode="SortMode.None"
+                 Filterable="false"
+                 FixedHeader="true"
+                 Height="100%"
+                 Style="height:100%;min-height:0;"
+                 ColumnResizeMode="ResizeMode.Container"
+                 DragDropColumnReordering="true"
+                 MultiSelection="@MultiSelect"
+                 SelectOnRowClick="false"
+                 RowsPerPage="@Math.Max(1, Items.Count)"
+                 CurrentPage="0"
+                 SelectedItems="@SelectedItems"
+                 SelectedItemsChanged="SelectedItemsChanged"
+                 RowClick="RowClick"
+                 RowContextMenuClick="RowContextMenuClick"
+                 RowClassFunc="RowClass">
+        <Columns>
+            @if (MultiSelect)
+            {
+                <TemplateColumn T="OperatorRow"
+                                Tag="@("select-column")"
+                                Sortable="false"
+                                Filterable="false"
+                                ShowColumnOptions="false"
+                                Editable="false"
+                                Resizable="false"
+                                DragAndDropEnabled="false"
+                                Hideable="false"
+                                HeaderClass="operator-select-column"
+                                HeaderStyle="width:52px!important;min-width:52px!important;max-width:52px!important"
+                                CellClass="operator-select-column"
+                                CellStyle="width:52px!important;min-width:52px!important;max-width:52px!important">
+                    <HeaderTemplate Context="header">
+                        <MudCheckBox T="bool?"
+                                     Dense="true"
+                                     Value="@header.IsAllSelected"
+                                     ValueChanged="@header.Actions.SetSelectAllAsync"
+                                     StopClickPropagation="true"
+                                     Size="Size.Medium" />
+                    </HeaderTemplate>
+                    <CellTemplate Context="cell">
+                        <MudCheckBox T="bool"
+                                     Dense="true"
+                                     Value="@cell.Selected"
+                                     ValueChanged="@cell.Actions.SetSelectedItemAsync"
+                                     StopClickPropagation="true"
+                                     Size="Size.Medium" />
+                    </CellTemplate>
+                </TemplateColumn>
+            }
+            @foreach (var column in Columns)
+            {
+                <TemplateColumn T="OperatorRow"
+                                @key="column.Key"
+                                Title="@column.Title"
+                                Sortable="false"
+                                Filterable="false"
+                                Resizable="true"
+                                DragAndDropEnabled="true"
+                                HeaderClass="@(ColumnClass(column))"
+                                HeaderStyle="@(ColumnStyle(column))"
+                                CellStyle="@(ColumnStyle(column))">
+                    <HeaderTemplate>
+                        @if (column.CanSort)
+                        {
+                            <button type="button" class="vendor-header-button"
+                                    title="Replace sorting with @column.Title"
+                                    aria-label="@HeaderLabel(column)"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => HeaderSort.InvokeAsync(column.Key)">
+                                <span>@column.Title</span>
+                                @if (SortMarker(column.Key) is { } marker)
+                                {
+                                    <span class="vendor-sort-marker" aria-hidden="true">@marker</span>
+                                }
+                            </button>
+                        }
+                        else
+                        {
+                            <span>@column.Title</span>
+                        }
+                    </HeaderTemplate>
+                    <CellTemplate Context="cell">
+                        @if (CellTemplate is not null)
+                        {
+                            @CellTemplate(new OperatorCell(cell.Item, column))
+                        }
+                        else
+                        {
+                            @DisplayValue(cell.Item, column)
+                        }
+                    </CellTemplate>
+                </TemplateColumn>
+            }
+        </Columns>
+        <NoRecordsContent><p>@EmptyText</p></NoRecordsContent>
+    </MudDataGrid>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OperatorRow> Items { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<OperatorColumn> Columns { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<OperatorSort> Sorts { get; set; } = [];
+    [Parameter] public bool MultiSelect { get; set; } = true;
+    [Parameter] public HashSet<OperatorRow> SelectedItems { get; set; } = [];
+    [Parameter] public EventCallback<HashSet<OperatorRow>> SelectedItemsChanged { get; set; }
+    [Parameter] public EventCallback<DataGridRowClickEventArgs<OperatorRow>> RowClick { get; set; }
+    [Parameter] public EventCallback<DataGridRowClickEventArgs<OperatorRow>> RowContextMenuClick { get; set; }
+    [Parameter] public EventCallback<string> HeaderSort { get; set; }
+    [Parameter] public EventCallback<OperatorGridLayoutChange> LayoutChanged { get; set; }
+    [Parameter] public RenderFragment<OperatorCell>? CellTemplate { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "No rows on this page.";
+    [Parameter] public int LayoutResetVersion { get; set; }
+
+    private ElementReference _frame;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<OperatorDataGrid>? _self;
+    private string _layoutSignature = string.Empty;
+    private string? _acceptedLayoutSignature;
+    private bool _remountAcceptedLayout;
+    private int _gridGeneration;
+    private int _knownLayoutResetVersion;
+
+    protected override void OnParametersSet()
+    {
+        var signature = LayoutSignature(Columns);
+        if (LayoutResetVersion != _knownLayoutResetVersion)
+        {
+            _knownLayoutResetVersion = LayoutResetVersion;
+            _acceptedLayoutSignature = null;
+            _remountAcceptedLayout = false;
+            _gridGeneration++;
+        }
+        else if (_layoutSignature.Length > 0 && signature != _layoutSignature)
+        {
+            if (signature == _acceptedLayoutSignature)
+            {
+                _acceptedLayoutSignature = null;
+                if (_remountAcceptedLayout)
+                {
+                    _gridGeneration++;
+                    _remountAcceptedLayout = false;
+                }
+            }
+            else
+            {
+                _acceptedLayoutSignature = null;
+                _remountAcceptedLayout = false;
+                _gridGeneration++;
+            }
+        }
+        else if (signature == _acceptedLayoutSignature)
+        {
+            _acceptedLayoutSignature = null;
+            _remountAcceptedLayout = false;
+        }
+        _layoutSignature = signature;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/gridLayout.js");
+                _self = DotNetObjectReference.Create(this);
+                await _module.InvokeVoidAsync("attach", _frame, _self, _layoutSignature, _gridGeneration);
+            }
+            catch (Exception exception)
+            {
+                Snackbar.Add($"Table layout could not be initialized: {exception.Message}", Severity.Error);
+            }
+        }
+        else if (_module is not null)
+        {
+            try { await _module.InvokeVoidAsync("refresh", _frame, _layoutSignature, _gridGeneration); }
+            catch (Exception exception)
+            {
+                Snackbar.Add($"Table layout could not be refreshed: {exception.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private string RowClass(OperatorRow row, int _) => SelectedItems.Contains(row) ? "vendor-selected-row" : string.Empty;
+    private static string ColumnClass(OperatorColumn column) => $"shows-column shows-column-{column.Key}";
+    private static string ColumnStyle(OperatorColumn column) => $"width:{column.DefaultWidth}px";
+    private static string DisplayValue(OperatorRow row, OperatorColumn column) =>
+        string.IsNullOrWhiteSpace(row.Value(column.Key)) ? "—" : row.Value(column.Key);
+
+    private string HeaderLabel(OperatorColumn column)
+    {
+        var index = Sorts.ToList().FindIndex(sort => sort.ColumnKey == column.Key);
+        return index < 0 ? $"Sort by {column.Title}" :
+            $"{column.Title}, sorted {(Sorts[index].Descending ? "descending" : "ascending")}, precedence {index + 1}";
+    }
+
+    private string? SortMarker(string key)
+    {
+        var index = Sorts.ToList().FindIndex(sort => sort.ColumnKey == key);
+        if (index < 0) return null;
+        var direction = Sorts[index].Descending ? "↓" : "↑";
+        return Sorts.Count > 1 ? $"{direction}{index + 1}" : direction;
+    }
+
+    [JSInvokable]
+    public async Task<bool> PersistLayoutAsync(GridDomLayout layout, string sourceLayoutSignature,
+        int sourceGridGeneration)
+    {
+        if (sourceGridGeneration != _gridGeneration || sourceLayoutSignature != _layoutSignature ||
+            layout.OrderedColumnKeys.Count == 0) return false;
+        _acceptedLayoutSignature = LayoutSignature(layout.OrderedColumnKeys, layout.Widths);
+        _remountAcceptedLayout = true;
+        await LayoutChanged.InvokeAsync(new OperatorGridLayoutChange(layout.OrderedColumnKeys, layout.Widths));
+        return true;
+    }
+
+    [JSInvokable]
+    public async Task<bool> PersistColumnWidthAsync(string columnKey, double width, string sourceLayoutSignature,
+        int sourceGridGeneration)
+    {
+        if (sourceGridGeneration != _gridGeneration || sourceLayoutSignature != _layoutSignature ||
+            !Columns.Any(column => column.Key == columnKey)) return false;
+        var widths = new Dictionary<string, double> { [columnKey] = width };
+        _acceptedLayoutSignature = LayoutSignature(Columns.Select(column => column.Key), widths, Columns);
+        _remountAcceptedLayout = false;
+        await LayoutChanged.InvokeAsync(new OperatorGridLayoutChange(Columns.Select(column => column.Key).ToArray(), widths));
+        return true;
+    }
+
+    private static string LayoutSignature(IReadOnlyList<OperatorColumn> columns) =>
+        string.Join('|', columns.Select(column => $"{column.Key}:{column.DefaultWidth}"));
+
+    private static string LayoutSignature(IEnumerable<string> keys, IReadOnlyDictionary<string, double> widths,
+        IReadOnlyList<OperatorColumn>? existingColumns = null)
+    {
+        var existingWidths = existingColumns?.ToDictionary(column => column.Key, column => column.DefaultWidth)
+            ?? new Dictionary<string, int>();
+        return string.Join('|', keys.Select(key =>
+            $"{key}:{Math.Round(widths.TryGetValue(key, out var width) ? width : existingWidths[key])}"));
+    }
+
+    [JSInvokable]
+    public Task ReportLayoutErrorAsync(string message) => InvokeAsync(() => Snackbar.Add(
+        $"Table layout could not be saved: {(string.IsNullOrWhiteSpace(message) ? "Unknown browser error." : message)}",
+        Severity.Error));
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.InvokeVoidAsync("detach", _frame);
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { }
+        }
+        _self?.Dispose();
+    }
+
+    public sealed class GridDomLayout
+    {
+        public List<string> OrderedColumnKeys { get; set; } = [];
+        public Dictionary<string, double> Widths { get; set; } = [];
+    }
+}

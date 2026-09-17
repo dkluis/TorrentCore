@@ -1,0 +1,11 @@
+@using TorrentCore.WebUI2.Client.Services
+@if (SettingsHelp.Find(Key) is { } help)
+{
+    <MudTooltip Text="@(help.Summary + " " + help.Detail)">
+        <button type="button" class="settings-help-icon" aria-label="Help: @help.Label" title="@(help.Summary + " " + help.Detail)">?</button>
+    </MudTooltip>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Key { get; set; } = "";
+}

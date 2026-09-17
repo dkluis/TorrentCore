@@ -1,0 +1,94 @@
+@page "/settings"
+@inject BrowserSession Session
+@inject BrowserPreferences Preferences
+@implements IDisposable
+
+<PageTitle>App Settings</PageTitle>
+<div class="app-settings">
+    <header>
+        <h1>App Settings</h1>
+        <p>These preferences apply to this browser.</p>
+    </header>
+
+    <section>
+        <h2>Appearance</h2>
+        <label for="app-appearance">Appearance</label>
+        <select id="app-appearance" value="@Preferences.Appearance" @onchange="ChangeAppearanceAsync">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+        </select>
+        <p>System follows this computer's appearance. Light and Dark apply only to TorrentCore in this browser.</p>
+    </section>
+
+    <section>
+        <h2>Refresh</h2>
+        <label><input type="checkbox" checked="@Preferences.AutoRefresh" @onchange="ChangeAutoRefreshAsync" /> Auto Refresh</label>
+        <label for="refresh-interval">Interval</label>
+        <select id="refresh-interval" value="@Preferences.RefreshSeconds" disabled="@(!Preferences.AutoRefresh)" @onchange="ChangeIntervalAsync">
+            @foreach (var seconds in RefreshIntervals)
+            {
+                <option value="@seconds">@seconds seconds</option>
+            }
+        </select>
+        <p>Refresh applies only to the open screen while TorrentCore is in the foreground. Manual Refresh remains available when Auto Refresh is off.</p>
+    </section>
+
+    <section>
+        <h2>Connections</h2>
+        <dl>
+            <dt>Active Connection</dt><dd>@(Session.ActiveProfile?.Name ?? "None")</dd>
+            <dt>Service Address</dt><dd>@(Session.ActiveProfile?.Address ?? "--")</dd>
+        </dl>
+        <p>Create, edit, test, select, or delete connections from the <a href="/connection">Connection</a> screen.</p>
+    </section>
+
+    @if (error is not null)
+    {
+        <p class="settings-error" role="alert">@error</p>
+    }
+</div>
+
+@code {
+    private static readonly int[] RefreshIntervals = [5, 10, 15];
+    private string? error;
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += HandleChanged;
+        Preferences.Changed += HandleChanged;
+    }
+
+    private void HandleChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private async Task ChangeAppearanceAsync(ChangeEventArgs args)
+        => await SaveAsync(args.Value?.ToString() ?? "system", Preferences.AutoRefresh, Preferences.RefreshSeconds);
+
+    private async Task ChangeAutoRefreshAsync(ChangeEventArgs args)
+        => await SaveAsync(Preferences.Appearance, args.Value is true, Preferences.RefreshSeconds);
+
+    private async Task ChangeIntervalAsync(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var seconds) && RefreshIntervals.Contains(seconds))
+            await SaveAsync(Preferences.Appearance, Preferences.AutoRefresh, seconds);
+    }
+
+    private async Task SaveAsync(string appearance, bool autoRefresh, int seconds)
+    {
+        try
+        {
+            await Preferences.SaveAsync(appearance, autoRefresh, seconds);
+            error = null;
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+        }
+    }
+
+    public void Dispose()
+    {
+        Session.Changed -= HandleChanged;
+        Preferences.Changed -= HandleChanged;
+    }
+}

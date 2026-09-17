@@ -27,6 +27,7 @@ REPO_ROOT="$(tc_resolve_repo_root)"
 PUBLISH_ROOT="${REPO_ROOT}/artifacts/publish/${TORRENTCORE_ARTIFACT_SEGMENT}"
 SERVICE_PUBLISH_DIR="${PUBLISH_ROOT}/service"
 WEBUI_PUBLISH_DIR="${PUBLISH_ROOT}/webui"
+WEBUI2_PUBLISH_DIR="${PUBLISH_ROOT}/webui2"
 TARGET_SCRIPT_DIR="${TORRENTCORE_DEPLOY_BASE}/Scripts"
 
 tc_log_info "Publishing TorrentCore.Service for ${TORRENTCORE_PUBLISH_RUNTIME}."
@@ -35,11 +36,17 @@ tc_publish_project "src/TorrentCore.ServiceHost/TorrentCore.Service.csproj" "${S
 tc_log_info "Publishing TorrentCore.WebUI for ${TORRENTCORE_PUBLISH_RUNTIME}."
 tc_publish_project "src/TorrentCore.WebUI/TorrentCore.WebUI.csproj" "${WEBUI_PUBLISH_DIR}"
 
+tc_log_info "Publishing TorrentCore.WebUI2 for ${TORRENTCORE_PUBLISH_RUNTIME}."
+tc_publish_project "src/TorrentCore.WebUI2/Host/TorrentCore.WebUI2.Host.csproj" "${WEBUI2_PUBLISH_DIR}"
+
 tc_log_info "Syncing service publish output."
 tc_sync_directory "${SERVICE_PUBLISH_DIR}" "${TORRENTCORE_DEPLOY_BASE}/Service"
 
 tc_log_info "Syncing web publish output."
 tc_sync_directory "${WEBUI_PUBLISH_DIR}" "${TORRENTCORE_DEPLOY_BASE}/WebUI"
+
+tc_log_info "Syncing WebUI2 publish output while preserving host-local configuration."
+tc_sync_webui2_directory "${WEBUI2_PUBLISH_DIR}" "${TORRENTCORE_DEPLOY_BASE}/WebUI2"
 
 tc_log_info "Syncing scripts."
 tc_sync_scripts_to_target

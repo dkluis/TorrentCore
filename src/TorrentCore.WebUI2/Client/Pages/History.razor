@@ -1,0 +1,244 @@
+@page "/history"
+@implements IDisposable
+@using TorrentCore.Contracts.History
+@using TorrentCore.Contracts.Torrents
+@inject BrowserSession Session
+@inject BrowserPreferences Preferences
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IDialogService Dialogs
+
+<PageTitle>History</PageTitle>
+<div class="tc-history">
+    <header><div><h1>History</h1><p>Torrent lifecycle records</p></div><button @onclick="RefreshAsync" disabled="@_busy">Refresh</button></header>
+    @if (Session.ActiveProfile is null) { <p>Choose a service connection to view history.</p> }
+    else
+    {
+        <fieldset class="tc-history-filters" disabled="@_paused">
+            <label>Torrent name <input @bind="_name" /></label>
+            <label>Category <select @bind="_category"><option value="">All Categories</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
+            <label>State <select @bind="_state"><option value="">All States</option>@foreach (var item in States) { <option value="@item">@Words(item)</option> }</select></label>
+            <label>Outcome <select @bind="_outcome"><option value="">All Outcomes</option><option>Active</option><option>Removed</option><option>Abandoned</option></select></label>
+            <label>Torrent ID <input @bind="_torrentIdText" /></label>
+            <label><input type="checkbox" @bind="_useFrom" /> From <input type="date" value="@_from" @onchange="e => _from = e.Value?.ToString() ?? string.Empty" disabled="@(!_useFrom)" /></label>
+            <label><input type="checkbox" @bind="_useTo" /> Through <input type="date" value="@_to" @onchange="e => _to = e.Value?.ToString() ?? string.Empty" disabled="@(!_useTo)" /></label>
+            <button @onclick="SearchAsync" disabled="@_busy">Search</button><button @onclick="ClearAsync" disabled="@_busy">Clear Filters</button><button @onclick="ResetAsync" disabled="@_busy">Reset Filters</button>
+            @if (_filterError is not null) { <p role="alert">@_filterError</p> }
+        </fieldset>
+        @if (_paused) { <p class="tc-processing-paused">Torrent processing is paused. Refresh after the service is available.</p> }
+        else
+        {
+            <div class="tc-history-abandoned"><span>@_abandonedCount abandoned torrent records</span><button @onclick="ShowAbandonedAsync" disabled="@_busy">Show Abandoned</button></div>
+            @if (_error is not null) { <p role="alert">@_error</p> }
+            @if (!_loaded && _error is null) { <p>Loading history…</p> }
+            else if (_loaded)
+            {
+                @if (_rows.Count == 500) { <p>Showing the most recent 500 history records. Narrow the server filters to inspect older records.</p> }
+                <OperatorTable @ref="_table" Items="@Rows" Columns="@Columns" DefaultSorts="@DefaultSorts" ExportColumns="@ExportColumns"
+                               StorageKey="torrentcore.webui2.history.v1" SelectedIds="@_selected" SelectedIdsChanged="SelectionChanged"
+                               Busy="@_busy" MultiSelect="false" EmptyText="No history matches the current filters."
+                               DetailTitle="@(_detail?.Name ?? "History Detail")" DetailContent="@Inspector"
+                               DefaultOverlayWidth="400" ExportPrefix="history" ExportScopeName="results" />
+            }
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "torrentId")] public Guid? RequestedTorrentId { get; set; }
+    private OperatorTable? _table;
+    private IReadOnlyList<TorrentHistorySummaryDto> _rows = [];
+    private TorrentHistoryFilterOptionsDto? _options;
+    private TorrentHistoryDetailDto? _detail;
+    private HashSet<string> _selected = [];
+    private string _name = "", _category = "", _state = "", _outcome = "", _torrentIdText = "";
+    private string _from = DateTime.Today.ToString("yyyy-MM-dd"), _to = DateTime.Today.ToString("yyyy-MM-dd");
+    private bool _useFrom = true, _useTo = true, _busy, _loaded, _disposed, _paused;
+    private string? _error, _filterError;
+    private long _revision = -1;
+    private CancellationTokenSource? _cts;
+    private Guid? _appliedTorrentId;
+    private TorrentHistoryQueryRequest _query = TodayQuery();
+
+    private static readonly IReadOnlyList<OperatorSort> DefaultSorts = [new("lastUpdated", true)];
+    private static readonly IReadOnlyList<OperatorColumn> Columns = [
+        new("lastUpdated", "Last Updated", 165), new("name", "Name", 340, CanHide: false),
+        new("category", "Category", 135), new("state", "State", 160), new("outcome", "Outcome", 125),
+        new("progress", "Progress", 95), new("downloaded", "Downloaded", 120), new("total", "Total", 120),
+        new("callback", "Callback", 190), new("removed", "Removed", 165), new("removalReason", "Removal Reason", 280),
+        new("callbackFinalResult", "Callback Final Result", 200, false), new("dataDeleted", "Data Deleted", 110, false),
+        new("downloadCompleted", "Download Completed", 165, false), new("downloadRootPath", "Download Root Path", 320, false),
+        new("downloadStarted", "Download Started", 165, false), new("infoHash", "Info Hash", 300, false),
+        new("lastActivity", "Last Activity", 165, false), new("connectedPeers", "Connected Peers", 120, false),
+        new("downloadRate", "Download Rate", 125, false), new("errorMessage", "Error Message", 300, false),
+        new("trackerCount", "Tracker Count", 105, false), new("uploadRate", "Upload Rate", 115, false),
+        new("uploaded", "Uploaded", 115, false), new("waitReason", "Wait Reason", 200, false),
+        new("metadataResolved", "Metadata Resolved", 165, false), new("removalKind", "Removal Kind", 220, false),
+        new("removedByCleanup", "Removed by Cleanup", 150, false), new("seedingStarted", "Seeding Started", 165, false),
+        new("submitted", "Submitted", 165, false), new("torrentId", "Torrent ID", 285, false)
+    ];
+    private static readonly IReadOnlyList<OperatorColumn> ExportColumns = [
+        new("exportCategory", "Category Key", 0), new("exportCallbackFinalResult", "Completion Callback Final Result", 0),
+        new("dataDeleted", "Data Deleted", 0), new("exportDownloadCompleted", "Download Completed At", 0),
+        new("exportDownloadRootPath", "Download Root Path", 0), new("exportDownloadStarted", "Download Started At", 0),
+        new("exportInfoHash", "Info Hash", 0), new("exportLastActivity", "Last Activity At", 0),
+        new("exportLastUpdated", "Last Updated At", 0), new("exportCallback", "Latest Callback Status", 0),
+        new("exportConnectedPeers", "Latest Connected Peer Count", 0), new("exportDownloadRate", "Latest Download Rate Bytes Per Second", 0),
+        new("exportDownloaded", "Latest Downloaded Bytes", 0), new("exportErrorMessage", "Latest Error Message", 0),
+        new("exportProgress", "Latest Progress Percent", 0), new("exportState", "Latest Torrent State", 0),
+        new("exportTotal", "Latest Total Bytes", 0), new("exportTrackerCount", "Latest Tracker Count", 0),
+        new("exportUploadRate", "Latest Upload Rate Bytes Per Second", 0), new("exportUploaded", "Latest Uploaded Bytes", 0),
+        new("exportWaitReason", "Latest Wait Reason", 0), new("exportMetadataResolved", "Metadata Resolved At", 0),
+        new("name", "Name", 0), new("outcome", "Outcome", 0), new("exportRemovalKind", "Removal Kind", 0),
+        new("exportRemovalReason", "Removal Reason", 0), new("exportRemoved", "Removed At", 0),
+        new("removedByCleanup", "Removed by Cleanup Policy", 0), new("exportSeedingStarted", "Seeding Started At", 0),
+        new("exportSubmitted", "Submitted At", 0), new("torrentId", "Torrent ID", 0)
+    ];
+    private IReadOnlyList<OperatorRow> Rows => _rows.Select(ToRow).ToArray();
+    private IEnumerable<string> Categories => ((_options?.CategoryKeys ?? []) .Concat(_rows.Select(x => x.CategoryKey ?? ""))).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x);
+    private IEnumerable<string> States => ((_options?.States ?? []) .Concat(_rows.Select(x => x.LatestTorrentState))).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x);
+    private TorrentHistorySummaryDto? Selected => _rows.FirstOrDefault(x => _selected.Contains(x.TorrentId.ToString("D")));
+    protected override void OnInitialized() { Session.Changed += Restart; Preferences.Changed += Restart; Restart(); }
+    protected override void OnParametersSet() {
+        if (RequestedTorrentId.HasValue && RequestedTorrentId != _appliedTorrentId) {
+            _appliedTorrentId = RequestedTorrentId;
+            _torrentIdText = RequestedTorrentId.Value.ToString("D"); _useFrom = _useTo = false;
+            _query = new() { TorrentId = RequestedTorrentId, Take = 500 };
+            _selected = [RequestedTorrentId.Value.ToString("D")];
+            if (Session.IsInitialized && Session.ActiveProfile is not null) Restart();
+        }
+    }
+    private void Restart() => _ = InvokeAsync(() => { _cts?.Cancel(); _cts?.Dispose(); _cts = new(); _revision = Session.Revision;
+        _rows = []; _detail = null; _options = null; _loaded = false; _error = null; _busy = false; _paused = false;
+        _selected = _appliedTorrentId is { } id ? [id.ToString("D")] : [];
+        if (Session.IsInitialized && Session.ActiveProfile is not null) _ = PollAsync(_revision, _cts.Token); StateHasChanged(); });
+    private async Task PollAsync(long rev, CancellationToken token) { await LoadAsync(rev, token);
+        while (!token.IsCancellationRequested) { try { await Task.Delay(TimeSpan.FromSeconds(Preferences.RefreshSeconds), token); } catch (OperationCanceledException) { break; }
+            if (!Preferences.AutoRefresh) continue;
+            try { if (await JS.InvokeAsync<bool>("tcBrowser.isVisible", token)) await LoadAsync(rev, token); }
+            catch (OperationCanceledException) { break; } catch (JSException) { } }
+    }
+    private Task RefreshAsync() => LoadAsync(_revision, _cts?.Token ?? CancellationToken.None);
+    private bool Current(long rev, CancellationToken token) => !_disposed && !token.IsCancellationRequested &&
+        rev == Session.Revision && _cts is not null && token == _cts.Token;
+    private async Task LoadAsync(long rev, CancellationToken token) { if (_busy || !Current(rev, token) || Session.ActiveProfile is null) return;
+        _busy = true;
+        try { var client = Session.CreateClient(rev);
+            var host = await client.GetHostStatusAsync(token); if (!Current(rev, token)) return;
+            _paused = host?.TorrentProcessingAvailable == false;
+            if (_paused) return;
+            var rows = await client.GetHistoryAsync(_query, token); if (!Current(rev, token)) return;
+            _rows = rows; _loaded = true; _error = null;
+            var options = await client.GetHistoryFilterOptionsAsync(token); if (!Current(rev, token)) return; _options = options;
+            var abandoned = await client.GetHistoryAsync(new() { Outcome = TorrentHistoryOutcome.Abandoned, Take = 500 }, token);
+            if (!Current(rev, token)) return;
+            _abandonedCount = abandoned.Count;
+            if (Selected is null) { _selected = []; _detail = null; }
+            else await LoadDetailAsync(client, rev, token);
+        } catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (Current(rev, token)) _error = ex.Message; }
+        finally { if (Current(rev, token)) { _busy = false; await InvokeAsync(StateHasChanged); } }
+    }
+    private int _abandonedCount;
+    private async Task LoadDetailAsync(TorrentCore.Client.TorrentCoreClient client, long rev, CancellationToken token) {
+        var selected = Selected; if (selected is null) return;
+        var detail = await client.GetHistoryByTorrentIdAsync(selected.TorrentId, token);
+        if (Current(rev, token) && Selected?.TorrentId == selected.TorrentId) _detail = detail;
+    }
+    private async Task SelectionChanged(HashSet<string> ids) { _selected = ids; _detail = null; if (Selected is null) return;
+        var rev = _revision; var token = _cts?.Token ?? CancellationToken.None;
+        try { await LoadDetailAsync(Session.CreateClient(rev), rev, token); }
+        catch (Exception ex) { if (Current(rev, token)) _error = ex.Message; }
+    }
+    private async Task SearchAsync() {
+        _filterError = null; var idText = _torrentIdText.Trim();
+        if (idText.Length > 0 && !Guid.TryParse(idText, out _)) { _filterError = "Enter a valid Torrent ID."; return; }
+        if (_useFrom && !DateOnly.TryParseExact(_from, "yyyy-MM-dd", out _)) { _filterError = "Enter a valid From date."; return; }
+        if (_useTo && !DateOnly.TryParseExact(_to, "yyyy-MM-dd", out _)) { _filterError = "Enter a valid Through date."; return; }
+        if (_useFrom && _useTo && DateOnly.Parse(_from) > DateOnly.Parse(_to)) { _filterError = "From must be before or equal to Through."; return; }
+        _query = new() { TorrentId = idText.Length == 0 ? null : Guid.Parse(idText), TorrentName = Blank(_name), CategoryKey = Blank(_category),
+            State = Blank(_state), Outcome = Enum.TryParse<TorrentHistoryOutcome>(_outcome, true, out var outcome) ? outcome : null,
+            FromDate = _useFrom ? DateOnly.Parse(_from) : null, ToDate = _useTo ? DateOnly.Parse(_to) : null, Take = 500 };
+        _selected = []; _detail = null; _appliedTorrentId = null;
+        await RefreshAsync();
+    }
+    private async Task ClearAsync() { _name = _category = _state = _outcome = _torrentIdText = ""; _useFrom = _useTo = false; await SearchAsync(); }
+    private async Task ResetAsync() { _name = _category = _state = _outcome = _torrentIdText = ""; _useFrom = _useTo = true;
+        _from = _to = DateTime.Today.ToString("yyyy-MM-dd"); await SearchAsync(); }
+    private async Task ShowAbandonedAsync() { _outcome = "Abandoned"; _useFrom = _useTo = false; await SearchAsync(); }
+    private static TorrentHistoryQueryRequest TodayQuery() => new() { FromDate = DateOnly.FromDateTime(DateTime.Today), ToDate = DateOnly.FromDateTime(DateTime.Today), Take = 500 };
+    private static string? Blank(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+    private static string Date(DateTimeOffset? value) => OperatorDateTime.Local(value);
+    private static string Words(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : System.Text.RegularExpressions.Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
+    private static string Bytes(long? value) { if (value is null) return "--"; double size = value.Value; string[] units = ["B", "KiB", "MiB", "GiB", "TiB"];
+        var i = 0; while (size >= 1024 && i < units.Length - 1) { size /= 1024; i++; } return $"{size:N1} {units[i]}"; }
+    private static string Rate(long value) => $"{Bytes(value)}/s";
+    private static string YesNo(bool value) => value ? "Yes" : "No";
+    private static OperatorRow ToRow(TorrentHistorySummaryDto x) { var v = new Dictionary<string,string> {
+        ["lastUpdated"] = Date(x.LastUpdatedAt), ["name"] = x.Name, ["category"] = x.CategoryKey ?? "--", ["state"] = Words(x.LatestTorrentState),
+        ["outcome"] = x.Outcome.ToString(), ["progress"] = $"{x.LatestProgressPercent:N1}%", ["downloaded"] = Bytes(x.LatestDownloadedBytes),
+        ["total"] = Bytes(x.LatestTotalBytes), ["callback"] = Words(x.LatestCallbackStatus), ["removed"] = Date(x.RemovedAt),
+        ["removalReason"] = x.RemovalReason ?? "--", ["callbackFinalResult"] = x.CompletionCallbackFinalResult ?? "--",
+        ["dataDeleted"] = YesNo(x.DataDeleted), ["downloadCompleted"] = Date(x.DownloadCompletedAt), ["downloadRootPath"] = x.DownloadRootPath ?? "--",
+        ["downloadStarted"] = Date(x.DownloadStartedAt), ["infoHash"] = x.InfoHash ?? "--", ["lastActivity"] = Date(x.LastActivityAt),
+        ["connectedPeers"] = x.LatestConnectedPeerCount.ToString("N0"), ["downloadRate"] = Rate(x.LatestDownloadRateBytesPerSecond),
+        ["errorMessage"] = x.LatestErrorMessage ?? "--", ["trackerCount"] = x.LatestTrackerCount.ToString("N0"), ["uploadRate"] = Rate(x.LatestUploadRateBytesPerSecond),
+        ["uploaded"] = Bytes(x.LatestUploadedBytes), ["waitReason"] = Words(x.LatestWaitReason), ["metadataResolved"] = Date(x.MetadataResolvedAt),
+        ["removalKind"] = Words(x.RemovalKind?.ToString()), ["removedByCleanup"] = YesNo(x.RemovedByCleanupPolicy),
+        ["seedingStarted"] = Date(x.SeedingStartedAt), ["submitted"] = Date(x.SubmittedAt), ["torrentId"] = x.TorrentId.ToString("D") };
+        v["exportCategory"] = x.CategoryKey ?? ""; v["exportCallbackFinalResult"] = x.CompletionCallbackFinalResult ?? "";
+        v["exportDownloadRootPath"] = x.DownloadRootPath ?? ""; v["exportInfoHash"] = x.InfoHash ?? "";
+        v["exportConnectedPeers"] = x.LatestConnectedPeerCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        v["exportErrorMessage"] = x.LatestErrorMessage ?? ""; v["exportState"] = x.LatestTorrentState;
+        v["exportTrackerCount"] = x.LatestTrackerCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        v["exportWaitReason"] = x.LatestWaitReason ?? ""; v["exportRemovalKind"] = x.RemovalKind?.ToString() ?? "";
+        v["exportRemovalReason"] = x.RemovalReason ?? "";
+        v["exportDownloadCompleted"] = Iso(x.DownloadCompletedAt); v["exportDownloadStarted"] = Iso(x.DownloadStartedAt);
+        v["exportLastActivity"] = Iso(x.LastActivityAt); v["exportLastUpdated"] = Iso(x.LastUpdatedAt);
+        v["exportCallback"] = x.LatestCallbackStatus ?? ""; v["exportDownloadRate"] = x.LatestDownloadRateBytesPerSecond.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        v["exportDownloaded"] = x.LatestDownloadedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        v["exportProgress"] = x.LatestProgressPercent.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+        v["exportTotal"] = x.LatestTotalBytes?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
+        v["exportUploadRate"] = x.LatestUploadRateBytesPerSecond.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        v["exportUploaded"] = x.LatestUploadedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        v["exportMetadataResolved"] = Iso(x.MetadataResolvedAt); v["exportRemoved"] = Iso(x.RemovedAt);
+        v["exportSeedingStarted"] = Iso(x.SeedingStartedAt); v["exportSubmitted"] = Iso(x.SubmittedAt);
+        var s = new Dictionary<string,IComparable?> { ["lastUpdated"] = x.LastUpdatedAt, ["progress"] = x.LatestProgressPercent,
+            ["downloaded"] = x.LatestDownloadedBytes, ["total"] = x.LatestTotalBytes, ["removed"] = x.RemovedAt, ["dataDeleted"] = x.DataDeleted,
+            ["downloadCompleted"] = x.DownloadCompletedAt, ["downloadStarted"] = x.DownloadStartedAt, ["lastActivity"] = x.LastActivityAt,
+            ["connectedPeers"] = x.LatestConnectedPeerCount, ["downloadRate"] = x.LatestDownloadRateBytesPerSecond,
+            ["trackerCount"] = x.LatestTrackerCount, ["uploadRate"] = x.LatestUploadRateBytesPerSecond, ["uploaded"] = x.LatestUploadedBytes,
+            ["metadataResolved"] = x.MetadataResolvedAt, ["removedByCleanup"] = x.RemovedByCleanupPolicy, ["seedingStarted"] = x.SeedingStartedAt,
+            ["submitted"] = x.SubmittedAt }; return new(x.TorrentId.ToString("D"), v, s); }
+    private static string Iso(DateTimeOffset? value) => value?.ToString("O") ?? "";
+    private RenderFragment Inspector => @<div class="tc-history-inspector">
+        @if (_detail is null) { <p>Select a history record to inspect it.</p> }
+        else { <dl>
+            @Fact("Outcome", _detail.Outcome.ToString()) @Fact("State", Words(_detail.LatestTorrentState))
+            @Fact("Progress", $"{_detail.LatestProgressPercent:N1}%") @Fact("Category", _detail.CategoryKey)
+            @Fact("Submitted", Date(_detail.SubmittedAt)) @Fact("Last Updated", Date(_detail.LastUpdatedAt))
+            @Fact("Removed", Date(_detail.RemovedAt)) @Fact("Removal Kind", Words(_detail.RemovalKind?.ToString()))
+            @Fact("Removal Reason", _detail.RemovalReason)
+            <dt>Callback Feedback</dt><dd>@(_detail.CompletionCallbackFeedback?.DisplayMessage ?? _detail.CompletionCallbackFeedback?.FinalState ?? "--")</dd>
+            @Fact("Feedback Received", Date(_detail.CompletionCallbackFeedback?.ReceivedAtUtc))
+            @Fact("Feedback Final Result", _detail.CompletionCallbackFeedback?.FinalState)
+            @Fact("Feedback Reason", _detail.CompletionCallbackFeedback?.ReasonCode)
+            @Fact("Magnet", _detail.MagnetUri) @Fact("Info Hash", _detail.InfoHash)
+            @Fact("Torrent ID", _detail.TorrentId.ToString("D")) @Fact("Service Instance ID", _detail.ServiceInstanceIdLastSeen?.ToString("D"))
+        </dl><button @onclick='() => CopyAsync("Magnet", _detail.MagnetUri)'>Copy Magnet</button>
+            <button @onclick='() => CopyAsync("Torrent ID", _detail.TorrentId.ToString("D"))'>Copy Torrent ID</button>
+            @if (_detail.ServiceInstanceIdLastSeen is { } instance) { <button @onclick='() => CopyAsync("Service Instance ID", instance.ToString("D"))'>Copy Service Instance ID</button> }
+            @if (_detail.Outcome == TorrentHistoryOutcome.Active) { <a href="@($"/torrents?torrentId={_detail.TorrentId:D}")">Show in Torrents</a> }
+        }
+    </div>;
+    private async Task CopyAsync(string title, string value) {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        try { if (await JS.InvokeAsync<bool>("tcBrowser.copyText", value)) return; }
+        catch (JSException) { }
+        var dialog = await Dialogs.ShowAsync<SelectableTextDialog>(title, new DialogParameters {
+            [nameof(SelectableTextDialog.Title)] = title, [nameof(SelectableTextDialog.Text)] = value });
+        await dialog.Result;
+    }
+    private static RenderFragment Fact(string label, string? value) => b => { b.OpenElement(0,"dt");b.AddContent(1,label);b.CloseElement();b.OpenElement(2,"dd");b.AddContent(3,string.IsNullOrWhiteSpace(value)?"--":value);b.CloseElement();};
+    public void Dispose() { _disposed = true; Session.Changed -= Restart; Preferences.Changed -= Restart; _cts?.Cancel(); _cts?.Dispose(); }
+}

@@ -1,0 +1,648 @@
+@namespace TorrentCore.WebUI2.Client.Components.Tables
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<section class="shows-evaluation operator-table" aria-busy="@Busy">
+    <div class="table-tools" @ref="_toolsElement">
+        @Toolbar
+        <details class="sort-menu">
+            <summary>Sort</summary>
+            <div class="tool-panel sort-editor">
+                <button class="tool-panel-close" type="button">Close Sort</button>
+                @for (var index = 0; index < _sorts.Count; index++)
+                {
+                    var sortIndex = index;
+                    <div class="sort-row">
+                        <strong>@(sortIndex + 1)</strong>
+                        <select value="@_sorts[sortIndex].ColumnKey"
+                                @onchange="e => ChangeSortFieldAsync(sortIndex, e.Value?.ToString())">
+                            @foreach (var column in SortableColumns)
+                            {
+                                <option value="@column.Key">@column.Title</option>
+                            }
+                        </select>
+                        <select value="@(_sorts[sortIndex].Descending ? "desc" : "asc")"
+                                @onchange="e => ChangeSortDirectionAsync(sortIndex, e.Value?.ToString())">
+                            <option value="asc">Ascending</option>
+                            <option value="desc">Descending</option>
+                        </select>
+                        <button @onclick="() => MoveSortAsync(sortIndex, -1)" disabled="@(sortIndex == 0)">Up</button>
+                        <button @onclick="() => MoveSortAsync(sortIndex, 1)" disabled="@(sortIndex == _sorts.Count - 1)">Down</button>
+                        <button @onclick="() => RemoveSortAsync(sortIndex)" disabled="@(_sorts.Count == 1)">Remove</button>
+                    </div>
+                }
+                <button @onclick="AddSortAsync" disabled="@(_sorts.Count >= SortableColumns.Count)">Add Sort</button>
+                <button @onclick="RestoreDefaultSortsAsync">Restore Default Sort</button>
+            </div>
+        </details>
+        <details class="columns-menu">
+            <summary>Columns</summary>
+            <div class="tool-panel columns-editor">
+                @foreach (var column in OrderedColumns)
+                {
+                    <label>
+                        <input type="checkbox" checked="@IsVisible(column)" disabled="@(!column.CanHide)"
+                               @onchange="e => SetColumnVisibleAsync(column, (bool)e.Value!)" />
+                        @column.Title
+                    </label>
+                }
+                <button @onclick="ShowAllColumnsAsync">Show All Columns</button>
+                <button @onclick="RestoreDefaultColumnsAsync">Restore Default Columns</button>
+                <button @onclick="ResetTableLayoutAsync">Reset Table Layout</button>
+            </div>
+        </details>
+        <details class="export-menu">
+            <summary>Export</summary>
+            <div class="tool-panel">
+                <button class="tool-panel-close" type="button">Close Export</button>
+                <button @onclick="() => ExportAsync(true)" disabled="@(SelectedIds.Count == 0)">
+                    Export Selected (@SelectedIds.Count)
+                </button>
+                <button @onclick="() => ExportAsync(false)" disabled="@(_sortedItems.Count == 0)">
+                    Export @ExportScopeName (@_sortedItems.Count)
+                </button>
+            </div>
+        </details>
+        @if (TrailingToolbar is not null)
+        {
+            <span class="toolbar-spacer" aria-hidden="true"></span>
+            @TrailingToolbar
+        }
+        @if (ContextActions is not null && _contextOpen)
+        {
+            <details @key="_contextGeneration" class="context-anchor" open>
+                <summary aria-label="Row actions" style="left:@(_contextX)px;top:@(_contextY)px"></summary>
+                <div class="tool-panel context-actions"
+                     style="left:clamp(8px,@(_contextX)px,calc(100vw - 228px));top:clamp(8px,@(_contextY)px,calc(100dvh - 120px))"
+                     @onclick="CloseContextMenu">
+                    @ContextActions
+                </div>
+            </details>
+        }
+    </div>
+
+    <div class="shows-grid-shell">
+        @if (_sortedItems.Count == 0)
+        {
+            <div class="empty-state">@EmptyText</div>
+        }
+        else
+        {
+            <div class="grid-viewport">
+                <OperatorDataGrid Items="@CurrentPageItems"
+                                  Columns="@VisibleColumns"
+                                  Sorts="@_sorts"
+                                  MultiSelect="@MultiSelect"
+                                  SelectedItems="@CurrentSelectedRows"
+                                  SelectedItemsChanged="GridSelectionChangedAsync"
+                                  RowClick="RowClickedAsync"
+                                  RowContextMenuClick="RowContextMenuAsync"
+                                  HeaderSort="HeaderSortAsync"
+                                  LayoutChanged="LayoutChangedAsync"
+                                  CellTemplate="@CellTemplate"
+                                  EmptyText="@EmptyText"
+                                  LayoutResetVersion="@_layoutResetVersion" />
+            </div>
+            <div class="phone-card-viewport">
+                @foreach (var row in CurrentPageItems)
+                {
+                    <div class="show-card-row @(!MultiSelect ? "single" : "") @(SelectedIds.Contains(row.Id) ? "selected" : "")">
+                        @if (MultiSelect)
+                        {
+                            <input type="checkbox" aria-label="Select @DefaultPhoneTitle(row)"
+                                   checked="@SelectedIds.Contains(row.Id)" disabled="@Busy"
+                                   @onchange="e => PhoneCheckboxChangedAsync(row, (bool)e.Value!)" />
+                        }
+                        <button class="show-card" type="button" disabled="@Busy"
+                                @onclick="() => SelectPhoneRowAsync(row)">
+                            @if (PhoneCard is not null)
+                            {
+                                @PhoneCard(row)
+                            }
+                            else
+                            {
+                                <strong>@DefaultPhoneTitle(row)</strong>
+                            }
+                        </button>
+                        @if (PhoneActions is not null)
+                        {
+                            <div class="phone-row-actions">@PhoneActions(row)</div>
+                        }
+                    </div>
+                }
+            </div>
+
+        }
+
+        @if (OverlayIsOpen)
+        {
+            <aside class="show-overlay" style="width:@(_layout.OverlayWidth)px" @ref="_overlayElement">
+                <div class="overlay-drag-handle" role="separator" aria-label="Resize details"
+                     aria-orientation="vertical" @ref="_overlayHandle"></div>
+                <header>
+                    <h2>@DetailTitle</h2>
+                    <button type="button" @onclick="CloseDetailsAsync">Close</button>
+                </header>
+                <button class="phone-detail-export" type="button" @onclick="() => ExportAsync(true)"
+                        disabled="@(SelectedIds.Count == 0)">Export selected</button>
+                <div class="operator-detail-content">@DetailContent</div>
+            </aside>
+        }
+    </div>
+
+    @if (Paginate)
+    {
+        <div class="pager">
+            <button @onclick="() => ChangePageAsync(0)" disabled="@(Busy || _pageIndex == 0)">First</button>
+            <button @onclick="() => ChangePageAsync(_pageIndex - 1)" disabled="@(Busy || _pageIndex == 0)">Previous</button>
+            <span>@ResultRangeLabel · Page @(_pageIndex + 1) of @(MaxPage + 1)</span>
+            <button @onclick="() => ChangePageAsync(_pageIndex + 1)" disabled="@(Busy || _pageIndex >= MaxPage)">Next</button>
+            <button @onclick="() => ChangePageAsync(MaxPage)" disabled="@(Busy || _pageIndex >= MaxPage)">Last</button>
+            <label>Rows
+                <select value="@_pageSize" @onchange="ChangePageSizeAsync" disabled="@Busy">
+                    <option>25</option><option>50</option><option>100</option><option>250</option>
+                </select>
+            </label>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OperatorRow> Items { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<OperatorColumn> Columns { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<OperatorSort> DefaultSorts { get; set; } = [];
+    [Parameter, EditorRequired] public string StorageKey { get; set; } = string.Empty;
+    [Parameter] public HashSet<string> SelectedIds { get; set; } = [];
+    [Parameter] public EventCallback<HashSet<string>> SelectedIdsChanged { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public bool MultiSelect { get; set; } = true;
+    [Parameter] public bool Paginate { get; set; } = true;
+    [Parameter] public RenderFragment? Toolbar { get; set; }
+    [Parameter] public RenderFragment? TrailingToolbar { get; set; }
+    [Parameter] public RenderFragment<OperatorRow>? PhoneCard { get; set; }
+    [Parameter] public RenderFragment<OperatorRow>? PhoneActions { get; set; }
+    [Parameter] public RenderFragment<OperatorCell>? CellTemplate { get; set; }
+    [Parameter] public RenderFragment? DetailContent { get; set; }
+    [Parameter] public string DetailTitle { get; set; } = "Details";
+    [Parameter] public bool? DetailOpen { get; set; }
+    [Parameter] public EventCallback<bool> DetailOpenChanged { get; set; }
+    [Parameter] public Func<Task<bool>>? BeforeChange { get; set; }
+    [Parameter] public string EmptyText { get; set; } = "No items.";
+    [Parameter] public double DefaultOverlayWidth { get; set; } = 480;
+    [Parameter] public string ExportPrefix { get; set; } = "export";
+    [Parameter] public string ExportScopeName { get; set; } = "filtered";
+    [Parameter] public IReadOnlyList<OperatorColumn>? ExportColumns { get; set; }
+    [Parameter] public int ResetVersion { get; set; }
+    [Parameter] public RenderFragment? ContextActions { get; set; }
+
+    private readonly List<OperatorSort> _sorts = [];
+    private readonly StoredOperatorTableLayout _layout = new();
+    private IReadOnlyList<OperatorRow> _sortedItems = [];
+    public IReadOnlyList<OperatorRow> SortedItems => _sortedItems;
+    private ElementReference _toolsElement, _overlayElement, _overlayHandle;
+    private DotNetObjectReference<OperatorTable>? _self;
+    private int _pageIndex, _pageSize = 25, _layoutResetVersion, _knownResetVersion;
+    private bool _loaded, _overlayAttached, _contextOpen, _suppressDefaultOverlay, _selectionNeedsClamp;
+    private int _contextGeneration;
+    private double _contextX, _contextY;
+    private string? _selectionAnchor;
+
+    private IReadOnlyList<OperatorColumn> SortableColumns => Columns.Where(column => column.CanSort).ToArray();
+    private IReadOnlyList<OperatorColumn> OrderedColumns => OrderColumns(Columns).ToArray();
+    private IReadOnlyList<OperatorColumn> VisibleColumns => OrderedColumns.Where(IsVisible)
+        .Select(column => _layout.Widths.TryGetValue(column.Key, out var width)
+            ? column with { DefaultWidth = Math.Max(48, (int)Math.Round(width)) }
+            : column).ToArray();
+    private IReadOnlyList<OperatorRow> CurrentPageItems => Paginate
+        ? _sortedItems.Skip(_pageIndex * _pageSize).Take(_pageSize).ToArray()
+        : _sortedItems;
+    private HashSet<OperatorRow> CurrentSelectedRows => CurrentPageItems.Where(row => SelectedIds.Contains(row.Id)).ToHashSet();
+    private int MaxPage => Paginate ? Math.Max(0, (_sortedItems.Count - 1) / _pageSize) : 0;
+    private bool OverlayIsOpen => DetailOpen ?? (SelectedIds.Count == 1 && !_suppressDefaultOverlay);
+    private string ResultRangeLabel => _sortedItems.Count == 0 ? "0 results" :
+        $"{_pageIndex * _pageSize + 1:N0}–{Math.Min((_pageIndex + 1) * _pageSize, _sortedItems.Count):N0} of {_sortedItems.Count:N0}";
+
+    protected override void OnParametersSet()
+    {
+        ValidateContract();
+        if (_sorts.Count == 0) _sorts.AddRange(ValidDefaultSorts());
+        ApplySort();
+        var currentIds = CurrentPageItems.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
+        _selectionNeedsClamp = SelectedIds.Any(id => !currentIds.Contains(id));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _self = DotNetObjectReference.Create(this);
+            await LoadLayoutAsync();
+            try { await JS.InvokeVoidAsync("tcBrowser.attachMenuDismiss", _toolsElement); }
+            catch (Exception exception) { ReportLayoutError("Table menus could not be initialized", exception); }
+            _loaded = true;
+            StateHasChanged();
+        }
+
+        if (_loaded && _selectionNeedsClamp)
+        {
+            _selectionNeedsClamp = false;
+            if (await CanChangeAsync())
+            {
+                _suppressDefaultOverlay = true;
+                var currentIds = CurrentPageItems.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
+                await SetSelectionAsync(SelectedIds.Where(currentIds.Contains).ToHashSet(StringComparer.Ordinal));
+                if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(false);
+            }
+        }
+
+        if (_loaded && ResetVersion != _knownResetVersion)
+        {
+            _knownResetVersion = ResetVersion;
+            if (await CanChangeAsync())
+            {
+                _pageIndex = 0;
+                _suppressDefaultOverlay = true;
+                await SetSelectionAsync([]);
+                if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(false);
+            }
+        }
+
+        if (_loaded && OverlayIsOpen && !_overlayAttached)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("tcBrowser.attachOverlayResize", _overlayElement, _overlayHandle, _self);
+                _overlayAttached = true;
+            }
+            catch (Exception exception) { ReportLayoutError("Details resizing could not be initialized", exception); }
+        }
+        else if (_overlayAttached && !OverlayIsOpen)
+        {
+            try { await JS.InvokeVoidAsync("tcBrowser.detachOverlayResize", _overlayElement); }
+            catch (Exception exception) { ReportLayoutError("Details resizing could not be stopped", exception); }
+            _overlayAttached = false;
+        }
+    }
+
+    private void ValidateContract()
+    {
+        if (string.IsNullOrWhiteSpace(StorageKey)) throw new InvalidOperationException("OperatorTable requires StorageKey.");
+        if (Columns.Count == 0 || Columns.Any(column => string.IsNullOrWhiteSpace(column.Key)) ||
+            Columns.Select(column => column.Key).Distinct(StringComparer.Ordinal).Count() != Columns.Count)
+            throw new InvalidOperationException("OperatorTable requires unique, non-empty column keys.");
+        if (Items.Any(row => string.IsNullOrWhiteSpace(row.Id)) ||
+            Items.Select(row => row.Id).Distinct(StringComparer.Ordinal).Count() != Items.Count)
+            throw new InvalidOperationException("OperatorTable requires unique, non-empty row IDs.");
+    }
+
+    private IEnumerable<OperatorSort> ValidDefaultSorts()
+    {
+        var sortable = SortableColumns.Select(column => column.Key).ToHashSet(StringComparer.Ordinal);
+        return DefaultSorts.Where(sort => sortable.Contains(sort.ColumnKey)).DistinctBy(sort => sort.ColumnKey);
+    }
+
+    private void ApplySort()
+    {
+        IOrderedEnumerable<OperatorRow>? ordered = null;
+        foreach (var sort in _sorts)
+        {
+            Func<OperatorRow, IComparable?> selector = row =>
+                row.SortValues?.TryGetValue(sort.ColumnKey, out var value) == true ? value : row.Value(sort.ColumnKey);
+            ordered = ordered is null
+                ? sort.Descending ? Items.OrderByDescending(selector, OperatorValueComparer.Instance)
+                    : Items.OrderBy(selector, OperatorValueComparer.Instance)
+                : sort.Descending ? ordered.ThenByDescending(selector, OperatorValueComparer.Instance)
+                    : ordered.ThenBy(selector, OperatorValueComparer.Instance);
+        }
+        _sortedItems = (ordered ?? Items.OrderBy(row => row.Id, StringComparer.CurrentCultureIgnoreCase)).ToArray();
+        _pageIndex = Math.Min(_pageIndex, MaxPage);
+    }
+
+    private async Task HeaderSortAsync(string key)
+    {
+        if (!SortableColumns.Any(column => column.Key == key) || !await CanChangeAsync()) return;
+        var descending = _sorts.Count == 1 && _sorts[0].ColumnKey == key && !_sorts[0].Descending;
+        _sorts.Clear();
+        _sorts.Add(new OperatorSort(key, descending));
+        await SortChangedAsync();
+    }
+
+    private async Task ChangeSortFieldAsync(int index, string? key)
+    {
+        if (key is null || !SortableColumns.Any(column => column.Key == key) ||
+            _sorts.Where((_, i) => i != index).Any(sort => sort.ColumnKey == key) || !await CanChangeAsync()) return;
+        _sorts[index] = _sorts[index] with { ColumnKey = key };
+        await SortChangedAsync();
+    }
+
+    private async Task ChangeSortDirectionAsync(int index, string? value)
+    {
+        if (!await CanChangeAsync()) return;
+        _sorts[index] = _sorts[index] with { Descending = value == "desc" };
+        await SortChangedAsync();
+    }
+
+    private async Task MoveSortAsync(int index, int delta)
+    {
+        var target = index + delta;
+        if (target < 0 || target >= _sorts.Count || !await CanChangeAsync()) return;
+        (_sorts[index], _sorts[target]) = (_sorts[target], _sorts[index]);
+        await SortChangedAsync();
+    }
+
+    private async Task RemoveSortAsync(int index)
+    {
+        if (_sorts.Count <= 1 || !await CanChangeAsync()) return;
+        _sorts.RemoveAt(index);
+        await SortChangedAsync();
+    }
+
+    private async Task AddSortAsync()
+    {
+        var key = SortableColumns.Select(column => column.Key).FirstOrDefault(value =>
+            _sorts.All(sort => sort.ColumnKey != value));
+        if (key is null || !await CanChangeAsync()) return;
+        _sorts.Add(new OperatorSort(key, false));
+        await SortChangedAsync();
+    }
+
+    private async Task RestoreDefaultSortsAsync()
+    {
+        if (!await CanChangeAsync()) return;
+        _sorts.Clear();
+        _sorts.AddRange(ValidDefaultSorts());
+        await SortChangedAsync();
+    }
+
+    private async Task SortChangedAsync()
+    {
+        ApplySort();
+        _pageIndex = 0;
+        _suppressDefaultOverlay = true;
+        await SetSelectionAsync([]);
+        await SaveLayoutAsync();
+    }
+
+    private async Task ChangePageAsync(int page)
+    {
+        page = Math.Clamp(page, 0, MaxPage);
+        if (page == _pageIndex || !await CanChangeAsync()) return;
+        _pageIndex = page;
+        _suppressDefaultOverlay = true;
+        await SetSelectionAsync([]);
+    }
+
+    private async Task ChangePageSizeAsync(ChangeEventArgs args)
+    {
+        if (!int.TryParse(args.Value?.ToString(), out var size) || size is not (25 or 50 or 100 or 250) ||
+            size == _pageSize || !await CanChangeAsync()) return;
+        _pageSize = size;
+        _layout.PageSize = size;
+        _pageIndex = 0;
+        _suppressDefaultOverlay = true;
+        await SetSelectionAsync([]);
+        await SaveLayoutAsync();
+    }
+
+    private async Task RowClickedAsync(DataGridRowClickEventArgs<OperatorRow> args)
+    {
+        if (Busy || !await CanChangeAsync()) return;
+        var mouse = args.MouseEventArgs;
+        HashSet<string> selected;
+        if (MultiSelect && mouse.ShiftKey && _selectionAnchor is not null)
+        {
+            var start = CurrentPageItems.ToList().FindIndex(row => row.Id == _selectionAnchor);
+            var end = CurrentPageItems.ToList().FindIndex(row => row.Id == args.Item.Id);
+            selected = start < 0 || end < 0 ? [args.Item.Id] : CurrentPageItems
+                .Skip(Math.Min(start, end)).Take(Math.Abs(start - end) + 1).Select(row => row.Id).ToHashSet();
+        }
+        else if (MultiSelect && (mouse.CtrlKey || mouse.MetaKey))
+        {
+            selected = SelectedIds.Where(id => CurrentPageItems.Any(row => row.Id == id)).ToHashSet();
+            if (!selected.Add(args.Item.Id)) selected.Remove(args.Item.Id);
+        }
+        else selected = [args.Item.Id];
+        _selectionAnchor = args.Item.Id;
+        _suppressDefaultOverlay = false;
+        await SetSelectionAsync(selected);
+        if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(selected.Count == 1);
+    }
+
+    private async Task GridSelectionChangedAsync(HashSet<OperatorRow> rows)
+    {
+        if (Busy || !await CanChangeAsync()) return;
+        var selected = MultiSelect ? rows.Select(row => row.Id).ToHashSet() :
+            rows.Take(1).Select(row => row.Id).ToHashSet();
+        _selectionAnchor = selected.LastOrDefault();
+        _suppressDefaultOverlay = true;
+        await SetSelectionAsync(selected);
+        if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(false);
+    }
+
+    private Task SelectPhoneRowAsync(OperatorRow row) => RowClickedAsync(new DataGridRowClickEventArgs<OperatorRow>(
+        new MouseEventArgs(), row, CurrentPageItems.ToList().IndexOf(row)));
+
+    private async Task PhoneCheckboxChangedAsync(OperatorRow row, bool selected)
+    {
+        if (Busy || !await CanChangeAsync()) return;
+        var values = SelectedIds.Where(id => CurrentPageItems.Any(item => item.Id == id))
+            .ToHashSet(StringComparer.Ordinal);
+        if (selected) values.Add(row.Id); else values.Remove(row.Id);
+        _selectionAnchor = row.Id;
+        _suppressDefaultOverlay = true;
+        await SetSelectionAsync(values);
+        if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task RowContextMenuAsync(DataGridRowClickEventArgs<OperatorRow> args)
+    {
+        if (ContextActions is null || Busy) return;
+        if (!SelectedIds.Contains(args.Item.Id))
+        {
+            if (!await CanChangeAsync()) return;
+            _suppressDefaultOverlay = true;
+            await SetSelectionAsync([args.Item.Id]);
+            _selectionAnchor = args.Item.Id;
+            if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(false);
+        }
+        _contextX = args.MouseEventArgs.ClientX;
+        _contextY = args.MouseEventArgs.ClientY;
+        _contextGeneration++;
+        _contextOpen = true;
+    }
+
+    private void CloseContextMenu() => _contextOpen = false;
+
+    private async Task CloseDetailsAsync()
+    {
+        if (!await CanChangeAsync()) return;
+        if (DetailOpen.HasValue) await DetailOpenChanged.InvokeAsync(false);
+        else
+        {
+            _suppressDefaultOverlay = true;
+            await SetSelectionAsync([]);
+        }
+    }
+
+    private async Task SetSelectionAsync(HashSet<string> value)
+    {
+        var currentPageIds = CurrentPageItems.Select(row => row.Id).ToHashSet(StringComparer.Ordinal);
+        value.IntersectWith(currentPageIds);
+        await SelectedIdsChanged.InvokeAsync(value);
+    }
+
+    private Task<bool> CanChangeAsync() => Busy ? Task.FromResult(false) : BeforeChange?.Invoke() ?? Task.FromResult(true);
+
+    private bool IsVisible(OperatorColumn column) => !column.CanHide || !_layout.HiddenColumnKeys.Contains(column.Key);
+
+    private async Task SetColumnVisibleAsync(OperatorColumn column, bool visible)
+    {
+        if (!column.CanHide) return;
+        if (visible) _layout.HiddenColumnKeys.Remove(column.Key); else _layout.HiddenColumnKeys.Add(column.Key);
+        await SaveLayoutAsync();
+    }
+
+    private async Task ShowAllColumnsAsync()
+    {
+        _layout.HiddenColumnKeys.Clear();
+        await SaveLayoutAsync();
+    }
+
+    private async Task RestoreDefaultColumnsAsync()
+    {
+        _layout.HiddenColumnKeys = Columns.Where(column => column.CanHide && !column.IsVisibleByDefault)
+            .Select(column => column.Key).ToHashSet(StringComparer.Ordinal);
+        await SaveLayoutAsync();
+    }
+
+    private async Task ResetTableLayoutAsync()
+    {
+        _layout.OrderedColumnKeys.Clear();
+        _layout.Widths.Clear();
+        _layoutResetVersion++;
+        await RestoreDefaultColumnsAsync();
+    }
+
+    private async Task LayoutChangedAsync(OperatorGridLayoutChange change)
+    {
+        _layout.OrderedColumnKeys = change.OrderedColumnKeys.ToList();
+        foreach (var pair in change.Widths) _layout.Widths[pair.Key] = pair.Value;
+        await SaveLayoutAsync();
+    }
+
+    private IEnumerable<OperatorColumn> OrderColumns(IEnumerable<OperatorColumn> columns)
+    {
+        var positions = _layout.OrderedColumnKeys.Select((key, index) => (key, index))
+            .ToDictionary(value => value.key, value => value.index, StringComparer.Ordinal);
+        var defaults = Columns.Select((column, index) => (column.Key, index))
+            .ToDictionary(value => value.Key, value => value.index, StringComparer.Ordinal);
+        return columns.OrderBy(column => positions.TryGetValue(column.Key, out var index) ? index : int.MaxValue)
+            .ThenBy(column => defaults[column.Key]);
+    }
+
+    private async Task LoadLayoutAsync()
+    {
+        _layout.OverlayWidth = DefaultOverlayWidth;
+        StoredOperatorTableLayout? saved;
+        try { saved = await JS.InvokeAsync<StoredOperatorTableLayout?>("tcBrowser.load", StorageKey + ".layout"); }
+        catch (Exception exception)
+        {
+            ReportLayoutError("Saved table settings could not be loaded", exception);
+            SetDefaultColumns();
+            return;
+        }
+        if (saved is null)
+        {
+            SetDefaultColumns();
+            return;
+        }
+        if (saved.OrderedColumnKeys is null || saved.Widths is null || saved.HiddenColumnKeys is null ||
+            saved.Sorts is null)
+        {
+            Snackbar.Add("Saved table settings are incomplete. Default table settings are being used.", Severity.Error);
+            SetDefaultColumns();
+            return;
+        }
+        var keys = Columns.Select(column => column.Key).ToHashSet(StringComparer.Ordinal);
+        _layout.OrderedColumnKeys = saved.OrderedColumnKeys.Where(keys.Contains).Distinct(StringComparer.Ordinal).ToList();
+        _layout.Widths = saved.Widths.Where(pair => keys.Contains(pair.Key) && pair.Value >= 48)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        _layout.HiddenColumnKeys = saved.HiddenColumnKeys.Where(key => keys.Contains(key) &&
+            Columns.Single(column => column.Key == key).CanHide).ToHashSet(StringComparer.Ordinal);
+        var sortable = SortableColumns.Select(column => column.Key).ToHashSet(StringComparer.Ordinal);
+        var savedSorts = saved.Sorts.Where(sort => sortable.Contains(sort.ColumnKey))
+            .DistinctBy(sort => sort.ColumnKey).ToList();
+        if (savedSorts.Count > 0)
+        {
+            _sorts.Clear();
+            _sorts.AddRange(savedSorts);
+        }
+        _pageSize = saved.PageSize is 25 or 50 or 100 or 250 ? saved.PageSize : 25;
+        _layout.PageSize = _pageSize;
+        _layout.OverlayWidth = Math.Clamp(saved.OverlayWidth, 320, 900);
+        ApplySort();
+    }
+
+    private async Task SaveLayoutAsync()
+    {
+        _layout.Sorts = [.. _sorts];
+        _layout.PageSize = _pageSize;
+        try { await JS.InvokeVoidAsync("tcBrowser.store", StorageKey + ".layout", _layout); }
+        catch (Exception exception) { ReportLayoutError("Table settings could not be saved", exception); }
+    }
+
+    [JSInvokable]
+    public Task SetOverlayWidthAsync(double width)
+    {
+        _layout.OverlayWidth = Math.Clamp(width, 320, 900);
+        return SaveLayoutAsync();
+    }
+
+    private async Task ExportAsync(bool selectedOnly)
+    {
+        var rows = selectedOnly ? _sortedItems.Where(row => SelectedIds.Contains(row.Id)).ToArray() : _sortedItems;
+        if (rows.Count == 0) return;
+        var columns = ExportColumns ?? Columns;
+        var lines = new List<string> { string.Join("##", columns.Select(column => column.Title)) };
+        lines.AddRange(rows.Select(row => string.Join("##", columns.Select(column => Quote(row.Value(column.Key))))));
+        var scope = selectedOnly ? "selected" : ExportScopeName;
+        var fileName = $"{ExportPrefix}-{scope}-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
+        try { await JS.InvokeVoidAsync("tcBrowser.download", fileName, string.Join(Environment.NewLine, lines) + Environment.NewLine); }
+        catch (Exception exception) { Snackbar.Add($"Export failed: {exception.Message}", Severity.Error); }
+    }
+
+    private static string Quote(string value) =>
+        $"\"{value.Replace('\r', ' ').Replace('\n', ' ').Replace("\"", "\"\"")}\"";
+    private string DefaultPhoneTitle(OperatorRow row) => Columns.Count == 0 ? row.Id :
+        (string.IsNullOrWhiteSpace(row.Value(Columns[0].Key)) ? row.Id : row.Value(Columns[0].Key));
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("tcBrowser.detachOverlayResize", _overlayElement); }
+        catch (JSDisconnectedException) { }
+        try { await JS.InvokeVoidAsync("tcBrowser.detachMenuDismiss", _toolsElement); }
+        catch (JSDisconnectedException) { }
+        _self?.Dispose();
+    }
+
+    private void SetDefaultColumns() => _layout.HiddenColumnKeys = Columns
+        .Where(column => column.CanHide && !column.IsVisibleByDefault)
+        .Select(column => column.Key).ToHashSet(StringComparer.Ordinal);
+
+    private void ReportLayoutError(string action, Exception exception) =>
+        Snackbar.Add($"{action}: {exception.Message}", Severity.Error);
+
+    private sealed class OperatorValueComparer : IComparer<IComparable?>
+    {
+        public static OperatorValueComparer Instance { get; } = new();
+        public int Compare(IComparable? left, IComparable? right)
+        {
+            if (ReferenceEquals(left, right)) return 0;
+            if (left is null) return -1;
+            if (right is null) return 1;
+            if (left.GetType() == right.GetType()) return left.CompareTo(right);
+            return StringComparer.CurrentCultureIgnoreCase.Compare(left.ToString(), right.ToString());
+        }
+    }
+}

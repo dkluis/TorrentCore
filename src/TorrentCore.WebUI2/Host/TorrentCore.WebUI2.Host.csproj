@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TorrentCore.WebUI2</AssemblyName>
+    <RootNamespace>TorrentCore.WebUI2.Host</RootNamespace>
+    <Version>0.8.0</Version>
+    <TorrentCoreSourceRoot Condition="'$(TorrentCoreSourceRoot)' == ''">../..</TorrentCoreSourceRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.1" />
+    <ProjectReference Include="../Client/TorrentCore.WebUI2.Client.csproj" />
+    <ProjectReference Include="../Shared/TorrentCore.WebUI2.Shared.csproj" />
+    <ProjectReference Include="$(TorrentCoreSourceRoot)/TorrentCore.Contracts/TorrentCore.Contracts.csproj" />
+    <Content Remove="Config/**" />
+    <None Remove="Config/**" />
+  </ItemGroup>
+  <Target Name="ExcludeLocalConnectionState" BeforeTargets="ComputeFilesToPublish">
+    <ItemGroup><ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$([System.String]::Copy('%(RelativePath)').StartsWith('Config/'))" /></ItemGroup>
+  </Target>
+  <Target Name="CopyMacOSAppDeploymentResources" AfterTargets="Publish">
+    <ItemGroup><MacOSAppDeploymentResource Include="Deployment/**/*" /></ItemGroup>
+    <Copy SourceFiles="@(MacOSAppDeploymentResource)" DestinationFiles="@(MacOSAppDeploymentResource->'$(PublishDir)TorrentCoreWebUI2.Deployment/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Error Condition="Exists('$(PublishDir)Config')" Text="Machine-local Config must not be present in WebUI2 publish output." />
+  </Target>
+</Project>

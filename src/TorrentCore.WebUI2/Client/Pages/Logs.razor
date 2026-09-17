@@ -1,0 +1,192 @@
+@page "/logs"
+@implements IDisposable
+@using TorrentCore.Contracts.Diagnostics
+@using TorrentCore.WebUI2.Client.Components.HistoryLogs
+@inject BrowserSession Session
+@inject BrowserPreferences Preferences
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<PageTitle>Logs</PageTitle>
+<div class="tc-logs">
+    <header><div><h1>Logs</h1><p>Recent activity from the selected service</p></div><button @onclick="RefreshAsync" disabled="@_busy">Refresh</button></header>
+    @if (Session.ActiveProfile is null) { <p>Choose a service connection to view logs.</p> }
+    else
+    {
+        <section class="tc-logs-filters">
+            <label>Search loaded logs <input @bind="_search" @bind:event="oninput" /></label>
+            <label>Level <select @bind="_level"><option value="">All Levels</option><option>Debug</option><option>Information</option><option>Warning</option><option>Error</option><option>Critical</option></select></label>
+            <label>Category <select @bind="_category"><option value="">All Categories</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
+            <label>Event Type <select @bind="_event"><option value="">All Event Types</option>@foreach (var item in Events) { <option value="@item">@item</option> }</select></label>
+            <label>Recent <select @bind="_take" @bind:after="SearchAsync" disabled="@_busy"><option value="100">100 rows</option><option value="500">500 rows</option><option value="1000">1,000 rows</option><option value="5000">5,000 rows</option></select></label>
+            <button @onclick="SearchAsync" disabled="@_busy">Search</button><button @onclick="ClearAsync" disabled="@_busy">Clear Filters</button><button @onclick="ResetAsync" disabled="@_busy">Reset Filters</button>
+            <label>Torrent ID <input @bind="_torrentIdText" /></label>
+            <label>Service Instance ID <input @bind="_instanceIdText" /></label>
+            <label><input type="checkbox" @bind="_useFrom" /> From <input type="datetime-local" value="@_from" @onchange="e => _from = e.Value?.ToString() ?? string.Empty" disabled="@(!_useFrom)" /></label>
+            <label><input type="checkbox" @bind="_useTo" /> To <input type="datetime-local" value="@_to" @onchange="e => _to = e.Value?.ToString() ?? string.Empty" disabled="@(!_useTo)" /></label>
+            <button @onclick="AskDelete" disabled="@_busy">Delete Orphaned</button>
+            @if (_filterError is not null) { <p role="alert">@_filterError</p> }
+        </section>
+        @if (_error is not null) { <p role="alert">@_error</p> }
+        @if (!_loaded && _error is null) { <p>Loading logs…</p> }
+        else if (_loaded)
+        {
+            @if (_logs.Count == _query.Take) { <p>Showing the most recent @_query.Take.ToString("N0") log entries. Narrow the server filters to inspect older activity.</p> }
+            <OperatorTable @ref="_table" Items="@Rows" Columns="@Columns" DefaultSorts="@DefaultSorts" ExportColumns="@ExportColumns"
+                           StorageKey="torrentcore.webui2.logs.v1" SelectedIds="@_selected" SelectedIdsChanged="SelectionChanged"
+                           Busy="@_busy" MultiSelect="false" EmptyText="No logs match the server filters or local search."
+                           DetailTitle="@(Selected?.EventType ?? "Log Entry")" DetailContent="@Inspector"
+                           DefaultOverlayWidth="420" ExportPrefix="logs" ExportScopeName="results" />
+        }
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "torrentId")] public Guid? RequestedTorrentId { get; set; }
+    private sealed record LogQuery(int Take = 1000, string? Level = null, string? Category = null, string? Event = null,
+        Guid? TorrentId = null, Guid? InstanceId = null, DateTimeOffset? From = null, DateTimeOffset? To = null);
+    private OperatorTable? _table;
+    private IReadOnlyList<ActivityLogEntryDto> _logs = [];
+    private ActivityLogFilterOptionsDto? _options;
+    private HashSet<string> _selected = [];
+    private string _search = "", _level = "", _category = "", _event = "", _torrentIdText = "", _instanceIdText = "";
+    private string _from = DateTime.Now.ToString("yyyy-MM-ddTHH:mm"), _to = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    private bool _useFrom, _useTo, _busy, _loaded, _disposed, _confirmDelete;
+    private int _take = 1000;
+    private string? _error, _filterError;
+    private long _revision = -1;
+    private CancellationTokenSource? _cts;
+    private Guid? _appliedTorrentId;
+    private LogQuery _query = new();
+    private static readonly IReadOnlyList<OperatorSort> DefaultSorts = [new("when", true)];
+    private static readonly IReadOnlyList<OperatorColumn> Columns = [
+        new("when", "When", 175), new("level", "Level", 110), new("category", "Category", 155),
+        new("event", "Event", 230), new("message", "Message", 520, CanHide: false),
+        new("logId", "Log ID", 100, false), new("torrentId", "Torrent ID", 285, false),
+        new("instanceId", "Service Instance ID", 285, false), new("traceId", "Trace ID", 240, false),
+        new("details", "Details JSON", 420, false)
+    ];
+    private static readonly IReadOnlyList<OperatorColumn> ExportColumns = [
+        new("category", "Category", 0), new("details", "Details JSON", 0), new("event", "Event Type", 0),
+        new("level", "Level", 0), new("logId", "Log Entry ID", 0), new("message", "Message", 0),
+        new("exportWhen", "Occurred At", 0), new("instanceId", "Service Instance ID", 0),
+        new("torrentId", "Torrent ID", 0), new("traceId", "Trace ID", 0)
+    ];
+    private IEnumerable<string> Categories => (_options?.Categories ?? []).Concat(_logs.Select(x => x.Category)).Append(_category).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x);
+    private IEnumerable<string> Events => (_options?.EventTypes ?? []).Concat(_logs.Select(x => x.EventType)).Append(_event).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x);
+    private IReadOnlyList<OperatorRow> Rows => _logs.Where(Matches).Select(ToRow).ToArray();
+    private ActivityLogEntryDto? Selected => _logs.FirstOrDefault(x => _selected.Contains(x.LogEntryId.ToString()));
+    protected override void OnInitialized() { Session.Changed += Restart; Preferences.Changed += Restart; Restart(); }
+    protected override void OnParametersSet() {
+        if (RequestedTorrentId.HasValue && RequestedTorrentId != _appliedTorrentId) {
+            _appliedTorrentId = RequestedTorrentId; _torrentIdText = RequestedTorrentId.Value.ToString("D");
+            _query = new(1000, TorrentId: RequestedTorrentId); _selected = [];
+            if (Session.IsInitialized && Session.ActiveProfile is not null) Restart();
+        }
+    }
+    private void Restart() => _ = InvokeAsync(() => { _cts?.Cancel(); _cts?.Dispose(); _cts = new(); _revision = Session.Revision;
+        _logs = []; _options = null; _loaded = false; _error = null; _selected = []; _busy = false; _confirmDelete = false;
+        if (Session.IsInitialized && Session.ActiveProfile is not null) _ = PollAsync(_revision, _cts.Token); StateHasChanged(); });
+    private async Task PollAsync(long rev, CancellationToken token) { await LoadAsync(rev, token);
+        while (!token.IsCancellationRequested) { try { await Task.Delay(TimeSpan.FromSeconds(Preferences.RefreshSeconds), token); } catch (OperationCanceledException) { break; }
+            if (!Preferences.AutoRefresh || _confirmDelete) continue;
+            try { if (await JS.InvokeAsync<bool>("tcBrowser.isVisible", token)) await LoadAsync(rev, token); }
+            catch (OperationCanceledException) { break; } catch (JSException) { } }
+    }
+    private Task RefreshAsync() => LoadAsync(_revision, _cts?.Token ?? CancellationToken.None);
+    private bool Current(long rev, CancellationToken token) => !_disposed && !token.IsCancellationRequested &&
+        rev == Session.Revision && _cts is not null && token == _cts.Token;
+    private async Task LoadAsync(long rev, CancellationToken token) {
+        if (_busy || !Current(rev, token) || Session.ActiveProfile is null) return;
+        _busy = true;
+        try { var client = Session.CreateClient(rev);
+            var logs = await client.GetRecentLogsAsync(_query.Take, _query.Category, _query.Event, _query.Level, _query.TorrentId,
+                _query.InstanceId, _query.From, _query.To, token);
+            if (!Current(rev, token)) return;
+            _logs = logs; _loaded = true; _error = null;
+            var options = await client.GetActivityLogFilterOptionsAsync(token);
+            if (!Current(rev, token)) return;
+            _options = options;
+            if (Selected is null) _selected = [];
+        } catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (Current(rev, token)) _error = ex.Message; }
+        finally { if (Current(rev, token)) { _busy = false; await InvokeAsync(StateHasChanged); } }
+    }
+    private Task SelectionChanged(HashSet<string> ids) { _selected = ids; return Task.CompletedTask; }
+    private bool Matches(ActivityLogEntryDto x) => string.IsNullOrWhiteSpace(_search) || new[] { x.Level, x.Category, x.EventType, x.Message,
+        x.DetailsJson, x.TraceId, x.TorrentId?.ToString("D"), x.ServiceInstanceId?.ToString("D") }
+        .Any(v => v?.Contains(_search.Trim(), StringComparison.CurrentCultureIgnoreCase) == true);
+    private async Task SearchAsync() {
+        _filterError = null;
+        if (_torrentIdText.Trim().Length > 0 && !Guid.TryParse(_torrentIdText.Trim(), out _)) { _filterError = "Enter a valid Torrent ID."; return; }
+        if (_instanceIdText.Trim().Length > 0 && !Guid.TryParse(_instanceIdText.Trim(), out _)) { _filterError = "Enter a valid Service Instance ID."; return; }
+        if (_useFrom && !DateTime.TryParse(_from, out _)) { _filterError = "Enter a valid From date and time."; return; }
+        if (_useTo && !DateTime.TryParse(_to, out _)) { _filterError = "Enter a valid To date and time."; return; }
+        var from = _useFrom ? new DateTimeOffset(DateTime.Parse(_from)) : (DateTimeOffset?)null;
+        var to = _useTo ? new DateTimeOffset(DateTime.Parse(_to)) : (DateTimeOffset?)null;
+        if (from > to) { _filterError = "From must be before or equal to To."; return; }
+        _query = new(_take, Blank(_level), Blank(_category), Blank(_event),
+            Guid.TryParse(_torrentIdText.Trim(), out var torrent) ? torrent : null,
+            Guid.TryParse(_instanceIdText.Trim(), out var instance) ? instance : null, from, to);
+        _selected = []; _appliedTorrentId = null;
+        await RefreshAsync();
+    }
+    private async Task ClearAsync() { _search = _level = _category = _event = _torrentIdText = _instanceIdText = ""; _useFrom = _useTo = false; await SearchAsync(); }
+    private async Task ResetAsync() { _search = _level = _category = _event = _torrentIdText = _instanceIdText = ""; _useFrom = _useTo = false;
+        _take = 1000; _from = _to = DateTime.Now.ToString("yyyy-MM-ddTHH:mm"); await SearchAsync(); }
+    private async Task AskDelete() {
+        if (_busy || Session.ActiveProfile is null) return;
+        var rev = _revision; var token = _cts?.Token ?? CancellationToken.None;
+        if (!Current(rev, token)) return;
+        _confirmDelete = true;
+        try {
+            var dialog = await Dialogs.ShowAsync<DeleteOrphanedLogsDialog>("Delete Orphaned Torrent Logs?");
+            var result = await dialog.Result;
+            if (result?.Canceled == false && Current(rev, token)) await DeleteAsync(rev, token);
+        } finally { _confirmDelete = false; }
+    }
+    private async Task DeleteAsync(long rev, CancellationToken token) { if (!_confirmDelete || _busy || !Current(rev, token) || Session.ActiveProfile is null) return;
+        _busy = true;
+        try { var result = await Session.CreateClient(rev).DeleteOrphanedTorrentLogsAsync(token);
+            if (!Current(rev, token)) return;
+            Snackbar.Add($"Deleted {result.DeletedLogEntryCount:N0} orphaned log entries.", Severity.Success);
+            _error = null;
+        } catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (Current(rev, token)) _error = ex.Message; }
+        finally { if (Current(rev, token)) { _busy = false; await InvokeAsync(StateHasChanged); } }
+        if (Current(rev, token)) await LoadAsync(rev, token);
+    }
+    private static string? Blank(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+    private static string Date(DateTimeOffset? value) => OperatorDateTime.Local(value);
+    private static OperatorRow ToRow(ActivityLogEntryDto x) { var v = new Dictionary<string,string> {
+        ["when"] = Date(x.OccurredAtUtc), ["level"] = x.Level, ["category"] = x.Category, ["event"] = x.EventType,
+        ["message"] = x.Message, ["logId"] = x.LogEntryId.ToString(), ["torrentId"] = x.TorrentId?.ToString("D") ?? "",
+        ["instanceId"] = x.ServiceInstanceId?.ToString("D") ?? "", ["traceId"] = x.TraceId ?? "", ["details"] = x.DetailsJson ?? "" };
+        v["exportWhen"] = x.OccurredAtUtc.ToString("O");
+        return new(x.LogEntryId.ToString(), v, new Dictionary<string,IComparable?> { ["when"] = x.OccurredAtUtc, ["logId"] = x.LogEntryId }); }
+    private RenderFragment Inspector => @<div class="tc-logs-inspector">
+        @if (Selected is { } log) {
+            <p>@log.Message</p><dl>
+                @Fact("Occurred", Date(log.OccurredAtUtc)) @Fact("Level", log.Level) @Fact("Category", log.Category)
+                @Fact("Torrent ID", log.TorrentId?.ToString("D")) @Fact("Service Instance ID", log.ServiceInstanceId?.ToString("D"))
+                @Fact("Trace ID", log.TraceId) @Fact("Details", log.DetailsJson)
+            </dl>
+            @if (log.TorrentId is { } torrent) { <button @onclick='() => CopyAsync("Torrent ID", torrent.ToString("D"))'>Copy Torrent ID</button>
+                <a href="@($"/torrents?torrentId={torrent:D}")">Show Torrent</a>
+                <a href="@($"/history?torrentId={torrent:D}")">Show History</a> }
+            @if (log.ServiceInstanceId is { } instance) { <button @onclick='() => CopyAsync("Service Instance ID", instance.ToString("D"))'>Copy Service Instance ID</button> }
+        }
+    </div>;
+    private async Task CopyAsync(string title, string value) {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        try { if (await JS.InvokeAsync<bool>("tcBrowser.copyText", value)) return; }
+        catch (JSException) { }
+        var dialog = await Dialogs.ShowAsync<SelectableTextDialog>(title, new DialogParameters {
+            [nameof(SelectableTextDialog.Title)] = title, [nameof(SelectableTextDialog.Text)] = value });
+        await dialog.Result;
+    }
+    private static RenderFragment Fact(string label, string? value) => b => { b.OpenElement(0,"dt");b.AddContent(1,label);b.CloseElement();b.OpenElement(2,"dd");b.AddContent(3,string.IsNullOrWhiteSpace(value)?"--":value);b.CloseElement();};
+    public void Dispose() { _disposed = true; Session.Changed -= Restart; Preferences.Changed -= Restart; _cts?.Cancel(); _cts?.Dispose(); }
+}

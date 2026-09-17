@@ -1,0 +1,14 @@
+<MudDialog>
+    <DialogContent>
+        <p>Select and copy the text below.</p>
+        <textarea class="selectable-text" readonly aria-label="@Title">@Text</textarea>
+    </DialogContent>
+    <DialogActions><MudButton Variant="Variant.Outlined" OnClick="Close">Close</MudButton></DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public string Title { get; set; } = "Copy Text";
+    [Parameter] public string Text { get; set; } = "";
+    private void Close() => Dialog.Close();
+}

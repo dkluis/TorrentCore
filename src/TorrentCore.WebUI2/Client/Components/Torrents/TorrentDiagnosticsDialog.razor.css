@@ -1,0 +1,5 @@
+.tc-diagnostics-body { display: flex; flex-direction: column; gap: .75rem; height: min(70vh, 800px); min-height: 0; min-width: min(60rem, 80vw); overflow: hidden; }
+.tc-diagnostics-body ::deep .operator-table { flex: 1 1 auto; height: auto; min-height: 0; }
+.tc-diagnostics-heading { display: flex; align-items: flex-start; justify-content: space-between; flex: 0 0 auto; gap: 1rem; }
+.tc-diagnostics-heading h2 { margin: 0; }
+.tc-diagnostics-heading p { margin: .25rem 0 0; opacity: .75; }

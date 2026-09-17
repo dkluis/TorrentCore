@@ -9,21 +9,25 @@ tc_load_env_file
 
 SERVICE_TEMPLATE="${SCRIPT_DIR}/com.torrentcore.service.plist"
 WEBUI_TEMPLATE="${SCRIPT_DIR}/com.torrentcore.webui.plist"
+WEBUI2_APP="${HOME}/Applications/TorrentCore/TorrentCoreWebUI2.app"
 TARGET_DIR="${TORRENTCORE_LAUNCH_AGENT_TARGET_DIR}"
 LOG_DIR="${TORRENTCORE_LAUNCH_AGENT_LOG_DIR}"
 LAUNCHD_DOMAIN="$(tc_launchd_domain)"
 
 service_program_path="$(tc_service_program_path)"
 webui_program_path="$(tc_webui_program_path)"
+webui2_program_path="$(tc_webui2_program_path)"
 service_working_directory="${service_program_path:h}"
 webui_working_directory="${webui_program_path:h}"
+webui2_working_directory="${webui2_program_path:h}"
 service_target_plist="${TARGET_DIR}/${TORRENTCORE_SERVICE_LAUNCH_LABEL}.plist"
 webui_target_plist="${TARGET_DIR}/${TORRENTCORE_WEBUI_LAUNCH_LABEL}.plist"
+webui2_target_plist="${TARGET_DIR}/${TORRENTCORE_WEBUI2_LAUNCH_LABEL}.plist"
 
 usage() {
   cat <<'EOF'
 Usage:
-  install-launch-agents.zsh [all|service|webui]
+  install-launch-agents.zsh [all|service|webui|webui2]
 EOF
 }
 
@@ -39,6 +43,9 @@ normalize_target() {
       ;;
     webui|torrentcore.webui|web)
       echo "webui"
+      ;;
+    webui2|torrentcore.webui2|web2)
+      echo "webui2"
       ;;
     *)
       return 1
@@ -58,11 +65,13 @@ render_env_block() {
   local app_kind="$1"
   local service_urls_escaped
   local webui_urls_escaped
+  local webui2_urls_escaped
   local webui_service_base_url_escaped
   local aspnet_env_escaped
 
   service_urls_escaped="$(xml_escape "${TORRENTCORE_SERVICE_URLS}")"
   webui_urls_escaped="$(xml_escape "${TORRENTCORE_WEBUI_URLS}")"
+  webui2_urls_escaped="$(xml_escape "${TORRENTCORE_WEBUI2_URLS}")"
   webui_service_base_url_escaped="$(xml_escape "${TORRENTCORE_WEBUI_SERVICE_BASE_URL}")"
   aspnet_env_escaped="$(xml_escape "${TORRENTCORE_ASPNETCORE_ENVIRONMENT}")"
 
@@ -73,6 +82,18 @@ render_env_block() {
             <string>${aspnet_env_escaped}</string>
             <key>ASPNETCORE_URLS</key>
             <string>${service_urls_escaped}</string>
+        </dict>
+EOF
+    return
+  fi
+
+  if [[ "${app_kind}" == "webui2" ]]; then
+    cat <<EOF
+        <dict>
+            <key>ASPNETCORE_ENVIRONMENT</key>
+            <string>${aspnet_env_escaped}</string>
+            <key>ASPNETCORE_URLS</key>
+            <string>${webui2_urls_escaped}</string>
         </dict>
 EOF
     return
@@ -129,6 +150,16 @@ bootstrap_agent() {
   launchctl kickstart -k "${LAUNCHD_DOMAIN}/${label}"
 }
 
+install_managed_bundle() {
+  local bundle="$1"
+  local installer="${bundle}/Contents/Resources/Deployment/install.zsh"
+  if [[ ! -x "${installer}" ]]; then
+    tc_log_error "Managed-app installer not found or not executable: ${installer}"
+    return 1
+  fi
+  "${installer}" "${bundle}"
+}
+
 target="${1:-all}"
 target="$(normalize_target "${target}")" || {
   usage
@@ -142,6 +173,9 @@ tc_require_command plutil
 mkdir -p "${TARGET_DIR}" "${LOG_DIR}"
 
 if [[ "${target}" == "all" || "${target}" == "service" ]]; then
+  if [[ "${service_program_path}" == *.app/Contents/MacOS/* ]]; then
+    install_managed_bundle "${service_program_path:h:h:h}"
+  else
   if [[ ! -x "${service_program_path}" ]]; then
     tc_log_error "TorrentCore.Service executable not found or not executable: ${service_program_path}"
     exit 1
@@ -161,9 +195,13 @@ if [[ "${target}" == "all" || "${target}" == "service" ]]; then
   bootstrap_agent "${service_target_plist}" "${TORRENTCORE_SERVICE_LAUNCH_LABEL}"
   print -- "Installed ${TORRENTCORE_SERVICE_LAUNCH_LABEL}"
   print -- "Service plist: ${service_target_plist}"
+  fi
 fi
 
 if [[ "${target}" == "all" || "${target}" == "webui" ]]; then
+  if [[ "${webui_program_path}" == *.app/Contents/MacOS/* ]]; then
+    install_managed_bundle "${webui_program_path:h:h:h}"
+  else
   if [[ ! -x "${webui_program_path}" ]]; then
     tc_log_error "TorrentCore.WebUI executable not found or not executable: ${webui_program_path}"
     exit 1
@@ -183,6 +221,33 @@ if [[ "${target}" == "all" || "${target}" == "webui" ]]; then
   bootstrap_agent "${webui_target_plist}" "${TORRENTCORE_WEBUI_LAUNCH_LABEL}"
   print -- "Installed ${TORRENTCORE_WEBUI_LAUNCH_LABEL}"
   print -- "WebUI plist: ${webui_target_plist}"
+  fi
+fi
+
+if [[ "${target}" == "webui2" || ( "${target}" == "all" && ( -d "${WEBUI2_APP}" || -x "${webui2_program_path}" ) ) ]]; then
+  if [[ "${webui2_program_path}" == *.app/Contents/MacOS/* ]]; then
+    install_managed_bundle "${WEBUI2_APP}"
+  else
+    if [[ ! -x "${webui2_program_path}" ]]; then
+      tc_log_error "TorrentCore.WebUI2 executable not found or not executable: ${webui2_program_path}"
+      exit 1
+    fi
+
+    render_plist \
+      "${WEBUI_TEMPLATE}" \
+      "${webui2_target_plist}" \
+      "${TORRENTCORE_WEBUI2_LAUNCH_LABEL}" \
+      "${webui2_program_path}" \
+      "${webui2_working_directory}" \
+      "${LOG_DIR}/TorrentCore.WebUI2.launchd.out.log" \
+      "${LOG_DIR}/TorrentCore.WebUI2.launchd.err.log" \
+      "webui2"
+
+    plutil -lint "${webui2_target_plist}" >/dev/null
+    bootstrap_agent "${webui2_target_plist}" "${TORRENTCORE_WEBUI2_LAUNCH_LABEL}"
+    print -- "Installed ${TORRENTCORE_WEBUI2_LAUNCH_LABEL}"
+    print -- "WebUI2 plist: ${webui2_target_plist}"
+  fi
 fi
 
 print -- "Logs: ${LOG_DIR}"

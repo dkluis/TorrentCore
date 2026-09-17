@@ -7,6 +7,7 @@
 .env
 src/TorrentCore.Web/Config/service-connection.json
 src/TorrentCore.WebUI/Config/service-connection.json
+src/TorrentCore.WebUI2/Host/Config/
 
 # User-specific files
 *.rsuser

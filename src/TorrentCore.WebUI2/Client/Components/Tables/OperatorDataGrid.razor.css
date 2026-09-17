@@ -1,0 +1,4 @@
+.vendor-grid-frame ::deep .operator-select-column { box-sizing: border-box; overflow: visible; padding: 0 !important; text-align: center; width: 52px; min-width: 52px; max-width: 52px; }
+.vendor-grid-frame ::deep .operator-select-column .mud-checkbox { margin: 0; }
+.vendor-grid-frame ::deep .vendor-selected-row > td { background: color-mix(in srgb, var(--mud-palette-primary, #1769aa) 18%, var(--mud-palette-surface, #fff)) !important; }
+.vendor-grid-frame ::deep .vendor-selected-row > td:first-child { box-shadow: inset 4px 0 var(--mud-palette-primary, #1769aa); }

@@ -12,6 +12,7 @@ Primary components:
 
 - `TorrentCore.Service`
 - `TorrentCore.WebUI`
+- `TorrentCore.WebUI2` (desktop WebAssembly client and Kestrel host)
 - `TorrentCore.Contracts`
 - `TorrentCore.Client`
 - `TorrentCore.Core`
@@ -23,10 +24,20 @@ the child runtime. The launcher executes that helper from the sealed bundle whil
 host-local configuration and installed version metadata. Packaging changes process representation only and does not
 move SQLite, cache, download, category, or callback state into the sealed app bundle.
 
-The supported operator UI is `TorrentCore.WebUI`. On Arm64 macOS it is represented by the background-only
+The existing browser UI is `TorrentCore.WebUI`. On Arm64 macOS it is represented by the background-only
 `TorrentCoreWebUI.app`; bundled runtime and static assets remain sealed while host-local configuration stays under
-`~/TorrentCore/WebUI`. The managed DMG treats Service and WebUI as one install, backup, recovery, and verification
+`~/TorrentCore/WebUI`. New managed DMGs treat Service, WebUI, and WebUI2 as one install, backup, recovery, and verification
 unit. The native `TorrentCore.app` remains a separate drag-to-Applications client.
+
+WebUI2 runs alongside the existing WebUI until operator acceptance. Its MudBlazor WebAssembly client follows the
+Native macOS actions, fields, confirmations, and settings groups, using TVMaze WebUI-2 table and overlay patterns.
+The Kestrel host serves browser assets and forwards the existing service API through `TorrentCore.Client` contracts;
+there are no service API, engine, or database changes. This UI is desktop-only.
+
+Browser local storage holds a stable identity plus appearance and table preferences. The host stores that browser's
+connection profiles and active selection under its external `Config/browser-connections` directory. Other tabs in
+the same browser share the selection; revisions reject requests for an outdated selection. Different browsers have
+separate identities. Deployments preserve this directory and do not include it in published app bundles.
 
 Removed surfaces:
 

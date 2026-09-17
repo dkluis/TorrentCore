@@ -20,7 +20,8 @@ Do not treat `docs/archive/` as active requirements unless the current code or a
 
 ## Repo Rules
 
-- Supported operator UI: `TorrentCore.WebUI`
+- Operator UIs: Native macOS, existing `TorrentCore.WebUI`, and desktop-only `TorrentCore.WebUI2` running alongside it until operator acceptance
+- WebUI2 follows Native functionality and TVMaze WebUI-2 browser table/overlay patterns; it uses the existing service API
 - Do not reintroduce `TorrentCore.Web` or `TorrentCore.Avalonia`
 - Use the existing project architecture, libraries, and patterns
 - Include complete error handling

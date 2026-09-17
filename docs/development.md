@@ -7,7 +7,9 @@
 - `src/TorrentCore.Core`: service-facing core abstractions
 - `src/TorrentCore.Persistence.Sqlite`: SQLite persistence and migrations
 - `src/TorrentCore.ServiceHost`: service host and runtime orchestration
-- `src/TorrentCore.WebUI`: supported operator UI
+- `src/TorrentCore.WebUI`: existing browser UI
+- `src/TorrentCore.WebUI2/{Client,Shared,Host}`: desktop WebAssembly UI, browser connection records, and Kestrel gateway
+- `src/TorrentCore.WebUI2/Tests`: isolated UI DTO, connection, and fake HTTP tests
 - `tests/TorrentCore.Service.Tests`: automated test suite
 - `Scripts/`: deployment and launch-agent scripts
 
@@ -120,3 +122,28 @@ Rules:
 - `--restart` is only valid when the deploy command runs on the same host as the runtime
 
 See [docs/deployment.md](deployment.md) for the full runtime and deployment model.
+
+## WebUI2
+
+Build only the new host and its referenced client projects:
+
+```bash
+dotnet build src/TorrentCore.WebUI2/Host/TorrentCore.WebUI2.Host.csproj -m:1 -nodeReuse:false
+dotnet test src/TorrentCore.WebUI2/Tests/TorrentCore.WebUI2.Tests.csproj -m:1 -nodeReuse:false
+python3 tests/test_webui2_deploy.py
+```
+
+The new tests use in-memory files, direct DTOs, disposable filesystem paths, and fake HTTP. They do not start the
+service or connect to its database. Run verification sequentially.
+
+When an operator requests a local preview:
+
+```bash
+dotnet run --project src/TorrentCore.WebUI2/Host/TorrentCore.WebUI2.Host.csproj -- --urls http://0.0.0.0:7510
+```
+
+The UI starts without a selected service. Use Connection to save and select an installation. Runtime connection
+files are written under the host's working directory `Config/browser-connections`; never commit them. Managed app
+installs use `~/TorrentCore/WebUI2` as that directory. Keeping the same browser address (scheme, host, and port) and
+browser storage retains its identity and preferences through deployment. A different address or clearing browser
+site data creates a different browser identity. The prior profiles on the host are not deleted by a deployment.

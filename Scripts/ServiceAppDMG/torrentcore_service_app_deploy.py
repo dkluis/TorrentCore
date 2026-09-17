@@ -24,10 +24,18 @@ class DeployError(RuntimeError):
 
 SERVICE_LABEL = "com.torrentcore.service"
 WEBUI_LABEL = "com.torrentcore.webui"
+WEBUI2_LABEL = "com.torrentcore.webui2"
 SERVICE_BUNDLE_ID = "com.conadv.torrentcore.service"
 WEBUI_BUNDLE_ID = "com.conadv.torrentcore.webui"
+WEBUI2_BUNDLE_ID = "com.conadv.torrentcore.webui2"
 SERVICE_APP_NAME = "TorrentCoreService.app"
 WEBUI_APP_NAME = "TorrentCoreWebUI.app"
+WEBUI2_APP_NAME = "TorrentCoreWebUI2.app"
+RUNTIME_SCRIPT_FILES = (
+    "ManageTorrentCoreLaunchAgents.zsh", "agentstatus.zsh", "install-launch-agents.zsh",
+    "lib/torrentcore-common.zsh", "torrentcore.env.example",
+    "com.torrentcore.service.plist", "com.torrentcore.webui.plist",
+)
 PRODUCT = "TorrentCoreManagedApps"
 TOOL_VERSION = "2"
 
@@ -122,15 +130,23 @@ class Context:
             raise DeployError("release.json has no managedApps metadata.")
         self.service_metadata = self._app_metadata(apps, "service", SERVICE_APP_NAME)
         self.webui_metadata = self._app_metadata(apps, "webUi", WEBUI_APP_NAME)
+        self.webui2_metadata = self._app_metadata(apps, "webUi2", WEBUI2_APP_NAME) if "webUi2" in apps else None
         self.service_payload = self.package_root / self.service_metadata["path"]
         self.webui_payload = self.package_root / self.webui_metadata["path"]
+        self.webui2_payload = self.package_root / self.webui2_metadata["path"] if self.webui2_metadata else None
         self.service_verifier = self.package_root / "Tools/verify-macos-service-app.zsh"
         self.webui_verifier = self.package_root / "Tools/verify-macos-webui-app.zsh"
+        self.webui2_verifier = self.package_root / "Tools/verify-macos-webui2-app.zsh"
+        self.webui2_assets_verifier = self.package_root / "Tools/verify-macos-webui2-static-assets.zsh"
+        self.runtime_scripts = self.package_root / "RuntimeScripts"
         self.user_home = Path.home().resolve()
         self.torrentcore_home = self.user_home / "TorrentCore"
         self.service_home = self.torrentcore_home / "Service"
         self.webui_home = self.torrentcore_home / "WebUI"
+        self.webui2_home = self.torrentcore_home / "WebUI2"
         self.connection_file = self.webui_home / "Config/service-connection.json"
+        self.webui2_settings = self.webui2_home / "appsettings.json"
+        self.webui2_profiles = self.webui2_home / "Config/browser-connections"
         self.logs_home = self.torrentcore_home / "Logs"
         self.env_file = self.torrentcore_home / "Scripts/torrentcore.env"
         self.deploy_home = self.torrentcore_home / ".deploy"
@@ -140,8 +156,10 @@ class Context:
         self.apps_home = self.user_home / "Applications/TorrentCore"
         self.service_app = self.apps_home / SERVICE_APP_NAME
         self.webui_app = self.apps_home / WEBUI_APP_NAME
+        self.webui2_app = self.apps_home / WEBUI2_APP_NAME
         self.service_agent = self.user_home / "Library/LaunchAgents" / f"{SERVICE_LABEL}.plist"
         self.webui_agent = self.user_home / "Library/LaunchAgents" / f"{WEBUI_LABEL}.plist"
+        self.webui2_agent = self.user_home / "Library/LaunchAgents" / f"{WEBUI2_LABEL}.plist"
 
     def _app_metadata(self, apps: dict[str, Any], key: str, expected_name: str) -> dict[str, str]:
         value = apps.get(key)
@@ -172,8 +190,35 @@ def verify_source(ctx: Context) -> None:
     verify_package_checksums(ctx.package_root)
     verify_app_payload(ctx.service_payload, ctx.service_metadata, ctx.service_verifier, "Service app")
     verify_app_payload(ctx.webui_payload, ctx.webui_metadata, ctx.webui_verifier, "WebUI app")
+    if ctx.webui2_metadata is not None:
+        assert ctx.webui2_payload is not None
+        verify_app_payload(ctx.webui2_payload, ctx.webui2_metadata, ctx.webui2_verifier, "WebUI2 app")
+        if not os.access(ctx.webui2_assets_verifier, os.X_OK):
+            raise DeployError("Packaged WebUI2 static-assets verifier is missing or not executable.")
+        verify_runtime_scripts(ctx)
+    elif ctx.runtime_scripts.exists():
+        raise DeployError("RuntimeScripts requires a WebUI2 managed app in release.json.")
     if any(ctx.package_root.rglob("service-connection.json")):
         raise DeployError("The package contains machine-local Config/service-connection.json.")
+    if any(ctx.package_root.rglob("browser-connections")):
+        raise DeployError("The package contains machine-local WebUI2 browser connection profiles.")
+
+
+def verify_runtime_scripts(ctx: Context) -> None:
+    expected = set(RUNTIME_SCRIPT_FILES)
+    if not ctx.runtime_scripts.is_dir() or ctx.runtime_scripts.is_symlink():
+        raise DeployError("WebUI2 release is missing the RuntimeScripts helper payload.")
+    found: set[str] = set()
+    for path in ctx.runtime_scripts.rglob("*"):
+        if path.is_symlink():
+            raise DeployError(f"RuntimeScripts contains a symbolic link: {path}")
+        if path.is_file():
+            found.add(path.relative_to(ctx.runtime_scripts).as_posix())
+    if found != expected:
+        raise DeployError(f"RuntimeScripts files do not match the supported helper set: missing {sorted(expected - found)}, unexpected {sorted(found - expected)}")
+    for name in ("ManageTorrentCoreLaunchAgents.zsh", "agentstatus.zsh", "install-launch-agents.zsh"):
+        if not os.access(ctx.runtime_scripts / name, os.X_OK):
+            raise DeployError(f"Packaged helper is not executable: {name}")
 
 
 def verify_target_structure(ctx: Context) -> None:
@@ -200,23 +245,41 @@ def print_plan(ctx: Context, *, dry_run: bool) -> None:
     print(f"Runtime:             {ctx.runtime}")
     print(f"Service version:     {read_version(ctx.service_home / 'version.json')}")
     print(f"WebUI version:       {read_version(ctx.webui_home / 'version.json')}")
+    if ctx.webui2_metadata is not None:
+        print(f"WebUI2 version:      {read_version(ctx.webui2_home / 'version.json')}")
     print(f"Service app target:  {ctx.service_app}")
     print(f"WebUI app target:    {ctx.webui_app}")
+    if ctx.webui2_metadata is not None:
+        print(f"WebUI2 app target:   {ctx.webui2_app}")
     print(f"Service files:       {ctx.service_home}")
     print(f"WebUI files:         {ctx.webui_home}")
+    if ctx.webui2_metadata is not None:
+        print(f"WebUI2 files:        {ctx.webui2_home}")
+        print(f"Browser profiles:    {ctx.webui2_profiles} (preserved)")
+        print(f"Runtime helpers:     {ctx.torrentcore_home / 'Scripts'} (existing torrentcore.env preserved)")
     print(f"Connection override: {ctx.connection_file} ({'present and preserved' if ctx.connection_file.is_file() else 'absent; fallback retained'})")
     print(f"Environment file:    {ctx.env_file}")
     print(f"Deployment state:    {ctx.deploy_home}")
     print(f"Backups:             {ctx.backups_home}")
     print(f"Service LaunchAgent: {ctx.service_agent}")
     print(f"WebUI LaunchAgent:   {ctx.webui_agent}")
+    if ctx.webui2_metadata is not None:
+        print(f"WebUI2 LaunchAgent:  {ctx.webui2_agent}")
     print("\nPlanned actions:")
-    print("  1. Reverify both signed Arm64 app bundles and all package checksums.")
-    print("  2. Back up both apps, both complete working directories, both LaunchAgents, and deployment state.")
-    print("  3. Stop both LaunchAgents only after both payloads pass preflight.")
-    print("  4. Stage, verify, and atomically replace TorrentCoreService.app and TorrentCoreWebUI.app.")
-    print("  5. Preserve all external state, including WebUI/Config/service-connection.json byte-for-byte.")
-    print("  6. Install both LaunchAgents and verify Service API health/version plus WebUI reachability.")
+    if ctx.webui2_metadata is None:
+        print("  1. Reverify both signed Arm64 app bundles and all package checksums.")
+        print("  2. Back up both apps, both complete working directories, both LaunchAgents, and deployment state.")
+        print("  3. Stop both LaunchAgents only after both payloads pass preflight.")
+        print("  4. Stage, verify, and atomically replace TorrentCoreService.app and TorrentCoreWebUI.app.")
+        print("  5. Preserve all external state, including WebUI/Config/service-connection.json byte-for-byte.")
+        print("  6. Install both LaunchAgents and verify Service API health/version plus WebUI reachability.")
+    else:
+        print("  1. Reverify all three signed Arm64 app bundles, runtime helpers, and all package checksums.")
+        print("  2. Back up all three apps, complete working directories, LaunchAgents, runtime helpers, and deployment state.")
+        print("  3. Stop all three LaunchAgents only after payload preflight.")
+        print("  4. Stage, verify, and atomically replace all three managed apps; install versioned runtime helpers.")
+        print("  5. Preserve WebUI connection override, WebUI2 appsettings and browser profiles, and torrentcore.env byte-for-byte.")
+        print("  6. Install LaunchAgents and verify Service health/version plus both WebUI endpoints.")
     print("Dry-run only. Nothing was changed." if dry_run else "Plan only. Nothing was changed.")
 
 
@@ -230,6 +293,21 @@ def archive_directory(source: Path, archive: Path) -> bool:
     if result.returncode != 0 or not archive.is_file():
         raise DeployError(f"Could not archive {source}: {result.stderr.strip() or result.stdout.strip()}")
     return True
+
+
+def runtime_helper_targets(ctx: Context) -> list[tuple[str, Path, Path]]:
+    return [(relative, ctx.runtime_scripts / relative, ctx.torrentcore_home / "Scripts" / relative)
+            for relative in RUNTIME_SCRIPT_FILES]
+
+
+def profile_hash(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    if not path.is_dir() or path.is_symlink():
+        raise DeployError(f"Browser profile path is not a directory: {path}")
+    if not any(path.iterdir()):
+        return None
+    return tree_hash(path)
 
 
 def create_backup(ctx: Context) -> tuple[Path, dict[str, Any]]:
@@ -247,12 +325,34 @@ def create_backup(ctx: Context) -> tuple[Path, dict[str, Any]]:
         "webUiLaunchAgentExisted": ctx.webui_agent.is_file(),
         "connectionSha256": file_hash(ctx.connection_file),
     }
+    if ctx.webui2_metadata is not None:
+        entries.update({
+            "webUi2AppExisted": ctx.webui2_app.is_dir(),
+            "webUi2DirectoryExisted": ctx.webui2_home.is_dir(),
+            "webUi2LaunchAgentExisted": ctx.webui2_agent.is_file(),
+            "webUi2SettingsSha256": file_hash(ctx.webui2_settings),
+            "webUi2ProfilesSha256": profile_hash(ctx.webui2_profiles),
+            "environmentSha256": file_hash(ctx.env_file),
+            "runtimeScriptExisted": {relative: target.is_file() for relative, _, target in runtime_helper_targets(ctx)},
+        })
     for source, name in ((ctx.service_app, f"{SERVICE_APP_NAME}.zip"), (ctx.webui_app, f"{WEBUI_APP_NAME}.zip"), (ctx.service_home, "Service.zip"), (ctx.webui_home, "WebUI.zip")):
         if source.exists():
             archive_directory(source, backup / name)
-    for source in (ctx.service_agent, ctx.webui_agent, ctx.env_file, ctx.installed_path):
+    if ctx.webui2_metadata is not None:
+        for source, name in ((ctx.webui2_app, f"{WEBUI2_APP_NAME}.zip"), (ctx.webui2_home, "WebUI2.zip")):
+            if source.exists():
+                archive_directory(source, backup / name)
+        for relative, _, target in runtime_helper_targets(ctx):
+            if target.exists() and (not target.is_file() or target.is_symlink()):
+                raise DeployError(f"Existing runtime helper is not a regular file: {target}")
+            if target.is_file():
+                saved = backup / "RuntimeScripts" / relative
+                saved.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, saved)
+    agents = (ctx.service_agent, ctx.webui_agent, ctx.webui2_agent) if ctx.webui2_metadata is not None else (ctx.service_agent, ctx.webui_agent)
+    for source in (*agents, ctx.env_file, ctx.installed_path):
         if source.is_file():
-            relative = (Path("LaunchAgents") / source.name if source in (ctx.service_agent, ctx.webui_agent)
+            relative = (Path("LaunchAgents") / source.name if source in agents
                         else Path("Scripts/torrentcore.env") if source == ctx.env_file
                         else Path(".deploy/installed.before.json"))
             target = backup / relative
@@ -288,27 +388,60 @@ def stage_app(payload: Path, target: Path, verifier: Path, history_id: str) -> P
     return staging
 
 
-def replace_staged_apps(ctx: Context, service_staging: Path, webui_staging: Path, history_id: str) -> list[Path]:
-    pairs = ((ctx.service_app, service_staging), (ctx.webui_app, webui_staging))
+def replace_staged_apps(ctx: Context, service_staging: Path, webui_staging: Path, history_id: str,
+                        webui2_staging: Path | None = None) -> list[Path]:
+    pairs = [(ctx.service_app, service_staging), (ctx.webui_app, webui_staging)]
+    if ctx.webui2_metadata is not None:
+        if webui2_staging is None:
+            raise DeployError("WebUI2 staging is required for this release.")
+        pairs.append((ctx.webui2_app, webui2_staging))
     retired: list[Path] = []
+    changed: list[tuple[Path, Path | None]] = []
     try:
         for target, staging in pairs:
             previous = target.parent / f".{target.name}.{history_id}.previous"
             if previous.exists():
                 raise DeployError(f"App retirement path already exists: {previous}")
+            old_path: Path | None = None
             if target.exists():
                 os.replace(target, previous)
                 retired.append(previous)
+                old_path = previous
+            changed.append((target, old_path))
             os.replace(staging, target)
     except Exception:
-        for target, _ in reversed(pairs):
-            previous = target.parent / f".{target.name}.{history_id}.previous"
-            if previous.exists():
-                if target.exists():
-                    shutil.rmtree(target)
+        for target, previous in reversed(changed):
+            if target.exists():
+                shutil.rmtree(target)
+            if previous is not None:
                 os.replace(previous, target)
         raise
     return retired
+
+
+def install_runtime_helpers(ctx: Context, history_id: str) -> None:
+    if ctx.webui2_metadata is None:
+        return
+    for _, source, target in runtime_helper_targets(ctx):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        staging = target.with_name(f".{target.name}.{history_id}.staging")
+        if staging.exists():
+            raise DeployError(f"Runtime helper staging path already exists: {staging}")
+        try:
+            shutil.copy2(source, staging)
+            if file_hash(source) != file_hash(staging):
+                raise DeployError(f"Runtime helper staging checksum mismatch: {source.name}")
+            os.replace(staging, target)
+        finally:
+            staging.unlink(missing_ok=True)
+
+
+def verify_runtime_helpers_installed(ctx: Context) -> None:
+    if ctx.webui2_metadata is None:
+        return
+    for _, source, target in runtime_helper_targets(ctx):
+        if file_hash(source) != file_hash(target):
+            raise DeployError(f"Installed runtime helper differs from the package: {target}")
 
 
 def configured_url(ctx: Context, variable: str, default: str) -> str:
@@ -358,19 +491,38 @@ def verify_agent(path: Path, program: Path, bundle_id: str, working: Path, label
         raise DeployError(f"{label} LaunchAgent is missing: {path}")
     with path.open("rb") as handle:
         value = plistlib.load(handle)
+    if value.get("Label") != path.stem:
+        raise DeployError(f"{label} LaunchAgent label is incorrect.")
     if value.get("ProgramArguments") != [str(program)]:
         raise DeployError(f"{label} LaunchAgent does not use the installed app launcher.")
     if value.get("AssociatedBundleIdentifiers") != [bundle_id] or value.get("WorkingDirectory") != str(working):
         raise DeployError(f"{label} LaunchAgent bundle association or working directory is incorrect.")
 
 
-def verify_installed(ctx: Context, *, require_snapshot: bool, check_connection: bool = False, expected_connection_hash: str | None = None) -> dict[str, Any]:
-    for verifier, app, label in ((ctx.service_verifier, ctx.service_app, "Service"), (ctx.webui_verifier, ctx.webui_app, "WebUI")):
+def verify_installed(ctx: Context, *, require_snapshot: bool, check_connection: bool = False,
+                     check_webui2_state: bool = False,
+                     expected_connection_hash: str | None = None,
+                     expected_settings_hash: str | None = None,
+                     expected_profiles_hash: str | None = None,
+                     expected_environment_hash: str | None = None) -> dict[str, Any]:
+    apps = [(ctx.service_verifier, ctx.service_app, "Service"), (ctx.webui_verifier, ctx.webui_app, "WebUI")]
+    if ctx.webui2_metadata is not None:
+        apps.append((ctx.webui2_verifier, ctx.webui2_app, "WebUI2"))
+    for verifier, app, label in apps:
         result = shell([str(verifier), "--bundle", str(app), "--require-signed"], check=False, capture=True)
         if result.returncode != 0:
             raise DeployError(f"Installed {label} app verification failed: {result.stderr.strip() or result.stdout.strip()}")
     verify_agent(ctx.service_agent, ctx.service_app / "Contents/MacOS/TorrentCoreService", SERVICE_BUNDLE_ID, ctx.service_home, "Service")
     verify_agent(ctx.webui_agent, ctx.webui_app / "Contents/MacOS/TorrentCoreWebUI", WEBUI_BUNDLE_ID, ctx.webui_home, "WebUI")
+    if ctx.webui2_metadata is not None:
+        verify_agent(ctx.webui2_agent, ctx.webui2_app / "Contents/MacOS/TorrentCoreWebUI2", WEBUI2_BUNDLE_ID, ctx.webui2_home, "WebUI2")
+        verify_runtime_helpers_installed(ctx)
+        if check_webui2_state and expected_settings_hash is not None and expected_settings_hash != file_hash(ctx.webui2_settings):
+            raise DeployError("WebUI2 appsettings.json changed during deployment.")
+        if check_webui2_state and expected_profiles_hash != profile_hash(ctx.webui2_profiles):
+            raise DeployError("WebUI2 browser profiles changed during deployment.")
+        if check_webui2_state and expected_environment_hash != file_hash(ctx.env_file):
+            raise DeployError("Scripts/torrentcore.env changed during deployment.")
     if check_connection and expected_connection_hash != file_hash(ctx.connection_file):
         raise DeployError("WebUI Config/service-connection.json changed during deployment.")
     service_url = configured_url(ctx, "TORRENTCORE_SERVICE_URLS", "http://0.0.0.0:7033")
@@ -385,9 +537,14 @@ def verify_installed(ctx: Context, *, require_snapshot: bool, check_connection: 
         raise DeployError(f"Running Service reported an unexpected VPN state: {phase or '<missing>'}")
     webui_url = configured_url(ctx, "TORRENTCORE_WEBUI_URLS", "http://0.0.0.0:7053")
     wait_for_webui(webui_url)
+    webui2_url = None
+    if ctx.webui2_metadata is not None:
+        webui2_url = configured_url(ctx, "TORRENTCORE_WEBUI2_URLS", "http://0.0.0.0:7510")
+        wait_for_webui(webui2_url)
     if require_snapshot and load_json(ctx.installed_path).get("releaseId") != ctx.release.get("releaseId"):
         raise DeployError("Installed deployment record does not match this release.")
-    return {"health": "ok", "vpnConnectionPhase": phase, "serviceBaseUrl": service_url, "webUiBaseUrl": webui_url}
+    return {"health": "ok", "vpnConnectionPhase": phase, "serviceBaseUrl": service_url,
+            "webUiBaseUrl": webui_url, **({"webUi2BaseUrl": webui2_url} if webui2_url is not None else {})}
 
 
 def apply(ctx: Context, *, confirm: bool, dry_run: bool) -> None:
@@ -401,6 +558,9 @@ def apply(ctx: Context, *, confirm: bool, dry_run: bool) -> None:
     verify_source(ctx)
     verify_target_structure(ctx)
     connection_before = file_hash(ctx.connection_file)
+    settings_before = file_hash(ctx.webui2_settings) if ctx.webui2_metadata is not None else None
+    profiles_before = profile_hash(ctx.webui2_profiles) if ctx.webui2_metadata is not None else None
+    environment_before = file_hash(ctx.env_file) if ctx.webui2_metadata is not None else None
     history_id = datetime.now().strftime("%Y%m%d-%H%M%S") + f"_{ctx.release['releaseId']}_apply"
     backup, backup_metadata = create_backup(ctx)
     history_path = ctx.history_home / f"{history_id}.json"
@@ -408,24 +568,34 @@ def apply(ctx: Context, *, confirm: bool, dry_run: bool) -> None:
     write_json_atomic(history_path, history)
     service_staging: Path | None = None
     webui_staging: Path | None = None
+    webui2_staging: Path | None = None
     retired: list[Path] = []
     try:
         service_staging = stage_app(ctx.service_payload, ctx.service_app, ctx.service_verifier, history_id)
         webui_staging = stage_app(ctx.webui_payload, ctx.webui_app, ctx.webui_verifier, history_id)
+        if ctx.webui2_metadata is not None:
+            assert ctx.webui2_payload is not None
+            webui2_staging = stage_app(ctx.webui2_payload, ctx.webui2_app, ctx.webui2_verifier, history_id)
+            stop_agent(WEBUI2_LABEL)
         stop_agent(WEBUI_LABEL)
         stop_agent(SERVICE_LABEL)
-        retired = replace_staged_apps(ctx, service_staging, webui_staging, history_id)
-        service_staging = webui_staging = None
-        for app in (ctx.service_app, ctx.webui_app):
+        retired = replace_staged_apps(ctx, service_staging, webui_staging, history_id, webui2_staging)
+        service_staging = webui_staging = webui2_staging = None
+        install_runtime_helpers(ctx, history_id)
+        apps = (ctx.service_app, ctx.webui_app, ctx.webui2_app) if ctx.webui2_metadata is not None else (ctx.service_app, ctx.webui_app)
+        for app in apps:
             installer = app / "Contents/Resources/Deployment/install.zsh"
             result = shell([str(installer), str(app)], check=False, capture=True)
             if result.returncode != 0:
                 raise DeployError(f"{app.name} installer failed: {result.stderr.strip() or result.stdout.strip()}")
-        verification = verify_installed(ctx, require_snapshot=False, check_connection=True, expected_connection_hash=connection_before)
+        verification = verify_installed(ctx, require_snapshot=False, check_connection=True,
+            expected_connection_hash=connection_before, check_webui2_state=ctx.webui2_metadata is not None,
+            expected_settings_hash=settings_before, expected_profiles_hash=profiles_before,
+            expected_environment_hash=environment_before)
         for path in retired:
             shutil.rmtree(path)
     except Exception as error:
-        for staging in (service_staging, webui_staging):
+        for staging in (service_staging, webui_staging, webui2_staging):
             if staging is not None:
                 shutil.rmtree(staging, ignore_errors=True)
         history.update(status="failed", completedAtUtc=utc_now(), error=str(error))
@@ -433,11 +603,21 @@ def apply(ctx: Context, *, confirm: bool, dry_run: bool) -> None:
         raise DeployError(f"Installation failed. Manual recovery material is at {backup}; history: {history_path}: {error}") from error
 
     installed = {"schemaVersion": 2, "product": PRODUCT, "releaseId": ctx.release["releaseId"], "version": ctx.release["version"], "build": ctx.release["build"], "gitSha": ctx.release["gitSha"], "runtime": ctx.runtime, "serviceAppPath": str(ctx.service_app), "webUiAppPath": str(ctx.webui_app), "serviceHome": str(ctx.service_home), "webUiHome": str(ctx.webui_home), "webUiConnectionSha256": connection_before, "backupRoot": str(backup), "installedAtUtc": utc_now()}
+    if ctx.webui2_metadata is not None:
+        installed.update(webUi2AppPath=str(ctx.webui2_app), webUi2Home=str(ctx.webui2_home),
+                         webUi2LaunchAgentPath=str(ctx.webui2_agent),
+                         webUi2SettingsSha256=file_hash(ctx.webui2_settings),
+                         webUi2ProfilesSha256=profile_hash(ctx.webui2_profiles),
+                         runtimeScripts={relative: file_hash(target) for relative, _, target in runtime_helper_targets(ctx)})
     write_json_atomic(ctx.installed_path, installed)
     history.update(status="applied", completedAtUtc=utc_now(), verification=verification)
     write_json_atomic(history_path, history)
-    print("TorrentCore Service and WebUI installation completed.")
-    print(f"Service app: {ctx.service_app}\nWebUI app:   {ctx.webui_app}\nBackup:     {backup}\nHistory:    {history_path}")
+    print("TorrentCore Service, WebUI, and WebUI2 installation completed." if ctx.webui2_metadata is not None
+          else "TorrentCore Service and WebUI installation completed.")
+    print(f"Service app: {ctx.service_app}\nWebUI app:   {ctx.webui_app}")
+    if ctx.webui2_metadata is not None:
+        print(f"WebUI2 app:  {ctx.webui2_app}")
+    print(f"Backup:     {backup}\nHistory:    {history_path}")
 
 
 def backup(ctx: Context) -> None:
@@ -460,7 +640,8 @@ def backup(ctx: Context) -> None:
         "backupRoot": str(backup_path),
         "backup": metadata,
     })
-    print("TorrentCore Service and WebUI backup completed.")
+    print("TorrentCore Service, WebUI, and WebUI2 backup completed." if ctx.webui2_metadata is not None
+          else "TorrentCore Service and WebUI backup completed.")
     print(f"Backup:  {backup_path}")
     print(f"History: {history_path}")
 
@@ -469,12 +650,37 @@ def rollback_plan(ctx: Context, history_path: Path) -> tuple[dict[str, Any], Pat
     history = load_json(history_path)
     if history.get("action") != "apply" or history.get("status") not in {"applied", "applying", "failed"}:
         raise DeployError("Recovery history must be a combined apply or failed-apply record.")
+    if history.get("releaseId") != ctx.release.get("releaseId"):
+        raise DeployError("Recovery history requires the same mounted release package that created it.")
     if Path(str(history.get("home", ""))) != ctx.user_home:
         raise DeployError("Recovery history belongs to a different user home.")
     backup = Path(str(history.get("backupRoot", "")))
     metadata = load_json(backup / "backup.json")
     if metadata.get("releaseId") != history.get("releaseId") or metadata.get("product") != PRODUCT:
         raise DeployError("Recovery backup and apply history do not match.")
+    if ctx.webui2_metadata is not None:
+        if any(key not in metadata for key in ("webUi2SettingsSha256", "webUi2ProfilesSha256", "environmentSha256")):
+            raise DeployError("Recovery backup lacks WebUI2 machine-local state hashes.")
+        previous_helpers = metadata.get("runtimeScriptExisted")
+        if not isinstance(previous_helpers, dict) or set(previous_helpers) != set(RUNTIME_SCRIPT_FILES) or any(
+            not isinstance(value, bool) for value in previous_helpers.values()
+        ):
+            raise DeployError("Recovery backup lacks a valid prior runtime-helper inventory.")
+        for key, archive_name in (("webUi2AppExisted", f"{WEBUI2_APP_NAME}.zip"),
+                                  ("webUi2DirectoryExisted", "WebUI2.zip")):
+            if not isinstance(metadata.get(key), bool):
+                raise DeployError(f"Recovery backup lacks {key} state.")
+            if metadata[key] and not (backup / archive_name).is_file():
+                raise DeployError(f"Recovery backup lacks {archive_name}.")
+        if not isinstance(metadata.get("webUi2LaunchAgentExisted"), bool):
+            raise DeployError("Recovery backup lacks WebUI2 LaunchAgent state.")
+        if metadata["webUi2LaunchAgentExisted"] and not (backup / "LaunchAgents" / ctx.webui2_agent.name).is_file():
+            raise DeployError("Recovery backup lacks the prior WebUI2 LaunchAgent.")
+        for relative, existed in previous_helpers.items():
+            if existed and not (backup / "RuntimeScripts" / relative).is_file():
+                raise DeployError(f"Recovery backup lacks runtime helper: {relative}")
+        if metadata.get("environmentSha256") is not None and not (backup / "Scripts/torrentcore.env").is_file():
+            raise DeployError("Recovery backup lacks the prior torrentcore.env file.")
     return history, backup, metadata
 
 
@@ -482,15 +688,25 @@ def rollback(ctx: Context, history_path: Path, *, confirm: bool, dry_run: bool) 
     history, backup, metadata = rollback_plan(ctx, history_path)
     print("TorrentCore Combined Manual-Recovery Plan")
     print(f"Apply history: {history_path}\nBackup:        {backup}\nService app:   {ctx.service_app}\nWebUI app:     {ctx.webui_app}")
-    print("Both complete external working directories and both LaunchAgents will be restored from the same backup without cleanup.")
+    if ctx.webui2_metadata is not None:
+        print(f"WebUI2 app:    {ctx.webui2_app}")
+        print("All three apps, working directories, LaunchAgents, and prior runtime helpers will be restored from the same backup.")
+    else:
+        print("Both complete external working directories and both LaunchAgents will be restored from the same backup without cleanup.")
     if dry_run:
         print("Dry-run only. Nothing was changed.")
         return
     if not confirm:
         raise DeployError("A real recovery requires --confirm after reviewing rollback --dry-run.")
+    if ctx.webui2_metadata is not None:
+        stop_agent(WEBUI2_LABEL)
     stop_agent(WEBUI_LABEL)
     stop_agent(SERVICE_LABEL)
-    for app, key, archive_name in ((ctx.service_app, "serviceAppExisted", f"{SERVICE_APP_NAME}.zip"), (ctx.webui_app, "webUiAppExisted", f"{WEBUI_APP_NAME}.zip")):
+    app_backups = [(ctx.service_app, "serviceAppExisted", f"{SERVICE_APP_NAME}.zip"),
+                   (ctx.webui_app, "webUiAppExisted", f"{WEBUI_APP_NAME}.zip")]
+    if ctx.webui2_metadata is not None:
+        app_backups.append((ctx.webui2_app, "webUi2AppExisted", f"{WEBUI2_APP_NAME}.zip"))
+    for app, key, archive_name in app_backups:
         if app.exists():
             shutil.rmtree(app)
         if metadata.get(key):
@@ -498,9 +714,48 @@ def rollback(ctx: Context, history_path: Path, *, confirm: bool, dry_run: bool) 
     for home, key, archive_name in ((ctx.service_home, "serviceDirectoryExisted", "Service.zip"), (ctx.webui_home, "webUiDirectoryExisted", "WebUI.zip")):
         if metadata.get(key):
             shell(["/usr/bin/ditto", "-x", "-k", str(backup / archive_name), str(home.parent)])
+    if ctx.webui2_metadata is not None:
+        if ctx.webui2_home.exists():
+            if not ctx.webui2_home.is_dir() or ctx.webui2_home.is_symlink():
+                raise DeployError(f"WebUI2 working directory is not a regular directory: {ctx.webui2_home}")
+            shutil.rmtree(ctx.webui2_home)
+        if metadata.get("webUi2DirectoryExisted"):
+            shell(["/usr/bin/ditto", "-x", "-k", str(backup / "WebUI2.zip"), str(ctx.webui2_home.parent)])
+        if metadata.get("webUi2SettingsSha256") != file_hash(ctx.webui2_settings):
+            raise DeployError("WebUI2 appsettings.json did not restore byte-for-byte.")
+        if metadata.get("webUi2ProfilesSha256") != profile_hash(ctx.webui2_profiles):
+            raise DeployError("WebUI2 browser profiles did not restore byte-for-byte.")
+        previous_helpers = metadata.get("runtimeScriptExisted")
+        if not isinstance(previous_helpers, dict):
+            raise DeployError("Recovery backup lacks the prior runtime-helper inventory.")
+        for relative, _, target in runtime_helper_targets(ctx):
+            if previous_helpers.get(relative):
+                saved = backup / "RuntimeScripts" / relative
+                if not saved.is_file():
+                    raise DeployError(f"Recovery backup lacks runtime helper: {relative}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(saved, target)
+                if file_hash(saved) != file_hash(target):
+                    raise DeployError(f"Runtime helper did not restore: {relative}")
+            else:
+                target.unlink(missing_ok=True)
+        saved_environment = backup / "Scripts/torrentcore.env"
+        if metadata.get("environmentSha256") is not None:
+            if not saved_environment.is_file():
+                raise DeployError("Recovery backup lacks the prior torrentcore.env file.")
+            ctx.env_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(saved_environment, ctx.env_file)
+        else:
+            ctx.env_file.unlink(missing_ok=True)
+        if metadata.get("environmentSha256") != file_hash(ctx.env_file):
+            raise DeployError("Scripts/torrentcore.env changed during recovery.")
     if metadata.get("connectionSha256") != file_hash(ctx.connection_file):
         raise DeployError("WebUI service connection did not restore byte-for-byte.")
-    for agent, key, label in ((ctx.service_agent, "serviceLaunchAgentExisted", SERVICE_LABEL), (ctx.webui_agent, "webUiLaunchAgentExisted", WEBUI_LABEL)):
+    agents = [(ctx.service_agent, "serviceLaunchAgentExisted", SERVICE_LABEL),
+              (ctx.webui_agent, "webUiLaunchAgentExisted", WEBUI_LABEL)]
+    if ctx.webui2_metadata is not None:
+        agents.append((ctx.webui2_agent, "webUi2LaunchAgentExisted", WEBUI2_LABEL))
+    for agent, key, label in agents:
         saved = backup / "LaunchAgents" / agent.name
         if metadata.get(key):
             agent.parent.mkdir(parents=True, exist_ok=True)
@@ -563,7 +818,10 @@ def main() -> int:
             apply(ctx, confirm=args.confirm, dry_run=args.dry_run)
         elif args.command == "verify":
             result = verify_installed(ctx, require_snapshot=True)
-            print(f"Verify passed. Service: {result['serviceBaseUrl']}; WebUI: {result['webUiBaseUrl']}; VPN: {result['vpnConnectionPhase']}")
+            line = f"Verify passed. Service: {result['serviceBaseUrl']}; WebUI: {result['webUiBaseUrl']}"
+            if ctx.webui2_metadata is not None:
+                line += f"; WebUI2: {result['webUi2BaseUrl']}"
+            print(line + f"; VPN: {result['vpnConnectionPhase']}")
         elif args.command == "rollback":
             if args.confirm == args.dry_run:
                 raise DeployError("Rollback requires exactly one of --dry-run or --confirm.")

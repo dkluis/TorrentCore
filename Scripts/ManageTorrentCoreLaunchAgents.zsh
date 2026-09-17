@@ -17,24 +17,27 @@ typeset -A LABELS
 LABELS=(
   service "${TORRENTCORE_SERVICE_LAUNCH_LABEL}"
   webui "${TORRENTCORE_WEBUI_LAUNCH_LABEL}"
+  webui2 "${TORRENTCORE_WEBUI2_LAUNCH_LABEL}"
 )
 
 typeset -A DISPLAY_NAMES
 DISPLAY_NAMES=(
   service "TorrentCore.Service"
   webui "TorrentCore.WebUI"
+  webui2 "TorrentCore.WebUI2"
 )
 
 typeset -A PLISTS
 PLISTS=(
   service "${TARGET_DIR}/${TORRENTCORE_SERVICE_LAUNCH_LABEL}.plist"
   webui "${TARGET_DIR}/${TORRENTCORE_WEBUI_LAUNCH_LABEL}.plist"
+  webui2 "${TARGET_DIR}/${TORRENTCORE_WEBUI2_LAUNCH_LABEL}.plist"
 )
 
 usage() {
   cat <<'EOF'
 Usage:
-  ManageTorrentCoreLaunchAgents.zsh <start|stop|restart> <all|service|webui>
+  ManageTorrentCoreLaunchAgents.zsh <start|stop|restart> <all|service|webui|webui2>
 EOF
 }
 
@@ -61,6 +64,9 @@ normalize_target() {
       ;;
     webui|torrentcore.webui|web)
       echo "webui"
+      ;;
+    webui2|torrentcore.webui2|web2)
+      echo "webui2"
       ;;
     *)
       return 1
@@ -187,12 +193,22 @@ target="$(normalize_target "$2")" || {
 
 typeset -a service_keys
 if [[ "$target" == "all" ]]; then
+  has_webui2=false
+  [[ -f "${PLISTS[webui2]}" ]] && has_webui2=true
   case "$action" in
     stop)
-      service_keys=(webui service)
+      if [[ "$has_webui2" == true ]]; then
+        service_keys=(webui2 webui service)
+      else
+        service_keys=(webui service)
+      fi
       ;;
     start|restart)
-      service_keys=(service webui)
+      if [[ "$has_webui2" == true ]]; then
+        service_keys=(service webui webui2)
+      else
+        service_keys=(service webui)
+      fi
       ;;
     *)
       service_keys=(service webui)

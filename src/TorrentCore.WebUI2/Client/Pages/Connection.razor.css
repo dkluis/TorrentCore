@@ -1,0 +1,23 @@
+.connection-page { height: 100%; overflow: auto; padding: 16px; }
+h1 { font-size: 1.6rem; margin: 0 0 14px; }
+h2 { font-size: 1.2rem; margin: 0 0 18px; }
+.connection-columns { display: flex; align-items: flex-start; gap: 16px; }
+.connection-list, .connection-editor { border: 1px solid var(--mud-palette-lines-default); border-radius: 6px; background: var(--mud-palette-surface); padding: 16px; }
+.connection-list { width: 330px; flex: 0 0 330px; }
+.connection-editor { width: 640px; max-width: 100%; }
+.connection-row { width: 100%; padding: 10px; border: 0; background: transparent; text-align: left; color: var(--mud-palette-text-primary); display: grid; gap: 3px; position: relative; }
+.connection-row.selected { background: var(--mud-palette-primary-hover); }
+.connection-row span { overflow-wrap: anywhere; font-size: .85rem; }
+.connection-row .production { color: #1976d2; }
+.connection-row .test { color: #f44336; }
+.connection-row .unclassified { color: var(--mud-palette-text-secondary); }
+.connection-active { position: absolute; right: 8px; top: 8px; color: var(--mud-palette-success); }
+.connection-list-actions { margin-top: 12px; display: flex; justify-content: space-between; }
+.connection-fields { display: grid; grid-template-columns: 130px minmax(200px, 1fr); align-items: center; gap: 12px; }
+.connection-fields input, .connection-fields select { padding: 8px; border: 1px solid var(--mud-palette-lines-inputs); border-radius: 5px; background: var(--mud-palette-surface); color: var(--mud-palette-text-primary); min-width: 0; }
+.connection-fields select { width: max-content; }
+.connection-help { color: var(--mud-palette-text-secondary); font-size: .8rem; margin-top: 12px; }
+.connection-status { margin: 18px 0; }
+.connection-status p { margin: 4px 0; }
+.connected { color: var(--mud-palette-success); }
+.connection-actions { display: flex; gap: 8px; flex-wrap: wrap; }

@@ -120,6 +120,7 @@ GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 BUILT_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 SERVICE_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreService.app"
 WEBUI_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreWebUI.app"
+WEBUI2_APP_PATH="$PACKAGE_ROOT/payload/$RUNTIME/TorrentCoreWebUI2.app"
 UI_APP_PATH="$PACKAGE_ROOT/TorrentCore.app"
 mkdir -p "${SERVICE_APP_PATH:h}"
 
@@ -133,6 +134,8 @@ print -r -- "Description:  $NOTES"
 "$REPO_ROOT/Scripts/ServiceApp/build-macos-service-app.zsh" --output-bundle "$SERVICE_APP_PATH" --signing-identity "$SIGNING_IDENTITY"
 "$REPO_ROOT/Scripts/WebUIApp/build-macos-webui-app.zsh" --output-bundle "$WEBUI_APP_PATH" --signing-identity "$SIGNING_IDENTITY"
 "$REPO_ROOT/Scripts/WebUIApp/verify-macos-webui-static-assets.zsh" "$WEBUI_APP_PATH"
+"$REPO_ROOT/Scripts/WebUI2App/build-macos-webui2-app.zsh" --output-bundle "$WEBUI2_APP_PATH" --signing-identity "$SIGNING_IDENTITY"
+"$REPO_ROOT/Scripts/WebUI2App/verify-macos-webui2-static-assets.zsh" "$WEBUI2_APP_PATH"
 "$REPO_ROOT/Scripts/MacOSApp/build-signed-macos-ui-app.zsh" \
     --output-bundle "$UI_APP_PATH" --version "$COMPONENT_VERSION" --build-number "$BUILD_NUMBER" \
     --git-sha "$GIT_SHA" --built-at-utc "$BUILT_AT_UTC" --signing-identity "$SIGNING_IDENTITY"
@@ -155,12 +158,23 @@ PY
 }
 SERVICE_SHA="$(tree_sha256 "$SERVICE_APP_PATH")"
 WEBUI_SHA="$(tree_sha256 "$WEBUI_APP_PATH")"
+WEBUI2_SHA="$(tree_sha256 "$WEBUI2_APP_PATH")"
 UI_SHA="$(tree_sha256 "$UI_APP_PATH")"
 
-python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$MACHINE" "$TARGET_HOME" "$RUNTIME" "$NOTES" "$GIT_SHA" "$BUILT_AT_UTC" "$SOURCE_DIRTY" "$SERVICE_SHA" "$WEBUI_SHA" "$UI_SHA" "$COMPONENT_VERSION" "$BUILD_NUMBER" <<'PY'
+RUNTIME_SCRIPTS="$PACKAGE_ROOT/RuntimeScripts"
+mkdir -p "$RUNTIME_SCRIPTS/lib"
+for helper in ManageTorrentCoreLaunchAgents.zsh agentstatus.zsh install-launch-agents.zsh torrentcore.env.example com.torrentcore.service.plist com.torrentcore.webui.plist; do
+    [[ -f "$REPO_ROOT/Scripts/$helper" ]] || fail "Runtime helper is missing: Scripts/$helper"
+    ditto --noqtn "$REPO_ROOT/Scripts/$helper" "$RUNTIME_SCRIPTS/$helper"
+done
+[[ -f "$REPO_ROOT/Scripts/lib/torrentcore-common.zsh" ]] || fail "Runtime helper is missing: Scripts/lib/torrentcore-common.zsh"
+ditto --noqtn "$REPO_ROOT/Scripts/lib/torrentcore-common.zsh" "$RUNTIME_SCRIPTS/lib/torrentcore-common.zsh"
+[[ ! -e "$RUNTIME_SCRIPTS/torrentcore.env" ]] || fail "Machine-local torrentcore.env must not be staged."
+
+python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$MACHINE" "$TARGET_HOME" "$RUNTIME" "$NOTES" "$GIT_SHA" "$BUILT_AT_UTC" "$SOURCE_DIRTY" "$SERVICE_SHA" "$WEBUI_SHA" "$WEBUI2_SHA" "$UI_SHA" "$COMPONENT_VERSION" "$BUILD_NUMBER" <<'PY'
 import json, pathlib, sys
 (output, release_id, release_date, installation, machine, target_home, runtime, notes,
- git_sha, built_at, dirty, service_sha, webui_sha, ui_sha, component_version, build_number)=sys.argv[1:]
+ git_sha, built_at, dirty, service_sha, webui_sha, webui2_sha, ui_sha, component_version, build_number)=sys.argv[1:]
 value={
  "schemaVersion":2, "product":"TorrentCoreManagedApps", "installation":installation,
  "machine":machine, "targetHome":target_home, "runtime":runtime, "releaseId":release_id,
@@ -170,10 +184,12 @@ value={
   "service":{"path":f"payload/{runtime}/TorrentCoreService.app", "runtime":runtime,
    "bundleIdentifier":"com.conadv.torrentcore.service", "version":component_version, "build":build_number, "sha256":service_sha},
   "webUi":{"path":f"payload/{runtime}/TorrentCoreWebUI.app", "runtime":runtime,
-   "bundleIdentifier":"com.conadv.torrentcore.webui", "version":component_version, "build":build_number, "sha256":webui_sha}},
+   "bundleIdentifier":"com.conadv.torrentcore.webui", "version":component_version, "build":build_number, "sha256":webui_sha},
+  "webUi2":{"path":f"payload/{runtime}/TorrentCoreWebUI2.app", "runtime":runtime,
+   "bundleIdentifier":"com.conadv.torrentcore.webui2", "version":component_version, "build":build_number, "sha256":webui2_sha}},
  "nativeUi":{"path":"TorrentCore.app", "version":component_version, "build":build_number, "runtime":runtime,
   "sha256":ui_sha, "installPath":"/Applications/TorrentCore.app", "installMode":"DragToApplications"},
- "protectedFiles":["Scripts/torrentcore.env", "WebUI/Config/service-connection.json"],
+ "protectedFiles":["Scripts/torrentcore.env", "WebUI/Config/service-connection.json", "WebUI2/appsettings.json", "WebUI2/Config/browser-connections/"],
 }
 pathlib.Path(output).write_text(json.dumps(value,indent=2)+"\n",encoding="utf-8")
 PY
@@ -185,6 +201,9 @@ python3 "$SCRIPT_DIR/generate-package-docs.py" "${doc_args[@]}"
 
 if find "$PACKAGE_ROOT" -path '*/Config/service-connection.json' -print -quit | grep -q .; then
     fail "Machine-local Config/service-connection.json was found in the staged package."
+fi
+if find "$PACKAGE_ROOT" \( -name torrentcore.env -o -path '*/browser-connections/*' \) -print -quit | grep -q .; then
+    fail "Machine-local WebUI2 connections or torrentcore.env were found in the staged package."
 fi
 
 print -r -- ""

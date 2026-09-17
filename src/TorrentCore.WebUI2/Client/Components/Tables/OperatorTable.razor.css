@@ -1,0 +1,31 @@
+.operator-table { background: var(--mud-palette-background, #fff); box-sizing: border-box; color: var(--mud-palette-text-primary, #172033); display: flex; flex: 1 1 auto; flex-direction: column; font: 14px system-ui, sans-serif; height: 100%; min-height: 0; min-width: 0; overflow: hidden; }
+.operator-table button, .operator-table summary, .operator-table input, .operator-table select { font: inherit; }
+.operator-table button, .operator-table summary { background: var(--mud-palette-surface, #fff); border: 1px solid var(--mud-palette-lines-default, #9ca8ba); border-radius: 5px; color: var(--mud-palette-text-primary, #172033); cursor: pointer; padding: 6px 10px; }
+.operator-table button:focus-visible, .operator-table summary:focus-visible, .operator-table input:focus-visible, .operator-table select:focus-visible { outline: 2px solid var(--mud-palette-primary, #1769aa); outline-offset: 2px; }
+.operator-table button:disabled { cursor: default; opacity: .5; }
+.operator-table input, .operator-table select { background: var(--mud-palette-surface, white); border: 1px solid var(--mud-palette-lines-inputs, #aeb7c7); border-radius: 5px; color: var(--mud-palette-text-primary, #172033); min-height: 32px; padding: 3px 7px; }
+.operator-table input[type="checkbox"] { accent-color: var(--mud-palette-primary, #1769aa); }
+.operator-table > .table-tools { box-sizing: border-box; display: flex; flex: 0 0 auto; gap: 8px; margin: 0 0 8px; padding: 0 12px; }
+.operator-table .toolbar-spacer { flex: 1 1 auto; }
+.operator-table .table-tools details { position: relative; }
+.operator-table .table-tools summary { list-style: none; }
+.operator-table .tool-panel { background: var(--mud-palette-surface, white); border: 1px solid var(--mud-palette-lines-default, #b9c1ce); border-radius: 6px; box-shadow: var(--mud-elevation-5, 0 5px 18px #0002); box-sizing: border-box; display: grid; gap: 7px; left: 0; min-width: 220px; overflow: auto; overscroll-behavior: contain; padding: 10px; position: absolute; top: calc(100% + 4px); z-index: 20; }
+.operator-table .tool-panel-close { display: none; }
+.operator-table .sort-editor { min-width: 580px; }
+.operator-table .sort-row { align-items: center; display: grid; gap: 6px; grid-template-columns: 24px 1fr 120px auto auto auto; }
+.operator-table .columns-editor label { align-items: center; display: flex; gap: 7px; }
+.operator-table .shows-grid-shell { border: 1px solid var(--mud-palette-lines-default, #c8cfda); flex: 1 1 auto; min-height: 0; overflow: hidden; position: relative; }
+.operator-table .grid-viewport { height: 100%; min-height: 0; overflow: hidden; }
+.operator-table .empty-state { color: var(--mud-palette-text-secondary, #5e6879); display: grid; height: 100%; min-height: 0; place-items: center; padding: 12px; text-align: center; }
+.operator-table .phone-card-viewport, .operator-table .phone-detail-export { display: none; }
+.operator-table .show-overlay { background: var(--mud-palette-surface, white); border-left: 1px solid var(--mud-palette-lines-default, #9ca8ba); bottom: 0; box-shadow: var(--mud-elevation-8, -7px 0 20px #0002); max-width: min(900px, 92vw); min-width: 320px; overflow: auto; position: absolute; right: 0; top: 0; z-index: 15; }
+.operator-table .overlay-drag-handle { bottom: 0; cursor: ew-resize; left: 0; position: absolute; top: 0; touch-action: none; width: 7px; z-index: 2; }
+.operator-table .overlay-drag-handle:hover { background: var(--mud-palette-primary-hover, #1769aa33); }
+.operator-table .show-overlay header { align-items: center; background: var(--mud-palette-surface, white); border-bottom: 1px solid var(--mud-palette-lines-default, #d6dbe3); display: flex; justify-content: space-between; padding: 12px; }
+.operator-table .show-overlay header h2 { font-size: 1.05rem; margin: 0; }
+.operator-table .operator-detail-content { padding: 12px; }
+.operator-table .pager { align-items: center; display: flex; flex: 0 0 auto; gap: 9px; justify-content: flex-end; padding: 9px 12px 9px 0; }
+.operator-table .pager label { align-items: center; display: flex; gap: 5px; }
+.operator-table .context-anchor > summary { border: 0; height: 1px; opacity: 0; padding: 0; position: fixed; width: 1px; }
+.operator-table .context-actions { bottom: auto; max-height: calc(100dvh - 16px); max-width: calc(100vw - 16px); min-width: 180px; overflow: auto; position: fixed; right: auto; }
+

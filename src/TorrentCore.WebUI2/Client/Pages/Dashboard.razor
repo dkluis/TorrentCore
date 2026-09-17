@@ -1,0 +1,122 @@
+@page "/"
+@page "/dashboard"
+@implements IDisposable
+@using TorrentCore.Contracts.Host
+@inject BrowserSession Session
+@inject BrowserPreferences Preferences
+@inject IJSRuntime JS
+
+<PageTitle>Dashboard</PageTitle>
+<div class="tc-dashboard">
+    <header><div><h1>Dashboard</h1><p>Service status, transfer activity, and recent lifecycle events.</p></div>
+        <button type="button" @onclick="RefreshAsync" disabled="@_busy">Refresh</button></header>
+    @if (Session.ActiveProfile is null) { <p>Choose a service connection to view the dashboard.</p> }
+    else if (_status is null && _error is null) { <p>Loading dashboard…</p> }
+    else if (_status is null) { <p role="alert">@_error</p> }
+    else
+    {
+        @if (_error is not null) { <p role="alert">@_error Last successful status remains below.</p> }
+        <section><h2>Service</h2><dl>
+            @Fact("Service", _status.ServiceName) @Fact("Version", _status.ServiceVersion)
+            @Fact("Engine", _status.EngineRuntime) @Fact("Environment", _status.EnvironmentName)
+            @Fact("Build", string.IsNullOrEmpty(_status.ServiceBuild) ? null : _status.ServiceBuild[..Math.Min(12, _status.ServiceBuild.Length)])
+            @Fact("Instance", _status.ServiceInstanceId.ToString("D")) @Fact("Status", Words(_status.Status.ToString()))
+            @Fact("Checked", OperatorDateTime.Local(_status.CheckedAtUtc))
+        </dl></section>
+        <section><h2>VPN Connection</h2><dl>
+            @Fact("Validation", Bool(_status.VpnValidationEnabled, "Enabled", "Disabled"))
+            @Fact("Connection", Words(_status.VpnConnectionPhase))
+            @Fact("Torrent Processing", Bool(_status.TorrentProcessingAvailable, "Active", "Paused"))
+            @Fact("Reason", Words(_status.VpnConnectionReason))
+            @Fact("Current Public IPv4", _status.VpnObservedPublicIpv4)
+            @Fact("Last Check", OperatorDateTime.Local(_status.VpnLastCheckAtUtc))
+            @Fact("Last Successful Check", OperatorDateTime.Local(_status.VpnLastSuccessAtUtc))
+            @Fact("Next Automatic Retry", OperatorDateTime.Local(_status.VpnNextAutomaticRetryAtUtc))
+            @Fact("Ready Check Interval", Seconds(_status.VpnReadyCheckIntervalSeconds))
+            @Fact("Paused Check Interval", Seconds(_status.VpnDegradedCheckIntervalSeconds))
+            @Fact("VPN Recovery Mode", Words(_status.VpnRecoveryMode ?? _status.ExpressVpnRecoveryMode))
+            @Fact("Recovery Phase", Words(_status.VpnRecoveryPhase ?? _status.ExpressVpnRecoveryPhase))
+            @Fact($"{(_status.VpnRecoveryProvider ?? "ExpressVPN")} Controller", Words(_status.VpnConnectionState ?? _status.ExpressVpnConnectionState))
+            @Fact("Reconnect Attempts", Attempts(_status.VpnReconnectAttemptsUsed ?? _status.ExpressVpnReconnectAttemptsUsed, _status.VpnReconnectAttemptsMaximum ?? _status.ExpressVpnReconnectAttemptsMaximum))
+            @Fact("Launch Attempts", _status.VpnRecoveryProvider == "PIA" ? "Not used" : Attempts(_status.VpnLaunchAttemptsUsed ?? _status.ExpressVpnLaunchAttemptsUsed, _status.VpnLaunchAttemptsMaximum ?? _status.ExpressVpnLaunchAttemptsMaximum))
+            @Fact("Next Provider Action", OperatorDateTime.Local(_status.VpnNextActionAtUtc ?? _status.ExpressVpnNextActionAtUtc))
+            @Fact("Last Provider Action", OperatorDateTime.Local(_status.VpnLastActionAtUtc ?? _status.ExpressVpnLastActionAtUtc))
+            @Fact("Last Provider Outcome", Words(_status.VpnLastActionOutcome ?? _status.ExpressVpnLastActionOutcome))
+        </dl><p>@(_status.TorrentProcessingMessage ?? (_status.VpnValidationEnabled == true ? "VPN connection is available. Torrent processing is active." : _status.VpnValidationEnabled is null ? "VPN connection status is unavailable from this Service version." : "VPN validation is disabled. Torrent processing is active."))</p>
+            @if (!string.IsNullOrEmpty(_status.VpnRecoveryMessage ?? _status.ExpressVpnRecoveryMessage)) { <p>@(_status.VpnRecoveryMessage ?? _status.ExpressVpnRecoveryMessage)</p> }
+        </section>
+        <section><h2>Current Transfer</h2><dl>
+            @Fact("Download", Rate(_status.CurrentDownloadRateBytesPerSecond)) @Fact("Upload", Rate(_status.CurrentUploadRateBytesPerSecond))
+            @Fact("Connected Peers", _status.CurrentConnectedPeerCount.ToString("N0")) @Fact("Total Torrents", _status.TorrentCount.ToString("N0"))
+        </dl></section>
+        <section><h2>Torrent States</h2><dl>
+            @Fact("Resolving Metadata", _status.ResolvingMetadataCount.ToString("N0"))
+            @Fact("Queued", (_status.MetadataQueueCount + _status.DownloadQueueCount).ToString("N0"))
+            @Fact("Downloading", _status.DownloadingCount.ToString("N0")) @Fact("Seeding", _status.SeedingCount.ToString("N0"))
+            @Fact("Paused", _status.PausedCount.ToString("N0")) @Fact("Completed", _status.CompletedCount.ToString("N0"))
+            @Fact("Errors", _status.ErrorCount.ToString("N0"))
+        </dl></section>
+        <section><h2>Capacity &amp; Startup Recovery</h2><dl>
+            @Fact("Download Slots", $"{_status.AvailableDownloadSlots} of {_status.MaxActiveDownloads} available")
+            @Fact("Metadata Slots", $"{_status.AvailableMetadataResolutionSlots} of {_status.MaxActiveMetadataResolutions} available")
+            @Fact("Recovery", _status.StartupRecoveryCompleted ? "Completed" : "In progress")
+            @Fact("Recovered", _status.StartupRecoveredTorrentCount.ToString("N0"))
+            @Fact("Normalized", _status.StartupNormalizedTorrentCount.ToString("N0"))
+            @Fact("Completed At", OperatorDateTime.Local(_status.StartupRecoveryCompletedAtUtc))
+        </dl></section>
+        <section><h2>Recent Lifecycle Events</h2>
+            @if (_lifecycleError is not null) { <p role="alert">@_lifecycleError</p> }
+            else if (_lifecycle?.RecentEvents.Count == 0) { <p>No recent lifecycle events for this service instance.</p> }
+            else if (_lifecycle is not null) { <ol>@foreach (var item in _lifecycle.RecentEvents.Take(12)) { <li><strong>@Words(item.EventType)</strong> <time>@OperatorDateTime.Local(item.OccurredAtUtc)</time><div>@item.Message</div><small>@item.Category</small></li> }</ol> }
+        </section>
+    }
+</div>
+
+@code {
+    private EngineHostStatusDto? _status;
+    private DashboardLifecycleSummaryDto? _lifecycle;
+    private string? _error, _lifecycleError;
+    private bool _busy, _disposed;
+    private long _revision = -1;
+    private CancellationTokenSource? _cts;
+    protected override void OnInitialized() { Session.Changed += Restart; Preferences.Changed += Restart; Restart(); }
+    private void Restart() => _ = InvokeAsync(() => {
+        _cts?.Cancel(); _cts?.Dispose(); _cts = new(); _revision = Session.Revision;
+        _status = null; _lifecycle = null; _error = null; _lifecycleError = null; _busy = false;
+        if (Session.IsInitialized && Session.ActiveProfile is not null) _ = PollAsync(_revision, _cts.Token);
+        StateHasChanged();
+    });
+    private async Task PollAsync(long revision, CancellationToken token) {
+        await LoadAsync(revision, token);
+        while (!token.IsCancellationRequested) {
+            try { await Task.Delay(TimeSpan.FromSeconds(Preferences.RefreshSeconds), token); } catch (OperationCanceledException) { break; }
+            if (!Preferences.AutoRefresh) continue;
+            try { if (await JS.InvokeAsync<bool>("tcBrowser.isVisible", token)) await LoadAsync(revision, token); }
+            catch (OperationCanceledException) { break; } catch (JSException) { }
+        }
+    }
+    private Task RefreshAsync() => LoadAsync(_revision, _cts?.Token ?? CancellationToken.None);
+    private bool Current(long revision, CancellationToken token) => !_disposed && !token.IsCancellationRequested &&
+        revision == Session.Revision && _cts is not null && token == _cts.Token;
+    private async Task LoadAsync(long revision, CancellationToken token) {
+        if (_busy || !Current(revision, token) || Session.ActiveProfile is null) return;
+        _busy = true;
+        try {
+            var client = Session.CreateClient(revision);
+            var status = await client.GetHostStatusAsync(token);
+            if (!Current(revision, token)) return;
+            _status = status ?? throw new InvalidOperationException("Service status was not returned."); _error = null;
+            try { var lifecycle = await client.GetDashboardLifecycleAsync(token); if (!Current(revision, token)) return; _lifecycle = lifecycle; _lifecycleError = null; }
+            catch (Exception ex) when (ex is not OperationCanceledException) { if (Current(revision, token)) _lifecycleError = ex.Message; }
+        } catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (Current(revision, token)) _error = ex.Message; }
+        finally { if (Current(revision, token)) { _busy = false; await InvokeAsync(StateHasChanged); } }
+    }
+    private static RenderFragment Fact(string label, string? value) => builder => { builder.OpenElement(0, "dt"); builder.AddContent(1, label); builder.CloseElement(); builder.OpenElement(2, "dd"); builder.AddContent(3, string.IsNullOrWhiteSpace(value) ? "--" : value); builder.CloseElement(); };
+    private static string Bool(bool? value, string yes, string no) => value is null ? "--" : value.Value ? yes : no;
+    private static string Seconds(int? value) => value is null ? "--" : $"{value:N0} seconds";
+    private static string Attempts(int? used, int? max) => used is null || max is null ? "--" : $"{used} of {max}";
+    private static string Rate(long value) => $"{value / 1024d / 1024d:N1} MiB/s";
+    private static string Words(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : System.Text.RegularExpressions.Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
+    public void Dispose() { _disposed = true; Session.Changed -= Restart; Preferences.Changed -= Restart; _cts?.Cancel(); _cts?.Dispose(); }
+}

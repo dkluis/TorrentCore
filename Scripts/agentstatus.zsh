@@ -9,7 +9,12 @@ tc_load_env_file
 
 LAUNCHD_DOMAIN="$(tc_launchd_domain)"
 
-for label in "${TORRENTCORE_SERVICE_LAUNCH_LABEL}" "${TORRENTCORE_WEBUI_LAUNCH_LABEL}"; do
+labels=("${TORRENTCORE_SERVICE_LAUNCH_LABEL}" "${TORRENTCORE_WEBUI_LAUNCH_LABEL}")
+if [[ -f "${TORRENTCORE_LAUNCH_AGENT_TARGET_DIR}/${TORRENTCORE_WEBUI2_LAUNCH_LABEL}.plist" ]]; then
+  labels+=("${TORRENTCORE_WEBUI2_LAUNCH_LABEL}")
+fi
+
+for label in "${labels[@]}"; do
   echo "=== $label ==="
   if ! launchctl print "$LAUNCHD_DOMAIN/$label" 2>/dev/null | rg "state =|pid =|last exit code =|program =|path ="; then
     echo "not loaded"

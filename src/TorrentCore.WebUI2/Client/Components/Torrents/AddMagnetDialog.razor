@@ -1,0 +1,82 @@
+@namespace TorrentCore.WebUI2.Client.Components.Torrents
+@using TorrentCore.Contracts.Categories
+@using TorrentCore.Contracts.Torrents
+@inject TorrentCore.WebUI2.Client.Services.BrowserSession Session
+
+<MudDialog>
+    <DialogContent>
+        <div class="tc-add-magnet">
+            <MudTextField T="string" Label="Magnet URI" Value="@_magnet" ValueChanged="MagnetChanged"
+                          Lines="5" Immediate="true" Variant="Variant.Outlined" />
+            <MudSelect T="string" Label="Category" Value="@_category" ValueChanged="CategoryChanged" Variant="Variant.Outlined">
+                <MudSelectItem T="string" Value="@string.Empty">Uncategorized</MudSelectItem>
+                @foreach (var category in _categories) { <MudSelectItem T="string" Value="@category.Key">@category.DisplayName</MudSelectItem> }
+            </MudSelect>
+            @if (_loadingCategories) { <p>Loading categories…</p> }
+            @if (_categoriesUnavailable) { <MudAlert Severity="Severity.Warning">Categories could not be loaded. You can still add the torrent as Uncategorized.</MudAlert> }
+            @if (!string.IsNullOrWhiteSpace(_magnet) && !IsValidMagnet(_magnet))
+            { <MudAlert Severity="Severity.Error">Enter a valid magnet link that begins with magnet:? and includes an xt value.</MudAlert> }
+            @if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" Disabled="@_submitting" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_submitting || !_canAdd || !IsValidMagnet(_magnet) || Session.ActiveProfile is null)" OnClick="SubmitAsync">Add Magnet</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public long Revision { get; set; }
+    private IReadOnlyList<TorrentCategoryDto> _categories = [];
+    private string _magnet = string.Empty, _category = string.Empty;
+    private string? _error;
+    private bool _loadingCategories, _categoriesUnavailable, _submitting, _canAdd;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loadingCategories = true;
+        try
+        {
+            var categories = await Session.CreateClient(Revision).GetCategoriesAsync();
+            if (Revision != Session.Revision) return;
+            _categories = categories.Where(x => x.Enabled && !string.IsNullOrWhiteSpace(x.Key))
+                .OrderBy(x => x.SortOrder).ThenBy(x => x.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToArray();
+        }
+        catch (Exception ex) { if (Revision == Session.Revision) { _categoriesUnavailable = true; _error = ex.Message; } }
+        finally { _loadingCategories = false; }
+        try { _canAdd = (await Session.CreateClient(Revision).GetHostStatusAsync())?.SupportsMagnetAdds == true && Revision == Session.Revision; }
+        catch (Exception ex) { if (Revision == Session.Revision) _error = ex.Message; }
+    }
+
+    private Task MagnetChanged(string value) { _magnet = value ?? string.Empty; _error = null; return Task.CompletedTask; }
+    private Task CategoryChanged(string value) { _category = value ?? string.Empty; return Task.CompletedTask; }
+    private void Cancel() => Dialog.Cancel();
+
+    private async Task SubmitAsync()
+    {
+        var magnet = _magnet.Trim();
+        if (!IsValidMagnet(magnet) || _submitting || Revision != Session.Revision) return;
+        _submitting = true; _error = null;
+        try
+        {
+            await Session.CreateClient(Revision).AddMagnetAsync(new AddMagnetRequest {
+                MagnetUri = magnet, CategoryKey = string.IsNullOrWhiteSpace(_category) ? null : _category
+            });
+            if (Revision == Session.Revision) Dialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex) { if (Revision == Session.Revision) _error = ex.Message; }
+        finally { _submitting = false; }
+    }
+
+    internal static bool IsValidMagnet(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !value.Trim().StartsWith("magnet:?", StringComparison.OrdinalIgnoreCase)) return false;
+        if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) || !uri.Scheme.Equals("magnet", StringComparison.OrdinalIgnoreCase)) return false;
+        var query = uri.Query.TrimStart('?');
+        return query.Split('&', StringSplitOptions.RemoveEmptyEntries).Any(x =>
+            x.Split('=', 2) is { Length: 2 } parts &&
+            Uri.UnescapeDataString(parts[0]).Equals("xt", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(Uri.UnescapeDataString(parts[1])));
+    }
+}

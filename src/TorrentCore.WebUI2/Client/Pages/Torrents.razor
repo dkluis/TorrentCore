@@ -1,0 +1,533 @@
+@page "/torrents"
+@implements IAsyncDisposable
+@using System.Globalization
+@using TorrentCore.Contracts.Torrents
+@using TorrentCore.Contracts.Host
+@using TorrentCore.Client
+@using TorrentCore.WebUI2.Client.Components.Tables
+@using TorrentCore.WebUI2.Client.Components.Torrents
+@using TorrentCore.WebUI2.Client.Components
+@inject TorrentCore.WebUI2.Client.Services.BrowserSession Session
+@inject TorrentCore.WebUI2.Client.Services.BrowserPreferences Preferences
+@inject IJSRuntime JS
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>Torrents</PageTitle>
+
+<div class="tc-torrents">
+    <header class="tc-torrents-heading">
+        <div><h1>Torrents</h1><p>Current torrent activity and selected torrent details</p></div>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@_busy" OnClick="RefreshAsync">Refresh</MudButton>
+    </header>
+
+    @if (!Session.IsInitialized || Session.ActiveProfile is null)
+    {
+        <MudAlert Severity="Severity.Info">Choose a service connection to view torrents.</MudAlert>
+    }
+    else
+    {
+        <div class="tc-torrents-workflow">
+        <div class="tc-torrent-filters">
+            <MudTextField T="string" Label="Search by name" Value="@_search" ValueChanged="SearchChanged" Immediate="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudSelect T="string" Label="State" Value="@_state" ValueChanged="StateChanged" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="string" Value="@string.Empty">All States</MudSelectItem>
+                @foreach (var state in Enum.GetValues<TorrentState>()) { <MudSelectItem T="string" Value="@state.ToString()">@Words(state.ToString())</MudSelectItem> }
+            </MudSelect>
+            <MudSelect T="string" Label="Category" Value="@_category" ValueChanged="CategoryChanged" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="string" Value="@string.Empty">All Categories</MudSelectItem>
+                <MudSelectItem T="string" Value="@Uncategorized">Uncategorized</MudSelectItem>
+                @foreach (var category in Categories) { <MudSelectItem T="string" Value="@category">@category</MudSelectItem> }
+            </MudSelect>
+            <MudSelect T="string" Label="Reason" Value="@_reason" ValueChanged="ReasonChanged" Variant="Variant.Outlined" Margin="Margin.Dense">
+                <MudSelectItem T="string" Value="@string.Empty">All Reasons</MudSelectItem>
+                <MudSelectItem T="string" Value="@NotWaiting">Not waiting</MudSelectItem>
+                @foreach (var reason in Reasons) { <MudSelectItem T="string" Value="@reason">@Words(reason)</MudSelectItem> }
+            </MudSelect>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ResetFilters" Disabled="@FiltersEmpty">Reset Filters</MudButton>
+        </div>
+        @if (_busy) { <div class="tc-phase-banner">@(_lastSuccessfulAt is null ? "Loading…" : "Refreshing…")</div> }
+        @if (_error is not null && _lastSuccessfulAt is not null) { <MudAlert Severity="Severity.Warning"><strong>Showing last-known information</strong><br />@_error</MudAlert> }
+        else if (_error is not null) { <MudAlert Severity="Severity.Error">@_error</MudAlert> }
+        <OperatorTable @ref="_table" Items="@Rows" Columns="@Columns" DefaultSorts="@DefaultSorts"
+                       StorageKey="torrentcore.webui2.torrents.v1" SelectedIds="@_selectedIds" SelectedIdsChanged="SelectionChanged"
+                       Busy="@_busy" MultiSelect="false" EmptyText="@(_loaded ? (_torrents.Count == 0 ? "No Torrents — the service is connected and has no torrents." : "No Torrents Match — clear or change the current torrent filters.") : "Waiting for TorrentCore torrent information.")"
+                       DetailTitle="@Selected?.Name" DetailContent="@Inspector" DefaultOverlayWidth="390"
+                       DetailOpen="@_inspectorOpen" DetailOpenChanged="InspectorOpenChanged" ContextActions="@ContextMenu"
+                       ExportColumns="@ExportColumns" ExportPrefix="torrents" ExportScopeName="all" />
+        @if (_hostStatus?.TorrentProcessingAvailable == false)
+        {
+            <div class="tc-processing-overlay" role="status">
+                <div class="tc-processing-overlay-content">
+                    <div class="tc-processing-icon" aria-hidden="true">@(_hostStatus.VpnConnectionPhase == "Activating" ? "↻" : "⏸")</div>
+                    <h2>@(_hostStatus.VpnConnectionPhase == "Activating" ? "Restarting Torrent Processing" : "Torrent Processing Paused")</h2>
+                    <p>@(_processingPausedMessage ?? "VPN connection could not be confirmed. Torrent processing is paused.")</p>
+                    @if (ProcessingReason is not null) { <small>@ProcessingReason</small> }
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RefreshAsync">Refresh</MudButton>
+                </div>
+            </div>
+        }
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "torrentId")] public Guid? RequestedTorrentId { get; set; }
+    private const string Uncategorized = "__uncategorized__";
+    private const string NotWaiting = "__not_waiting__";
+    private const string FilterStorageKey = "torrentcore.webui2.torrents.filters.v1";
+    private OperatorTable? _table;
+    private IReadOnlyList<TorrentSummaryDto> _torrents = [];
+    private TorrentDetailDto? _detail;
+    private HashSet<string> _selectedIds = [];
+    private string _search = "", _state = "", _category = "", _reason = "";
+    private string? _error;
+    private bool _busy, _loaded, _disposed;
+    private bool _inspectorOpen, _hostAvailable;
+    private DateTimeOffset? _lastSuccessfulAt;
+    private EngineHostStatusDto? _hostStatus;
+    private bool _supportsPause, _supportsResume, _supportsRemove;
+    private string? _processingPausedMessage;
+    private long _revision = -1;
+    private CancellationTokenSource? _contextCts;
+    private Task? _pollTask;
+    private Guid? _detailFor;
+    private bool _dialogOpen;
+
+    private static readonly IReadOnlyList<OperatorSort> DefaultSorts = [new("state", false), new("progress", true)];
+    private static readonly IReadOnlyList<OperatorColumn> Columns = [
+        new("name", "Name", 340, CanHide: false), new("state", "State", 145),
+        new("progress", "Progress", 160), new("download", "Download", 105),
+        new("peers", "Peers", 65), new("category", "Category", 125),
+        new("queue", "Queue #", 85), new("priority", "Priority #", 85), new("held", "Held #", 85),
+        new("reason", "Reason", 180, false), new("torrentId", "Torrent ID", 290, false),
+        new("upload", "Upload", 105, false), new("trackers", "Trackers", 85, false),
+        new("downloaded", "Downloaded", 110, false), new("total", "Total", 110, false),
+        new("added", "Added", 200, false), new("completed", "Completed", 200, false),
+        new("lastActivity", "Last Activity", 200, false), new("noProgressSince", "No Progress Since", 200, false),
+        new("lastYielded", "Last Yielded", 200, false), new("callback", "Callback", 150, false),
+        new("callbackPendingSince", "Callback Pending Since", 200, false),
+        new("callbackInvoked", "Callback Invoked", 200, false), new("callbackError", "Callback Error", 220, false),
+        new("error", "Error", 220, false), new("queueHeld", "Queue Held", 100, false),
+        new("downloadYielded", "Download Yielded", 130, false)
+    ];
+    private static readonly IReadOnlyList<OperatorColumn> ExportColumns = [
+        new("x.torrentId", "Torrent ID", 1), new("x.name", "Name", 1), new("x.category", "Category", 1),
+        new("x.state", "State", 1), new("x.progress", "Progress Percent", 1),
+        new("x.downloadRate", "Download Rate Bytes Per Second", 1), new("x.uploadRate", "Upload Rate Bytes Per Second", 1),
+        new("x.peers", "Connected Peer Count", 1), new("x.trackers", "Tracker Count", 1),
+        new("x.downloaded", "Downloaded Bytes", 1), new("x.total", "Total Bytes", 1),
+        new("x.added", "Added At", 1), new("x.lastActivity", "Last Activity At", 1),
+        new("x.completed", "Completed At", 1), new("x.error", "Error Message", 1),
+        new("x.reason", "Wait Reason", 1), new("x.queue", "Queue Position", 1),
+        new("x.priority", "Priority Queue Position", 1), new("x.held", "Held Queue Position", 1),
+        new("x.queueHeld", "Is Queue Held", 1), new("x.downloadYielded", "Is Download Yielded", 1),
+        new("x.noProgressSince", "Download No Progress Started At", 1),
+        new("x.lastYielded", "Download Last Yielded At", 1),
+        new("x.callback", "Completion Callback State", 1),
+        new("x.callbackPendingSince", "Completion Callback Pending Since", 1),
+        new("x.callbackInvoked", "Completion Callback Invoked At", 1),
+        new("x.callbackError", "Completion Callback Last Error", 1),
+        new("x.canPause", "Can Pause", 1), new("x.canResume", "Can Resume", 1),
+        new("x.canRemove", "Can Remove", 1), new("x.canRefreshMetadata", "Can Refresh Metadata", 1),
+        new("x.canRetryCallback", "Can Retry Completion Callback", 1),
+        new("x.canMakeNext", "Can Make Next", 1), new("x.canHold", "Can Hold", 1),
+        new("x.canReleaseHold", "Can Release Hold", 1), new("x.canResumeNext", "Can Resume Next", 1),
+        new("x.canResumeOnHold", "Can Resume On Hold", 1)
+    ];
+    private IEnumerable<string> Categories => _torrents.Select(x => x.CategoryKey).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x!).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.CurrentCultureIgnoreCase);
+    private IEnumerable<string> Reasons => _torrents.Where(x => x.WaitReason.HasValue).Select(x => x.WaitReason!.Value.ToString()).Distinct().OrderBy(x => Words(x), StringComparer.CurrentCultureIgnoreCase);
+    private bool FiltersEmpty => string.IsNullOrEmpty(_search) && string.IsNullOrEmpty(_state) && string.IsNullOrEmpty(_category) && string.IsNullOrEmpty(_reason);
+    private TorrentSummaryDto? Selected => _torrents.FirstOrDefault(x => _selectedIds.Contains(x.TorrentId.ToString("D")));
+    private IReadOnlyList<OperatorRow> Rows => _torrents.Where(Matches).Select(ToRow).ToArray();
+    private string? ProcessingReason => _hostStatus?.VpnConnectionReason switch {
+        "DirectIsp" => "The service is using the configured direct ISP connection.",
+        "InvalidResponse" => "The VPN check returned an invalid public address.",
+        "TimedOut" => "The VPN check timed out.",
+        "EndpointFailure" => "The VPN check service could not be reached.",
+        "UnexpectedFailure" => "The VPN check failed unexpectedly.",
+        "EngineActivationFailed" => "The VPN is available, but torrent processing could not restart.",
+        "EngineSuspensionFailed" => "Torrent processing could not be paused cleanly.",
+        _ => null
+    };
+
+    protected override void OnInitialized()
+    {
+        Session.Changed += SessionChanged;
+        Preferences.Changed += PreferencesChanged;
+        RestartContext();
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (RequestedTorrentId.HasValue && _selectedIds.Count == 0 && _torrents.Any(x => x.TorrentId == RequestedTorrentId.Value))
+        { _selectedIds = [RequestedTorrentId.Value.ToString("D")]; _inspectorOpen = true; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var saved = await JS.InvokeAsync<SavedFilters?>("tcBrowser.load", FilterStorageKey);
+            if (saved is null) return;
+            _state = saved.State ?? string.Empty;
+            _category = saved.Category ?? string.Empty;
+            _reason = saved.Reason ?? string.Empty;
+            StateHasChanged();
+        }
+        catch (JSException) { }
+    }
+
+    private void SessionChanged() => _ = InvokeAsync(() => { RestartContext(); StateHasChanged(); });
+    private void PreferencesChanged() => _ = InvokeAsync(() => { RestartPolling(); StateHasChanged(); });
+
+    private void RestartPolling()
+    {
+        _contextCts?.Cancel(); _contextCts?.Dispose();
+        _contextCts = new CancellationTokenSource();
+        _busy = false;
+        if (Session.IsInitialized && Session.ActiveProfile is not null)
+            _pollTask = PollAsync(_revision, _contextCts.Token);
+    }
+
+    private void RestartContext()
+    {
+        _contextCts?.Cancel(); _contextCts?.Dispose();
+        _contextCts = new CancellationTokenSource();
+        _busy = false;
+        _revision = Session.Revision;
+        _torrents = []; _detail = null; _detailFor = null; _selectedIds = []; _loaded = false; _error = null;
+        _inspectorOpen = false; _lastSuccessfulAt = null; _hostAvailable = false; _hostStatus = null;
+        _supportsPause = _supportsResume = _supportsRemove = false; _processingPausedMessage = null;
+        if (!Session.IsInitialized || Session.ActiveProfile is null) return;
+        _pollTask = PollAsync(_revision, _contextCts.Token);
+    }
+
+    private async Task PollAsync(long revision, CancellationToken token)
+    {
+        await InvokeAsync(() => LoadAsync(revision, token));
+        while (!token.IsCancellationRequested)
+        {
+            try { await Task.Delay(TimeSpan.FromSeconds(Math.Clamp(Preferences.RefreshSeconds, 5, 15)), token); }
+            catch (OperationCanceledException) { break; }
+            if (!Preferences.AutoRefresh || _dialogOpen) continue;
+            bool visible;
+            try { visible = await JS.InvokeAsync<bool>("tcBrowser.isVisible", token); }
+            catch (JSException) { continue; }
+            catch (OperationCanceledException) { break; }
+            if (visible) await InvokeAsync(() => LoadAsync(revision, token));
+        }
+    }
+
+    private Task RefreshAsync() => LoadAsync(_revision, _contextCts?.Token ?? CancellationToken.None);
+
+    private bool Current(long revision, CancellationToken token) =>
+        !_disposed && !token.IsCancellationRequested && _contextCts?.Token == token &&
+        revision == _revision && revision == Session.Revision;
+
+    private async Task LoadAsync(long revision, CancellationToken token)
+    {
+        if (_busy || !Current(revision, token) || Session.ActiveProfile is null) return;
+        _busy = true;
+        try
+        {
+            var client = Session.CreateClient(revision);
+            var result = await client.GetTorrentsAsync(token);
+            if (!Current(revision, token)) return;
+            _torrents = result;
+            _lastSuccessfulAt = DateTimeOffset.Now;
+            try
+            {
+                var host = await client.GetHostStatusAsync(token);
+                if (!Current(revision, token)) return;
+                _hostStatus = host;
+                _hostAvailable = host is not null;
+                _supportsPause = host?.SupportsPause == true;
+                _supportsResume = host?.SupportsResume == true;
+                _supportsRemove = host?.SupportsRemove == true;
+                _processingPausedMessage = host?.TorrentProcessingAvailable == false
+                    ? host.TorrentProcessingMessage ?? "Torrent processing is paused by the service." : null;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+            catch { if (Current(revision, token)) { _supportsPause = _supportsResume = _supportsRemove = false; _hostAvailable = false; _hostStatus = null; } }
+            if (!Current(revision, token)) return;
+            _loaded = true; _error = null;
+            if (RequestedTorrentId.HasValue && _selectedIds.Count == 0 && result.Any(x => x.TorrentId == RequestedTorrentId.Value))
+            { _selectedIds = [RequestedTorrentId.Value.ToString("D")]; _inspectorOpen = true; }
+            if (Selected is null) { _selectedIds = []; _detail = null; _detailFor = null; _inspectorOpen = false; }
+            else await LoadDetailAsync(client, revision, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (Exception ex) { if (Current(revision, token)) _error = ex.Message; }
+        finally { if (Current(revision, token)) { _busy = false; await InvokeAsync(StateHasChanged); } }
+    }
+
+    private async Task LoadDetailAsync(TorrentCoreClient client, long revision, CancellationToken token)
+    {
+        var selected = Selected;
+        if (selected is null) return;
+        var detail = await client.GetTorrentAsync(selected.TorrentId, token);
+        if (Current(revision, token) && Selected?.TorrentId == selected.TorrentId)
+        { _detail = detail; _detailFor = selected.TorrentId; }
+    }
+
+    private async Task SelectionChanged(HashSet<string> ids)
+    {
+        var revision = _revision;
+        var token = _contextCts?.Token ?? CancellationToken.None;
+        if (!Current(revision, token)) return;
+        _selectedIds = ids;
+        if (ids.Count == 0) _inspectorOpen = false;
+        _detail = null; _detailFor = null;
+        var selected = Selected;
+        if (selected is null) return;
+        try { await LoadDetailAsync(Session.CreateClient(revision), revision, token); if (Current(revision, token)) _error = null; }
+        catch (Exception ex) { if (Current(revision, token)) _error = ex.Message; }
+    }
+
+    private Task InspectorOpenChanged(bool open) { _inspectorOpen = open; return Task.CompletedTask; }
+    private void ShowDetails() { if (Selected is not null) _inspectorOpen = true; }
+    private RenderFragment ContextMenu => @<div class="tc-torrent-context">
+        @if (Selected is { } torrent)
+        {
+            <button type="button" @onclick="ShowDetails">Show Details</button>
+            <button type="button" @onclick="@(() => Navigation.NavigateTo($"/history?torrentId={torrent.TorrentId:D}"))">Show History</button>
+            <button type="button" @onclick="@(() => Navigation.NavigateTo($"/logs?torrentId={torrent.TorrentId:D}"))">Show Filtered Logs</button>
+            @if (_hostAvailable && torrent.CanMakeNext) { <button type="button" @onclick="@(() => ActAsync("Make Next", c => c.MakeNextAsync(torrent.TorrentId)))">Make Next</button> }
+            @if (_hostAvailable && torrent.CanHold) { <button type="button" @onclick="@(() => ActAsync("Hold", c => c.HoldAsync(torrent.TorrentId)))">Hold</button> }
+            @if (_hostAvailable && torrent.CanReleaseHold) { <button type="button" @onclick="@(() => ActAsync("Release Hold", c => c.ReleaseHoldAsync(torrent.TorrentId)))">Release Hold</button> }
+            @if (_hostAvailable && torrent.CanResumeNext) { <button type="button" @onclick="@(() => ActAsync("Resume Next", c => c.ResumeNextAsync(torrent.TorrentId)))">Resume Next</button> }
+            @if (_hostAvailable && torrent.CanResumeOnHold) { <button type="button" @onclick="@(() => ActAsync("Resume on Hold", c => c.ResumeOnHoldAsync(torrent.TorrentId)))">Resume on Hold</button> }
+        }
+    </div>;
+
+    private bool Matches(TorrentSummaryDto x) =>
+        (string.IsNullOrWhiteSpace(_search) || x.Name.Contains(_search.Trim(), StringComparison.CurrentCultureIgnoreCase)) &&
+        (string.IsNullOrEmpty(_state) || x.State.ToString() == _state) &&
+        (string.IsNullOrEmpty(_category) || (_category == Uncategorized ? string.IsNullOrWhiteSpace(x.CategoryKey) : string.Equals(_category, x.CategoryKey, StringComparison.OrdinalIgnoreCase))) &&
+        (string.IsNullOrEmpty(_reason) || (_reason == NotWaiting ? x.WaitReason is null : x.WaitReason?.ToString() == _reason));
+
+    private static OperatorRow ToRow(TorrentSummaryDto x)
+    {
+        var values = new Dictionary<string, string> {
+            ["name"] = x.Name, ["state"] = Words(x.State.ToString()), ["progress"] = $"{x.ProgressPercent:N1}%",
+            ["download"] = Rate(x.DownloadRateBytesPerSecond), ["peers"] = x.ConnectedPeerCount.ToString("N0"),
+            ["category"] = Category(x.CategoryKey), ["queue"] = Number(x.QueuePosition), ["priority"] = Number(x.PriorityQueuePosition),
+            ["held"] = Number(x.HeldQueuePosition), ["reason"] = x.WaitReason.HasValue ? Words(x.WaitReason.Value.ToString()) : "Not waiting",
+            ["torrentId"] = x.TorrentId.ToString("D"), ["upload"] = Rate(x.UploadRateBytesPerSecond),
+            ["trackers"] = x.TrackerCount.ToString("N0"), ["downloaded"] = Bytes(x.DownloadedBytes), ["total"] = Bytes(x.TotalBytes),
+            ["added"] = Date(x.AddedAtUtc), ["completed"] = Date(x.CompletedAtUtc), ["lastActivity"] = Date(x.LastActivityAtUtc),
+            ["noProgressSince"] = Date(x.DownloadNoProgressStartedAtUtc), ["lastYielded"] = Date(x.DownloadLastYieldedAtUtc),
+            ["callback"] = Text(x.CompletionCallbackState), ["callbackPendingSince"] = Date(x.CompletionCallbackPendingSinceUtc),
+            ["callbackInvoked"] = Date(x.CompletionCallbackInvokedAtUtc), ["callbackError"] = Text(x.CompletionCallbackLastError),
+            ["error"] = Text(x.ErrorMessage), ["queueHeld"] = YesNo(x.IsQueueHeld), ["downloadYielded"] = YesNo(x.IsDownloadYielded),
+            ["x.torrentId"] = x.TorrentId.ToString("D"), ["x.name"] = x.Name, ["x.category"] = x.CategoryKey ?? "",
+            ["x.state"] = x.State.ToString(), ["x.progress"] = x.ProgressPercent.ToString("F1", CultureInfo.InvariantCulture),
+            ["x.downloadRate"] = x.DownloadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
+            ["x.uploadRate"] = x.UploadRateBytesPerSecond.ToString(CultureInfo.InvariantCulture),
+            ["x.peers"] = x.ConnectedPeerCount.ToString(CultureInfo.InvariantCulture), ["x.trackers"] = x.TrackerCount.ToString(CultureInfo.InvariantCulture),
+            ["x.downloaded"] = x.DownloadedBytes.ToString(CultureInfo.InvariantCulture), ["x.total"] = RawNumber(x.TotalBytes),
+            ["x.added"] = ExportDate(x.AddedAtUtc), ["x.lastActivity"] = ExportDate(x.LastActivityAtUtc),
+            ["x.completed"] = ExportDate(x.CompletedAtUtc), ["x.error"] = x.ErrorMessage ?? "",
+            ["x.reason"] = x.WaitReason?.ToString() ?? "", ["x.queue"] = RawNumber(x.QueuePosition),
+            ["x.priority"] = RawNumber(x.PriorityQueuePosition), ["x.held"] = RawNumber(x.HeldQueuePosition),
+            ["x.queueHeld"] = YesNo(x.IsQueueHeld), ["x.downloadYielded"] = YesNo(x.IsDownloadYielded),
+            ["x.noProgressSince"] = ExportDate(x.DownloadNoProgressStartedAtUtc), ["x.lastYielded"] = ExportDate(x.DownloadLastYieldedAtUtc),
+            ["x.callback"] = x.CompletionCallbackState ?? "", ["x.callbackPendingSince"] = ExportDate(x.CompletionCallbackPendingSinceUtc),
+            ["x.callbackInvoked"] = ExportDate(x.CompletionCallbackInvokedAtUtc), ["x.callbackError"] = x.CompletionCallbackLastError ?? "",
+            ["x.canPause"] = YesNo(x.CanPause), ["x.canResume"] = YesNo(x.CanResume), ["x.canRemove"] = YesNo(x.CanRemove),
+            ["x.canRefreshMetadata"] = YesNo(x.CanRefreshMetadata), ["x.canRetryCallback"] = YesNo(x.CanRetryCompletionCallback),
+            ["x.canMakeNext"] = YesNo(x.CanMakeNext), ["x.canHold"] = YesNo(x.CanHold),
+            ["x.canReleaseHold"] = YesNo(x.CanReleaseHold), ["x.canResumeNext"] = YesNo(x.CanResumeNext),
+            ["x.canResumeOnHold"] = YesNo(x.CanResumeOnHold)
+        };
+        var sort = new Dictionary<string, IComparable?> {
+            ["state"] = x.State.ToString(), ["progress"] = x.ProgressPercent, ["download"] = x.DownloadRateBytesPerSecond,
+            ["peers"] = x.ConnectedPeerCount, ["queue"] = x.QueuePosition, ["priority"] = x.PriorityQueuePosition,
+            ["held"] = x.HeldQueuePosition, ["upload"] = x.UploadRateBytesPerSecond, ["trackers"] = x.TrackerCount,
+            ["downloaded"] = x.DownloadedBytes, ["total"] = x.TotalBytes, ["added"] = x.AddedAtUtc,
+            ["completed"] = x.CompletedAtUtc, ["lastActivity"] = x.LastActivityAtUtc, ["noProgressSince"] = x.DownloadNoProgressStartedAtUtc,
+            ["lastYielded"] = x.DownloadLastYieldedAtUtc, ["callbackPendingSince"] = x.CompletionCallbackPendingSinceUtc,
+            ["callbackInvoked"] = x.CompletionCallbackInvokedAtUtc, ["queueHeld"] = x.IsQueueHeld, ["downloadYielded"] = x.IsDownloadYielded
+        };
+        return new(x.TorrentId.ToString("D"), values, sort);
+    }
+
+    private Task SearchChanged(string value) { _search = value ?? ""; return Task.CompletedTask; }
+    private async Task StateChanged(string value) { _state = value ?? ""; await SaveFiltersAsync(); }
+    private async Task CategoryChanged(string value) { _category = value ?? ""; await SaveFiltersAsync(); }
+    private async Task ReasonChanged(string value) { _reason = value ?? ""; await SaveFiltersAsync(); }
+    private async Task ResetFilters() { _search = _state = _category = _reason = ""; await SaveFiltersAsync(); }
+    private async Task SaveFiltersAsync()
+    {
+        try { await JS.InvokeVoidAsync("tcBrowser.store", FilterStorageKey, new SavedFilters(_state, _category, _reason)); }
+        catch (JSException) { }
+    }
+    private sealed record SavedFilters(string? State, string? Category, string? Reason);
+
+    private RenderFragment Inspector => @<div class="tc-torrent-inspector">
+        @if (Selected is { } torrent)
+        {
+            <div class="tc-inspector-state">@Words(torrent.State.ToString()) · @Category(torrent.CategoryKey)</div>
+            <MudProgressLinear Value="@torrent.ProgressPercent" Color="Color.Primary" />
+            <strong>@($"{torrent.ProgressPercent:N1}%")</strong>
+            <div class="tc-inspector-actions">
+                <MudButton Disabled="@(_busy || !_supportsPause || !torrent.CanPause)" OnClick="@(() => ActAsync("Pause", c => c.PauseAsync(torrent.TorrentId)))">Pause</MudButton>
+                <MudButton Disabled="@(_busy || !_supportsResume || !torrent.CanResume)" OnClick="@(() => ActAsync("Resume", c => c.ResumeAsync(torrent.TorrentId)))">Resume</MudButton>
+                @if (_hostAvailable && torrent.CanMakeNext) { <MudButton Disabled="@_busy" OnClick="@(() => ActAsync("Make Next", c => c.MakeNextAsync(torrent.TorrentId)))">Make Next</MudButton> }
+                @if (_hostAvailable && torrent.CanHold) { <MudButton Disabled="@_busy" OnClick="@(() => ActAsync("Hold", c => c.HoldAsync(torrent.TorrentId)))">Hold</MudButton> }
+                @if (_hostAvailable && torrent.CanReleaseHold) { <MudButton Disabled="@_busy" OnClick="@(() => ActAsync("Release Hold", c => c.ReleaseHoldAsync(torrent.TorrentId)))">Release Hold</MudButton> }
+                @if (_hostAvailable && torrent.CanResumeNext) { <MudButton Disabled="@_busy" OnClick="@(() => ActAsync("Resume Next", c => c.ResumeNextAsync(torrent.TorrentId)))">Resume Next</MudButton> }
+                @if (_hostAvailable && torrent.CanResumeOnHold) { <MudButton Disabled="@_busy" OnClick="@(() => ActAsync("Resume on Hold", c => c.ResumeOnHoldAsync(torrent.TorrentId)))">Resume on Hold</MudButton> }
+            </div>
+            <div class="tc-inspector-actions">
+                <MudButton OnClick="@(() => OpenPeersAsync(torrent))">Peers</MudButton>
+                <MudButton OnClick="@(() => OpenTrackersAsync(torrent))">Trackers</MudButton>
+                <MudButton OnClick="@(() => Navigation.NavigateTo($"/history?torrentId={torrent.TorrentId:D}"))">History</MudButton>
+                <MudButton OnClick="@(() => Navigation.NavigateTo($"/logs?torrentId={torrent.TorrentId:D}"))">Logs</MudButton>
+            </div>
+            <dl class="tc-torrent-details">
+                @foreach (var row in DetailRows(torrent))
+                {
+                    <dt>@row.Label</dt>
+                    <dd>
+                        @row.Value
+                        @if (row.Label == "Torrent ID")
+                        { <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => CopyTorrentIdAsync(torrent.TorrentId))">Copy</MudButton> }
+                    </dd>
+                }
+            </dl>
+            <h3>Recovery Actions</h3>
+            <div class="tc-inspector-actions">
+                <MudButton Disabled="@(_busy || !_hostAvailable || !torrent.CanRefreshMetadata)" OnClick="@(() => ActAsync("Refresh Metadata", c => c.RefreshMetadataAsync(torrent.TorrentId)))">Refresh Metadata</MudButton>
+                <MudButton Disabled="@(_busy || !_hostAvailable)" OnClick="@(() => ConfirmActionAsync("Reset Metadata Session?", "Stop the current metadata resolution session and start it again for the selected torrent?", "Reset Metadata Session", c => c.ResetMetadataSessionAsync(torrent.TorrentId)))">Reset Metadata Session</MudButton>
+                <MudButton Disabled="@(_busy || !_hostAvailable || !torrent.CanRetryCompletionCallback)" OnClick="@(() => ConfirmActionAsync("Retry Completion Callback?", "Ask TorrentCore to invoke the completion callback again for the selected torrent?", "Retry Callback", c => c.RetryCompletionCallbackAsync(torrent.TorrentId)))">Retry Completion Callback</MudButton>
+            </div>
+            <h3>Remove</h3>
+            <div class="tc-inspector-actions">
+                <MudButton Color="Color.Error" Disabled="@(_busy || !_supportsRemove || !torrent.CanRemove)" OnClick="@(() => RemoveAsync(torrent, false))">Remove from TorrentCore</MudButton>
+                <MudButton Color="Color.Error" Disabled="@(_busy || !_supportsRemove || !torrent.CanRemove)" OnClick="@(() => RemoveAsync(torrent, true))">Remove &amp; Delete Data</MudButton>
+            </div>
+        }
+    </div>;
+
+    private IEnumerable<(string Label, string Value)> DetailRows(TorrentSummaryDto x)
+    {
+        var d = _detailFor == x.TorrentId ? _detail : null;
+        yield return ("Downloaded", Bytes(d?.DownloadedBytes ?? x.DownloadedBytes));
+        yield return ("Total Size", Bytes(d?.TotalBytes ?? x.TotalBytes));
+        yield return ("Download", Rate(d?.DownloadRateBytesPerSecond ?? x.DownloadRateBytesPerSecond));
+        yield return ("Upload", Rate(d?.UploadRateBytesPerSecond ?? x.UploadRateBytesPerSecond));
+        yield return ("Peers", (d?.ConnectedPeerCount ?? x.ConnectedPeerCount).ToString("N0"));
+        yield return ("Trackers", (d?.TrackerCount ?? x.TrackerCount).ToString("N0"));
+        yield return ("Reason", d?.WaitReason is { } r ? Words(r.ToString()) : x.WaitReason is { } xr ? Words(xr.ToString()) : "Not waiting");
+        yield return ("Queue #", Number(d?.QueuePosition ?? x.QueuePosition));
+        yield return ("Priority #", Number(d?.PriorityQueuePosition ?? x.PriorityQueuePosition));
+        yield return ("Held #", Number(d?.HeldQueuePosition ?? x.HeldQueuePosition));
+        yield return ("Added", Date(d?.AddedAtUtc ?? x.AddedAtUtc));
+        yield return ("Completed", Date(d?.CompletedAtUtc ?? x.CompletedAtUtc));
+        yield return ("Last Activity", Date(d?.LastActivityAtUtc ?? x.LastActivityAtUtc));
+        yield return ("No Progress Since", Date(d?.DownloadNoProgressStartedAtUtc ?? x.DownloadNoProgressStartedAtUtc));
+        yield return ("Last Yielded", Date(d?.DownloadLastYieldedAtUtc ?? x.DownloadLastYieldedAtUtc));
+        yield return ("Download Yielded", YesNo(d?.IsDownloadYielded ?? x.IsDownloadYielded));
+        yield return ("Queue Held", YesNo(d?.IsQueueHeld ?? x.IsQueueHeld));
+        yield return ("Callback", Text(d?.CompletionCallbackState ?? x.CompletionCallbackState));
+        yield return ("Callback Pending Since", Date(d?.CompletionCallbackPendingSinceUtc ?? x.CompletionCallbackPendingSinceUtc));
+        yield return ("Callback Invoked", Date(d?.CompletionCallbackInvokedAtUtc ?? x.CompletionCallbackInvokedAtUtc));
+        yield return ("Callback Error", Text(d?.CompletionCallbackLastError ?? x.CompletionCallbackLastError));
+        yield return ("Info Hash", Text(d?.InfoHash));
+        yield return ("Torrent ID", x.TorrentId.ToString("D"));
+        yield return ("Error", Text(d?.ErrorMessage ?? x.ErrorMessage));
+    }
+
+    private async Task ActAsync(string label, Func<TorrentCoreClient, Task<TorrentActionResultDto>> action)
+    {
+        if (_busy || !_hostAvailable || Selected is null) return;
+        var revision = _revision;
+        var token = _contextCts?.Token ?? CancellationToken.None;
+        if (!Current(revision, token)) return;
+        _busy = true; _error = null;
+        try
+        {
+            await action(Session.CreateClient(revision));
+            if (!Current(revision, token)) return;
+            Snackbar.Add($"{label} requested.", Severity.Success);
+        }
+        catch (Exception ex) { if (Current(revision, token)) _error = ex.Message; }
+        finally { if (Current(revision, token)) { _busy = false; await LoadAsync(revision, token); } }
+    }
+
+    private async Task ConfirmActionAsync(string title, string message, string confirmText, Func<TorrentCoreClient, Task<TorrentActionResultDto>> action)
+    {
+        var selectedId = Selected?.TorrentId;
+        var revision = _revision;
+        var token = _contextCts?.Token ?? CancellationToken.None;
+        var parameters = new DialogParameters { [nameof(TorrentConfirmationDialog.Message)] = message, [nameof(TorrentConfirmationDialog.ConfirmText)] = confirmText };
+        var dialog = await Dialogs.ShowAsync<TorrentConfirmationDialog>(title, parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false } && Current(revision, token) && selectedId.HasValue && Selected?.TorrentId == selectedId.Value)
+            await ActAsync(confirmText, action);
+    }
+
+    private Task RemoveAsync(TorrentSummaryDto torrent, bool deleteData) => ConfirmActionAsync(
+        deleteData ? "Remove Torrent and Delete Data?" : "Remove Torrent?",
+        deleteData ? $"Remove “{torrent.Name}” from TorrentCore and permanently delete its downloaded data from disk?" : $"Remove “{torrent.Name}” from TorrentCore tracking? Downloaded data will remain on disk.",
+        deleteData ? "Remove & Delete Data" : "Remove Torrent",
+        c => c.RemoveAsync(torrent.TorrentId, new RemoveTorrentRequest { DeleteData = deleteData }));
+
+    private async Task CopyTorrentIdAsync(Guid torrentId)
+    {
+        var text = torrentId.ToString("D");
+        bool copied;
+        try { copied = await JS.InvokeAsync<bool>("tcBrowser.copyText", text); }
+        catch (JSException) { copied = false; }
+        if (copied) { Snackbar.Add("Torrent ID copied.", Severity.Success); return; }
+        var parameters = new DialogParameters {
+            [nameof(SelectableTextDialog.Title)] = "Torrent ID",
+            [nameof(SelectableTextDialog.Text)] = text
+        };
+        await Dialogs.ShowAsync<SelectableTextDialog>("Torrent ID", parameters);
+    }
+
+    private async Task OpenPeersAsync(TorrentSummaryDto torrent)
+    {
+        _dialogOpen = true;
+        try { var dialog = await Dialogs.ShowAsync<TorrentPeersDialog>("Peers", new DialogParameters { [nameof(TorrentPeersDialog.TorrentId)] = torrent.TorrentId, [nameof(TorrentPeersDialog.TorrentName)] = torrent.Name }); await dialog.Result; }
+        finally { _dialogOpen = false; }
+    }
+    private async Task OpenTrackersAsync(TorrentSummaryDto torrent)
+    {
+        _dialogOpen = true;
+        try { var dialog = await Dialogs.ShowAsync<TorrentTrackersDialog>("Trackers", new DialogParameters { [nameof(TorrentTrackersDialog.TorrentId)] = torrent.TorrentId, [nameof(TorrentTrackersDialog.TorrentName)] = torrent.Name }); await dialog.Result; }
+        finally { _dialogOpen = false; }
+    }
+
+    internal static string Words(string value) => System.Text.RegularExpressions.Regex.Replace(value, "(?<!^)([A-Z])", " $1");
+    internal static string Text(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : value;
+    internal static string Category(string? value) => string.IsNullOrWhiteSpace(value) ? "Uncategorized" : value;
+    internal static string Number(int? value) => value?.ToString("N0") ?? "--";
+    internal static string YesNo(bool value) => value ? "Yes" : "No";
+    internal static string Date(DateTimeOffset? value) => value?.ToLocalTime().ToString("yyyy/MM/dd h:mm:ss tt", CultureInfo.CurrentCulture) ?? "--";
+    private static string ExportDate(DateTimeOffset? value) => value?.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture) ?? "";
+    private static string RawNumber(long? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "";
+    private static string RawNumber(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "";
+    internal static string Bytes(long? bytes)
+    {
+        if (!bytes.HasValue) return "--";
+        double size = bytes.Value; string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var i = 0; while (Math.Abs(size) >= 1024 && i < units.Length - 1) { size /= 1024; i++; }
+        return $"{size:N1} {units[i]}";
+    }
+    internal static string Rate(long bytes) => $"{Bytes(bytes)}/s";
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Session.Changed -= SessionChanged;
+        Preferences.Changed -= PreferencesChanged;
+        _contextCts?.Cancel(); _contextCts?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
