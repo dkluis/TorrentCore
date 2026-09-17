@@ -200,6 +200,7 @@ extension TorrentCoreRuntimeSettings {
         supportsLiveUpdates = value.supportsLiveUpdates
         updatedAt = value.updatedAtUtc
         usesPersistedOverrides = value.usesPersistedOverrides
+        vpnRecoveryProvider = value.vpnRecoveryProvider ?? "ExpressVPN"
         expressVPNAutomaticRecoveryMode = value.expressVpnAutomaticRecoveryMode ?? "Disabled"
         expressVPNRecoveryDelaySeconds = Int(value.expressVpnRecoveryDelaySeconds ?? 180)
         expressVPNUnavailableLaunchDelaySeconds = Int(
@@ -285,7 +286,8 @@ extension Components.Schemas.UpdateRuntimeSettingsRequest {
             vpnEgressReadyCheckIntervalSeconds: Int32(value.vpnEgressReadyCheckIntervalSeconds),
             vpnEgressRequestTimeoutSeconds: Int32(value.vpnEgressRequestTimeoutSeconds),
             vpnEgressValidationEnabled: value.vpnEgressValidationEnabled,
-            vpnEgressValidationEndpoint: value.vpnEgressValidationEndpoint
+            vpnEgressValidationEndpoint: value.vpnEgressValidationEndpoint,
+            vpnRecoveryProvider: value.vpnRecoveryProvider
         )
     }
 }

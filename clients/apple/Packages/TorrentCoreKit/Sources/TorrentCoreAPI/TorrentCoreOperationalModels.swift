@@ -321,6 +321,7 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var supportsLiveUpdates: Bool
     public var updatedAt: Date?
     public var usesPersistedOverrides: Bool
+    public var vpnRecoveryProvider: String = "ExpressVPN"
     public var expressVPNAutomaticRecoveryMode: String
     public var expressVPNRecoveryDelaySeconds: Int
     public var expressVPNUnavailableLaunchDelaySeconds: Int
@@ -368,6 +369,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var seedingStopMinutes: Int
     public var seedingStopMode: String
     public var seedingStopRatio: Double
+    public var vpnRecoveryProvider: String = "ExpressVPN"
     public var expressVPNAutomaticRecoveryMode: String
     public var expressVPNRecoveryDelaySeconds: Int
     public var expressVPNUnavailableLaunchDelaySeconds: Int
@@ -379,6 +381,16 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var vpnEgressValidationEnabled: Bool
     public var vpnEgressValidationEndpoint: String
     public var runtimeTickDurationSummaryEnabled: Bool
+
+    public var expressVPNSelected: Bool {
+        get { vpnRecoveryProvider == "ExpressVPN" }
+        set { if newValue { vpnRecoveryProvider = "ExpressVPN" } }
+    }
+
+    public var piaSelected: Bool {
+        get { vpnRecoveryProvider == "PIA" }
+        set { if newValue { vpnRecoveryProvider = "PIA" } }
+    }
 
     public init(settings: TorrentCoreRuntimeSettings) {
         automaticMetadataResetStuckThresholdSeconds = settings.automaticMetadataResetStuckThresholdSeconds
@@ -414,6 +426,7 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         seedingStopMinutes = settings.seedingStopMinutes
         seedingStopMode = settings.seedingStopMode ?? ""
         seedingStopRatio = settings.seedingStopRatio
+        vpnRecoveryProvider = settings.vpnRecoveryProvider
         expressVPNAutomaticRecoveryMode = settings.expressVPNAutomaticRecoveryMode
         expressVPNRecoveryDelaySeconds = settings.expressVPNRecoveryDelaySeconds
         expressVPNUnavailableLaunchDelaySeconds = settings.expressVPNUnavailableLaunchDelaySeconds

@@ -248,6 +248,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 currentSettings.VpnEgressRequestTimeoutSeconds;
         var vpnEgressEngineSuspensionTimeoutSeconds = request.VpnEgressEngineSuspensionTimeoutSeconds ??
                 currentSettings.VpnEgressEngineSuspensionTimeoutSeconds;
+        var providerValue = request.VpnRecoveryProvider ?? currentSettings.VpnRecoveryProvider.ToString();
+        if (!Enum.TryParse<VpnRecoveryProvider>(providerValue, true, out var provider) ||
+            !Enum.IsDefined(provider) || !Enum.GetNames<VpnRecoveryProvider>().Contains(providerValue, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new Application.ServiceOperationException("invalid_runtime_settings",
+                "VpnRecoveryProvider must be ExpressVPN or PIA.", StatusCodes.Status400BadRequest,
+                nameof(request.VpnRecoveryProvider));
+        }
         var expressVpnAutomaticRecoveryModeValue = request.ExpressVpnAutomaticRecoveryMode ??
                 currentSettings.ExpressVpnAutomaticRecoveryMode.ToString();
         var expressVpnRecoveryDelaySeconds = request.ExpressVpnRecoveryDelaySeconds ??
@@ -483,6 +491,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             vpnEgressRequestTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.VpnEgressEngineSuspensionTimeoutSeconds] =
                             vpnEgressEngineSuspensionTimeoutSeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.VpnRecoveryProvider] = provider.ToString(),
                     [RuntimeSettingsKeys.ExpressVpnAutomaticRecoveryMode] =
                             expressVpnAutomaticRecoveryMode.ToString(),
                     [RuntimeSettingsKeys.ExpressVpnRecoveryDelaySeconds] =
@@ -953,6 +962,12 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             RuntimeSettingsKeys.VpnEgressEngineSuspensionTimeoutSeconds,
             baseOptions.VpnEgressEngineSuspensionTimeoutSeconds
         );
+        var provider = baseOptions.VpnRecoveryProvider;
+        if (values.TryGetValue(RuntimeSettingsKeys.VpnRecoveryProvider, out var providerValue) &&
+            Enum.TryParse<VpnRecoveryProvider>(providerValue, true, out var parsedProvider) && Enum.IsDefined(parsedProvider))
+        {
+            provider = parsedProvider;
+        }
         var expressVpnAutomaticRecoveryMode = baseOptions.ExpressVpnAutomaticRecoveryMode;
         if (values.TryGetValue(
                 RuntimeSettingsKeys.ExpressVpnAutomaticRecoveryMode,
@@ -1040,6 +1055,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             VpnEgressReadyCheckIntervalSeconds           = vpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds               = vpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds      = vpnEgressEngineSuspensionTimeoutSeconds,
+            VpnRecoveryProvider = provider,
             ExpressVpnAutomaticRecoveryMode               = expressVpnAutomaticRecoveryMode,
             ExpressVpnRecoveryDelaySeconds                 = expressVpnRecoveryDelaySeconds,
             ExpressVpnUnavailableLaunchDelaySeconds        = expressVpnUnavailableLaunchDelaySeconds,
@@ -1106,6 +1122,7 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             VpnEgressReadyCheckIntervalSeconds           = settings.VpnEgressReadyCheckIntervalSeconds,
             VpnEgressRequestTimeoutSeconds               = settings.VpnEgressRequestTimeoutSeconds,
             VpnEgressEngineSuspensionTimeoutSeconds      = settings.VpnEgressEngineSuspensionTimeoutSeconds,
+            VpnRecoveryProvider = settings.VpnRecoveryProvider.ToString(),
             ExpressVpnAutomaticRecoveryMode               = settings.ExpressVpnAutomaticRecoveryMode.ToString(),
             ExpressVpnRecoveryDelaySeconds                 = settings.ExpressVpnRecoveryDelaySeconds,
             ExpressVpnUnavailableLaunchDelaySeconds        = settings.ExpressVpnUnavailableLaunchDelaySeconds,

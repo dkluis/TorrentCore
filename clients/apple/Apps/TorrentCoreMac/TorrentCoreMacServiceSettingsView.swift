@@ -598,7 +598,18 @@ struct TorrentCoreMacServiceSettingsView: View {
                         content: TorrentCoreHelpCatalog.Settings.vpnEgressEngineSuspensionTimeoutSeconds
                     )
                 }
-                Section("ExpressVPN Recovery") {
+                Section("VPN Recovery") {
+                    Toggle("ExpressVPN", isOn: draft.expressVPNSelected)
+                        .toggleStyle(.switch)
+                        .accessibilityIdentifier("serviceSettings.expressVPNSelected")
+                    Toggle("PIA", isOn: draft.piaSelected)
+                        .toggleStyle(.switch)
+                        .accessibilityIdentifier("serviceSettings.piaSelected")
+                    if draft.wrappedValue.piaSelected {
+                        Text("PIA background mode must be enabled on the Service host. Recovery preserves your PIA connection settings.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     choiceField(
                         selection: draft.expressVPNAutomaticRecoveryMode,
                         choices: Self.expressVPNRecoveryModes,
@@ -611,12 +622,14 @@ struct TorrentCoreMacServiceSettingsView: View {
                         content: TorrentCoreHelpCatalog.Settings.expressVPNRecoveryDelaySeconds,
                         identifier: "serviceSettings.expressVPNRecoveryDelaySeconds"
                     )
-                    integerField(
-                        "Unavailable launch delay seconds",
-                        value: draft.expressVPNUnavailableLaunchDelaySeconds,
-                        content: TorrentCoreHelpCatalog.Settings.expressVPNUnavailableLaunchDelaySeconds,
-                        identifier: "serviceSettings.expressVPNUnavailableLaunchDelaySeconds"
-                    )
+                    if draft.wrappedValue.expressVPNSelected {
+                        integerField(
+                            "Unavailable launch delay seconds",
+                            value: draft.expressVPNUnavailableLaunchDelaySeconds,
+                            content: TorrentCoreHelpCatalog.Settings.expressVPNUnavailableLaunchDelaySeconds,
+                            identifier: "serviceSettings.expressVPNUnavailableLaunchDelaySeconds"
+                        )
+                    }
                 }
                 Text(
                     "These values apply live. Interval edits take effect at the next scheduled check without resetting the current countdown."

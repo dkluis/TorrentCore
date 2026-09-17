@@ -1,3 +1,5 @@
+using TorrentCore.Service.Configuration;
+
 namespace TorrentCore.Service.Vpn;
 
 public enum VpnConnectionPhase
@@ -51,7 +53,8 @@ public sealed record VpnConnectionRuntimeSnapshot(
     DateTimeOffset? ExpressVpnNextActionAtUtc = null,
     DateTimeOffset? ExpressVpnLastActionAtUtc = null,
     string? ExpressVpnLastActionOutcome = null,
-    string? ExpressVpnRecoveryMessage = null)
+    string? ExpressVpnRecoveryMessage = null,
+    VpnRecoveryProvider RecoveryProvider = VpnRecoveryProvider.ExpressVPN)
 {
     public bool IsTorrentProcessingAvailable => Phase is VpnConnectionPhase.Disabled or VpnConnectionPhase.Ready;
 }

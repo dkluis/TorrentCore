@@ -691,6 +691,10 @@
             "nullable": true,
             "type": "string"
           },
+          "vpnConnectionState": {
+            "nullable": true,
+            "type": "string"
+          },
           "vpnDegradedCheckIntervalSeconds": {
             "format": "int32",
             "nullable": true,
@@ -700,12 +704,36 @@
             "nullable": true,
             "type": "string"
           },
+          "vpnLastActionAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnLastActionOutcome": {
+            "nullable": true,
+            "type": "string"
+          },
           "vpnLastCheckAtUtc": {
             "format": "date-time",
             "nullable": true,
             "type": "string"
           },
           "vpnLastSuccessAtUtc": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnLaunchAttemptsMaximum": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnLaunchAttemptsUsed": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnNextActionAtUtc": {
             "format": "date-time",
             "nullable": true,
             "type": "string"
@@ -723,6 +751,32 @@
             "format": "int32",
             "nullable": true,
             "type": "integer"
+          },
+          "vpnReconnectAttemptsMaximum": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnReconnectAttemptsUsed": {
+            "format": "int32",
+            "nullable": true,
+            "type": "integer"
+          },
+          "vpnRecoveryMessage": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnRecoveryMode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnRecoveryPhase": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnRecoveryProvider": {
+            "nullable": true,
+            "type": "string"
           },
           "vpnValidationEnabled": {
             "nullable": true,
@@ -1111,6 +1165,10 @@
             "type": "boolean"
           },
           "vpnEgressValidationEndpoint": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnRecoveryProvider": {
             "nullable": true,
             "type": "string"
           }
@@ -2412,6 +2470,10 @@
             "type": "boolean"
           },
           "vpnEgressValidationEndpoint": {
+            "nullable": true,
+            "type": "string"
+          },
+          "vpnRecoveryProvider": {
             "nullable": true,
             "type": "string"
           }

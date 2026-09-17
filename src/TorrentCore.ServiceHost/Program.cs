@@ -69,6 +69,7 @@ builder.Services.AddHttpClient(VpnEgressProbe.HttpClientName, client => client.T
 builder.Services.AddSingleton<IVpnEgressProbe, VpnEgressProbe>();
 builder.Services.AddSingleton<IExternalProcessRunner, ExternalProcessRunner>();
 builder.Services.AddSingleton<IExpressVpnController, ExpressVpnController>();
+builder.Services.AddSingleton<IPiaVpnController, PiaVpnController>();
 builder.Services.AddSingleton<VpnConnectionRuntimeState>();
 builder.Services.AddSingleton<VpnSettingsChangeSignal>();
 builder.Services.AddSingleton<RuntimeTickDurationSummaryState>();

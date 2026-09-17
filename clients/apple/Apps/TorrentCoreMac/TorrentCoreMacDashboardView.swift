@@ -153,7 +153,7 @@ struct TorrentCoreMacDashboardView: View {
                     }
                     GridRow {
                         TorrentCoreMacDetailRow(
-                            label: "ExpressVPN Recovery Mode",
+                            label: "VPN Recovery Mode",
                             value: displayIdentifier(status.expressVPNRecoveryMode)
                         )
                         TorrentCoreMacDetailRow(
@@ -163,7 +163,7 @@ struct TorrentCoreMacDashboardView: View {
                     }
                     GridRow {
                         TorrentCoreMacDetailRow(
-                            label: "ExpressVPN Controller",
+                            label: "\(status.vpnRecoveryProvider ?? "ExpressVPN") Controller",
                             value: displayIdentifier(status.expressVPNConnectionState)
                         )
                         TorrentCoreMacDetailRow(
@@ -177,7 +177,7 @@ struct TorrentCoreMacDashboardView: View {
                     GridRow {
                         TorrentCoreMacDetailRow(
                             label: "Launch Attempts",
-                            value: attemptDescription(
+                            value: status.vpnRecoveryProvider == "PIA" ? "Not used" : attemptDescription(
                                 used: status.expressVPNLaunchAttemptsUsed,
                                 maximum: status.expressVPNLaunchAttemptsMaximum
                             )

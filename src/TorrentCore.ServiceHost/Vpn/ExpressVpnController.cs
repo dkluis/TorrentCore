@@ -11,17 +11,17 @@ internal sealed class ExpressVpnController(
 
     public bool IsSupported => OperatingSystem.IsMacOS();
 
-    public async Task<ExpressVpnControllerStateResult> GetConnectionStateAsync(
+    public async Task<VpnControllerStateResult> GetConnectionStateAsync(
         CancellationToken cancellationToken)
         => await GetConnectionStateAsync(OperationTimeout, cancellationToken);
 
-    public async Task<ExpressVpnControllerStateResult> WaitForConnectionStateAsync(
-        ExpressVpnConnectionState expectedState,
+    public async Task<VpnControllerStateResult> WaitForConnectionStateAsync(
+        VpnControllerConnectionState expectedState,
         CancellationToken cancellationToken)
     {
         var startedAt = timeProvider.GetUtcNow();
         var deadline = startedAt + OperationTimeout;
-        ExpressVpnControllerStateResult? latest = null;
+        VpnControllerStateResult? latest = null;
 
         while (timeProvider.GetUtcNow() < deadline)
         {
@@ -45,7 +45,7 @@ internal sealed class ExpressVpnController(
             );
         }
 
-        return new ExpressVpnControllerStateResult
+        return new VpnControllerStateResult
         {
             IsAvailable = latest?.IsAvailable ?? false,
             State = latest?.State,
@@ -56,16 +56,16 @@ internal sealed class ExpressVpnController(
         };
     }
 
-    public Task<ExpressVpnControllerActionResult> DisconnectAsync(CancellationToken cancellationToken)
+    public Task<VpnControllerActionResult> DisconnectAsync(CancellationToken cancellationToken)
         => RunActionAsync(ControllerPath, ["disconnect"], cancellationToken);
 
-    public Task<ExpressVpnControllerActionResult> ConnectAsync(CancellationToken cancellationToken)
+    public Task<VpnControllerActionResult> ConnectAsync(CancellationToken cancellationToken)
         => RunActionAsync(ControllerPath, ["connect"], cancellationToken);
 
-    public Task<ExpressVpnControllerActionResult> LaunchApplicationAsync(CancellationToken cancellationToken)
+    public Task<VpnControllerActionResult> LaunchApplicationAsync(CancellationToken cancellationToken)
         => RunActionAsync(OpenPath, ["-g", "-a", "ExpressVPN"], cancellationToken);
 
-    private async Task<ExpressVpnControllerStateResult> GetConnectionStateAsync(
+    private async Task<VpnControllerStateResult> GetConnectionStateAsync(
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
@@ -77,7 +77,7 @@ internal sealed class ExpressVpnController(
         var duration = timeProvider.GetUtcNow() - startedAt;
         if (!result.Succeeded)
         {
-            return new ExpressVpnControllerStateResult
+            return new VpnControllerStateResult
             {
                 IsAvailable = false,
                 TimedOut = result.TimedOut,
@@ -90,7 +90,7 @@ internal sealed class ExpressVpnController(
         var state = ParseConnectionState(result.StandardOutput);
         if (state is null)
         {
-            return new ExpressVpnControllerStateResult
+            return new VpnControllerStateResult
             {
                 IsAvailable = false,
                 TimedOut = false,
@@ -100,7 +100,7 @@ internal sealed class ExpressVpnController(
             };
         }
 
-        return new ExpressVpnControllerStateResult
+        return new VpnControllerStateResult
         {
             IsAvailable = true,
             State = state.Value,
@@ -110,25 +110,25 @@ internal sealed class ExpressVpnController(
         };
     }
 
-    private static ExpressVpnConnectionState? ParseConnectionState(string output)
+    private static VpnControllerConnectionState? ParseConnectionState(string output)
         => output.Trim() switch
         {
             var value when value.Equals("Connected", StringComparison.OrdinalIgnoreCase) =>
-                ExpressVpnConnectionState.Connected,
+                VpnControllerConnectionState.Connected,
             var value when value.Equals("Disconnected", StringComparison.OrdinalIgnoreCase) =>
-                ExpressVpnConnectionState.Disconnected,
+                VpnControllerConnectionState.Disconnected,
             var value when value.Equals("Connecting", StringComparison.OrdinalIgnoreCase) =>
-                ExpressVpnConnectionState.Connecting,
+                VpnControllerConnectionState.Connecting,
             var value when value.Equals("Reconnecting", StringComparison.OrdinalIgnoreCase) =>
-                ExpressVpnConnectionState.Reconnecting,
+                VpnControllerConnectionState.Reconnecting,
             var value when value.Equals("DisconnectingToReconnect", StringComparison.OrdinalIgnoreCase) =>
-                ExpressVpnConnectionState.DisconnectingToReconnect,
+                VpnControllerConnectionState.DisconnectingToReconnect,
             var value when value.Equals("Disconnecting", StringComparison.OrdinalIgnoreCase) =>
-                ExpressVpnConnectionState.Disconnecting,
+                VpnControllerConnectionState.Disconnecting,
             _ => null,
         };
 
-    private async Task<ExpressVpnControllerActionResult> RunActionAsync(
+    private async Task<VpnControllerActionResult> RunActionAsync(
         string fileName,
         IReadOnlyList<string> arguments,
         CancellationToken cancellationToken)
@@ -138,7 +138,7 @@ internal sealed class ExpressVpnController(
             new ExternalProcessRequest(fileName, arguments, OperationTimeout),
             cancellationToken
         );
-        return new ExpressVpnControllerActionResult
+        return new VpnControllerActionResult
         {
             Started = result.Started,
             Succeeded = result.Succeeded,

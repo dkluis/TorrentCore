@@ -79,6 +79,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     settings.vpnEgressReadyCheckIntervalSeconds = 120
     settings.vpnEgressRequestTimeoutSeconds = 5
     settings.vpnEgressEngineSuspensionTimeoutSeconds = 7
+    settings.vpnRecoveryProvider = "PIA"
     settings.expressVPNAutomaticRecoveryMode = "AnyValidationFailure"
     settings.expressVPNRecoveryDelaySeconds = 181
     settings.expressVPNUnavailableLaunchDelaySeconds = 301
@@ -92,6 +93,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     #expect(update.vpnEgressValidationEnabled)
     #expect(update.vpnEgressDirectIspCidrs == ["198.51.100.0/24"])
     #expect(update.vpnEgressEngineSuspensionTimeoutSeconds == 7)
+    #expect(update.vpnRecoveryProvider == "PIA")
     #expect(update.expressVPNAutomaticRecoveryMode == "AnyValidationFailure")
     #expect(update.expressVPNRecoveryDelaySeconds == 181)
     #expect(update.expressVPNUnavailableLaunchDelaySeconds == 301)
@@ -111,6 +113,7 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     #expect(body["vpnEgressReadyCheckIntervalSeconds"] as? Int == 120)
     #expect(body["vpnEgressRequestTimeoutSeconds"] as? Int == 5)
     #expect(body["vpnEgressEngineSuspensionTimeoutSeconds"] as? Int == 7)
+    #expect(body["vpnRecoveryProvider"] as? String == "PIA")
     #expect(body["expressVpnAutomaticRecoveryMode"] as? String == "AnyValidationFailure")
     #expect(body["expressVpnRecoveryDelaySeconds"] as? Int == 181)
     #expect(body["expressVpnUnavailableLaunchDelaySeconds"] as? Int == 301)
@@ -1099,4 +1102,42 @@ private extension String {
             return try #require(object as? [String: Any])
         }
     }
+}
+
+@Test
+func vpnProviderSwitchesAlwaysSelectExactlyOneProvider() {
+    var draft = TorrentCoreRuntimeSettingsUpdate(settings: TorrentCorePreviewFixtures.runtimeSettings)
+    #expect(draft.expressVPNSelected)
+    #expect(!draft.piaSelected)
+    draft.expressVPNSelected = false
+    #expect(draft.expressVPNSelected)
+    draft.piaSelected = true
+    #expect(draft.piaSelected && !draft.expressVPNSelected)
+    draft.piaSelected = false
+    #expect(draft.piaSelected)
+    draft.expressVPNSelected = true
+    #expect(draft.expressVPNSelected && !draft.piaSelected)
+}
+
+@Test
+func nativeRecoveryStatusUsesSelectedProviderAndSupportsOlderServices() throws {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    var generated = try decoder.decode(Components.Schemas.EngineHostStatusDto.self, from: Data(FixturePayloads.host.utf8))
+    generated.expressVpnConnectionState = "Connected"
+    let legacy = TorrentCoreHostStatus(generated)
+    #expect(legacy.vpnRecoveryProvider == "ExpressVPN")
+    #expect(legacy.expressVPNConnectionState == "Connected")
+
+    generated.vpnRecoveryProvider = "PIA"
+    generated.vpnConnectionState = "Interrupted"
+    generated.vpnRecoveryPhase = "WaitingForController"
+    generated.vpnRecoveryMessage = "Waiting for PIA"
+    generated.vpnLaunchAttemptsMaximum = 0
+    let pia = TorrentCoreHostStatus(generated)
+    #expect(pia.vpnRecoveryProvider == "PIA")
+    #expect(pia.expressVPNConnectionState == "Interrupted")
+    #expect(pia.expressVPNRecoveryPhase == "WaitingForController")
+    #expect(pia.expressVPNRecoveryMessage == "Waiting for PIA")
+    #expect(pia.expressVPNLaunchAttemptsMaximum == 0)
 }

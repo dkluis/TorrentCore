@@ -2,6 +2,7 @@ namespace TorrentCore.Contracts.Host;
 
 public sealed class RuntimeSettingsDto
 {
+    public string VpnRecoveryProvider { get; init; } = "ExpressVPN";
     public required string          EngineRuntime                                  { get; init; }
     public required bool            SupportsLiveUpdates                            { get; init; }
     public required bool            UsesPersistedOverrides                         { get; init; }

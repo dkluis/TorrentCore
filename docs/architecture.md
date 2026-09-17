@@ -105,6 +105,11 @@ configured range means direct ISP access, while matching none means validated ac
 provider. When validation is enabled, startup leaves MonoTorrent inactive and the API available until the immediate
 first check succeeds. Ready and degraded checks use their independent configured intervals and never overlap.
 
+Automatic provider recovery runs within that same serialized coordinator. One persisted provider selection chooses
+ExpressVPN or PIA; controller adapters share the existing bounded external-process runner. Recovery policy and delays
+are shared, and only a successful public-IP probe can restore processing. PIA relies on operator-enabled background
+mode and never modifies its routing configuration. The native macOS client exposes the selector; WebUI is unchanged.
+
 A routine check does not close the execution gate or publish degraded state. A failed check closes admission before
 suspending and disposing MonoTorrent. A later successful degraded check recreates and recovers MonoTorrent before
 reopening admission. Activation failure retries the engine directly at the degraded interval without repeating an

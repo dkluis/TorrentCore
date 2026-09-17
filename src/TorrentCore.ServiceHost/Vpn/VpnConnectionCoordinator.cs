@@ -13,6 +13,7 @@ internal sealed class VpnConnectionCoordinator(
     IRuntimeSettingsService runtimeSettingsService,
     IVpnEgressProbe vpnEgressProbe,
     IExpressVpnController expressVpnController,
+    IPiaVpnController piaVpnController,
     IMonoTorrentLifecycle monoTorrentLifecycle,
     ITorrentEngineAdapter torrentEngineAdapter,
     TorrentExecutionGate executionGate,
@@ -33,6 +34,9 @@ internal sealed class VpnConnectionCoordinator(
     private bool _retryActivationWithoutProbe;
     private bool _validationEnabled;
     private ExpressVpnAutomaticRecoveryMode _recoveryMode;
+    private VpnRecoveryProvider _provider;
+    private IVpnController Controller => _provider == VpnRecoveryProvider.PIA ? piaVpnController : expressVpnController;
+    private string ProviderName => _provider.ToString();
     private int _consecutiveEligibleValidationFailures;
     private int _reconnectAttempts;
     private int _launchAttempts;
@@ -56,13 +60,14 @@ internal sealed class VpnConnectionCoordinator(
         var settings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
         _validationEnabled = settings.VpnEgressValidationEnabled;
         _recoveryMode = settings.ExpressVpnAutomaticRecoveryMode;
+        SelectProvider(settings);
         UpdateExpressVpnRecoveryState(
             _recoveryMode == ExpressVpnAutomaticRecoveryMode.Disabled
                 ? ExpressVpnRecoveryPhase.Inactive
                 : ExpressVpnRecoveryPhase.WaitingForConfirmation,
             _recoveryMode == ExpressVpnAutomaticRecoveryMode.Disabled
                 ? null
-                : "Waiting for two eligible VPN validation failures before automatic ExpressVPN recovery."
+                : $"Waiting for two eligible VPN validation failures before automatic {ProviderName} recovery."
         );
         if (_validationEnabled)
         {
@@ -113,6 +118,7 @@ internal sealed class VpnConnectionCoordinator(
             try
             {
                 var settings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+                SelectProvider(settings);
                 if (settings.VpnEgressValidationEnabled != _validationEnabled)
                 {
                     checkImmediately = await ApplyEnabledChangeAsync(settings, cancellationToken);
@@ -234,6 +240,8 @@ internal sealed class VpnConnectionCoordinator(
             return;
         }
 
+        SelectProvider(latestSettings);
+
         if (result.IsValidated)
         {
             ResetRecoveryEpisode();
@@ -291,7 +299,7 @@ internal sealed class VpnConnectionCoordinator(
             {
                 UpdateExpressVpnRecoveryState(
                     ExpressVpnRecoveryPhase.WaitingForConfirmation,
-                    "MonoTorrent suspension failed. Automatic ExpressVPN recovery is blocked."
+                    $"MonoTorrent suspension failed. Automatic {ProviderName} recovery is blocked."
                 );
             }
         }
@@ -301,7 +309,7 @@ internal sealed class VpnConnectionCoordinator(
             _engineSuspendedForVpn = false;
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.WaitingForConfirmation,
-                "MonoTorrent suspension failed. Automatic ExpressVPN recovery is blocked."
+                $"MonoTorrent suspension failed. Automatic {ProviderName} recovery is blocked."
             );
             await SetStateAsync(
                 true,
@@ -324,11 +332,11 @@ internal sealed class VpnConnectionCoordinator(
             return;
         }
 
-        if (!expressVpnController.IsSupported)
+        if (!Controller.IsSupported)
         {
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.Inactive,
-                "Automatic ExpressVPN recovery is unavailable on this host."
+                $"Automatic {ProviderName} recovery is unavailable on this host."
             );
             return;
         }
@@ -337,7 +345,7 @@ internal sealed class VpnConnectionCoordinator(
         {
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.WaitingForConfirmation,
-                "Waiting for a second eligible VPN validation failure before automatic ExpressVPN recovery."
+                $"Waiting for a second eligible VPN validation failure before automatic {ProviderName} recovery."
             );
             return;
         }
@@ -348,7 +356,7 @@ internal sealed class VpnConnectionCoordinator(
         {
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.WaitingForRecoveryDelay,
-                "Automatic ExpressVPN recovery is waiting for the configured recovery delay.",
+                $"Automatic {ProviderName} recovery is waiting for the configured recovery delay.",
                 startupDeadline
             );
             return;
@@ -356,39 +364,80 @@ internal sealed class VpnConnectionCoordinator(
 
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.WaitingForController,
-            "Checking whether ExpressVPN is available."
+            $"Checking whether {ProviderName} is available."
         );
-        var controllerState = await expressVpnController.GetConnectionStateAsync(cancellationToken);
+        var controllerState = await Controller.GetConnectionStateAsync(cancellationToken);
         await ObserveControllerStateAsync(controllerState);
         if (!controllerState.IsAvailable || controllerState.State is null)
         {
-            await TryLaunchExpressVpnAsync(settings, now, cancellationToken);
+            if (_provider == VpnRecoveryProvider.PIA)
+            {
+                UpdateExpressVpnRecoveryState(ExpressVpnRecoveryPhase.WaitingForController,
+                    "PIA controller is unavailable. Check that PIA is installed, logged in, and background mode is enabled. Torrent processing remains suspended.");
+            }
+            else
+            {
+                await TryLaunchExpressVpnAsync(settings, now, cancellationToken);
+            }
             return;
         }
 
         _controllerUnavailableSinceUtc = null;
+        if (_provider == VpnRecoveryProvider.PIA && controllerState.State is
+            VpnControllerConnectionState.Interrupted or VpnControllerConnectionState.Connecting or
+            VpnControllerConnectionState.Reconnecting or VpnControllerConnectionState.DisconnectingToReconnect)
+        {
+            UpdateExpressVpnRecoveryState(ExpressVpnRecoveryPhase.WaitingForController,
+                "Waiting up to 60 seconds for PIA to finish reconnecting. Torrent processing remains suspended.");
+            controllerState = await Controller.WaitForConnectionStateAsync(VpnControllerConnectionState.Connected, cancellationToken);
+            await ObserveControllerStateAsync(controllerState);
+            if (!controllerState.IsAvailable || controllerState.State is null ||
+                !await IsRecoveryStillSelectedAsync(settings, cancellationToken))
+                return;
+            if (controllerState.State is not VpnControllerConnectionState.Disconnected and
+                not VpnControllerConnectionState.Disconnecting)
+            {
+                // PIA may have recovered during the grace period. Recheck egress before disrupting it.
+                if (controllerState.State == VpnControllerConnectionState.Connected)
+                {
+                    var validation = await vpnEgressProbe.ValidateAsync(settings, cancellationToken);
+                    RecordValidationResult(validation);
+                    if (!await IsRecoveryStillSelectedAsync(settings, cancellationToken))
+                        return;
+                    if (validation.IsValidated)
+                    {
+                        ResetRecoveryEpisode();
+                        await ActivateAsync(validationEnabled: true, cancellationToken);
+                        return;
+                    }
+                }
+                await TryDisconnectConnectAsync(settings, timeProvider.GetUtcNow(), cancellationToken);
+                return;
+            }
+        }
+
         switch (controllerState.State.Value)
         {
-            case ExpressVpnConnectionState.Connecting:
-            case ExpressVpnConnectionState.Reconnecting:
-            case ExpressVpnConnectionState.DisconnectingToReconnect:
+            case VpnControllerConnectionState.Connecting:
+            case VpnControllerConnectionState.Reconnecting:
+            case VpnControllerConnectionState.DisconnectingToReconnect:
                 UpdateExpressVpnRecoveryState(
                     ExpressVpnRecoveryPhase.WaitingForController,
-                    $"ExpressVPN is {controllerState.State}. Torrent processing remains suspended."
+                    $"{ProviderName} is {controllerState.State}. Torrent processing remains suspended."
                 );
                 return;
 
-            case ExpressVpnConnectionState.Disconnecting:
-                var disconnected = await expressVpnController.WaitForConnectionStateAsync(
-                    ExpressVpnConnectionState.Disconnected,
+            case VpnControllerConnectionState.Disconnecting:
+                var disconnected = await Controller.WaitForConnectionStateAsync(
+                    VpnControllerConnectionState.Disconnected,
                     cancellationToken
                 );
                 await ObserveControllerStateAsync(disconnected);
-                if (!disconnected.IsAvailable || disconnected.State != ExpressVpnConnectionState.Disconnected)
+                if (!disconnected.IsAvailable || disconnected.State != VpnControllerConnectionState.Disconnected)
                 {
                     UpdateExpressVpnRecoveryState(
                         ExpressVpnRecoveryPhase.WaitingForController,
-                        "ExpressVPN did not finish disconnecting. Torrent processing remains suspended."
+                        $"{ProviderName} did not finish disconnecting. Torrent processing remains suspended."
                     );
                     return;
                 }
@@ -396,11 +445,11 @@ internal sealed class VpnConnectionCoordinator(
                 await TryConnectOnlyAsync(settings, now, cancellationToken);
                 return;
 
-            case ExpressVpnConnectionState.Disconnected:
+            case VpnControllerConnectionState.Disconnected:
                 await TryConnectOnlyAsync(settings, now, cancellationToken);
                 return;
 
-            case ExpressVpnConnectionState.Connected:
+            case VpnControllerConnectionState.Connected:
                 await TryDisconnectConnectAsync(settings, now, cancellationToken);
                 return;
         }
@@ -420,7 +469,7 @@ internal sealed class VpnConnectionCoordinator(
             {
                 UpdateExpressVpnRecoveryState(
                     ExpressVpnRecoveryPhase.Exhausted,
-                    "ExpressVPN is not running or responding. Torrent processing remains suspended. Two automatic launch attempts were unsuccessful."
+                    $"{ProviderName} is not running or responding. Torrent processing remains suspended. Two automatic launch attempts were unsuccessful."
                 );
                 await WriteExhaustedLogAsync("launch", cancellationToken);
             }
@@ -428,7 +477,7 @@ internal sealed class VpnConnectionCoordinator(
             {
                 UpdateExpressVpnRecoveryState(
                     ExpressVpnRecoveryPhase.WaitingForController,
-                    "Waiting to confirm whether the final ExpressVPN launch attempt restored the controller.",
+                    $"Waiting to confirm whether the final {ProviderName} launch attempt restored the controller.",
                     launchDeadline
                 );
             }
@@ -439,7 +488,7 @@ internal sealed class VpnConnectionCoordinator(
         {
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.WaitingForController,
-                "ExpressVPN is unavailable. An automatic application launch is scheduled.",
+                $"{ProviderName} is unavailable. An automatic application launch is scheduled.",
                 launchDeadline
             );
             return;
@@ -447,7 +496,7 @@ internal sealed class VpnConnectionCoordinator(
 
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.LaunchingApplication,
-            "Requesting macOS to launch ExpressVPN. Torrent processing remains suspended."
+            $"Requesting macOS to launch {ProviderName}. Torrent processing remains suspended."
         );
         var launch = await expressVpnController.LaunchApplicationAsync(cancellationToken);
         if (launch.Started)
@@ -461,8 +510,8 @@ internal sealed class VpnConnectionCoordinator(
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.WaitingForController,
             launch.Started
-                ? "ExpressVPN launch was requested. Waiting for the controller to become available."
-                : "ExpressVPN could not be launched. Torrent processing remains suspended.",
+                ? $"{ProviderName} launch was requested. Waiting for the controller to become available."
+                : $"{ProviderName} could not be launched. Torrent processing remains suspended.",
             launch.Started ? now + unavailableDelay : launchDeadline
         );
     }
@@ -472,6 +521,9 @@ internal sealed class VpnConnectionCoordinator(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (!await IsRecoveryStillSelectedAsync(settings, cancellationToken))
+            return;
+
         if (!CanStartReconnect(settings, now))
         {
             await UpdateReconnectDelayOrExhaustionAsync(settings, now, cancellationToken);
@@ -480,10 +532,11 @@ internal sealed class VpnConnectionCoordinator(
 
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.Disconnecting,
-            "Disconnecting ExpressVPN. Torrent processing remains suspended."
+            $"Disconnecting {ProviderName}. Torrent processing remains suspended."
         );
+        var priorState = runtimeState.Snapshot.ExpressVpnConnectionState ?? "Unknown";
         var attemptNumber = _reconnectAttempts + 1;
-        var disconnect = await expressVpnController.DisconnectAsync(cancellationToken);
+        var disconnect = await Controller.DisconnectAsync(cancellationToken);
         if (disconnect.Started)
         {
             BeginReconnectAttempt(now);
@@ -495,24 +548,24 @@ internal sealed class VpnConnectionCoordinator(
             if (disconnect.Started)
             {
                 await WriteRecoveryAttemptLogAsync(
-                    attemptNumber, "Connected", disconnect, null, null, null, outcome, cancellationToken
+                    attemptNumber, priorState, disconnect, null, null, null, outcome, cancellationToken
                 );
             }
             await UpdateReconnectDelayOrExhaustionAsync(settings, now, cancellationToken);
             return;
         }
 
-        var disconnected = await expressVpnController.WaitForConnectionStateAsync(
-            ExpressVpnConnectionState.Disconnected,
+        var disconnected = await Controller.WaitForConnectionStateAsync(
+            VpnControllerConnectionState.Disconnected,
             cancellationToken
         );
         await ObserveControllerStateAsync(disconnected);
-        if (!disconnected.IsAvailable || disconnected.State != ExpressVpnConnectionState.Disconnected)
+        if (!disconnected.IsAvailable || disconnected.State != VpnControllerConnectionState.Disconnected)
         {
             var outcome = disconnected.TimedOut ? "DisconnectTransitionTimedOut" : "DisconnectTransitionFailed";
             UpdateLastProviderAction(now, outcome);
             await WriteRecoveryAttemptLogAsync(
-                attemptNumber, "Connected", disconnect, disconnected, null, null, outcome, cancellationToken
+                attemptNumber, priorState, disconnect, disconnected, null, null, outcome, cancellationToken
             );
             await UpdateReconnectDelayOrExhaustionAsync(settings, now, cancellationToken);
             return;
@@ -524,7 +577,7 @@ internal sealed class VpnConnectionCoordinator(
         var finalOutcome = DescribeSequenceOutcome(sequence);
         UpdateLastProviderAction(now, finalOutcome);
         await WriteRecoveryAttemptLogAsync(
-            attemptNumber, "Connected", disconnect, disconnected, sequence, sequence.Validation, finalOutcome,
+            attemptNumber, priorState, disconnect, disconnected, sequence, sequence.Validation, finalOutcome,
             cancellationToken
         );
         if (sequence.Validation?.IsValidated != true)
@@ -538,6 +591,9 @@ internal sealed class VpnConnectionCoordinator(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (!await IsRecoveryStillSelectedAsync(settings, cancellationToken))
+            return;
+
         if (!CanStartReconnect(settings, now))
         {
             await UpdateReconnectDelayOrExhaustionAsync(settings, now, cancellationToken);
@@ -568,11 +624,20 @@ internal sealed class VpnConnectionCoordinator(
         bool countConnectAsAttempt,
         CancellationToken cancellationToken)
     {
+        if (!await IsRecoveryStillSelectedAsync(settings, cancellationToken))
+        {
+            return new ConnectValidationSequence(new VpnControllerActionResult
+            {
+                Started = false, Succeeded = false, TimedOut = false, Duration = TimeSpan.Zero,
+                FailureSummary = "VPN recovery settings changed during the recovery sequence.",
+            }, null, null);
+        }
+
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.Connecting,
-            "Connecting ExpressVPN. Torrent processing remains suspended."
+            $"Connecting {ProviderName}. Torrent processing remains suspended."
         );
-        var connect = await expressVpnController.ConnectAsync(cancellationToken);
+        var connect = await Controller.ConnectAsync(cancellationToken);
         if (countConnectAsAttempt && connect.Started)
         {
             BeginReconnectAttempt(attemptStartedAtUtc);
@@ -582,19 +647,19 @@ internal sealed class VpnConnectionCoordinator(
             return new ConnectValidationSequence(connect, null, null);
         }
 
-        var connected = await expressVpnController.WaitForConnectionStateAsync(
-            ExpressVpnConnectionState.Connected,
+        var connected = await Controller.WaitForConnectionStateAsync(
+            VpnControllerConnectionState.Connected,
             cancellationToken
         );
         await ObserveControllerStateAsync(connected);
-        if (!connected.IsAvailable || connected.State != ExpressVpnConnectionState.Connected)
+        if (!connected.IsAvailable || connected.State != VpnControllerConnectionState.Connected)
         {
             return new ConnectValidationSequence(connect, connected, null);
         }
 
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.Validating,
-            "ExpressVPN reports connected. Validating TorrentCore public egress before restarting MonoTorrent."
+            $"{ProviderName} reports connected. Validating TorrentCore public egress before restarting MonoTorrent."
         );
         var verification = await vpnEgressProbe.ValidateAsync(settings, cancellationToken);
         if (verification.Outcome == VpnEgressValidationOutcome.Cancelled && cancellationToken.IsCancellationRequested)
@@ -628,6 +693,14 @@ internal sealed class VpnConnectionCoordinator(
             verification.FailureSummary
         );
         return new ConnectValidationSequence(connect, connected, verification);
+    }
+
+    private async Task<bool> IsRecoveryStillSelectedAsync(
+        RuntimeSettingsSnapshot settings, CancellationToken cancellationToken)
+    {
+        var latest = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        return latest.VpnEgressValidationEnabled && latest.VpnRecoveryProvider == settings.VpnRecoveryProvider &&
+            latest.ExpressVpnAutomaticRecoveryMode == settings.ExpressVpnAutomaticRecoveryMode;
     }
 
     private bool CanStartReconnect(RuntimeSettingsSnapshot settings, DateTimeOffset now)
@@ -682,7 +755,7 @@ internal sealed class VpnConnectionCoordinator(
         {
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.WaitingForConfirmation,
-                "Waiting for a second eligible VPN validation failure before automatic ExpressVPN recovery."
+                $"Waiting for a second eligible VPN validation failure before automatic {ProviderName} recovery."
             );
         }
     }
@@ -696,7 +769,7 @@ internal sealed class VpnConnectionCoordinator(
         {
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.Exhausted,
-                "ExpressVPN automatic recovery did not restore validated TorrentCore egress. Torrent processing remains suspended. Two automatic reconnect attempts were unsuccessful."
+                $"{ProviderName} automatic recovery did not restore validated TorrentCore egress. Torrent processing remains suspended. Two automatic reconnect attempts were unsuccessful."
             );
             await WriteExhaustedLogAsync("reconnect", cancellationToken);
             return;
@@ -707,7 +780,7 @@ internal sealed class VpnConnectionCoordinator(
             var deadline = lastAttempt + TimeSpan.FromSeconds(settings.ExpressVpnRecoveryDelaySeconds);
             UpdateExpressVpnRecoveryState(
                 ExpressVpnRecoveryPhase.WaitingForRecoveryDelay,
-                "Automatic ExpressVPN recovery is waiting before another reconnect attempt.",
+                $"Automatic {ProviderName} recovery is waiting before another reconnect attempt.",
                 deadline > now ? deadline : null
             );
             return;
@@ -715,11 +788,11 @@ internal sealed class VpnConnectionCoordinator(
 
         UpdateExpressVpnRecoveryState(
             ExpressVpnRecoveryPhase.WaitingForController,
-            "ExpressVPN recovery could not start. Torrent processing remains suspended."
+            $"{ProviderName} recovery could not start. Torrent processing remains suspended."
         );
     }
 
-    private async Task ObserveControllerStateAsync(ExpressVpnControllerStateResult result)
+    private async Task ObserveControllerStateAsync(VpnControllerStateResult result)
     {
         var observation = result.IsAvailable && result.State is { } state
             ? state.ToString()
@@ -737,10 +810,11 @@ internal sealed class VpnConnectionCoordinator(
             {
                 Level = result.IsAvailable ? ActivityLogLevel.Information : ActivityLogLevel.Warning,
                 Category = VpnEgressActivityEvents.Category,
-                EventType = VpnEgressActivityEvents.ExpressVpnControllerStateChanged,
+                EventType = _provider == VpnRecoveryProvider.PIA
+                    ? VpnEgressActivityEvents.PiaControllerStateChanged : VpnEgressActivityEvents.ExpressVpnControllerStateChanged,
                 Message = result.IsAvailable
-                    ? $"ExpressVPN controller state changed to {observation}."
-                    : "ExpressVPN controller is unavailable.",
+                    ? $"{ProviderName} controller state changed to {observation}."
+                    : $"{ProviderName} controller is unavailable.",
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(new
                 {
@@ -757,7 +831,7 @@ internal sealed class VpnConnectionCoordinator(
     }
 
     private async Task WriteLaunchAttemptLogAsync(
-        ExpressVpnControllerActionResult launch,
+        VpnControllerActionResult launch,
         CancellationToken cancellationToken)
     {
         await activityLogService.TryWriteActivityLogAsync(
@@ -767,8 +841,8 @@ internal sealed class VpnConnectionCoordinator(
                 Category = VpnEgressActivityEvents.Category,
                 EventType = VpnEgressActivityEvents.ExpressVpnLaunchAttempted,
                 Message = launch.Succeeded
-                    ? "ExpressVPN application launch was requested."
-                    : "ExpressVPN application launch request failed.",
+                    ? $"{ProviderName} application launch was requested."
+                    : $"{ProviderName} application launch request failed.",
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(new
                 {
@@ -789,8 +863,8 @@ internal sealed class VpnConnectionCoordinator(
     private async Task WriteRecoveryAttemptLogAsync(
         int attemptNumber,
         string priorControllerState,
-        ExpressVpnControllerActionResult? disconnect,
-        ExpressVpnControllerStateResult? disconnected,
+        VpnControllerActionResult? disconnect,
+        VpnControllerStateResult? disconnected,
         ConnectValidationSequence? sequence,
         VpnEgressValidationResult? validation,
         string outcome,
@@ -803,10 +877,11 @@ internal sealed class VpnConnectionCoordinator(
                     ? ActivityLogLevel.Information
                     : ActivityLogLevel.Warning,
                 Category = VpnEgressActivityEvents.Category,
-                EventType = VpnEgressActivityEvents.ExpressVpnRecoveryAttempted,
+                EventType = _provider == VpnRecoveryProvider.PIA
+                    ? VpnEgressActivityEvents.PiaRecoveryAttempted : VpnEgressActivityEvents.ExpressVpnRecoveryAttempted,
                 Message = validation?.IsValidated == true
-                    ? "ExpressVPN automatic recovery restored validated TorrentCore egress."
-                    : "ExpressVPN automatic recovery did not restore validated TorrentCore egress.",
+                    ? $"{ProviderName} automatic recovery restored validated TorrentCore egress."
+                    : $"{ProviderName} automatic recovery did not restore validated TorrentCore egress.",
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(new
                 {
@@ -881,10 +956,11 @@ internal sealed class VpnConnectionCoordinator(
             {
                 Level = ActivityLogLevel.Warning,
                 Category = VpnEgressActivityEvents.Category,
-                EventType = VpnEgressActivityEvents.ExpressVpnRecoveryExhausted,
+                EventType = _provider == VpnRecoveryProvider.PIA
+                    ? VpnEgressActivityEvents.PiaRecoveryExhausted : VpnEgressActivityEvents.ExpressVpnRecoveryExhausted,
                 Message = category == "launch"
-                    ? "ExpressVPN automatic application launch attempts were exhausted."
-                    : "ExpressVPN automatic reconnect attempts were exhausted.",
+                    ? $"{ProviderName} automatic application launch attempts were exhausted."
+                    : $"{ProviderName} automatic reconnect attempts were exhausted.",
                 ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
                 DetailsJson = JsonSerializer.Serialize(new
                 {
@@ -923,7 +999,7 @@ internal sealed class VpnConnectionCoordinator(
         });
     }
 
-    private static string DescribeActionOutcome(ExpressVpnControllerActionResult action)
+    private static string DescribeActionOutcome(VpnControllerActionResult action)
         => action.Succeeded ? "Succeeded" : action.TimedOut ? "TimedOut" : action.Started ? "Failed" : "NotStarted";
 
     private static string DescribeSequenceOutcome(ConnectValidationSequence sequence)
@@ -932,11 +1008,27 @@ internal sealed class VpnConnectionCoordinator(
         {
             return $"Connect{DescribeActionOutcome(sequence.Connect)}";
         }
-        if (sequence.Connected?.State != ExpressVpnConnectionState.Connected)
+        if (sequence.Connected?.State != VpnControllerConnectionState.Connected)
         {
             return sequence.Connected?.TimedOut == true ? "ConnectTransitionTimedOut" : "ConnectTransitionFailed";
         }
         return sequence.Validation?.Outcome.ToString() ?? "ValidationNotCompleted";
+    }
+
+    private void SelectProvider(RuntimeSettingsSnapshot settings)
+    {
+        if (_provider == settings.VpnRecoveryProvider)
+            return;
+        _provider = settings.VpnRecoveryProvider;
+        ResetRecoveryEpisode();
+        _lastControllerObservation = null;
+        runtimeState.Update(snapshot => snapshot with
+        {
+            RecoveryProvider = _provider,
+            ExpressVpnConnectionState = null,
+            ExpressVpnLastActionAtUtc = null,
+            ExpressVpnLastActionOutcome = null,
+        });
     }
 
     private void ResetRecoveryEpisode()
@@ -952,8 +1044,8 @@ internal sealed class VpnConnectionCoordinator(
     }
 
     private sealed record ConnectValidationSequence(
-        ExpressVpnControllerActionResult Connect,
-        ExpressVpnControllerStateResult? Connected,
+        VpnControllerActionResult Connect,
+        VpnControllerStateResult? Connected,
         VpnEgressValidationResult? Validation);
 
     private async Task ActivateAsync(

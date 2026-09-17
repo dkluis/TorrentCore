@@ -247,6 +247,13 @@ instance, but the database alone cannot distinguish an OS reboot, a Service rest
 On a new instance, enabled validation must succeed before MonoTorrent activation; a provider recovery attempt that had
 not started before the old instance ended does not consume an attempt.
 
+For PIA recovery, inspect `vpn.pia.controller_state_changed`, `vpn.pia.recovery_attempted`, and
+`vpn.pia.recovery_exhausted`. The native dashboard identifies the selected provider and its recovery status.
+`Unavailable` means a CLI error, timeout, or unrecognized response; it is not a disconnected-state report. Check the
+installed PIA CLI, login, and operator-enabled background mode. PIA recovery never launches the GUI or changes routing
+settings. `Connected` still requires the existing Service public-IP check to pass before MonoTorrent resumes.
+Live disconnect/reconnect acceptance must be coordinated because the same connection also carries Transmission.
+
 The ready interval is detection latency, not immediate packet protection. ExpressVPN Network Lock remains responsible
 for blocking traffic during the interval before TorrentCore performs its next check.
 

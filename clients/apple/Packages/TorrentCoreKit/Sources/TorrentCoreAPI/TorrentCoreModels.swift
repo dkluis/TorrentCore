@@ -140,6 +140,7 @@ public struct TorrentCoreHostStatus: Codable, Hashable, Sendable {
     public var vpnDegradedCheckIntervalSeconds: Int?
     public var vpnReadyCheckIntervalSeconds: Int?
     public var vpnFailureSummary: String?
+    public var vpnRecoveryProvider: String? = "ExpressVPN"
     public var expressVPNRecoveryMode: String?
     public var expressVPNRecoveryPhase: String?
     public var expressVPNConnectionState: String?

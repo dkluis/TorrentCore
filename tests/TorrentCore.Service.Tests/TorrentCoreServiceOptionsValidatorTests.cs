@@ -102,6 +102,7 @@ public sealed class TorrentCoreServiceOptionsValidatorTests
             VpnEgressReadyCheckIntervalSeconds = 0,
             VpnEgressRequestTimeoutSeconds = 0,
             VpnEgressEngineSuspensionTimeoutSeconds = 0,
+            VpnRecoveryProvider = (VpnRecoveryProvider)999,
             ExpressVpnAutomaticRecoveryMode = (ExpressVpnAutomaticRecoveryMode)999,
             ExpressVpnRecoveryDelaySeconds = 0,
             ExpressVpnUnavailableLaunchDelaySeconds = 0,

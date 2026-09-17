@@ -229,6 +229,11 @@ public sealed class TorrentCoreServiceOptionsValidator(IHostEnvironment hostEnvi
             );
         }
 
+        if (!Enum.IsDefined(options.VpnRecoveryProvider))
+        {
+            failures.Add("TorrentCore:VpnRecoveryProvider is invalid.");
+        }
+
         if (!Enum.IsDefined(options.ExpressVpnAutomaticRecoveryMode))
         {
             failures.Add(

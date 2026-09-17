@@ -215,12 +215,12 @@ public enum TorrentCoreHelpCatalog {
             "The agreed default is 10 seconds. It applies live and does not limit activation or recovery."
         )
         public static let expressVPNAutomaticRecoveryMode = help(
-            "ExpressVPN Automatic Recovery",
-            "Selects when TorrentCore may ask ExpressVPN to reconnect after VPN validation fails.",
-            "Disabled performs no ExpressVPN commands. Direct ISP Only requires two consecutive direct-ISP detections. Any Validation Failure accepts two consecutive failed validation outcomes. MonoTorrent remains suspended until public-IP validation succeeds."
+            "VPN Automatic Recovery",
+            "Selects when TorrentCore may ask the selected VPN provider to reconnect after VPN validation fails.",
+            "Disabled performs no provider commands. Direct ISP Only requires two consecutive direct-ISP detections. Any Validation Failure accepts two consecutive failed validation outcomes. MonoTorrent remains suspended until public-IP validation succeeds."
         )
         public static let expressVPNRecoveryDelaySeconds = help(
-            "ExpressVPN Recovery Delay Seconds",
+            "VPN Recovery Delay Seconds",
             "Sets the shared startup grace period and minimum interval between reconnect cycles.",
             "The default is 180 seconds. This delay never permits torrent processing while egress is degraded."
         )

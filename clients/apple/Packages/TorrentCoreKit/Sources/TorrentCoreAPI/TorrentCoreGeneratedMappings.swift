@@ -81,17 +81,18 @@ extension TorrentCoreHostStatus {
         vpnDegradedCheckIntervalSeconds = value.vpnDegradedCheckIntervalSeconds.map(Int.init)
         vpnReadyCheckIntervalSeconds = value.vpnReadyCheckIntervalSeconds.map(Int.init)
         vpnFailureSummary = value.vpnFailureSummary
-        expressVPNRecoveryMode = value.expressVpnRecoveryMode
-        expressVPNRecoveryPhase = value.expressVpnRecoveryPhase
-        expressVPNConnectionState = value.expressVpnConnectionState
-        expressVPNReconnectAttemptsUsed = value.expressVpnReconnectAttemptsUsed.map(Int.init)
-        expressVPNReconnectAttemptsMaximum = value.expressVpnReconnectAttemptsMaximum.map(Int.init)
-        expressVPNLaunchAttemptsUsed = value.expressVpnLaunchAttemptsUsed.map(Int.init)
-        expressVPNLaunchAttemptsMaximum = value.expressVpnLaunchAttemptsMaximum.map(Int.init)
-        expressVPNNextActionAt = value.expressVpnNextActionAtUtc
-        expressVPNLastActionAt = value.expressVpnLastActionAtUtc
-        expressVPNLastActionOutcome = value.expressVpnLastActionOutcome
-        expressVPNRecoveryMessage = value.expressVpnRecoveryMessage
+        vpnRecoveryProvider = value.vpnRecoveryProvider ?? "ExpressVPN"
+        expressVPNRecoveryMode = (value.vpnRecoveryMode ?? value.expressVpnRecoveryMode)
+        expressVPNRecoveryPhase = (value.vpnRecoveryPhase ?? value.expressVpnRecoveryPhase)
+        expressVPNConnectionState = (value.vpnConnectionState ?? value.expressVpnConnectionState)
+        expressVPNReconnectAttemptsUsed = (value.vpnReconnectAttemptsUsed ?? value.expressVpnReconnectAttemptsUsed).map(Int.init)
+        expressVPNReconnectAttemptsMaximum = (value.vpnReconnectAttemptsMaximum ?? value.expressVpnReconnectAttemptsMaximum).map(Int.init)
+        expressVPNLaunchAttemptsUsed = (value.vpnLaunchAttemptsUsed ?? value.expressVpnLaunchAttemptsUsed).map(Int.init)
+        expressVPNLaunchAttemptsMaximum = (value.vpnLaunchAttemptsMaximum ?? value.expressVpnLaunchAttemptsMaximum).map(Int.init)
+        expressVPNNextActionAt = (value.vpnNextActionAtUtc ?? value.expressVpnNextActionAtUtc)
+        expressVPNLastActionAt = (value.vpnLastActionAtUtc ?? value.expressVpnLastActionAtUtc)
+        expressVPNLastActionOutcome = (value.vpnLastActionOutcome ?? value.expressVpnLastActionOutcome)
+        expressVPNRecoveryMessage = (value.vpnRecoveryMessage ?? value.expressVpnRecoveryMessage)
         checkedAt = value.checkedAtUtc
     }
 }
