@@ -861,6 +861,17 @@ public sealed class SqliteSchemaMigrator(string databaseFilePath)
                     }
                 }
             ),
+            new SqliteMigrationDefinition(
+                23, "persist_executable_rejection_in_history", async (connection, cancellationToken) =>
+                {
+                    if (!await ColumnExistsAsync(connection, "torrent_history", "executable_rejection_json", cancellationToken))
+                    {
+                        var command = connection.CreateCommand();
+                        command.CommandText = "ALTER TABLE torrent_history ADD COLUMN executable_rejection_json TEXT NULL;";
+                        await command.ExecuteNonQueryAsync(cancellationToken);
+                    }
+                }
+            ),
         ];
     }
 

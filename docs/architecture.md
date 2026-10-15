@@ -137,6 +137,34 @@ Synchronization timing summaries are an optional DB-log output, not part of engi
 loop always runs. When `RuntimeTickDurationSummaryEnabled` is off or torrent processing is VPN-degraded, it does not
 accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to ready begins a new one-minute window.
 
+## Executable Payload Rejection
+
+For the existing `TV` and `Movie` category keys, MonoTorrent's resolved manifest is inspected for final `.exe`
+extensions, case-insensitively. Detection blocks queue admission and completion callbacks for that torrent and stops
+its manager. It does not rely on release names or the provider's displayed file list. Music, Audiobook and uncategorized
+work remain outside this feature.
+
+The existing TVMaze rejection POST is used first with cleanup unconfirmed (`Failed`), then with
+`DeletedIncludingData` only after removal and awaited file deletion are confirmed. Its recorded `SeasonExcluded`
+acknowledgement retains the torrent and releases the temporary block. An unavailable API, invalid acknowledgement,
+or missing explicit callback API URL/key keeps the offending torrent stopped; other torrents keep their normal flow.
+The bounded eligibility request is polled without waiting for HTTP inside engine synchronization. Deletion and final
+notification run outside that synchronization gate. Ordinary manual delete-data remains unchanged.
+
+Progress is stored on the existing history row by migration 23, using the torrent UUID as the notification event ID.
+Restart reconciliation resumes removal/deletion/notification while that history remains retained. A lost final reply
+reuses the event; confirmed data deletion is not repeated just to retry notification. Retained history explicitly marked
+`executable_payload_rejected` blocks that hash at admission, including manual submissions and persistence-only admission
+while VPN processing is disabled. Normal history cleanup removes that block; no permanent blacklist or separate queue
+is added. The existing insert transaction repeats the history check to close admission/removal races. TVMaze keeps
+ownership of candidate selection, companion protection, status reset, Errors, Action Items and
+V2 summaries. Unlinked manual magnets get rejection reporting without guessed media recovery.
+
+The source integration uses APIComplete contract 1.7.0 without a new endpoint, public TorrentCore contract change,
+Native UI change or dependency. Physical deletion, installed configuration, independent service restarts and TVMaze
+recovery require the separately authorized complete CA-Server Test acceptance. A proposed Slice 6 will discuss operator
+UI needs in both products; UI scope has not yet been agreed.
+
 ## Engine Dependency
 
 - TorrentCore pins MonoTorrent `3.0.2` as the production baseline.

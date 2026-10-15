@@ -32,7 +32,8 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     ITorrentRemovalCleanupScheduler torrentRemovalCleanupScheduler,
     RuntimeOperationDurationDiagnostics durationDiagnostics,
     TorrentExecutionGate executionGate,
-    ILogger<MonoTorrentEngineAdapter> logger) : ITorrentEngineAdapter, IMonoTorrentLifecycle, IHostedService,
+    ILogger<MonoTorrentEngineAdapter> logger,
+    TorrentPayloadRejectionCoordinator? payloadRejections = null) : ITorrentEngineAdapter, IMonoTorrentLifecycle, IHostedService,
     IAsyncDisposable
 {
     private static readonly TimeSpan ConnectionActivitySummaryInterval = TimeSpan.FromMinutes(1);
@@ -345,6 +346,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     public async Task SynchronizeAsync(CancellationToken cancellationToken)
     {
+        if (payloadRejections is not null) { await payloadRejections.ReconcileRemovedAsync(cancellationToken); }
         using var executionLease = executionGate.TryAcquire();
         if (executionLease is null)
         {
@@ -509,6 +511,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
     {
         var magnet = ParseMagnet(request.MagnetUri);
         var infoHash = magnet.InfoHashes.V1OrV2.ToHex().ToUpperInvariant();
+        if (payloadRejections is not null) { await payloadRejections.EnsureAdmissionAllowedAsync(infoHash, cancellationToken); }
         if (await torrentStateStore.ExistsByInfoHashAsync(infoHash, cancellationToken))
         {
             throw new ServiceOperationException(
@@ -585,7 +588,22 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         };
 
         snapshot = CreateUpdatedSnapshot(snapshot, manager, now);
-        await torrentStateStore.InsertAsync(snapshot, cancellationToken);
+        try { await torrentStateStore.InsertAsync(snapshot, cancellationToken); }
+        catch (TorrentCore.Core.History.TorrentPayloadRejectedException)
+        {
+            // A rejection recorded after the first admission read must also release this unstarted manager.
+            try { await RemoveManagedTorrentAsync(torrentId, manager, CancellationToken.None); }
+            catch (Exception ex)
+            {
+                try { await activityLogService.TryWriteActivityLogAsync(new()
+                {
+                    Level = ActivityLogLevel.Error, Category = "torrent", EventType = "torrent.payload_rejection.admission_cleanup_failed",
+                    Message = "Rejected unstarted manager cleanup needs review: " + ex.Message,
+                    TorrentId = torrentId, ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+                }, CancellationToken.None); } catch (Exception) { }
+            }
+            throw;
+        }
 
         await _gate.WaitAsync(cancellationToken);
         try
@@ -1103,7 +1121,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         }
 
         return persistedSnapshots.Select(snapshot
-                                          => managers.TryGetValue(snapshot.TorrentId, out var manager) ?
+                                          => payloadRejections?.IsBlocked(snapshot.TorrentId) != true && managers.TryGetValue(snapshot.TorrentId, out var manager) ?
                                                   CreateReadProjectedSnapshot(snapshot, manager) : snapshot
                                   )
                                  .ToArray();
@@ -2076,7 +2094,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         foreach (var entry in managers)
         {
             var snapshot = await torrentStateStore.GetAsync(entry.Key, cancellationToken);
-            if (snapshot is not null)
+            if (snapshot is not null && payloadRejections?.IsBlocked(entry.Key) != true)
             {
                 managedTorrents.Add((snapshot, entry.Value));
             }
@@ -2124,6 +2142,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 continue;
             }
 
+            if (await RejectExecutablePayloadAsync(snapshot, entry.Value, cancellationToken)) { continue; }
             var observedFiles = GetObservedFilePaths(entry.Value);
             if (snapshot.State == ContractTorrentState.Completed && IsManagerStoppedForCompletion(entry.Value) &&
                 snapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
@@ -4271,6 +4290,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
 
     private async Task EnsureManagerStartedAsync(TorrentManager manager, CancellationToken cancellationToken)
     {
+        if (payloadRejections?.IsBlocked(GetTorrentId(manager) ?? Guid.Empty) == true) { return; }
         await WaitForManagerToBecomeRestartableAsync(manager, cancellationToken);
 
         if (!IsManagerRunning(manager))
@@ -4498,6 +4518,41 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         RuntimeSettingsSnapshot runtimeSettings, IReadOnlyList<TorrentCompletionObservedFilePaths>? observedFiles)
     {
         return finalizationChecker.Check(snapshot, runtimeSettings, observedFiles);
+    }
+
+    private async Task<bool> RejectExecutablePayloadAsync(TorrentSnapshot snapshot, TorrentManager manager, CancellationToken token)
+    {
+        if (payloadRejections is null || !manager.HasMetadata || !TorrentPayloadRejectionCoordinator.IsMediaCategory(snapshot.CategoryKey)) { return false; }
+        var metadataFiles = manager.Files.Select(file => file.Path).ToArray();
+        if (TorrentPayloadRejectionCoordinator.Executables(metadataFiles).Length == 0) { return false; }
+        const string heldMessage = "Executable payload blocked pending rejection cleanup/season verification.";
+        var held = await payloadRejections.InspectAsync(snapshot, metadataFiles,
+            GetCleanupCandidatePaths(manager).Append(snapshot.SavePath).Distinct(StringComparer.Ordinal).ToArray(),
+            async () =>
+            {
+                await EnsureManagerStoppedAsync(manager, token, snapshot.TorrentId);
+                if (snapshot.State != ContractTorrentState.Error || snapshot.ErrorMessage != heldMessage)
+                {
+                    snapshot.State = ContractTorrentState.Error; snapshot.ErrorMessage = heldMessage;
+                    snapshot.ConnectedPeerCount = 0; snapshot.DownloadRateBytesPerSecond = 0; snapshot.UploadRateBytesPerSecond = 0;
+                    await torrentStateStore.UpdateAsync(snapshot, token);
+                }
+                // The ordinary history service creates the row if admission/restart was interrupted before history creation.
+                await torrentHistoryService.ObserveSnapshotAsync(snapshot, token);
+            },
+            async () =>
+            {
+                await RemoveManagedTorrentAsync(snapshot.TorrentId, manager, token);
+                await torrentStateStore.DeleteAsync(snapshot.TorrentId, token);
+            }, token);
+        if (!held && snapshot.ErrorMessage == heldMessage)
+        {
+            snapshot.State = snapshot.DesiredState == TorrentDesiredState.Paused ? ContractTorrentState.Paused : ContractTorrentState.Queued;
+            snapshot.ErrorMessage = null;
+            await torrentStateStore.UpdateAsync(snapshot, token);
+            await torrentHistoryService.ObserveSnapshotAsync(snapshot, token);
+        }
+        return held;
     }
 
     private static IReadOnlyList<TorrentCompletionObservedFilePaths>? GetObservedFilePaths(TorrentManager? manager)

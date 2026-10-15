@@ -85,6 +85,11 @@ Current core tables:
 - migration 22 adds nullable download no-progress and last-yield timestamps plus the non-null download-yielded queue
   marker. Existing rows receive null timestamps and a false marker, so an active download receives a fresh full
   interval from its first post-upgrade active observation without changing queue intent or cold-recovery history.
+- migration 23 adds nullable `executable_rejection_json` to existing history rows. It records the offending manifest
+  paths, cleanup paths, stable event identity, phase and next attempt for executable rejection. Normal history writes
+  preserve it; normal date cleanup deletes it with its row. There is no separate rejection table or permanent blacklist.
+- retained rows with removal reason `executable_payload_rejected` block resubmission of that exact hash. Ordinary
+  removal/failure history does not block submission. Retry bookkeeping does not refresh the history retention date.
 - `download_no_progress_started_at_utc` is present only for an active or recovery-suspended download attempt. Durable
   completed-piece growth restarts it; automatic yield and ordinary queue intent clear it.
 - `is_download_yielded` identifies the current automatic-retry queue class, while

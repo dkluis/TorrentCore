@@ -16,7 +16,8 @@ namespace TorrentCore.Service.Engine;
 public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStateStore,
     IRuntimeSettingsService runtimeSettingsService, ITorrentCompletionFinalizationChecker finalizationChecker,
     ITorrentHistoryService torrentHistoryService,
-    ResolvedTorrentCoreServicePaths servicePaths) : ITorrentEngineAdapter
+    ResolvedTorrentCoreServicePaths servicePaths,
+    TorrentPayloadRejectionCoordinator? payloadRejections = null) : ITorrentEngineAdapter
 {
     public Task<int> GetTorrentCountAsync(CancellationToken cancellationToken)
     {
@@ -130,6 +131,7 @@ public sealed class PersistedTorrentEngineAdapter(ITorrentStateStore torrentStat
         ResolvedTorrentCategorySelection categorySelection, CancellationToken cancellationToken)
     {
         var magnet = ParseMagnet(request.MagnetUri);
+        if (payloadRejections is not null) { await payloadRejections.EnsureAdmissionAllowedAsync(magnet.InfoHash, cancellationToken); }
 
         if (await torrentStateStore.ExistsByInfoHashAsync(magnet.InfoHash, cancellationToken))
         {

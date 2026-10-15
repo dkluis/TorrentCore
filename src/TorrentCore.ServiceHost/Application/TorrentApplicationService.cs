@@ -538,6 +538,11 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
 
             return torrent;
         }
+        catch (TorrentCore.Core.History.TorrentPayloadRejectedException exception)
+        {
+            await LogFailureAsync("torrent", "torrent.add.failed", exception.Message, null, cancellationToken);
+            throw new ServiceOperationException("executable_payload_rejected", exception.Message, 409, nameof(request.MagnetUri));
+        }
         catch (ServiceOperationException exception)
         {
             await LogFailureAsync("torrent", "torrent.add.failed", exception.Message, null, cancellationToken);

@@ -13,6 +13,13 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 
 Representative coverage areas:
 
+- executable payload rejection in TV/Movie categories: direct-input and fake-I/O cases cover recorded-season
+  retention, save-before-removal, unavailable eligibility, nonblocking HTTP polling, deletion failure, lost notification
+  replies and retained-history admission errors. A dedicated disposable SQLite test checks migration 23, restart state,
+  preservation by ordinary history writes and removal of the admission block by unchanged history cleanup. These tests
+  never use installed TorrentCore storage or a TVMaze database. Physical removal and cross-service acceptance belong
+  to the operator-controlled CA-Server Test installation.
+
 - deterministic VPN-egress coverage for controllable time, scripted HTTP outcomes, typed/bounded IPv4 response
   parsing, multiple direct-ISP CIDRs, timeout and cancellation behavior, stable endpoint-failure reasons, and
   change-suppressed DB logging; these tests require neither Internet access nor ExpressVPN
