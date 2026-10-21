@@ -4525,7 +4525,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         if (payloadRejections is null || !manager.HasMetadata || !TorrentPayloadRejectionCoordinator.IsMediaCategory(snapshot.CategoryKey)) { return false; }
         var metadataFiles = manager.Files.Select(file => file.Path).ToArray();
         if (TorrentPayloadRejectionCoordinator.Executables(metadataFiles).Length == 0) { return false; }
-        const string heldMessage = "Executable payload blocked pending rejection cleanup/season verification.";
+        const string heldMessage = "Executable payload blocked pending rejection cleanup.";
         var held = await payloadRejections.InspectAsync(snapshot, metadataFiles,
             GetCleanupCandidatePaths(manager).Append(snapshot.SavePath).Distinct(StringComparer.Ordinal).ToArray(),
             async () =>

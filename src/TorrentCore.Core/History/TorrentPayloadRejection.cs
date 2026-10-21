@@ -3,7 +3,7 @@ namespace TorrentCore.Core.History;
 // Stored on the ordinary history row; ordinary history cleanup also removes this state.
 public sealed record TorrentPayloadRejection(
     Guid TorrentId, string InfoHash, string DownloadRootPath, string[] CandidatePaths,
-    string[] OffendingFiles, string Phase = "EligibilityPending", DateTimeOffset? NextAttemptAtUtc = null);
+    string[] OffendingFiles, string Phase = "Removing", DateTimeOffset? NextAttemptAtUtc = null);
 
 public interface ITorrentPayloadRejectionStore
 {

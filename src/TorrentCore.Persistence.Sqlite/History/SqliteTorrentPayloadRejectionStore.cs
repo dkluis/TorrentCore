@@ -11,7 +11,8 @@ public sealed class SqliteTorrentPayloadRejectionStore(string databaseFilePath, 
     public Task<TorrentPayloadRejection?> GetAsync(Guid torrentId, CancellationToken token) =>
         ActivityAsync("read", () => ReadCoreAsync(torrentId, token), token);
     public Task<IReadOnlyList<TorrentPayloadRejection>> ListPendingAsync(CancellationToken token) =>
-        ActivityAsync("list", () => ListCoreAsync(token), token);
+        // Synchronization polls every tick. Actual reads/writes/actions and scan failures remain logged.
+        ActivityAsync("list", () => ListCoreAsync(token), token, logSuccess: false);
     public Task<bool> IsRejectedAsync(string hash, CancellationToken token) =>
         ActivityAsync("check_hash", () => CheckCoreAsync(hash, token), token);
     public Task SaveAsync(TorrentPayloadRejection row, CancellationToken token) =>
@@ -80,13 +81,14 @@ public sealed class SqliteTorrentPayloadRejectionStore(string databaseFilePath, 
         { throw new InvalidOperationException("Executable rejection history is missing or has changed; no cleanup acknowledgement saved."); }
     }
 
-    private async Task<T> ActivityAsync<T>(string activity, Func<Task<T>> execute, CancellationToken token)
+    private async Task<T> ActivityAsync<T>(string activity, Func<Task<T>> execute, CancellationToken token,
+        bool logSuccess = true)
     {
         try
         {
-            await LogAsync(activity, "Started executable rejection history activity.", false);
+            if (logSuccess) { await LogAsync(activity, "Started executable rejection history activity.", false); }
             var result = await execute();
-            await LogAsync(activity, "Completed executable rejection history activity.", false);
+            if (logSuccess) { await LogAsync(activity, "Completed executable rejection history activity.", false); }
             return result;
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }

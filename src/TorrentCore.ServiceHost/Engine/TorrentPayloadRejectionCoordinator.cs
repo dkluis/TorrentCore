@@ -10,10 +10,10 @@ using TorrentCore.Contracts.Torrents;
 
 namespace TorrentCore.Service.Engine;
 
-public sealed record PayloadRejectionReply(bool Confirmed, bool SeasonExcluded = false, string Message = "");
+public sealed record PayloadRejectionReply(bool Confirmed, string Message = "");
 public interface ITorrentPayloadRejectionEffects
 {
-    Task<PayloadRejectionReply> ReportAsync(TorrentPayloadRejection rejection, bool dataDeleted, CancellationToken token);
+    Task<PayloadRejectionReply> ReportAsync(TorrentPayloadRejection rejection, CancellationToken token);
     Task DeleteAsync(TorrentPayloadRejection rejection, CancellationToken token);
 }
 
@@ -26,8 +26,7 @@ public sealed class TorrentPayloadRejectionCoordinator
     private readonly ITorrentPayloadRejectionEffects _effects;
     private readonly Func<Guid?, string, string, bool, Task> _log;
     private readonly ConcurrentDictionary<Guid, byte> _blocked = new();
-    private readonly ConcurrentDictionary<Guid, byte> _excluded = new();
-    private readonly ConcurrentDictionary<Guid, Task<PayloadRejectionReply>> _eligibilityRequests = new();
+    private readonly ConcurrentDictionary<Guid, Task<PayloadRejectionReply>> _notificationRequests = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public TorrentPayloadRejectionCoordinator(ITorrentPayloadRejectionStore store, ITorrentStateStore states,
@@ -97,7 +96,7 @@ public sealed class TorrentPayloadRejectionCoordinator
     public async Task<bool> InspectAsync(TorrentSnapshot snapshot, IReadOnlyList<string> metadataFiles,
         IReadOnlyList<string> cleanupPaths, Func<Task> stop, Func<Task> remove, CancellationToken token)
     {
-        if (!IsMediaCategory(snapshot.CategoryKey) || _excluded.ContainsKey(snapshot.TorrentId)) { return false; }
+        if (!IsMediaCategory(snapshot.CategoryKey)) { return false; }
         var offending = Executables(metadataFiles);
         if (offending.Length == 0) { return false; }
         _blocked.TryAdd(snapshot.TorrentId, 0);
@@ -110,36 +109,15 @@ public sealed class TorrentPayloadRejectionCoordinator
                 !string.Equals(row.InfoHash, snapshot.InfoHash, StringComparison.OrdinalIgnoreCase) ||
                 !string.Equals(row.DownloadRootPath, snapshot.DownloadRootPath, StringComparison.Ordinal)))
             { throw new InvalidOperationException("Recorded executable cleanup identity differs from the current torrent; review required."); }
-            if (row?.Phase == "Excluded") { _excluded.TryAdd(snapshot.TorrentId, 0); _blocked.TryRemove(snapshot.TorrentId, out _); return false; }
             row ??= new(snapshot.TorrentId, snapshot.InfoHash ?? "", snapshot.DownloadRootPath ?? "",
                 cleanupPaths.ToArray(), offending.Take(1000).ToArray());
-            if (row.Phase is not ("EligibilityPending" or "Removing"))
+            // Older retained intents can still contain the former pre-removal season-check phases.
+            if (row.Phase is not ("EligibilityPending" or "Excluded" or "Removing"))
             { throw new InvalidOperationException("Stored cleanup phase conflicts with a current torrent; review required."); }
-            if (row.NextAttemptAtUtc > DateTimeOffset.UtcNow) { return true; }
-            if (_eligibilityRequests.TryGetValue(row.TorrentId, out var inFlight) && !inFlight.IsCompleted) { return true; }
-            await LogAsync(row.TorrentId, "inspect", $"Executable manifest path awaiting recorded-season verification. Hash={row.InfoHash}; files={string.Join(", ", row.OffendingFiles)}.");
-            // Save before the first network call, including the event ID used for every retry.
+            row = row with { Phase = "Removing", NextAttemptAtUtc = null };
+            await LogAsync(row.TorrentId, "rejected", $"Executable payload rejected. Hash={row.InfoHash}; files={string.Join(", ", row.OffendingFiles)}.", true);
+            // Persist the rejection before removal. TVMaze is notified only after confirmed data deletion.
             await SaveAsync(row, token);
-            if (row.Phase == "EligibilityPending")
-            {
-                // Like the existing finalization probes, poll bounded I/O rather than hold engine synchronization waiting for HTTP.
-                var pendingReply = _eligibilityRequests.GetOrAdd(row.TorrentId, _ => _effects.ReportAsync(row, false, token));
-                if (!pendingReply.IsCompleted) { return true; }
-                _eligibilityRequests.TryRemove(row.TorrentId, out _);
-                var reply = await pendingReply;
-                await LogAsync(row.TorrentId, "eligibility", reply.Message, !reply.Confirmed);
-                if (!reply.Confirmed) { await SaveAsync(row with { NextAttemptAtUtc = DateTimeOffset.UtcNow.AddSeconds(30) }, token); return true; }
-                if (reply.SeasonExcluded)
-                {
-                    await SaveAsync(row with { Phase = "Excluded", NextAttemptAtUtc = null }, token);
-                    _excluded.TryAdd(row.TorrentId, 0);
-                    _blocked.TryRemove(row.TorrentId, out _);
-                    return false;
-                }
-                row = row with { Phase = "Removing", NextAttemptAtUtc = null };
-                await LogAsync(row.TorrentId, "rejected", $"Executable payload rejected. Hash={row.InfoHash}; files={string.Join(", ", row.OffendingFiles)}.", true);
-                await SaveAsync(row, token);
-            }
             await LogAsync(row.TorrentId, "remove", "Started executable torrent removal; downstream callback remains blocked.");
             await remove();
             await _markRemoved(row, token);
@@ -161,7 +139,8 @@ public sealed class TorrentPayloadRejectionCoordinator
         {
             foreach (var row in await _store.ListPendingAsync(token))
             {
-                if (row.NextAttemptAtUtc > DateTimeOffset.UtcNow || row.Phase == "EligibilityPending") { continue; }
+                if (row.Phase == "EligibilityPending" || row.NextAttemptAtUtc > DateTimeOffset.UtcNow &&
+                    !(_notificationRequests.TryGetValue(row.TorrentId, out var pending) && pending.IsCompleted)) { continue; }
                 try
                 {
                     if (await _exists(row.TorrentId, token)) { continue; }
@@ -197,7 +176,11 @@ public sealed class TorrentPayloadRejectionCoordinator
             await LogAsync(row.TorrentId, "deleted", "Executable payload data deletion confirmed.");
         }
         if (row.Phase != "Deleted") { return; }
-        var reply = await _effects.ReportAsync(row, true, token);
+        // Poll bounded callback work like existing engine probes; do not hold the runtime tick waiting on a process/API.
+        var request = _notificationRequests.GetOrAdd(row.TorrentId, _ => _effects.ReportAsync(row, token));
+        if (!request.IsCompleted) { return; }
+        _notificationRequests.TryRemove(row.TorrentId, out _);
+        var reply = await request;
         await LogAsync(row.TorrentId, "notification", reply.Message, !reply.Confirmed);
         await SaveAsync(row with { Phase = reply.Confirmed ? "Notified" : "Deleted",
             NextAttemptAtUtc = reply.Confirmed ? null : DateTimeOffset.UtcNow.AddSeconds(30) }, token);

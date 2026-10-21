@@ -144,12 +144,20 @@ extensions, case-insensitively. Detection blocks queue admission and completion 
 its manager. It does not rely on release names or the provider's displayed file list. Music, Audiobook and uncategorized
 work remain outside this feature.
 
-The existing TVMaze rejection POST is used first with cleanup unconfirmed (`Failed`), then with
-`DeletedIncludingData` only after removal and awaited file deletion are confirmed. Its recorded `SeasonExcluded`
-acknowledgement retains the torrent and releases the temporary block. An unavailable API, invalid acknowledgement,
-or missing explicit callback API URL/key keeps the offending torrent stopped; other torrents keep their normal flow.
-The bounded eligibility request is polled without waiting for HTTP inside engine synchronization. Deletion and final
-notification run outside that synchronization gate. Ordinary manual delete-data remains unchanged.
+Removal no longer depends on a preliminary TVMaze season check. Per the operator's October 21 decision, all TV/Movie
+executable payloads are rejected, including an unexpected season pack. After removal and awaited file deletion are
+confirmed, TorrentCore launches its configured one-shot completion callback command with `--payload-rejection`.
+The JSON request is delivered through standard input; the updated TVMaze `TransmissionDoneCallback` application uses
+the same DB-backed API configuration and optional overrides as normal completion handling to POST
+`DeletedIncludingData` to the existing rejection endpoint. A successful exit and matching structured acknowledgement
+are required. No additional URL/key settings are required. An unavailable callback/API or lost reply leaves the
+notification pending under the same event ID; it does not undo confirmed cleanup. Deploy the updated callback app
+with the Service. Older completion-only apps cannot acknowledge rejection and are given no completion name.
+Deletion and notification run outside engine synchronization. The callback task is polled without holding a runtime
+tick waiting for the process/API reply. Routine rejection-history scans do not emit success rows every tick; actual
+history reads/writes, rejection actions and scan failures retain their logging. Ordinary manual delete-data remains unchanged.
+TVMaze owns operator reporting and saved-alternate/reset recovery for individual episodes/movies; season packs have
+no automatic replacement/reset. Only the recorded individual episode is unmarked remotely and locally when needed.
 
 Progress is stored on the existing history row by migration 23, using the torrent UUID as the notification event ID.
 Restart reconciliation resumes removal/deletion/notification while that history remains retained. A lost final reply

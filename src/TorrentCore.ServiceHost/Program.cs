@@ -66,7 +66,6 @@ builder.Services.AddSingleton(serviceProvider =>
 builder.Services.AddSingleton<ServiceInstanceContext>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient(VpnEgressProbe.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan);
-builder.Services.AddHttpClient(TorrentPayloadRejectionEffects.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddSingleton<IVpnEgressProbe, VpnEgressProbe>();
 builder.Services.AddSingleton<IExternalProcessRunner, ExternalProcessRunner>();
 builder.Services.AddSingleton<IExpressVpnController, ExpressVpnController>();
@@ -133,7 +132,11 @@ builder.Services.AddSingleton<ITorrentHistoryService, TorrentHistoryService>();
 builder.Services.AddSingleton<ITorrentPayloadRejectionStore>(serviceProvider =>
     new SqliteTorrentPayloadRejectionStore(serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>().DatabaseFilePath,
         serviceProvider.GetRequiredService<IActivityLogService>()));
-builder.Services.AddSingleton<ITorrentPayloadRejectionEffects, TorrentPayloadRejectionEffects>();
+builder.Services.AddSingleton<ITorrentPayloadRejectionEffects>(services => new TorrentPayloadRejectionEffects(
+    services.GetRequiredService<IRuntimeSettingsService>().GetEffectiveSettingsAsync,
+    services.GetRequiredService<ITorrentStateStore>().ListAsync,
+    services.GetRequiredService<IExternalProcessRunner>().RunAsync,
+    services.GetRequiredService<ResolvedTorrentCoreServicePaths>().StorageRootPath));
 builder.Services.AddSingleton<TorrentPayloadRejectionCoordinator>();
 builder.Services.AddSingleton<IMaintenanceCleanupService, MaintenanceCleanupService>();
 builder.Services.AddSingleton<ITorrentCompletionFinalizationChecker, TorrentCompletionFinalizationChecker>();

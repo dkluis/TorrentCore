@@ -38,6 +38,7 @@ internal sealed class ExternalProcessRunner(TimeProvider timeProvider) : IExtern
 
         var standardOutputTask = ReadBoundedAsync(process.StandardOutput);
         var standardErrorTask = ReadBoundedAsync(process.StandardError);
+        var standardInputTask = WriteInputAsync(process, request.StandardInput, cancellationToken);
         var exitTask = process.WaitForExitAsync(cancellationToken);
         var timeoutTask = Task.Delay(request.Timeout, timeProvider, cancellationToken);
 
@@ -49,6 +50,7 @@ internal sealed class ExternalProcessRunner(TimeProvider timeProvider) : IExtern
                 await timeoutTask;
                 TryKill(process);
                 await process.WaitForExitAsync(CancellationToken.None);
+                await standardInputTask;
                 return new ExternalProcessResult
                 {
                     Started = true,
@@ -66,10 +68,12 @@ internal sealed class ExternalProcessRunner(TimeProvider timeProvider) : IExtern
         {
             TryKill(process);
             await process.WaitForExitAsync(CancellationToken.None);
+            try { await standardInputTask; } catch (OperationCanceledException) { }
             await Task.WhenAll(standardOutputTask, standardErrorTask);
             throw;
         }
 
+        var inputWritten = await standardInputTask;
         var standardOutput = await standardOutputTask;
         var standardError = await standardErrorTask;
         return new ExternalProcessResult
@@ -79,13 +83,13 @@ internal sealed class ExternalProcessRunner(TimeProvider timeProvider) : IExtern
             ExitCode = process.ExitCode,
             StandardOutput = standardOutput,
             StandardError = standardError,
-            FailureSummary = process.ExitCode == 0
+            FailureSummary = !inputWritten ? "The process did not accept its input." : process.ExitCode == 0
                 ? null
                 : Sanitize(string.IsNullOrWhiteSpace(standardError) ? standardOutput : standardError),
         };
     }
 
-    private static ProcessStartInfo BuildStartInfo(ExternalProcessRequest request)
+    internal static ProcessStartInfo BuildStartInfo(ExternalProcessRequest request)
     {
         var startInfo = new ProcessStartInfo
         {
@@ -93,15 +97,36 @@ internal sealed class ExternalProcessRunner(TimeProvider timeProvider) : IExtern
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            RedirectStandardInput = request.StandardInput is not null,
             CreateNoWindow = true,
-            WorkingDirectory = "/",
+            WorkingDirectory = request.WorkingDirectory,
         };
-        foreach (var argument in request.Arguments)
+        if (request.ArgumentString is not null)
         {
-            startInfo.ArgumentList.Add(argument);
+            startInfo.Arguments = request.ArgumentString;
+        }
+        else
+        {
+            foreach (var argument in request.Arguments) { startInfo.ArgumentList.Add(argument); }
+        }
+        if (request.Environment is not null)
+        {
+            foreach (var entry in request.Environment) { startInfo.Environment[entry.Key] = entry.Value; }
         }
 
         return startInfo;
+    }
+
+    private static async Task<bool> WriteInputAsync(Process process, string? input, CancellationToken token)
+    {
+        if (input is null) { return true; }
+        try
+        {
+            using var writer = process.StandardInput;
+            await writer.WriteAsync(input.AsMemory(), token);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException) { return false; }
     }
 
     private static async Task<string> ReadBoundedAsync(StreamReader reader)

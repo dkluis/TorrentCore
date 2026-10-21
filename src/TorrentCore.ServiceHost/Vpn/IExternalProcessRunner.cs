@@ -3,7 +3,13 @@ namespace TorrentCore.Service.Vpn;
 internal sealed record ExternalProcessRequest(
     string FileName,
     IReadOnlyList<string> Arguments,
-    TimeSpan Timeout);
+    TimeSpan Timeout)
+{
+    public string? ArgumentString { get; init; }
+    public string? StandardInput { get; init; }
+    public string WorkingDirectory { get; init; } = "/";
+    public IReadOnlyDictionary<string, string>? Environment { get; init; }
+}
 
 internal sealed record ExternalProcessResult
 {

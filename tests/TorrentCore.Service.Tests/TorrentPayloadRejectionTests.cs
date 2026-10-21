@@ -32,36 +32,30 @@ public sealed class TorrentPayloadRejectionTests
         Assert.Equal(blocked, result);
         if (blocked)
         {
+            Assert.DoesNotContain("report", events);
             await service.ReconcileRemovedAsync(default);
-            Assert.True(events.IndexOf("save:EligibilityPending") < events.IndexOf("report:False"));
             Assert.True(events.IndexOf("save:Removing") < events.IndexOf("remove"));
-            Assert.True(events.IndexOf("delete") < events.IndexOf("report:True"));
+            Assert.True(events.IndexOf("delete") < events.IndexOf("report"));
             Assert.Equal("Notified", store.Saved!.Phase);
         }
         else { Assert.Empty(events); }
     }
-    [Fact]
-    public async Task RecordedSeasonIsRetainedAndNeverDeletedOrNotifiedAsDeleted()
+    [Theory]
+    [InlineData("EligibilityPending")]
+    [InlineData("Excluded")]
+    public async Task EarlierSeasonCheckIntentNowRemovesWithoutPreRemovalNotification(string phase)
     {
-        var events = new List<string>(); var store = new Store(events); var effects = new Effects(events) { Season = true };
-        var service = Service(store, effects); var snapshot = Snapshot(); var stops = 0;
-        for (var i = 0; i < 2; i++)
-        {
-            Assert.False(await service.InspectAsync(snapshot, ["setup.exe"], ["/downloads/payload"],
-                () => { stops++; return Task.CompletedTask; }, () => throw new Exception("Unexpected removal"), default));
-        }
-        Assert.Equal(1, stops); Assert.Equal("Excluded", store.Saved!.Phase);
-        Assert.DoesNotContain("delete", events); Assert.DoesNotContain("report:True", events); Assert.False(service.IsBlocked(snapshot.TorrentId));
-    }
-    [Fact]
-    public async Task UnavailableEligibilityStopsOnlyTheOffendingTorrentAndNeverDeletes()
-    {
-        var events = new List<string>(); var store = new Store(events); var effects = new Effects(events) { Unconfirmed = true };
-        var service = Service(store, effects); var snapshot = Snapshot();
+        var events = new List<string>(); var snapshot = Snapshot();
+        var row = new TorrentPayloadRejection(snapshot.TorrentId, Hash, "/downloads", ["/downloads/payload"], ["setup.exe"], phase);
+        var store = new Store(events) { Saved = row }; var effects = new Effects(events);
+        var service = Service(store, effects);
         Assert.True(await service.InspectAsync(snapshot, ["setup.exe"], ["/downloads/payload"],
-            () => { events.Add("stop"); return Task.CompletedTask; }, () => throw new Exception("Unexpected removal"), default));
-        Assert.True(service.IsBlocked(snapshot.TorrentId)); Assert.Contains("stop", events); Assert.DoesNotContain("delete", events);
-        Assert.Equal("EligibilityPending", store.Saved!.Phase); Assert.NotNull(store.Saved.NextAttemptAtUtc);
+            () => Task.CompletedTask, () => { events.Add("remove"); return Task.CompletedTask; }, default));
+        Assert.DoesNotContain("report", events);
+        await service.ReconcileRemovedAsync(default);
+        Assert.True(events.IndexOf("remove") < events.IndexOf("delete"));
+        Assert.True(events.IndexOf("delete") < events.IndexOf("report"));
+        Assert.Equal("Notified", store.Saved!.Phase);
     }
     [Fact]
     public async Task FailedIntentSaveNeverRemovesOrReportsAcceptance()
@@ -69,7 +63,7 @@ public sealed class TorrentPayloadRejectionTests
         var events = new List<string>(); var store = new Store(events) { ThrowSave = true };
         Assert.True(await Service(store, new Effects(events)).InspectAsync(Snapshot(), ["setup.exe"], ["/downloads/payload"],
             () => Task.CompletedTask, () => { events.Add("remove"); return Task.CompletedTask; }, default));
-        Assert.DoesNotContain("remove", events); Assert.DoesNotContain("report:False", events);
+        Assert.DoesNotContain("remove", events); Assert.DoesNotContain("report", events);
     }
     [Fact]
     public async Task ConflictingStoredIdentityCannotRemoveTheCurrentPayload()
@@ -81,18 +75,15 @@ public sealed class TorrentPayloadRejectionTests
         Assert.DoesNotContain("remove", events); Assert.DoesNotContain("delete", events);
     }
     [Fact]
-    public async Task PendingEligibilityDoesNotHoldEngineSynchronizationWaitingForHttp()
+    public async Task FailedRemovalCannotDeleteOrNotifyUntilRemovalIsConfirmed()
     {
-        var events = new List<string>(); var reply = new TaskCompletionSource<PayloadRejectionReply>();
-        var store = new Store(events); var effects = new Effects(events) { PendingReply = reply.Task };
-        var service = Service(store, effects); var snapshot = Snapshot();
-        var inspect = service.InspectAsync(snapshot, ["setup.exe"], ["/downloads/payload"], () => Task.CompletedTask,
-            () => { events.Add("remove"); return Task.CompletedTask; }, default);
-        Assert.True(inspect.IsCompleted); Assert.True(await inspect); Assert.DoesNotContain("remove", events);
-        reply.SetResult(new(true));
+        var events = new List<string>(); var store = new Store(events); var snapshot = Snapshot();
+        var service = Service(store, new Effects(events));
         Assert.True(await service.InspectAsync(snapshot, ["setup.exe"], ["/downloads/payload"], () => Task.CompletedTask,
-            () => { events.Add("remove"); return Task.CompletedTask; }, default));
-        Assert.Contains("remove", events); Assert.Single(events, x => x == "report:False");
+            () => throw new IOException("Removal failed"), default));
+        Assert.Equal("Removing", store.Saved!.Phase);
+        Assert.DoesNotContain("delete", events); Assert.DoesNotContain("report", events);
+        Assert.True(service.IsBlocked(snapshot.TorrentId));
     }
     [Fact]
     public async Task LostNotificationReplyRemainsPendingAndReusesTheSameHistoryEvent()
@@ -104,19 +95,37 @@ public sealed class TorrentPayloadRejectionTests
         await Service(store, new Effects(events)).ReconcileRemovedAsync(default);
         Assert.Equal("Notified", store.Saved.Phase); Assert.Equal(row.TorrentId, store.Saved.TorrentId); Assert.DoesNotContain("delete", events);
     }
+
+    [Fact]
+    public async Task PendingCallbackDoesNotBlockTicksOrLaunchAgainAndItsReplyIsConsumedWithoutRetryDelay()
+    {
+        var events = new List<string>(); var store = new Store(events) { Saved = Row("Deleted") };
+        var completion = new TaskCompletionSource<PayloadRejectionReply>();
+        var effects = new Effects(events) { PendingReply = completion.Task };
+        var service = Service(store, effects);
+        var pass = service.ReconcileRemovedAsync(default);
+        Assert.True(pass.IsCompleted); await pass;
+        Assert.Equal("Deleted", store.Saved!.Phase);
+        await service.ReconcileRemovedAsync(default);
+        Assert.Single(events, value => value == "report");
+        completion.SetResult(new(true));
+        await service.ReconcileRemovedAsync(default);
+        Assert.Equal("Notified", store.Saved.Phase);
+        Assert.Single(events, value => value == "report");
+    }
     [Fact]
     public async Task CleanupFailureNeverSendsConfirmedDeletion()
     {
         var events = new List<string>(); var store = new Store(events) { Saved = Row() };
         await Service(store, new Effects(events) { ThrowDelete = true }).ReconcileRemovedAsync(default);
-        Assert.Equal("Removed", store.Saved.Phase); Assert.DoesNotContain("report:True", events);
+        Assert.Equal("Removed", store.Saved.Phase); Assert.DoesNotContain("report", events);
     }
     [Fact]
     public async Task RestartAfterDeletionResendsSameEventWithoutRepeatingDeletion()
     {
         var events = new List<string>(); var row = Row("Deleted"); var store = new Store(events) { Saved = row };
         await Service(store, new Effects(events)).ReconcileRemovedAsync(default);
-        Assert.DoesNotContain("delete", events); Assert.Contains("report:True", events);
+        Assert.DoesNotContain("delete", events); Assert.Contains("report", events);
         Assert.Equal(row.TorrentId, store.Saved!.TorrentId); Assert.Equal("Notified", store.Saved.Phase);
     }
     [Fact]
@@ -160,10 +169,10 @@ public sealed class TorrentPayloadRejectionTests
     private sealed class Effects(List<string> events) : ITorrentPayloadRejectionEffects
     {
         public List<string> Events => events;
-        public bool Season; public bool Unconfirmed; public bool ThrowDelete;
+        public bool Unconfirmed; public bool ThrowDelete;
         public Task<PayloadRejectionReply>? PendingReply;
-        public Task<PayloadRejectionReply> ReportAsync(TorrentPayloadRejection row, bool deleted, CancellationToken token)
-        { events.Add("report:" + deleted); return PendingReply ?? Task.FromResult(new PayloadRejectionReply(!Unconfirmed, Season)); }
+        public Task<PayloadRejectionReply> ReportAsync(TorrentPayloadRejection row, CancellationToken token)
+        { events.Add("report"); Assert.Equal("Deleted", row.Phase); return PendingReply ?? Task.FromResult(new PayloadRejectionReply(!Unconfirmed)); }
         public Task DeleteAsync(TorrentPayloadRejection row, CancellationToken token)
         { events.Add("delete"); return ThrowDelete ? throw new IOException("Fake deletion failure") : Task.CompletedTask; }
     }

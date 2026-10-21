@@ -5,12 +5,50 @@ using TorrentCore.Persistence.Sqlite.Schema;
 using TorrentCore.Persistence.Sqlite.Torrents;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Contracts.Torrents;
+using TorrentCore.Core.Diagnostics;
 
 namespace TorrentCore.Service.Tests;
 
 // Uses only a newly generated disposable TorrentCore database, never installed/configured storage or TVMaze.
 public sealed class SqliteTorrentPayloadRejectionTests
 {
+    [Fact]
+    public async Task RoutineScansDoNotWriteSuccessLogsButReadsAndScanFailuresRemainLogged()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "torrentcore-rejection-logging-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(directory, "disposable.db");
+        try
+        {
+            await new SqliteSchemaMigrator(path).ApplyMigrationsAsync(default);
+            var logs = new CapturedLogs();
+            var store = new SqliteTorrentPayloadRejectionStore(path, logs);
+            for (var tick = 0; tick < 100; tick++)
+            {
+                Assert.Empty(await store.ListPendingAsync(default));
+            }
+            Assert.Empty(logs.Requests);
+
+            Assert.Null(await store.GetAsync(Guid.NewGuid(), default));
+            Assert.Equal(2, logs.Requests.Count);
+            Assert.All(logs.Requests, entry => Assert.Equal("history.payload_rejection.read", entry.EventType));
+            logs.Requests.Clear();
+
+            // Break only this disposable schema to verify that scan errors still reach the activity channel.
+            await using (var connection = new SqliteConnection("Data Source=" + path))
+            {
+                await connection.OpenAsync();
+                using var command = connection.CreateCommand();
+                command.CommandText = "DROP TABLE torrent_history;";
+                await command.ExecuteNonQueryAsync();
+            }
+            await Assert.ThrowsAsync<InvalidOperationException>(() => store.ListPendingAsync(default));
+            var failure = Assert.Single(logs.Requests);
+            Assert.Equal("history.payload_rejection.list", failure.EventType);
+            Assert.Equal(ActivityLogLevel.Error, failure.Level);
+        }
+        finally { SqliteConnection.ClearAllPools(); if (Directory.Exists(directory)) { Directory.Delete(directory, true); } }
+    }
+
     [Fact]
     public async Task HistoryOwnsRejectionStateAndNormalCleanupRemovesAdmissionBlock()
     {
@@ -32,7 +70,7 @@ public sealed class SqliteTorrentPayloadRejectionTests
                 InvokeCompletionCallback = false, DataDeleted = false, RemovedByCleanupPolicy = false,
             }, default);
             var store = new SqliteTorrentPayloadRejectionStore(path);
-            var row = new TorrentPayloadRejection(id, hash, "/downloads", ["/downloads/payload"], ["setup.exe"]);
+            var row = new TorrentPayloadRejection(id, hash, "/downloads", ["/downloads/payload"], ["setup.exe"], "EligibilityPending");
             await store.SaveAsync(row, default);
             Assert.False(await store.IsRejectedAsync(hash, default)); // Detection is not a rejection until season exclusion is resolved.
             await store.SaveAsync(row with { Phase = "Removing" }, default);
@@ -61,5 +99,18 @@ public sealed class SqliteTorrentPayloadRejectionTests
             Assert.Equal(1L, await command.ExecuteScalarAsync());
         }
         finally { SqliteConnection.ClearAllPools(); if (Directory.Exists(directory)) { Directory.Delete(directory, true); } }
+    }
+
+    private sealed class CapturedLogs : IActivityLogService
+    {
+        public List<ActivityLogWriteRequest> Requests { get; } = [];
+        public Task WriteAsync(ActivityLogWriteRequest request, CancellationToken cancellationToken)
+        { Requests.Add(request); return Task.CompletedTask; }
+        public Task EnsureInitializedAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ActivityLogEntry>> GetRecentAsync(ActivityLogQuery query, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ActivityLogFilterOptions> GetFilterOptionsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<int> DeleteByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<int> DeleteOrphanedTorrentLogsAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<int> DeleteInactiveBeforeAsync(DateTimeOffset cutoffUtc, CancellationToken cancellationToken) => throw new NotSupportedException();
     }
 }

@@ -1,61 +1,70 @@
-using System.Net;
-using System.Net.Http.Json;
+using System.Text.Json;
 using TorrentCore.Core.History;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Service.Configuration;
+using TorrentCore.Service.Vpn;
 
 namespace TorrentCore.Service.Engine;
 
 public sealed class TorrentPayloadRejectionEffects : ITorrentPayloadRejectionEffects
 {
-    public const string HttpClientName = "TvmazePayloadRejection";
-    private readonly IHttpClientFactory _clients;
-    private readonly Func<CancellationToken, Task<(string? Url, string? Key)>> _connection;
+    internal const string AcknowledgementPrefix = "TORRENTCORE_REJECTION_ACK:";
+    private readonly Func<CancellationToken, Task<RuntimeSettingsSnapshot>> _settings;
     private readonly Func<CancellationToken, Task<IReadOnlyList<TorrentSnapshot>>> _currentTorrents;
+    private readonly Func<ExternalProcessRequest, CancellationToken, Task<ExternalProcessResult>> _run;
+    private readonly string _storageRoot;
 
-    public TorrentPayloadRejectionEffects(IHttpClientFactory clients, IRuntimeSettingsService settings, ITorrentStateStore states)
-        : this(clients, async token =>
-        {
-            var value = await settings.GetEffectiveSettingsAsync(token);
-            return (value.CompletionCallbackApiBaseUrlOverride, value.CompletionCallbackApiKeyOverride);
-        }, states.ListAsync) { }
-    internal TorrentPayloadRejectionEffects(IHttpClientFactory clients,
-        Func<CancellationToken, Task<(string? Url, string? Key)>> connection,
-        Func<CancellationToken, Task<IReadOnlyList<TorrentSnapshot>>> currentTorrents)
-    { _clients = clients; _connection = connection; _currentTorrents = currentTorrents; }
+    internal TorrentPayloadRejectionEffects(Func<CancellationToken, Task<RuntimeSettingsSnapshot>> settings,
+        Func<CancellationToken, Task<IReadOnlyList<TorrentSnapshot>>> currentTorrents,
+        Func<ExternalProcessRequest, CancellationToken, Task<ExternalProcessResult>> run, string storageRoot)
+    { _settings = settings; _currentTorrents = currentTorrents; _run = run; _storageRoot = storageRoot; }
 
-    public async Task<PayloadRejectionReply> ReportAsync(TorrentPayloadRejection rejection, bool dataDeleted, CancellationToken token)
+    public async Task<PayloadRejectionReply> ReportAsync(TorrentPayloadRejection rejection, CancellationToken token)
     {
         try
         {
-            var current = await _connection(token);
-            if (!Uri.TryCreate(current.Url?.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri) ||
-                baseUri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(baseUri.UserInfo) ||
-                string.IsNullOrWhiteSpace(current.Key))
-            { return new(false, Message: "TVMaze API URL/key is missing or invalid; executable torrent remains blocked."); }
-            using var client = _clients.CreateClient(HttpClientName);
-            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, "api/acquisition/rejections"));
-            request.Headers.Add("X-API-Key", current.Key);
-            request.Content = JsonContent.Create(new
+            if (rejection.Phase != "Deleted")
+            { return new(false, "Executable data deletion is not confirmed; callback was not launched."); }
+            var settings = await _settings(token);
+            if (!settings.CompletionCallbackEnabled || string.IsNullOrWhiteSpace(settings.CompletionCallbackCommandPath))
+            { return new(false, "The configured TVMaze callback is disabled or missing; rejection notification remains pending."); }
+            var command = settings.CompletionCallbackCommandPath.Trim();
+            // An older completion-only app must fail its normal environment validation, never process a completion.
+            var environment = new Dictionary<string, string> { ["TR_TORRENT_NAME"] = "" };
+            if (!string.IsNullOrWhiteSpace(settings.CompletionCallbackApiBaseUrlOverride))
+            { environment["TVMAZE_API_COMPLETE_URL"] = settings.CompletionCallbackApiBaseUrlOverride.Trim(); }
+            if (!string.IsNullOrWhiteSpace(settings.CompletionCallbackApiKeyOverride))
+            { environment["TVMAZE_API_COMPLETE_API_KEY"] = settings.CompletionCallbackApiKeyOverride.Trim(); }
+            var workingDirectory = settings.CompletionCallbackWorkingDirectory?.Trim();
+            if (string.IsNullOrWhiteSpace(workingDirectory))
+            { workingDirectory = Path.GetDirectoryName(command); }
+            var invocation = new ExternalProcessRequest(command, [], TimeSpan.FromSeconds(settings.CompletionCallbackTimeoutSeconds))
             {
-                EventId = rejection.TorrentId, Source = "TorrentCore", rejection.InfoHash, rejection.OffendingFiles,
-                // Existing contract: Failed means cleanup is unconfirmed and recovery must wait.
-                CleanupOutcome = dataDeleted ? "DeletedIncludingData" : "Failed",
-            });
-            using var response = await client.SendAsync(request, token);
-            if (response.StatusCode != HttpStatusCode.Accepted)
-            { return new(false, Message: $"TVMaze rejection registration was not acknowledged (HTTP {(int)response.StatusCode}); no alternate/reset authorized."); }
-            var reply = await response.Content.ReadFromJsonAsync<RejectionAcknowledgement>(token);
+                ArgumentString = (settings.CompletionCallbackArguments ?? "") + " --payload-rejection",
+                WorkingDirectory = string.IsNullOrWhiteSpace(workingDirectory) ? _storageRoot : workingDirectory,
+                Environment = environment,
+                StandardInput = JsonSerializer.Serialize(new
+                {
+                    EventId = rejection.TorrentId, Source = "TorrentCore", rejection.InfoHash,
+                    rejection.OffendingFiles, CleanupOutcome = "DeletedIncludingData",
+                }),
+            };
+            var result = await _run(invocation, token);
+            // Do not echo process output: configured callback arguments or diagnostics may include credentials.
+            if (!result.Succeeded || result.FailureSummary is not null)
+            { return new(false, $"TVMaze rejection callback was not acknowledged (started={result.Started}, timedOut={result.TimedOut}, exit={result.ExitCode}); retry remains pending."); }
+            var acknowledgements = result.StandardOutput.Split('\n', StringSplitOptions.TrimEntries)
+                .Where(line => line.StartsWith(AcknowledgementPrefix, StringComparison.Ordinal)).ToArray();
+            if (acknowledgements.Length != 1)
+            { return new(false, "TVMaze callback returned no unique rejection acknowledgement; retry remains pending."); }
+            var reply = JsonSerializer.Deserialize<RejectionAcknowledgement>(acknowledgements[0][AcknowledgementPrefix.Length..]);
             if (reply is null || reply.RecoveryId == Guid.Empty || !string.Equals(reply.InfoHash, rejection.InfoHash, StringComparison.OrdinalIgnoreCase))
-            { return new(false, Message: "TVMaze rejection acknowledgement does not identify the submitted hash."); }
-            return new(true, reply.Outcome == "SeasonExcluded", reply.Outcome == "SeasonExcluded"
-                ? "Recorded season pack excluded; download retained."
-                : dataDeleted ? "TVMaze acknowledged confirmed deletion; linked recovery/reporting owns the next action."
-                : "TVMaze registered rejection with cleanup unconfirmed; no alternate/reset can start yet.");
+            { return new(false, "TVMaze rejection acknowledgement does not identify the submitted hash."); }
+            return new(true, "TVMaze acknowledged confirmed deletion; reporting and eligible alternate/reset recovery are queued.");
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
-        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or System.Text.Json.JsonException or InvalidOperationException or ArgumentException)
-        { return new(false, Message: "TVMaze rejection acknowledgement is unconfirmed: " + ex.GetType().Name); }
+        catch (Exception ex)
+        { return new(false, "TVMaze rejection acknowledgement is unconfirmed: " + ex.GetType().Name); }
     }
 
     public async Task DeleteAsync(TorrentPayloadRejection rejection, CancellationToken token)
@@ -91,5 +100,5 @@ public sealed class TorrentPayloadRejectionEffects : ITorrentPayloadRejectionEff
         return result.Distinct(StringComparer.Ordinal).ToArray();
     }
     private static bool IsWithin(string path, string root) => path == root || path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal);
-    private sealed record RejectionAcknowledgement(Guid RecoveryId, string InfoHash, string Outcome);
+    private sealed record RejectionAcknowledgement(Guid RecoveryId, string InfoHash);
 }
