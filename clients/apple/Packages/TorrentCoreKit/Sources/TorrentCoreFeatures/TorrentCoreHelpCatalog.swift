@@ -408,6 +408,11 @@ public enum TorrentCoreHelpCatalog {
     }
 
     public enum History {
+        public static let rejectionReason = help(
+            "Rejection Reason",
+            "Filters history by the recorded media payload rejection reason.",
+            "Choices come from retained history. Search matches the exact reason before the result limit is applied. Details show the cleanup/notification phase and recorded filenames."
+        )
         public static let filters = help(
             "Filters",
             "Controls which history rows TorrentCore requests.",

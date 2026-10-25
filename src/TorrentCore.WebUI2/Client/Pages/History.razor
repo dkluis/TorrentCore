@@ -18,6 +18,7 @@
             <label>Torrent name <input @bind="_name" /></label>
             <label>Category <select @bind="_category"><option value="">All Categories</option>@foreach (var item in Categories) { <option value="@item">@item</option> }</select></label>
             <label>State <select @bind="_state"><option value="">All States</option>@foreach (var item in States) { <option value="@item">@Words(item)</option> }</select></label>
+            <label>Rejection reason <select @bind="_rejectionReason"><option value="">All Reasons</option>@foreach (var item in RejectionReasons) { <option value="@item">@Words(item)</option> }</select></label>
             <label>Outcome <select @bind="_outcome"><option value="">All Outcomes</option><option>Active</option><option>Removed</option><option>Abandoned</option></select></label>
             <label>Torrent ID <input @bind="_torrentIdText" /></label>
             <label><input type="checkbox" @bind="_useFrom" /> From <input type="date" value="@_from" @onchange="e => _from = e.Value?.ToString() ?? string.Empty" disabled="@(!_useFrom)" /></label>
@@ -51,7 +52,7 @@
     private TorrentHistoryFilterOptionsDto? _options;
     private TorrentHistoryDetailDto? _detail;
     private HashSet<string> _selected = [];
-    private string _name = "", _category = "", _state = "", _outcome = "", _torrentIdText = "";
+    private string _name = "", _category = "", _state = "", _outcome = "", _rejectionReason = "", _torrentIdText = "";
     private string _from = DateTime.Today.ToString("yyyy-MM-dd"), _to = DateTime.Today.ToString("yyyy-MM-dd");
     private bool _useFrom = true, _useTo = true, _busy, _loaded, _disposed, _paused;
     private string? _error, _filterError;
@@ -75,6 +76,7 @@
         new("uploaded", "Uploaded", 115, false), new("waitReason", "Wait Reason", 200, false),
         new("metadataResolved", "Metadata Resolved", 165, false), new("removalKind", "Removal Kind", 220, false),
         new("removedByCleanup", "Removed by Cleanup", 150, false), new("seedingStarted", "Seeding Started", 165, false),
+        new("rejectionReason", "Rejection Reason", 190, false), new("rejectionPhase", "Rejection Phase", 190, false),
         new("submitted", "Submitted", 165, false), new("torrentId", "Torrent ID", 285, false)
     ];
     private static readonly IReadOnlyList<OperatorColumn> ExportColumns = [
@@ -92,18 +94,21 @@
         new("name", "Name", 0), new("outcome", "Outcome", 0), new("exportRemovalKind", "Removal Kind", 0),
         new("exportRemovalReason", "Removal Reason", 0), new("exportRemoved", "Removed At", 0),
         new("removedByCleanup", "Removed by Cleanup Policy", 0), new("exportSeedingStarted", "Seeding Started At", 0),
-        new("exportSubmitted", "Submitted At", 0), new("torrentId", "Torrent ID", 0)
+        new("exportSubmitted", "Submitted At", 0), new("torrentId", "Torrent ID", 0),
+        new("rejectionReason", "Rejection Reason", 0), new("rejectionPhase", "Rejection Phase", 0),
+        new("rejectionOffending", "Rejection Offending Files", 0), new("rejectionObserved", "Rejection Observed Files", 0), new("rejectionNextAttempt", "Rejection Next Attempt", 0)
     ];
     private IReadOnlyList<OperatorRow> Rows => _rows.Select(ToRow).ToArray();
     private IEnumerable<string> Categories => ((_options?.CategoryKeys ?? []) .Concat(_rows.Select(x => x.CategoryKey ?? ""))).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x);
     private IEnumerable<string> States => ((_options?.States ?? []) .Concat(_rows.Select(x => x.LatestTorrentState))).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x);
+    private IEnumerable<string> RejectionReasons => (_options?.RejectionReasons ?? []).OrderBy(x => x);
     private TorrentHistorySummaryDto? Selected => _rows.FirstOrDefault(x => _selected.Contains(x.TorrentId.ToString("D")));
     protected override void OnInitialized() { Session.Changed += Restart; Preferences.Changed += Restart; Restart(); }
     protected override void OnParametersSet() {
         if (RequestedTorrentId.HasValue && RequestedTorrentId != _appliedTorrentId) {
             _appliedTorrentId = RequestedTorrentId;
             _torrentIdText = RequestedTorrentId.Value.ToString("D"); _useFrom = _useTo = false;
-            _query = new() { TorrentId = RequestedTorrentId, Take = 500 };
+            _query = new() { IncludePayloadRejection = true, TorrentId = RequestedTorrentId, Take = 500 };
             _selected = [RequestedTorrentId.Value.ToString("D")];
             if (Session.IsInitialized && Session.ActiveProfile is not null) Restart();
         }
@@ -129,8 +134,8 @@
             if (_paused) return;
             var rows = await client.GetHistoryAsync(_query, token); if (!Current(rev, token)) return;
             _rows = rows; _loaded = true; _error = null;
-            var options = await client.GetHistoryFilterOptionsAsync(token); if (!Current(rev, token)) return; _options = options;
-            var abandoned = await client.GetHistoryAsync(new() { Outcome = TorrentHistoryOutcome.Abandoned, Take = 500 }, token);
+            var options = await client.GetHistoryFilterOptionsAsync(token, includePayloadRejection: true); if (!Current(rev, token)) return; _options = options;
+            var abandoned = await client.GetHistoryAsync(new() { IncludePayloadRejection = true, Outcome = TorrentHistoryOutcome.Abandoned, Take = 500 }, token);
             if (!Current(rev, token)) return;
             _abandonedCount = abandoned.Count;
             if (Selected is null) { _selected = []; _detail = null; }
@@ -142,7 +147,7 @@
     private int _abandonedCount;
     private async Task LoadDetailAsync(TorrentCore.Client.TorrentCoreClient client, long rev, CancellationToken token) {
         var selected = Selected; if (selected is null) return;
-        var detail = await client.GetHistoryByTorrentIdAsync(selected.TorrentId, token);
+        var detail = await client.GetHistoryByTorrentIdAsync(selected.TorrentId, token, includePayloadRejection: true);
         if (Current(rev, token) && Selected?.TorrentId == selected.TorrentId) _detail = detail;
     }
     private async Task SelectionChanged(HashSet<string> ids) { _selected = ids; _detail = null; if (Selected is null) return;
@@ -156,17 +161,17 @@
         if (_useFrom && !DateOnly.TryParseExact(_from, "yyyy-MM-dd", out _)) { _filterError = "Enter a valid From date."; return; }
         if (_useTo && !DateOnly.TryParseExact(_to, "yyyy-MM-dd", out _)) { _filterError = "Enter a valid Through date."; return; }
         if (_useFrom && _useTo && DateOnly.Parse(_from) > DateOnly.Parse(_to)) { _filterError = "From must be before or equal to Through."; return; }
-        _query = new() { TorrentId = idText.Length == 0 ? null : Guid.Parse(idText), TorrentName = Blank(_name), CategoryKey = Blank(_category),
-            State = Blank(_state), Outcome = Enum.TryParse<TorrentHistoryOutcome>(_outcome, true, out var outcome) ? outcome : null,
+        _query = new() { IncludePayloadRejection = true, TorrentId = idText.Length == 0 ? null : Guid.Parse(idText), TorrentName = Blank(_name), CategoryKey = Blank(_category),
+            State = Blank(_state), RejectionReason = Blank(_rejectionReason), Outcome = Enum.TryParse<TorrentHistoryOutcome>(_outcome, true, out var outcome) ? outcome : null,
             FromDate = _useFrom ? DateOnly.Parse(_from) : null, ToDate = _useTo ? DateOnly.Parse(_to) : null, Take = 500 };
         _selected = []; _detail = null; _appliedTorrentId = null;
         await RefreshAsync();
     }
-    private async Task ClearAsync() { _name = _category = _state = _outcome = _torrentIdText = ""; _useFrom = _useTo = false; await SearchAsync(); }
-    private async Task ResetAsync() { _name = _category = _state = _outcome = _torrentIdText = ""; _useFrom = _useTo = true;
+    private async Task ClearAsync() { _name = _category = _state = _outcome = _rejectionReason = _torrentIdText = ""; _useFrom = _useTo = false; await SearchAsync(); }
+    private async Task ResetAsync() { _name = _category = _state = _outcome = _rejectionReason = _torrentIdText = ""; _useFrom = _useTo = true;
         _from = _to = DateTime.Today.ToString("yyyy-MM-dd"); await SearchAsync(); }
     private async Task ShowAbandonedAsync() { _outcome = "Abandoned"; _useFrom = _useTo = false; await SearchAsync(); }
-    private static TorrentHistoryQueryRequest TodayQuery() => new() { FromDate = DateOnly.FromDateTime(DateTime.Today), ToDate = DateOnly.FromDateTime(DateTime.Today), Take = 500 };
+    private static TorrentHistoryQueryRequest TodayQuery() => new() { IncludePayloadRejection = true, FromDate = DateOnly.FromDateTime(DateTime.Today), ToDate = DateOnly.FromDateTime(DateTime.Today), Take = 500 };
     private static string? Blank(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
     private static string Date(DateTimeOffset? value) => OperatorDateTime.Local(value);
     private static string Words(string? value) => string.IsNullOrWhiteSpace(value) ? "--" : System.Text.RegularExpressions.Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
@@ -178,6 +183,9 @@
         ["lastUpdated"] = Date(x.LastUpdatedAt), ["name"] = x.Name, ["category"] = x.CategoryKey ?? "--", ["state"] = Words(x.LatestTorrentState),
         ["outcome"] = x.Outcome.ToString(), ["progress"] = $"{x.LatestProgressPercent:N1}%", ["downloaded"] = Bytes(x.LatestDownloadedBytes),
         ["total"] = Bytes(x.LatestTotalBytes), ["callback"] = Words(x.LatestCallbackStatus), ["removed"] = Date(x.RemovedAt),
+        ["rejectionReason"] = x.PayloadRejection?.Reason ?? "", ["rejectionPhase"] = x.PayloadRejection?.Phase ?? "",
+        ["rejectionOffending"] = string.Join(" | ", x.PayloadRejection?.OffendingFiles ?? []),
+        ["rejectionObserved"] = string.Join(" | ", x.PayloadRejection?.ObservedFiles ?? []), ["rejectionNextAttempt"] = Iso(x.PayloadRejection?.NextAttemptAt),
         ["removalReason"] = x.RemovalReason ?? "--", ["callbackFinalResult"] = x.CompletionCallbackFinalResult ?? "--",
         ["dataDeleted"] = YesNo(x.DataDeleted), ["downloadCompleted"] = Date(x.DownloadCompletedAt), ["downloadRootPath"] = x.DownloadRootPath ?? "--",
         ["downloadStarted"] = Date(x.DownloadStartedAt), ["infoHash"] = x.InfoHash ?? "--", ["lastActivity"] = Date(x.LastActivityAt),
@@ -219,6 +227,15 @@
             @Fact("Submitted", Date(_detail.SubmittedAt)) @Fact("Last Updated", Date(_detail.LastUpdatedAt))
             @Fact("Removed", Date(_detail.RemovedAt)) @Fact("Removal Kind", Words(_detail.RemovalKind?.ToString()))
             @Fact("Removal Reason", _detail.RemovalReason)
+            @if (_detail.PayloadRejection is { } rejection)
+            {
+                @Fact("Payload Rejection Reason", Words(rejection.Reason))
+                @Fact("Rejection Phase", Words(rejection.Phase))
+                @Fact("Offending Files", string.Join(" | ", rejection.OffendingFiles))
+                @Fact("Observed Files", string.Join(" | ", rejection.ObservedFiles))
+                @Fact("Next Attempt", Date(rejection.NextAttemptAt))
+                @Fact("Data Deleted", YesNo(_detail.DataDeleted))
+            }
             <dt>Callback Feedback</dt><dd>@(_detail.CompletionCallbackFeedback?.DisplayMessage ?? _detail.CompletionCallbackFeedback?.FinalState ?? "--")</dd>
             @Fact("Feedback Received", Date(_detail.CompletionCallbackFeedback?.ReceivedAtUtc))
             @Fact("Feedback Final Result", _detail.CompletionCallbackFeedback?.FinalState)

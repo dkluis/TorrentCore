@@ -493,3 +493,27 @@ Live settings currently include:
 - completed-torrent cleanup policy
 - callback settings
 - category settings
+
+## Inspecting Media Payload Rejections (Slice 6)
+
+Native macOS and WebUI2 use the existing **History** view. The Rejection Reason filter uses reasons recorded in retained
+history and matches exactly (case insensitive) before the server result limit. Clear/Reset retain their existing
+meaning. Available optional columns `rejectionReason` and `rejectionPhase` use the existing sort/customization framework;
+the previous default columns, last-updated sort, paging, single selection, and resizable detail overlay remain intact.
+Both added columns are text, sortable, hidden by default, with minimum/ideal Native widths 130/190. Name remains required.
+
+Details show the recorded reason, cleanup/notification phase, offending and observed filenames, next pending attempt,
+and Data Deleted. Existing callback feedback and removal fields remain available. These views do not initiate retry,
+reset, removal, or an alternate download. Exports retain all history summary fields and add the five rejection evidence
+fields; existing selected/results scopes and file format apply. Ordinary history records have no rejection evidence;
+absent filenames are never invented. Invalid stored evidence returns a controlled read failure and writes through the
+existing persistent activity log. Optional successful-read Debug records follow Performance Timing Summaries; errors are retained with that switch off.
+
+Native identity is **1.1.0 build 18**. The service API stays **v1**, with additive history evidence/query fields. The existing
+history column is read without changing its coordinator-owned writes; there is no new SQLite migration or retention
+change. TorrentCore legacy WebUI receives no Slice 6 UI changes; its retirement is a separate later decision.
+
+History evidence is opt-in with `includePayloadRejection=true` on list, detail, and filter-options reads. Updated
+Native/WebUI2 clients request it explicitly. Without that flag, the additional JSON members are omitted entirely;
+this preserves the previous response shape for build 17's strict generated decoder. The C# client defaults to the
+previous shape; WebUI2 opts in. No API version change or coordinated client restart is required for older History reads.

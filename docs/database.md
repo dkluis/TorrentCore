@@ -130,3 +130,10 @@ Media validation settings use additive rows in `runtime_settings`, not torrent p
 `executable_rejection_json` also carries `RejectionReason` and `ObservedFiles`; older records default to `Executable`.
 `NotificationNotRequired` is terminal confirmed deletion when downstream callbacks are intentionally disabled.
 No SQLite migration follows 23 for this extension. Ordinary history cleanup and its retention dates are unchanged.
+
+## Slice 6 History Read Projection
+
+The Service reads the existing `executable_rejection_json` into typed reason, phase, offending/observed files, and
+next-attempt fields for explicitly opted-in History requests. Ordinary history writes still preserve the coordinator's
+JSON, and existing cleanup/retention rules remain unchanged. This projection requires no schema migration or new table.
+See [History evidence](operator-settings.md#inspecting-media-payload-rejections-slice-6) for the API compatibility boundary.

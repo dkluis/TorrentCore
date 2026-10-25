@@ -302,7 +302,7 @@ func historyTorrentIDQueryMatchesServiceContract() async throws {
     )
     let torrentID = try #require(UUID(uuidString: FixturePayloads.torrentID))
 
-    _ = try await client.history(query: .init(torrentID: torrentID, take: 500))
+    _ = try await client.history(query: .init(torrentID: torrentID, rejectionReason: "MissingVideo", take: 500))
 
     let requests = await recorder.entries
     let request = try #require(requests.only)
@@ -310,6 +310,8 @@ func historyTorrentIDQueryMatchesServiceContract() async throws {
     let path = try #require(request.path)
     let components = try #require(URLComponents(string: "http://torrentcore.test\(path)"))
     let queryItems = components.queryItems ?? []
+    #expect(queryItems.contains { $0.name.lowercased() == "includepayloadrejection" && $0.value == "true" })
+    #expect(queryItems.contains { $0.name.lowercased() == "rejectionreason" && $0.value == "MissingVideo" })
     #expect(queryItems.first(where: { $0.name == "TorrentId" })?.value == torrentID.uuidString)
     #expect(queryItems.first(where: { $0.name == "Take" })?.value == "500")
 }
@@ -339,7 +341,7 @@ func filterOptionsUseDedicatedUnfilteredEndpoints() async throws {
         "Logs_GetFilterOptions",
     ])
     #expect(requests.map(\.path) == [
-        "/api/history/filter-options",
+        "/api/history/filter-options?includePayloadRejection=true",
         "/api/logs/filter-options",
     ])
 }
@@ -1144,4 +1146,20 @@ func nativeRecoveryStatusUsesSelectedProviderAndSupportsOlderServices() throws {
     #expect(pia.expressVPNRecoveryPhase == "WaitingForController")
     #expect(pia.expressVPNRecoveryMessage == "Waiting for PIA")
     #expect(pia.expressVPNLaunchAttemptsMaximum == 0)
+}
+
+@Test
+func historyPayloadRejectionMappingPreservesEvidenceAndRejectsIncompleteData() throws {
+    let decoder = JSONDecoder()
+    let valid = try decoder.decode(Components.Schemas.TorrentPayloadRejectionDto.self, from: Data("""
+    {"reason":"MissingVideo","phase":"Notified","offendingFiles":[],"observedFiles":["episode.srt"]}
+    """.utf8))
+    let row = try TorrentCorePayloadRejection(valid)
+    #expect(row.reason == "MissingVideo")
+    #expect(row.phase == "Notified")
+    #expect(row.observedFiles == ["episode.srt"])
+    let invalid = try decoder.decode(Components.Schemas.TorrentPayloadRejectionDto.self, from: Data("""
+    {"reason":null,"phase":"Notified","offendingFiles":[],"observedFiles":[]}
+    """.utf8))
+    #expect(throws: TorrentCoreClientError.self) { try TorrentCorePayloadRejection(invalid) }
 }

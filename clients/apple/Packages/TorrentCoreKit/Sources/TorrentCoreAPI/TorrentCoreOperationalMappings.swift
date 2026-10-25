@@ -4,11 +4,13 @@ extension TorrentCoreHistoryFilterOptions {
     init(_ value: Components.Schemas.TorrentHistoryFilterOptionsDto) {
         categoryKeys = value.categoryKeys ?? []
         states = value.states ?? []
+        rejectionReasons = value.rejectionReasons ?? []
     }
 }
 
 extension TorrentCoreHistorySummary {
-    init(_ value: Components.Schemas.TorrentHistorySummaryDto) {
+    init(_ value: Components.Schemas.TorrentHistorySummaryDto) throws {
+        payloadRejection = try value.payloadRejection.map(TorrentCorePayloadRejection.init)
         categoryKey = value.categoryKey
         completionCallbackFinalResult = value.completionCallbackFinalResult
         dataDeleted = value.dataDeleted
@@ -44,7 +46,8 @@ extension TorrentCoreHistorySummary {
 }
 
 extension TorrentCoreHistoryDetail {
-    init(_ value: Components.Schemas.TorrentHistoryDetailDto) {
+    init(_ value: Components.Schemas.TorrentHistoryDetailDto) throws {
+        payloadRejection = try value.payloadRejection.map(TorrentCorePayloadRejection.init)
         callbackCompletedAt = value.callbackCompletedAt
         callbackLastError = value.callbackLastError
         callbackStartedAt = value.callbackStartedAt
@@ -306,5 +309,19 @@ extension Components.Schemas.UpdateTorrentCategoryRequest {
             invokeCompletionCallback: value.invokeCompletionCallback,
             sortOrder: Int32(value.sortOrder)
         )
+    }
+}
+
+extension TorrentCorePayloadRejection {
+    init(_ value: Components.Schemas.TorrentPayloadRejectionDto) throws {
+        guard let reason = value.reason, !reason.isEmpty, let phase = value.phase, !phase.isEmpty,
+              let offendingFiles = value.offendingFiles, let observedFiles = value.observedFiles else {
+            throw TorrentCoreClientError.invalidPayload("Payload rejection evidence is incomplete.")
+        }
+        self.reason = reason
+        self.phase = phase
+        self.offendingFiles = offendingFiles
+        self.observedFiles = observedFiles
+        nextAttemptAt = value.nextAttemptAt
     }
 }

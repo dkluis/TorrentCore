@@ -27,9 +27,9 @@ public interface ITorrentApplicationService
     Task<IReadOnlyList<TorrentSummaryDto>> GetTorrentsAsync(CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
         CancellationToken cancellationToken);
-    Task<TorrentHistoryFilterOptionsDto> GetHistoryFilterOptionsAsync(CancellationToken cancellationToken);
+    Task<TorrentHistoryFilterOptionsDto> GetHistoryFilterOptionsAsync(CancellationToken cancellationToken, bool includePayloadRejection = false);
     Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken);
-    Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken, bool includePayloadRejection = false);
     Task<IReadOnlyList<TorrentPeerDto>> GetTorrentPeersAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentTrackerDto>> GetTorrentTrackersAsync(Guid torrentId, CancellationToken cancellationToken);
     Task<TorrentDetailDto> AddMagnetAsync(AddMagnetRequest request, CancellationToken cancellationToken);

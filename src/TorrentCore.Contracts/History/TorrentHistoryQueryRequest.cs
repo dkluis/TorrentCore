@@ -2,6 +2,8 @@ namespace TorrentCore.Contracts.History;
 
 public sealed class TorrentHistoryQueryRequest
 {
+    public bool IncludePayloadRejection { get; init; }
+    public string? RejectionReason { get; init; }
     public Guid?                  TorrentId   { get; init; }
     public string?                TorrentName { get; init; }
     public string?                CategoryKey { get; init; }

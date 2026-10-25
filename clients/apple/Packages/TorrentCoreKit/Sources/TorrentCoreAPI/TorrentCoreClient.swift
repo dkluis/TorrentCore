@@ -164,6 +164,8 @@ public struct TorrentCoreClient: Sendable {
     ) async throws -> [TorrentCoreHistorySummary] {
         try await perform(.history) {
             let generatedQuery = Operations.HistoryGetAll.Input.Query(
+                includePayloadRejection: true,
+                rejectionReason: query.rejectionReason,
                 torrentId: query.torrentID?.uuidString,
                 torrentName: query.torrentName,
                 categoryKey: query.categoryKey,
@@ -185,7 +187,7 @@ public struct TorrentCoreClient: Sendable {
 
     public func historyFilterOptions() async throws -> TorrentCoreHistoryFilterOptions {
         try await perform(.history) {
-            switch try await readClient.historyGetFilterOptions() {
+            switch try await readClient.historyGetFilterOptions(query: .init(includePayloadRejection: true)) {
             case let .ok(response):
                 return TorrentCoreHistoryFilterOptions(try response.body.json)
             case let .undocumented(statusCode, _):
@@ -197,10 +199,11 @@ public struct TorrentCoreClient: Sendable {
     public func historyDetail(torrentID: UUID) async throws -> TorrentCoreHistoryDetail {
         try await perform(.historyDetail) {
             switch try await readClient.historyGetByTorrentId(
-                path: .init(torrentId: torrentID.uuidString)
+                path: .init(torrentId: torrentID.uuidString),
+                query: .init(includePayloadRejection: true)
             ) {
             case let .ok(response):
-                return TorrentCoreHistoryDetail(try response.body.json)
+                return try TorrentCoreHistoryDetail(response.body.json)
             case let .notFound(response):
                 throw TorrentCoreClientError.service(
                     TorrentCoreServiceProblem(try response.body.applicationProblemJson)

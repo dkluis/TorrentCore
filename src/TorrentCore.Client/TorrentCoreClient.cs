@@ -109,6 +109,13 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
             query.Add($"categoryKey={Uri.EscapeDataString(request.CategoryKey)}");
         }
 
+        if (request.IncludePayloadRejection) { query.Add("includePayloadRejection=true"); }
+
+        if (!string.IsNullOrWhiteSpace(request.RejectionReason))
+        {
+            query.Add($"rejectionReason={Uri.EscapeDataString(request.RejectionReason)}");
+        }
+
         if (!string.IsNullOrWhiteSpace(request.State))
         {
             query.Add($"state={Uri.EscapeDataString(request.State)}");
@@ -146,17 +153,17 @@ public sealed class TorrentCoreClient(HttpClient httpClient, ITorrentCoreEndpoin
     }
 
     public async Task<TorrentHistoryFilterOptionsDto?> GetHistoryFilterOptionsAsync(
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool includePayloadRejection = false)
     {
-        using var response = await httpClient.GetAsync(BuildRequestUri("api/history/filter-options"), cancellationToken);
+        using var response = await httpClient.GetAsync(BuildRequestUri("api/history/filter-options" + (includePayloadRejection ? "?includePayloadRejection=true" : "")), cancellationToken);
         return await ReadResponseAsync<TorrentHistoryFilterOptionsDto>(response, cancellationToken);
     }
 
     public async Task<TorrentHistoryDetailDto?> GetHistoryByTorrentIdAsync(Guid torrentId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, bool includePayloadRejection = false)
     {
         using var response = await httpClient.GetAsync(
-            BuildRequestUri($"api/history/by-torrent/{torrentId}"), cancellationToken
+            BuildRequestUri($"api/history/by-torrent/{torrentId}" + (includePayloadRejection ? "?includePayloadRejection=true" : "")), cancellationToken
         );
         return await ReadResponseAsync<TorrentHistoryDetailDto>(response, cancellationToken);
     }

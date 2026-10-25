@@ -179,9 +179,11 @@ the new producer. TVMaze remains responsible for its own local FileOps policy, o
 TorrentCore stores additional evidence in the existing history JSON and uses existing key/value runtime settings;
 no additional SQLite migration/table or retention exception is needed. An intentionally disabled callback completes
 local rejection as `NotificationNotRequired`; an enabled but unavailable/misconfigured callback stays pending.
-TorrentCore API v1 gains additive settings fields and the Native Mac client is 1.0.0 build 17. The broader earlier
-Slice 6 history UI work remains separate. Functional acceptance for the new rejection types remains CA-Server work;
-normal valid-media completion is already accepted.
+TorrentCore API v1 gains additive settings fields. Slice 6 adds read-only rejection evidence/filtering in Native
+1.1.0 build 18 and WebUI2 History; see [operator settings](operator-settings.md#inspecting-media-payload-rejections-slice-6).
+Evidence is opt-in so older strict Native decoders retain their existing response shape. Legacy WebUI is unchanged.
+The operator accepted the CA-Server rejection/alternate test as sufficient to begin Slice 6; UI acceptance remains
+separate CA-Server work. Normal valid-media completion is already accepted.
 
 ## Engine Dependency
 

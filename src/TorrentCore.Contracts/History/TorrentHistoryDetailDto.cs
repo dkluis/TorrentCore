@@ -4,6 +4,8 @@ namespace TorrentCore.Contracts.History;
 
 public sealed class TorrentHistoryDetailDto
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public TorrentPayloadRejectionDto? PayloadRejection { get; init; }
     public required Guid            TorrentId                        { get; init; }
     public required string          Name                             { get; init; }
     public required string          MagnetUri                        { get; init; }

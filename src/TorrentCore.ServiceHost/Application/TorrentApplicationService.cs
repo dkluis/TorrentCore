@@ -318,9 +318,9 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
         return torrentHistoryService.GetHistoryAsync(request, cancellationToken);
     }
 
-    public Task<TorrentHistoryFilterOptionsDto> GetHistoryFilterOptionsAsync(CancellationToken cancellationToken)
+    public Task<TorrentHistoryFilterOptionsDto> GetHistoryFilterOptionsAsync(CancellationToken cancellationToken, bool includePayloadRejection = false)
     {
-        return torrentHistoryService.GetFilterOptionsAsync(cancellationToken);
+        return torrentHistoryService.GetFilterOptionsAsync(cancellationToken, includePayloadRejection);
     }
 
     public async Task<TorrentDetailDto> GetTorrentAsync(Guid torrentId, CancellationToken cancellationToken)
@@ -483,11 +483,11 @@ public sealed class TorrentApplicationService(IHostEnvironment hostEnvironment,
     }
 
     public async Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool includePayloadRejection = false)
     {
         try
         {
-            return await torrentHistoryService.GetHistoryByTorrentIdAsync(torrentId, cancellationToken);
+            return await torrentHistoryService.GetHistoryByTorrentIdAsync(torrentId, cancellationToken, includePayloadRejection);
         }
         catch (ServiceOperationException exception)
         {

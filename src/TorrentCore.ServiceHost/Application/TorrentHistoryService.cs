@@ -13,7 +13,8 @@ using TorrentCore.Service.Configuration;
 namespace TorrentCore.Service.Application;
 
 public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistoryStore,
-    ServiceInstanceContext serviceInstanceContext) : ITorrentHistoryService
+    ServiceInstanceContext serviceInstanceContext, IActivityLogService? activityLog = null,
+    RuntimeTickDurationSummaryState? diagnostics = null) : ITorrentHistoryService
 {
     private static readonly TimeZoneInfo LocalTimeZone = TimeZoneInfo.Local;
 
@@ -43,45 +44,56 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         await torrentHistoryStore.UpdateAsync(updated, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
-        CancellationToken cancellationToken)
-    {
-        var records = await torrentHistoryStore.ListAsync(cancellationToken);
-        var filtered = ApplyFilters(records, request);
-        var take = request.Take is > 0 ? request.Take.Value : int.MaxValue;
-
-        return filtered
-            .OrderByDescending(record => record.LastUpdatedAtUtc)
-            .ThenByDescending(record => record.TorrentId)
-            .Take(take)
-            .Select(MapSummary)
-            .ToArray();
-    }
-
-    public async Task<TorrentHistoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken cancellationToken)
-    {
-        var options = await torrentHistoryStore.GetFilterOptionsAsync(cancellationToken);
-        return new TorrentHistoryFilterOptionsDto
+    public Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
+        CancellationToken cancellationToken) =>
+        ReadAsync<IReadOnlyList<TorrentHistorySummaryDto>>("GetHistoryAsync", async () =>
         {
-            CategoryKeys = options.CategoryKeys,
-            States = options.States,
-        };
-    }
+            var records = await torrentHistoryStore.ListAsync(cancellationToken);
+            var filtered = ApplyFilters(records, request);
+            var take = request.Take is > 0 ? request.Take.Value : int.MaxValue;
 
-    public async Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken)
-    {
-        var record = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);
-        if (record is null)
+            return filtered
+                .OrderByDescending(record => record.LastUpdatedAtUtc)
+                .ThenByDescending(record => record.TorrentId)
+                .Take(take)
+                .Select(record => MapSummary(record, request.IncludePayloadRejection))
+                .ToArray();
+        }, cancellationToken);
+
+    public Task<TorrentHistoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken cancellationToken, bool includePayloadRejection = false) =>
+        ReadAsync<TorrentHistoryFilterOptionsDto>("GetFilterOptionsAsync", async () =>
         {
-            throw new ServiceOperationException(
-                "torrent_history_not_found",
-                $"Torrent history for '{torrentId}' was not found.",
-                StatusCodes.Status404NotFound,
-                nameof(torrentId));
-        }
+            var options = await torrentHistoryStore.GetFilterOptionsAsync(cancellationToken);
+            string[]? reasons = null;
+            if (includePayloadRejection)
+            {
+                var records = await torrentHistoryStore.ListAsync(cancellationToken);
+                reasons = records.Select(MapRejection).Where(x => x is not null).Select(x => x!.Reason)
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+            }
+            return new TorrentHistoryFilterOptionsDto
+            {
+                CategoryKeys = options.CategoryKeys,
+                States = options.States,
+                RejectionReasons = reasons,
+            };
+        }, cancellationToken);
 
-        return MapDetail(record);
-    }
+    public Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken, bool includePayloadRejection = false) =>
+        ReadAsync<TorrentHistoryDetailDto>("GetHistoryByTorrentIdAsync", async () =>
+        {
+            var record = await torrentHistoryStore.GetAsync(torrentId, cancellationToken);
+            if (record is null)
+            {
+                throw new ServiceOperationException(
+                    "torrent_history_not_found",
+                    $"Torrent history for '{torrentId}' was not found.",
+                    StatusCodes.Status404NotFound,
+                    nameof(torrentId));
+            }
+
+            return MapDetail(record, includePayloadRejection);
+        }, cancellationToken);
 
     public async Task ObserveSnapshotAsync(TorrentSnapshot snapshot, CancellationToken cancellationToken)
     {
@@ -538,6 +550,12 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
                 StringComparison.OrdinalIgnoreCase));
         }
 
+        if (!string.IsNullOrWhiteSpace(request.RejectionReason))
+        {
+            query = query.Where(record => string.Equals(MapRejection(record)?.Reason,
+                request.RejectionReason.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
         if (request.Outcome is not null)
         {
             query = request.Outcome.Value switch
@@ -569,13 +587,14 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         return query;
     }
 
-    private static TorrentHistorySummaryDto MapSummary(TorrentHistoryRecord record)
+    private static TorrentHistorySummaryDto MapSummary(TorrentHistoryRecord record, bool includePayloadRejection)
     {
         var completionCallbackFeedback =
                 CompletionCallbackFeedbackMapper.Deserialize(record.LatestCompletionCallbackFeedbackJson);
 
         return new TorrentHistorySummaryDto
         {
+            PayloadRejection = includePayloadRejection ? MapRejection(record) : null,
             TorrentId = record.TorrentId,
             Name = record.Name,
             InfoHash = record.InfoHash,
@@ -610,10 +629,11 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         };
     }
 
-    private static TorrentHistoryDetailDto MapDetail(TorrentHistoryRecord record)
+    private static TorrentHistoryDetailDto MapDetail(TorrentHistoryRecord record, bool includePayloadRejection)
     {
         return new TorrentHistoryDetailDto
         {
+            PayloadRejection = includePayloadRejection ? MapRejection(record) : null,
             TorrentId = record.TorrentId,
             Name = record.Name,
             MagnetUri = record.MagnetUri,
@@ -656,6 +676,54 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
         };
     }
 
+    private static TorrentPayloadRejectionDto? MapRejection(TorrentHistoryRecord record)
+    {
+        if (record.PayloadRejectionJson is null) { return null; }
+        var value = JsonSerializer.Deserialize<TorrentPayloadRejection>(record.PayloadRejectionJson)
+            ?? throw new JsonException("Stored payload rejection is empty for " + record.TorrentId);
+        if (string.IsNullOrWhiteSpace(value.RejectionReason) || string.IsNullOrWhiteSpace(value.Phase) ||
+            value.OffendingFiles is null || value.ObservedFiles is null)
+        { throw new JsonException("Stored payload rejection is incomplete for " + record.TorrentId); }
+        return new()
+        {
+            Reason = value.RejectionReason, Phase = value.Phase, OffendingFiles = value.OffendingFiles,
+            ObservedFiles = value.ObservedFiles, NextAttemptAt = ToLocalTime(value.NextAttemptAtUtc),
+        };
+    }
+
+    private async Task<T> ReadAsync<T>(string activity, Func<Task<T>> read, CancellationToken token)
+    {
+        try
+        {
+            var result = await read();
+            if (diagnostics?.Enabled == true) { await LogReadAsync(activity, "Loaded torrent history.", false); }
+            return result;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch (ServiceOperationException) { throw; }
+        catch (Exception ex)
+        {
+            await LogReadAsync(activity, "Torrent history could not be loaded: " + ex.Message, true);
+            throw new ServiceOperationException("torrent_history_unavailable",
+                "Torrent history is temporarily unavailable. Refresh to try again.", StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    private async Task LogReadAsync(string activity, string message, bool failed)
+    {
+        if (activityLog is null) { return; }
+        try
+        {
+            await activityLog.WriteAsync(new()
+            {
+                Category = "history", EventType = "history.read." + activity, Message = message,
+                Level = failed ? ActivityLogLevel.Error : ActivityLogLevel.Debug,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId,
+            }, CancellationToken.None);
+        }
+        catch (Exception) { /* The controlled read failure must still reach the operator if diagnostics are unavailable. */ }
+    }
+
     private static DateOnly ToLocalDate(DateTimeOffset value)
     {
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(value, LocalTimeZone).DateTime);
@@ -675,6 +743,7 @@ public sealed class TorrentHistoryService(ITorrentHistoryStore torrentHistorySto
     {
         return new TorrentHistoryRecord
         {
+            PayloadRejectionJson = source.PayloadRejectionJson,
             TorrentId = source.TorrentId,
             Name = source.Name,
             MagnetUri = source.MagnetUri,

@@ -227,7 +227,7 @@ part of this packaging-only proof.
 
 The October 25 combined-package identity correction passed shell syntax checks and isolated direct-input checks
 for Xcode Release identity loading, exact Native builder arguments, malformed/missing and invalid identity refusal,
-separate managed/Native `release.json` identities, and README rendering. Native identity is `1.0.0`/build `17`;
+separate managed/Native `release.json` identities, and README rendering. That packaging-only checkpoint used Native `1.0.0`/build `17`;
 managed identities remain `0.8.0`/build `15`. Verification used temporary files only and did not stage a release,
 archive an app, sign/notarize a DMG, access a database, or change installed services.
 
@@ -337,3 +337,17 @@ dotnet test TorrentCore.sln
 ```
 
 If a docs-only change ever coincides with config or script changes, verify those command surfaces separately.
+
+## Slice 6 History Evidence Verification (2026-10-25)
+
+Five selected C# cases passed: three disposable SQLite evidence/filter/preservation cases, one disposable SQLite
+malformed-evidence/persistent-error case, and the existing OpenAPI contract case using a temporary fake-engine host.
+The preservation cases also verify that requests without the evidence opt-in omit the added list/detail/filter-options
+JSON members, protecting older strict Native decoders. Three in-memory Swift cases passed for the list opt-in/reason
+query, filter-options opt-in, and typed evidence validation. These are local tests, not CA-Server functional tests.
+
+The WebUI2 Host build and unsigned Native macOS/test-target compilation passed. The existing Native export contract
+was updated for the appended evidence fields; its application-hosted test was compiled but not launched. Existing
+WebAssembly Server dependency warnings remain. No installed Service or client was started. The operator judged the
+supplied CA-Server rejection/alternate scenario sufficient to begin Slice 6; the new History rendering, filtering,
+selection, copy, and Downloads exports still require live UI acceptance.

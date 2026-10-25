@@ -10,7 +10,7 @@ Managed components:
 - `TorrentCore.WebUI`
 - `TorrentCore.WebUI2` (parallel desktop browser UI)
 
-Managed-app packaging identity: `0.8.0`, build `15`. Native macOS Release identity: `1.0.0`, build `17`.
+Managed-app packaging identity: `0.8.0`, build `15`. Native macOS Release target identity: `1.1.0`, build `18`.
 
 Launch agent labels:
 
@@ -241,7 +241,7 @@ The package `release.json` records all managed-app checksums, the short change d
 
 The combined-package tooling retains managed-app version `0.8.0`, build `15` for `TorrentCoreService.app`,
 `TorrentCoreWebUI.app`, and `TorrentCoreWebUI2.app`. Native `TorrentCore.app` uses its own explicit Release
-`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` from the `TorrentCoreMac` Xcode target (currently `1.0.0`, build `17`).
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` from the `TorrentCoreMac` Xcode target (currently `1.1.0`, build `18`).
 Staging stops if those values cannot be read or validated; it never substitutes the managed-app identity.
 The Native builder, package `nativeUi` metadata, and generated README all use that Native identity.
 
@@ -435,20 +435,30 @@ curl http://127.0.0.1:7033/api/health
 curl -I http://127.0.0.1:7053/
 ```
 
+## Media Payload Slice 6 Source Scope
+
+The changed runtime components are Service, Native macOS 1.1.0 build 18, and WebUI2. Legacy WebUI has no Slice 6 UI
+changes; it is not retired by this release. The managed packaging identity remains 0.8.0 build 15 and the HTTP API
+remains v1. Updated clients opt in to History evidence; old clients retain their previous response shape. No SQLite
+migration or retention change is required. This records source scope only; packaging, installation, and CA-Server UI
+acceptance have not been established. Keep the standard packaging/install workflow and host-local settings preservation.
+See [operator settings](operator-settings.md#inspecting-media-payload-rejections-slice-6) and
+[verification](testing.md#slice-6-history-evidence-verification-2026-10-25).
+
 ## Native macOS App Release
 
 The native app is released separately from the Service and WebUI deployment. It is a direct-download,
 Developer ID-signed and Apple-notarized DMG for Apple Silicon Macs running macOS 26 or later. Building or installing
 the app does not deploy, restart, or modify the Service or WebUI.
 
-Current release identity:
+Current source release identity (installed/released versions require separate assessment):
 
 | Item | Value |
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `1.0.0` |
-| Current build | `17` |
+| Current version | `1.1.0` |
+| Current build | `18` |
 | Standalone script default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.8.0.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
@@ -553,7 +563,7 @@ from [testing.md](testing.md). The standalone script still has historical defaul
 explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 1.0.0 --build 17
+./Scripts/release-macos-app.zsh --version 1.1.0 --build 18
 ```
 
 The script:
@@ -574,7 +584,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 1.0.0 --build 17
+./Scripts/release-macos-app.zsh --version 1.1.0 --build 18
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete

@@ -4,6 +4,7 @@ namespace TorrentCore.Core.History;
 
 public sealed class TorrentHistoryRecord
 {
+    public string? PayloadRejectionJson { get; set; }
     public required Guid            TorrentId                          { get; init; }
     public required string          Name                               { get; set; }
     public required string          MagnetUri                          { get; set; }

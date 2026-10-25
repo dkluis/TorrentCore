@@ -1729,6 +1729,9 @@
           "outcome": {
             "$ref": "#/components/schemas/TorrentHistoryOutcome"
           },
+          "payloadRejection": {
+            "$ref": "#/components/schemas/TorrentPayloadRejectionDto"
+          },
           "removalKind": {
             "$ref": "#/components/schemas/TorrentRemovalKind"
           },
@@ -1788,6 +1791,13 @@
         "additionalProperties": false,
         "properties": {
           "categoryKeys": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "rejectionReasons": {
             "items": {
               "type": "string"
             },
@@ -1918,6 +1928,9 @@
           "outcome": {
             "$ref": "#/components/schemas/TorrentHistoryOutcome"
           },
+          "payloadRejection": {
+            "$ref": "#/components/schemas/TorrentPayloadRejectionDto"
+          },
           "removalKind": {
             "$ref": "#/components/schemas/TorrentRemovalKind"
           },
@@ -1963,6 +1976,45 @@
           "removedByCleanupPolicy",
           "submittedAt",
           "torrentId"
+        ],
+        "type": "object"
+      },
+      "TorrentPayloadRejectionDto": {
+        "additionalProperties": false,
+        "properties": {
+          "nextAttemptAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "observedFiles": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "offendingFiles": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "phase": {
+            "nullable": true,
+            "type": "string"
+          },
+          "reason": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "observedFiles",
+          "offendingFiles",
+          "phase",
+          "reason"
         ],
         "type": "object"
       },
@@ -2701,6 +2753,20 @@
         "parameters": [
           {
             "in": "query",
+            "name": "IncludePayloadRejection",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "RejectionReason",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
             "name": "TorrentId",
             "schema": {
               "format": "uuid",
@@ -2799,6 +2865,14 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "includePayloadRejection",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2831,6 +2905,16 @@
     "/api/history/filter-options": {
       "get": {
         "operationId": "History_GetFilterOptions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includePayloadRejection",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

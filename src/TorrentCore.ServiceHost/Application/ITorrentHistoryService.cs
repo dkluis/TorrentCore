@@ -15,8 +15,8 @@ public interface ITorrentHistoryService
         CancellationToken cancellationToken);
     Task<IReadOnlyList<TorrentHistorySummaryDto>> GetHistoryAsync(TorrentHistoryQueryRequest request,
         CancellationToken cancellationToken);
-    Task<TorrentHistoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken cancellationToken);
-    Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken);
+    Task<TorrentHistoryFilterOptionsDto> GetFilterOptionsAsync(CancellationToken cancellationToken, bool includePayloadRejection = false);
+    Task<TorrentHistoryDetailDto> GetHistoryByTorrentIdAsync(Guid torrentId, CancellationToken cancellationToken, bool includePayloadRejection = false);
     Task ObserveSnapshotAsync(TorrentSnapshot snapshot, CancellationToken cancellationToken);
     Task MarkRemovedAsync(TorrentSnapshot snapshot, bool dataDeleted, string removalReason,
         TorrentRemovalKind removalKind, bool removedByCleanupPolicy, DateTimeOffset removedAtUtc,

@@ -10,6 +10,83 @@ namespace TorrentCore.Service.Tests;
 
 public sealed class SqliteTorrentHistoryStoreTests
 {
+    // All storage and activity logging below use a disposable temporary SQLite database.
+    [Theory]
+    [InlineData("Executable", "setup.exe")]
+    [InlineData("ProhibitedExtension", "episode.7z")]
+    [InlineData("MissingVideo", "")]
+    public async Task RejectionHistoryProjectsEvidenceAndFiltersBeforeTheLimit(string reason, string offending)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "torrentcore-rejection-ui-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var file = Path.Combine(root, "torrentcore.db");
+        try
+        {
+            await new SqliteSchemaMigrator(file).ApplyMigrationsAsync(default);
+            var store = new SqliteTorrentHistoryStore(file);
+            var rejected = CreateRecord(lastUpdatedAtUtc: DateTimeOffset.UtcNow.AddHours(-2));
+            await store.InsertAsync(rejected, default);
+            await store.InsertAsync(CreateRecord(), default); // A newer ordinary record must not hide the older match.
+            var nextAttempt = DateTimeOffset.UtcNow.AddMinutes(1);
+            await new SqliteTorrentPayloadRejectionStore(file).SaveAsync(new(rejected.TorrentId, rejected.InfoHash!, "/downloads", [],
+                offending.Length == 0 ? [] : [offending], "EligibilityPending", nextAttempt)
+                { RejectionReason = reason, ObservedFiles = ["episode.srt"] }, default);
+            var service = new TorrentCore.Service.Application.TorrentHistoryService(store, new TorrentCore.Service.Configuration.ServiceInstanceContext());
+            var row = Assert.Single(await service.GetHistoryAsync(new() { IncludePayloadRejection = true, RejectionReason = reason.ToLowerInvariant(), Take = 1 }, default));
+            Assert.Equal(rejected.TorrentId, row.TorrentId);
+            Assert.Equal(reason, row.PayloadRejection?.Reason);
+            Assert.Equal("EligibilityPending", row.PayloadRejection?.Phase);
+            Assert.Equal(new[] { "episode.srt" }, row.PayloadRejection?.ObservedFiles);
+            Assert.Equal(nextAttempt, row.PayloadRejection?.NextAttemptAt);
+            Assert.Equal(reason, Assert.Single((await service.GetFilterOptionsAsync(default, true)).RejectionReasons!));
+            var detail = await service.GetHistoryByTorrentIdAsync(rejected.TorrentId, default, true);
+            Assert.Equal(row.PayloadRejection?.OffendingFiles, detail.PayloadRejection?.OffendingFiles);
+            Assert.Null((await service.GetHistoryAsync(new() { Take = 1 }, default)).Single().PayloadRejection);
+            // Build 17's strict decoders must see exactly the previous field set without opt-in.
+            var legacyList = await service.GetHistoryAsync(new(), default);
+            var legacyDetail = await service.GetHistoryByTorrentIdAsync(rejected.TorrentId, default);
+            var legacyOptions = await service.GetFilterOptionsAsync(default);
+            Assert.DoesNotContain("PayloadRejection", System.Text.Json.JsonSerializer.Serialize(legacyList));
+            Assert.DoesNotContain("PayloadRejection", System.Text.Json.JsonSerializer.Serialize(legacyDetail));
+            Assert.DoesNotContain("RejectionReasons", System.Text.Json.JsonSerializer.Serialize(legacyOptions));
+            // Ordinary lifecycle updates must leave the cleanup coordinator's JSON untouched.
+            var reloaded = (await store.GetAsync(rejected.TorrentId, default))!;
+            var json = reloaded.PayloadRejectionJson;
+            reloaded.Name = "Updated name";
+            await store.UpdateAsync(reloaded, default);
+            Assert.Equal(json, (await store.GetAsync(rejected.TorrentId, default))!.PayloadRejectionJson);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task InvalidRejectionHistoryReturnsControlledFailureAndPersistsError()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "torrentcore-rejection-ui-invalid-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var file = Path.Combine(root, "torrentcore.db");
+        try
+        {
+            await new SqliteSchemaMigrator(file).ApplyMigrationsAsync(default);
+            var store = new SqliteTorrentHistoryStore(file);
+            var record = CreateRecord(); await store.InsertAsync(record, default);
+            await using (var db = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + file))
+            {
+                await db.OpenAsync(); using var command = db.CreateCommand();
+                command.CommandText = "UPDATE torrent_history SET executable_rejection_json = '{' WHERE torrent_id = $id";
+                command.Parameters.AddWithValue("$id", record.TorrentId.ToString());
+                await command.ExecuteNonQueryAsync();
+            }
+            var logs = new TorrentCore.Persistence.Sqlite.Logging.SqliteActivityLogService(file, 100);
+            var service = new TorrentCore.Service.Application.TorrentHistoryService(store, new TorrentCore.Service.Configuration.ServiceInstanceContext(), logs);
+            var failure = await Assert.ThrowsAsync<TorrentCore.Service.Application.ServiceOperationException>(() => service.GetHistoryAsync(new() { IncludePayloadRejection = true }, default));
+            Assert.Equal(503, failure.StatusCode);
+            var entries = await logs.GetRecentAsync(new(), default);
+            Assert.Contains(entries, x => x.EventType == "history.read.GetHistoryAsync" && x.Level == TorrentCore.Core.Diagnostics.ActivityLogLevel.Error);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     [Fact]
     public async Task InsertAndGet_PreservesInsertedHistoryRow()
     {

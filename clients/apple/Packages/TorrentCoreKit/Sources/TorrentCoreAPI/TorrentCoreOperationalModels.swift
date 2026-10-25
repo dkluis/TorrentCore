@@ -28,6 +28,7 @@ public struct TorrentCoreRemovalKind: RawRepresentable, Codable, Hashable, Senda
 public struct TorrentCoreHistoryQuery: Hashable, Sendable {
     public var torrentID: UUID?
     public var torrentName: String?
+    public var rejectionReason: String?
     public var categoryKey: String?
     public var state: String?
     public var outcome: TorrentCoreHistoryOutcome?
@@ -39,6 +40,7 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
     public init(
         torrentID: UUID? = nil,
         torrentName: String? = nil,
+        rejectionReason: String? = nil,
         categoryKey: String? = nil,
         state: String? = nil,
         outcome: TorrentCoreHistoryOutcome? = nil,
@@ -49,6 +51,7 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
     ) {
         self.torrentID = torrentID
         self.torrentName = torrentName
+        self.rejectionReason = rejectionReason
         self.categoryKey = categoryKey
         self.state = state
         self.outcome = outcome
@@ -62,14 +65,17 @@ public struct TorrentCoreHistoryQuery: Hashable, Sendable {
 public struct TorrentCoreHistoryFilterOptions: Codable, Hashable, Sendable {
     public var categoryKeys: [String]
     public var states: [String]
+    public var rejectionReasons: [String]
 
-    public init(categoryKeys: [String], states: [String]) {
+    public init(categoryKeys: [String], states: [String], rejectionReasons: [String] = []) {
         self.categoryKeys = categoryKeys
         self.states = states
+        self.rejectionReasons = rejectionReasons
     }
 }
 
 public struct TorrentCoreHistorySummary: Codable, Hashable, Sendable, Identifiable {
+    public var payloadRejection: TorrentCorePayloadRejection? = nil
     public var categoryKey: String?
     public var completionCallbackFinalResult: String?
     public var dataDeleted: Bool
@@ -108,6 +114,7 @@ public struct TorrentCoreHistorySummary: Codable, Hashable, Sendable, Identifiab
 }
 
 public struct TorrentCoreHistoryDetail: Codable, Hashable, Sendable {
+    public var payloadRejection: TorrentCorePayloadRejection? = nil
     public var callbackCompletedAt: Date?
     public var callbackLastError: String?
     public var callbackStartedAt: Date?
@@ -469,4 +476,12 @@ public struct TorrentCoreServiceRestartResult: Codable, Hashable, Sendable {
     public var message: String?
     public var requestedAt: Date
     public var serviceLabel: String?
+}
+
+public struct TorrentCorePayloadRejection: Codable, Hashable, Sendable {
+    public var reason: String
+    public var phase: String
+    public var offendingFiles: [String]
+    public var observedFiles: [String]
+    public var nextAttemptAt: Date?
 }

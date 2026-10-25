@@ -212,8 +212,12 @@ func historyExportKeepsEverySummaryFieldInStableOrder() throws {
     #expect(row[8] == TorrentCoreMacTableExport.isoTimestamp(summary.lastUpdatedAt))
     #expect(TorrentCoreMacHistoryView.exportHeaders[22] == "Name")
     #expect(row[22] == summary.name)
-    #expect(TorrentCoreMacHistoryView.exportHeaders.last == "Torrent ID")
-    #expect(row.last == summary.torrentID?.uuidString)
+    #expect(TorrentCoreMacHistoryView.exportHeaders[30] == "Torrent ID")
+    #expect(row[30] == summary.torrentID?.uuidString)
+    #expect(TorrentCoreMacHistoryView.exportHeaders[31] == "Rejection Reason")
+    #expect(row[31] == (summary.payloadRejection?.reason ?? ""))
+    #expect(TorrentCoreMacHistoryView.exportHeaders.last == "Rejection Next Attempt")
+    #expect(row.last == "")
 }
 
 @Test

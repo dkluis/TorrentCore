@@ -147,3 +147,13 @@ files are written under the host's working directory `Config/browser-connections
 installs use `~/TorrentCore/WebUI2` as that directory. Keeping the same browser address (scheme, host, and port) and
 browser storage retains its identity and preferences through deployment. A different address or clearing browser
 site data creates a different browser identity. The prior profiles on the host are not deleted by a deployment.
+
+## Slice 6 History Evidence Contract
+
+API v1 adds optional `includePayloadRejection=true` on `GET api/history`, `GET api/history/by-torrent/{torrentId}`,
+and `GET api/history/filter-options`. The updated Native SDK requests it; WebUI2 explicitly opts in through the C#
+client. Without it, the added `payloadRejection` / `rejectionReasons` members are omitted, preserving older Native
+clients' strict decoder contract. The C# client defaults to the previous shape. The list's optional `rejectionReason`
+filter matches retained evidence before its result limit. The existing persistent activity logger handles controlled
+read failures; optional successful-read Debug records follow Performance Timing Summaries. No new logging framework,
+recovery mutation, persistence owner, dependency, or migration is introduced.

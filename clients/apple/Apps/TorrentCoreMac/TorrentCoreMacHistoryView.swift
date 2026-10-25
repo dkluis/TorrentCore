@@ -71,6 +71,8 @@ private struct TorrentCoreMacHistoryTableItem: Identifiable {
     var seedingStarted: Date { summary.seedingStartedAt ?? .distantPast }
     var submitted: Date { summary.submittedAt }
     var torrentID: String { summary.torrentID?.uuidString ?? "" }
+    var rejectionReason: String { summary.payloadRejection?.reason ?? "" }
+    var rejectionPhase: String { summary.payloadRejection?.phase ?? "" }
 }
 
 enum TorrentCoreMacHistorySortField: String, CaseIterable, Codable, Identifiable {
@@ -105,6 +107,7 @@ enum TorrentCoreMacHistorySortField: String, CaseIterable, Codable, Identifiable
     case seedingStarted
     case submitted
     case torrentID
+    case rejectionReason, rejectionPhase
 
     var id: Self { self }
 
@@ -140,6 +143,8 @@ enum TorrentCoreMacHistorySortField: String, CaseIterable, Codable, Identifiable
         case .removedByCleanup: "Removed by Cleanup"
         case .seedingStarted: "Seeding Started"
         case .submitted: "Submitted"
+        case .rejectionReason: "Rejection Reason"
+        case .rejectionPhase: "Rejection Phase"
         case .torrentID: "Torrent ID"
         }
     }
@@ -207,6 +212,10 @@ enum TorrentCoreMacHistorySortField: String, CaseIterable, Codable, Identifiable
             KeyPathComparator(\.seedingStarted, order: order)
         case .submitted:
             KeyPathComparator(\.submitted, order: order)
+        case .rejectionReason:
+            KeyPathComparator(\.rejectionReason, comparator: .localizedStandard, order: order)
+        case .rejectionPhase:
+            KeyPathComparator(\.rejectionPhase, comparator: .localizedStandard, order: order)
         case .torrentID:
             KeyPathComparator(\.torrentID, comparator: .localizedStandard, order: order)
         }
@@ -246,6 +255,8 @@ enum TorrentCoreMacHistorySortField: String, CaseIterable, Codable, Identifiable
         case \TorrentCoreMacHistoryTableItem.removedByCleanup: .removedByCleanup
         case \TorrentCoreMacHistoryTableItem.seedingStarted: .seedingStarted
         case \TorrentCoreMacHistoryTableItem.submitted: .submitted
+        case \TorrentCoreMacHistoryTableItem.rejectionReason: .rejectionReason
+        case \TorrentCoreMacHistoryTableItem.rejectionPhase: .rejectionPhase
         case \TorrentCoreMacHistoryTableItem.torrentID: .torrentID
         default: nil
         }
@@ -258,6 +269,7 @@ private enum TorrentCoreMacHistoryColumn: String, CaseIterable, Identifiable {
     case downloadRootPath, downloadStarted, infoHash, lastActivity, connectedPeers
     case downloadRate, errorMessage, trackerCount, uploadRate, uploaded, waitReason
     case metadataResolved, removalKind, removedByCleanup, seedingStarted, submitted, torrentID
+    case rejectionReason, rejectionPhase
 
     var id: String { rawValue }
     var title: String { TorrentCoreMacHistorySortField(rawValue: rawValue)?.title ?? rawValue }
@@ -302,6 +314,7 @@ struct TorrentCoreMacHistoryView: View {
     @State private var nameFilter: String
     @State private var categoryFilter: String
     @State private var stateFilter: String
+    @State private var rejectionReasonFilter: String
     @State private var outcomeFilter: String
     @State private var torrentIDFilterInput: String
     @State private var fromDate: Date
@@ -337,6 +350,7 @@ struct TorrentCoreMacHistoryView: View {
         _nameFilter = State(initialValue: initial.torrentName ?? "")
         _categoryFilter = State(initialValue: initial.categoryKey ?? "")
         _stateFilter = State(initialValue: initial.state ?? "")
+        _rejectionReasonFilter = State(initialValue: initial.rejectionReason ?? "")
         _outcomeFilter = State(initialValue: initial.outcome?.rawValue ?? "")
         _torrentIDFilterInput = State(initialValue: initial.torrentID?.uuidString ?? "")
         _selectedHistoryKey = State(
@@ -573,6 +587,21 @@ struct TorrentCoreMacHistoryView: View {
                 Spacer(minLength: 0)
             }
 
+            HStack(spacing: 10) {
+                HStack(spacing: 4) {
+                    Picker("Rejection reason", selection: $rejectionReasonFilter) {
+                        Text("All Reasons").tag("")
+                        ForEach(historyRejectionReasons, id: \.self) {
+                            Text(TorrentCoreDisplayFormatter.splitIdentifier($0)).tag($0)
+                        }
+                    }
+                    .frame(width: 235)
+                    .accessibilityIdentifier("history.rejectionReasonFilter")
+                    TorrentCoreMacHelpButton(content: TorrentCoreHelpCatalog.History.rejectionReason)
+                }
+                Spacer(minLength: 0)
+            }
+
             if !isTorrentIDFilterValid {
                 Text("Enter a valid Torrent ID.")
                     .font(.caption)
@@ -698,6 +727,21 @@ struct TorrentCoreMacHistoryView: View {
             .width(min: 75, ideal: 190)
             .defaultVisibility(.visible)
             .customizationID("callback")
+            }
+
+            Group {
+                TableColumn(sortHeaderTitle(.rejectionReason), value: \TorrentCoreMacHistoryTableItem.rejectionReason, comparator: .localizedStandard) {
+                    Text(TorrentCoreDisplayFormatter.splitIdentifier($0.rejectionReason))
+                }
+                .width(min: 130, ideal: 190)
+                .defaultVisibility(.hidden)
+                .customizationID("rejectionReason")
+                TableColumn(sortHeaderTitle(.rejectionPhase), value: \TorrentCoreMacHistoryTableItem.rejectionPhase, comparator: .localizedStandard) {
+                    Text(TorrentCoreDisplayFormatter.splitIdentifier($0.rejectionPhase))
+                }
+                .width(min: 130, ideal: 190)
+                .defaultVisibility(.hidden)
+                .customizationID("rejectionPhase")
             }
 
             Group {
@@ -1063,6 +1107,16 @@ struct TorrentCoreMacHistoryView: View {
                         value: TorrentCoreDisplayFormatter.operatorValue(detail.removalReason)
                     )
                     Divider()
+                    if let rejection = detail.payloadRejection {
+                        Text("Payload Rejection").font(.headline)
+                        TorrentCoreMacDetailRow(label: "Reason", value: TorrentCoreDisplayFormatter.splitIdentifier(rejection.reason))
+                        TorrentCoreMacDetailRow(label: "Phase", value: TorrentCoreDisplayFormatter.splitIdentifier(rejection.phase))
+                        TorrentCoreMacDetailRow(label: "Offending Files", value: rejection.offendingFiles.joined(separator: " | "))
+                        TorrentCoreMacDetailRow(label: "Observed Files", value: rejection.observedFiles.joined(separator: " | "))
+                        TorrentCoreMacDetailRow(label: "Next Attempt", value: TorrentCoreDisplayFormatter.timestamp(rejection.nextAttemptAt))
+                        TorrentCoreMacDetailRow(label: "Data Deleted", value: yesNo(detail.dataDeleted))
+                        Divider()
+                    }
                     Text("Callback Feedback")
                         .font(.headline)
                     TorrentCoreMacDetailRow(
@@ -1261,6 +1315,11 @@ struct TorrentCoreMacHistoryView: View {
         )
     }
 
+    private var historyRejectionReasons: [String] {
+        uniqueOptions((session.historyFilterOptions.value?.rejectionReasons ?? [])
+            + (session.history.value ?? []).compactMap { $0.payloadRejection?.reason }, preserving: rejectionReasonFilter)
+    }
+
     private var historyStateOptions: [String] {
         uniqueOptions(
             (session.historyFilterOptions.value?.states ?? [])
@@ -1326,6 +1385,7 @@ struct TorrentCoreMacHistoryView: View {
         query = TorrentCoreHistoryQuery(
             torrentID: UUID(uuidString: normalizedTorrentIDFilter),
             torrentName: nameFilter.nilIfBlank,
+            rejectionReason: rejectionReasonFilter.nilIfBlank,
             categoryKey: categoryFilter.nilIfBlank,
             state: stateFilter.nilIfBlank,
             outcome: outcome,
@@ -1353,6 +1413,7 @@ struct TorrentCoreMacHistoryView: View {
         categoryFilter = ""
         stateFilter = ""
         outcomeFilter = ""
+        rejectionReasonFilter = ""
         torrentIDFilterInput = ""
         includesFromDate = false
         includesToDate = false
@@ -1365,6 +1426,7 @@ struct TorrentCoreMacHistoryView: View {
         categoryFilter = defaults.categoryKey ?? ""
         stateFilter = defaults.state ?? ""
         outcomeFilter = defaults.outcome?.rawValue ?? ""
+        rejectionReasonFilter = defaults.rejectionReason ?? ""
         torrentIDFilterInput = ""
         includesFromDate = defaults.fromDate != nil
         includesToDate = defaults.toDate != nil
@@ -1412,6 +1474,7 @@ struct TorrentCoreMacHistoryView: View {
         "Seeding Started At",
         "Submitted At",
         "Torrent ID",
+        "Rejection Reason", "Rejection Phase", "Rejection Offending Files", "Rejection Observed Files", "Rejection Next Attempt",
     ]
 
     static func exportRow(_ value: TorrentCoreHistorySummary) -> [String] {
@@ -1452,6 +1515,10 @@ struct TorrentCoreMacHistoryView: View {
             TorrentCoreMacTableExport.isoTimestamp(value.seedingStartedAt),
             TorrentCoreMacTableExport.isoTimestamp(value.submittedAt),
             value.torrentID?.uuidString ?? "",
+            value.payloadRejection?.reason ?? "", value.payloadRejection?.phase ?? "",
+            value.payloadRejection?.offendingFiles.joined(separator: " | ") ?? "",
+            value.payloadRejection?.observedFiles.joined(separator: " | ") ?? "",
+            TorrentCoreMacTableExport.isoTimestamp(value.payloadRejection?.nextAttemptAt),
         ]
     }
 

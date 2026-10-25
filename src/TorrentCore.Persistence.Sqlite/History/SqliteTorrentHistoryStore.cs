@@ -51,7 +51,8 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
                                              removed_by_cleanup_policy,
                                              final_payload_path,
                                              service_instance_id_last_seen,
-                                             removal_kind
+                                             removal_kind,
+                                             executable_rejection_json
                                          FROM torrent_history
                                          """;
     private readonly SemaphoreSlim _initializationLock = new(1, 1);
@@ -482,6 +483,7 @@ public sealed class SqliteTorrentHistoryStore(string databaseFilePath) : ITorren
             FinalPayloadPath = reader.IsDBNull(36) ? null : reader.GetString(36),
             ServiceInstanceIdLastSeen = reader.IsDBNull(37) ? null : Guid.Parse(reader.GetString(37)),
             RemovalKind = reader.IsDBNull(38) ? null : ParseRemovalKind(reader.GetString(38)),
+            PayloadRejectionJson = reader.IsDBNull(39) ? null : reader.GetString(39),
         };
     }
 
