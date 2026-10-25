@@ -100,6 +100,16 @@
                                 </div>
 
                                 <div class="settings-field-grid">
+                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.RequiredVideoExtensions" />
+                                    <MudTextField T="string" Label="Required video extensions" Value="_lifecycle.RequiredVideoExtensions"
+                                        ValueChanged="value => UpdateLifecycle(value, (group, next) => group.RequiredVideoExtensions = next)"
+                                        HelperText="Comma-separated final extensions; at least one video is required in TV/Movie payloads." />
+                                    <SettingHelpTrigger Content="@SettingsHelpCatalog.ProhibitedPayloadExtensions" />
+                                    <MudTextField T="string" Label="Prohibited payload extensions" Value="_lifecycle.ProhibitedPayloadExtensions"
+                                        ValueChanged="value => UpdateLifecycle(value, (group, next) => group.ProhibitedPayloadExtensions = next)"
+                                        HelperText="Any match rejects the whole TV/Movie payload. Saved list edits apply only after Service restart, to existing and new torrents." />
+                                </div>
+                                <div class="settings-field-grid">
                                     <div class="settings-field-block">
                                         <SettingHelpTrigger Content="@SettingsHelpCatalog.SeedingStopMode" />
                                         <MudSelect T="string"
@@ -752,7 +762,7 @@
                                 </div>
 
                                 <p class="dashboard-panel-copy">
-                                    This changes only the one-minute synchronization timing summary written to the Service log. Torrent processing and other diagnostics remain unchanged.
+                                    Controls one-minute timing summaries and payload-rejection Debug records. Slow-operation warnings, errors, and torrent processing remain unchanged.
                                 </p>
                             </div>
                         </OperatorCard>
@@ -1251,8 +1261,8 @@
         _dirtyGroupKey = null;
 
         Feedback.Success(
-            key == SettingsGroupKey.Engine && result.Value.EngineSettingsRequireRestart ?
-                "Engine settings saved. Restart TorrentCore.Service to apply them." :
+            (key == SettingsGroupKey.Engine || key == SettingsGroupKey.Lifecycle) && result.Value.EngineSettingsRequireRestart ?
+                "Settings saved. Restart TorrentCore.Service to apply pending engine or payload settings." :
                 $"{GetGroupTitle(key)} saved."
         );
     }
@@ -1625,6 +1635,8 @@
         _lifecycle.SeedingStopMinutes = _runtimeSnapshot.SeedingStopMinutes;
         _lifecycle.CompletedTorrentCleanupMode = _runtimeSnapshot.CompletedTorrentCleanupMode;
         _lifecycle.CompletedTorrentCleanupMinutes = _runtimeSnapshot.CompletedTorrentCleanupMinutes;
+        _lifecycle.RequiredVideoExtensions = string.Join(",", _runtimeSnapshot.RequiredVideoExtensions);
+        _lifecycle.ProhibitedPayloadExtensions = string.Join(",", _runtimeSnapshot.ProhibitedPayloadExtensions);
         _lifecycle.DeleteLogsForCompletedTorrents = _runtimeSnapshot.DeleteLogsForCompletedTorrents;
     }
 
@@ -1721,6 +1733,8 @@
             SeedingStopMinutes = _lifecycle.SeedingStopMinutes,
             CompletedTorrentCleanupMode = _lifecycle.CompletedTorrentCleanupMode,
             CompletedTorrentCleanupMinutes = _lifecycle.CompletedTorrentCleanupMinutes,
+            RequiredVideoExtensions = _lifecycle.RequiredVideoExtensions.Split(',', StringSplitOptions.TrimEntries),
+            ProhibitedPayloadExtensions = _lifecycle.ProhibitedPayloadExtensions.Split(',', StringSplitOptions.TrimEntries),
             DeleteLogsForCompletedTorrents = _lifecycle.DeleteLogsForCompletedTorrents,
             EngineConnectionFailureLogBurstLimit = _queue.EngineConnectionFailureLogBurstLimit,
             EngineConnectionFailureLogWindowSeconds = _queue.EngineConnectionFailureLogWindowSeconds,
@@ -1849,7 +1863,9 @@
     private bool IsLifecycleDirty()
     {
         return _runtimeSnapshot is not null &&
-               (_lifecycle.SeedingStopMode != _runtimeSnapshot.SeedingStopMode ||
+               (_lifecycle.RequiredVideoExtensions != string.Join(",", _runtimeSnapshot.RequiredVideoExtensions) ||
+                _lifecycle.ProhibitedPayloadExtensions != string.Join(",", _runtimeSnapshot.ProhibitedPayloadExtensions) ||
+                _lifecycle.SeedingStopMode != _runtimeSnapshot.SeedingStopMode ||
                 _lifecycle.SeedingStopRatio != _runtimeSnapshot.SeedingStopRatio ||
                 _lifecycle.SeedingStopMinutes != _runtimeSnapshot.SeedingStopMinutes ||
                 _lifecycle.CompletedTorrentCleanupMode != _runtimeSnapshot.CompletedTorrentCleanupMode ||
@@ -2165,6 +2181,8 @@
         public int SeedingStopMinutes { get; set; } = 60;
         public string CompletedTorrentCleanupMode { get; set; } = "Never";
         public int CompletedTorrentCleanupMinutes { get; set; } = 60;
+        public string RequiredVideoExtensions { get; set; } = "";
+        public string ProhibitedPayloadExtensions { get; set; } = "";
         public bool DeleteLogsForCompletedTorrents { get; set; }
     }
 

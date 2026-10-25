@@ -539,6 +539,8 @@ public enum TorrentCorePreviewFixtures {
         vpnEgressEngineSuspensionTimeoutSeconds: 10,
         vpnEgressValidationEnabled: false,
         vpnEgressValidationEndpoint: "https://api.ipify.org?format=json",
+        requiredVideoExtensions: [".mkv", ".mp4"],
+        prohibitedPayloadExtensions: [".exe", ".iso", ".7z", ".zip"],
         runtimeTickDurationSummaryEnabled: false
     )
 

@@ -527,6 +527,8 @@ public sealed class TorrentApiTests
 
             var updateResponse = await httpClient.PutAsJsonAsync("api/host/runtime-settings", new UpdateRuntimeSettingsRequest
             {
+                RequiredVideoExtensions = ["MKV", "mp4", ".avi"],
+                ProhibitedPayloadExtensions = ["exe", "ISO", "7z", "zip"],
             SeedingStopMode = SeedingStopMode.StopAfterRatioOrTime.ToString(),
             SeedingStopRatio = 1.5,
             SeedingStopMinutes = 90,
@@ -577,6 +579,11 @@ public sealed class TorrentApiTests
             var hostStatus = await httpClient.GetFromJsonAsync<EngineHostStatusDto>("api/host/status");
 
             Assert.NotNull(settings);
+            Assert.Equal(new[] { ".mkv", ".mp4", ".avi" }, settings.RequiredVideoExtensions);
+            Assert.Equal(new[] { ".exe", ".iso", ".7z", ".zip" }, settings.ProhibitedPayloadExtensions);
+            var appliedPolicy = factory.Services.GetRequiredService<AppliedEngineSettingsState>().MediaPayloadPolicy;
+            Assert.NotNull(appliedPolicy);
+            Assert.Equal("MissingVideo", appliedPolicy.Inspect(["episode.avi"]).RejectionReason);
             Assert.True(settings.UsesPersistedOverrides);
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), settings.SeedingStopMode);
             Assert.Equal(1.5, settings.SeedingStopRatio);
@@ -654,6 +661,11 @@ public sealed class TorrentApiTests
             var logs = await httpClient.GetFromJsonAsync<IReadOnlyList<ActivityLogEntryDto>>("api/logs?take=50&eventType=service.runtime_settings.updated");
 
             Assert.NotNull(settings);
+            Assert.Equal(new[] { ".mkv", ".mp4", ".avi" }, settings.RequiredVideoExtensions);
+            Assert.Equal(new[] { ".exe", ".iso", ".7z", ".zip" }, settings.ProhibitedPayloadExtensions);
+            var appliedPolicy = factory.Services.GetRequiredService<AppliedEngineSettingsState>().MediaPayloadPolicy;
+            Assert.NotNull(appliedPolicy);
+            Assert.False(appliedPolicy.Inspect(["episode.avi"]).Rejected);
             Assert.True(settings.UsesPersistedOverrides);
             Assert.Equal(SeedingStopMode.StopAfterRatioOrTime.ToString(), settings.SeedingStopMode);
             Assert.Equal(1.5, settings.SeedingStopRatio);
@@ -725,6 +737,36 @@ public sealed class TorrentApiTests
             Assert.NotNull(logs);
             Assert.Contains(logs, log => log.EventType == "service.runtime_settings.updated");
         }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UpdatePayloadLists_RequiresRestartWithoutChangingAppliedPolicy(bool changeVideoList)
+    {
+        await using var factory = CreateFactory();
+        using var httpClient = factory.CreateClient();
+        var applied = factory.Services.GetRequiredService<AppliedEngineSettingsState>().MediaPayloadPolicy;
+        Assert.NotNull(applied);
+        var response = await httpClient.PutAsJsonAsync("api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(
+                requiredVideoExtensions: changeVideoList ? [".mkv", ".mp4", ".avi"] : null,
+                prohibitedPayloadExtensions: changeVideoList ? null : [".exe", ".iso", ".7z", ".zip", ".rar"]));
+        response.EnsureSuccessStatusCode();
+        var saved = await response.Content.ReadFromJsonAsync<RuntimeSettingsDto>();
+        Assert.NotNull(saved);
+        Assert.True(saved.EngineSettingsRequireRestart);
+        Assert.Same(applied, factory.Services.GetRequiredService<AppliedEngineSettingsState>().MediaPayloadPolicy);
+        Assert.Equal("MissingVideo", applied.Inspect(["episode.avi"]).RejectionReason);
+        Assert.False(applied.Inspect(["episode.mkv", "extra.rar"]).Rejected);
+
+        var restore = await httpClient.PutAsJsonAsync("api/host/runtime-settings",
+            CreateDefaultRuntimeSettingsUpdateRequest(requiredVideoExtensions: [".mkv", ".mp4"],
+                prohibitedPayloadExtensions: [".exe", ".iso", ".7z", ".zip"]));
+        restore.EnsureSuccessStatusCode();
+        var restored = await restore.Content.ReadFromJsonAsync<RuntimeSettingsDto>();
+        Assert.NotNull(restored);
+        Assert.False(restored.EngineSettingsRequireRestart);
     }
 
     [Fact]
@@ -4470,10 +4512,14 @@ public sealed class TorrentApiTests
         string? expressVpnAutomaticRecoveryMode = null,
         int? expressVpnRecoveryDelaySeconds = null,
         int? expressVpnUnavailableLaunchDelaySeconds = null,
-        bool? runtimeTickDurationSummaryEnabled = null)
+        bool? runtimeTickDurationSummaryEnabled = null,
+        string[]? requiredVideoExtensions = null,
+        string[]? prohibitedPayloadExtensions = null)
     {
         return new UpdateRuntimeSettingsRequest
         {
+            RequiredVideoExtensions = requiredVideoExtensions,
+            ProhibitedPayloadExtensions = prohibitedPayloadExtensions,
             SeedingStopMode = SeedingStopMode.Unlimited.ToString(),
             SeedingStopRatio = 1.5,
             SeedingStopMinutes = 90,

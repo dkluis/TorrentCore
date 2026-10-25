@@ -2,6 +2,8 @@ namespace TorrentCore.Contracts.Host;
 
 public sealed class UpdateRuntimeSettingsRequest
 {
+    public string[]? RequiredVideoExtensions { get; init; }
+    public string[]? ProhibitedPayloadExtensions { get; init; }
     public string? VpnRecoveryProvider { get; init; }
     public required string  SeedingStopMode                              { get; init; }
     public required double  SeedingStopRatio                             { get; init; }

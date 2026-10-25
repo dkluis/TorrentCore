@@ -13,15 +13,30 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 
 Representative coverage areas:
 
-- executable payload rejection in TV/Movie categories: direct-input and fake-I/O cases cover save-before-removal,
+- media payload rejection in TV/Movie categories: direct-input and fake-I/O cases cover save-before-removal,
   no preliminary season/API exchange, deletion failure, callback invocation with blank API overrides, nonblocking
   callback polling, structured
   acknowledgement validation, lost notification replies and retained-history admission errors. Process configuration
   tests do not launch processes. Dedicated disposable SQLite tests check quiet routine scans with retained failure
-  logging, migration 23, restart state,
+  logging, live Debug gating by the existing Performance Timing Summaries switch, migration 23, restart state,
   preservation by ordinary history writes and removal of the admission block by unchanged history cleanup. These tests
   never use installed TorrentCore storage or a TVMaze database. Physical removal and cross-service acceptance belong
   to the operator-controlled CA-Server Test installation.
+
+  October 22 Debug-switch verification passed 10 selected Service tests: rejection-history persistence/logging,
+  live synchronization-summary switching and operation-duration diagnostics. Persistence cases created disposable
+  temporary SQLite databases; other cases used fake adapters/log collectors. Both web builds passed; WebUI2 retained
+  two NU1903 warnings for its existing WebAssembly Server 10.0.1 dependency. Two selected Swift package tests covering
+  the shared settings help catalog and settings request mapping also passed. No installed runtime was started.
+
+  October 25 expanded-policy verification passed 56 selected Service cases covering configured video/prohibited
+  matching, mixed and subtitle/archive-only payloads, cleanup/recovery evidence, retained-history admission,
+  callback behavior, settings persistence and OpenAPI synchronization. Runtime-setting tests prove saved list edits
+  leave the startup policy active and flag a restart, and that a fresh Service instance loads the saved lists.
+  They use fake engines and isolated temporary SQLite roots. Three direct WebUI2 settings-mapping cases and two
+  selected Swift help/request cases passed. Both web builds and the unsigned Native macOS build passed; the existing
+  WebUI2 dependency warnings remain. Expanded-policy CA-Server acceptance is still separate; normal valid-media
+  completion is already accepted, and a live FileOps rejection test is not a gate.
 
 - deterministic VPN-egress coverage for controllable time, scripted HTTP outcomes, typed/bounded IPv4 response
   parsing, multiple direct-ISP CIDRs, timeout and cancellation behavior, stable endpoint-failure reasons, and

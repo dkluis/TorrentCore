@@ -24,10 +24,12 @@ public sealed class TorrentPayloadRejectionEffects : ITorrentPayloadRejectionEff
         try
         {
             if (rejection.Phase != "Deleted")
-            { return new(false, "Executable data deletion is not confirmed; callback was not launched."); }
+            { return new(false, "Rejected payload data deletion is not confirmed; callback was not launched."); }
             var settings = await _settings(token);
-            if (!settings.CompletionCallbackEnabled || string.IsNullOrWhiteSpace(settings.CompletionCallbackCommandPath))
-            { return new(false, "The configured TVMaze callback is disabled or missing; rejection notification remains pending."); }
+            if (!settings.CompletionCallbackEnabled)
+            { return new(true, "Payload deleted; downstream rejection notification is disabled by configuration.", NotRequired: true); }
+            if (string.IsNullOrWhiteSpace(settings.CompletionCallbackCommandPath))
+            { return new(false, "The configured rejection callback command is missing; rejection notification remains pending."); }
             var command = settings.CompletionCallbackCommandPath.Trim();
             // An older completion-only app must fail its normal environment validation, never process a completion.
             var environment = new Dictionary<string, string> { ["TR_TORRENT_NAME"] = "" };
@@ -46,25 +48,25 @@ public sealed class TorrentPayloadRejectionEffects : ITorrentPayloadRejectionEff
                 StandardInput = JsonSerializer.Serialize(new
                 {
                     EventId = rejection.TorrentId, Source = "TorrentCore", rejection.InfoHash,
-                    rejection.OffendingFiles, CleanupOutcome = "DeletedIncludingData",
+                    rejection.OffendingFiles, rejection.RejectionReason, rejection.ObservedFiles, CleanupOutcome = "DeletedIncludingData",
                 }),
             };
             var result = await _run(invocation, token);
             // Do not echo process output: configured callback arguments or diagnostics may include credentials.
             if (!result.Succeeded || result.FailureSummary is not null)
-            { return new(false, $"TVMaze rejection callback was not acknowledged (started={result.Started}, timedOut={result.TimedOut}, exit={result.ExitCode}); retry remains pending."); }
+            { return new(false, $"Downstream rejection callback was not acknowledged (started={result.Started}, timedOut={result.TimedOut}, exit={result.ExitCode}); retry remains pending."); }
             var acknowledgements = result.StandardOutput.Split('\n', StringSplitOptions.TrimEntries)
                 .Where(line => line.StartsWith(AcknowledgementPrefix, StringComparison.Ordinal)).ToArray();
             if (acknowledgements.Length != 1)
-            { return new(false, "TVMaze callback returned no unique rejection acknowledgement; retry remains pending."); }
+            { return new(false, "Downstream callback returned no unique rejection acknowledgement; retry remains pending."); }
             var reply = JsonSerializer.Deserialize<RejectionAcknowledgement>(acknowledgements[0][AcknowledgementPrefix.Length..]);
             if (reply is null || reply.RecoveryId == Guid.Empty || !string.Equals(reply.InfoHash, rejection.InfoHash, StringComparison.OrdinalIgnoreCase))
-            { return new(false, "TVMaze rejection acknowledgement does not identify the submitted hash."); }
-            return new(true, "TVMaze acknowledged confirmed deletion; reporting and eligible alternate/reset recovery are queued.");
+            { return new(false, "Downstream rejection acknowledgement does not identify the submitted hash."); }
+            return new(true, "Downstream callback acknowledged confirmed payload deletion.");
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception ex)
-        { return new(false, "TVMaze rejection acknowledgement is unconfirmed: " + ex.GetType().Name); }
+        { return new(false, "Downstream rejection acknowledgement is unconfirmed: " + ex.GetType().Name); }
     }
 
     public async Task DeleteAsync(TorrentPayloadRejection rejection, CancellationToken token)
@@ -78,9 +80,9 @@ public sealed class TorrentPayloadRejectionEffects : ITorrentPayloadRejectionEff
         }
         // Await the existing deletion implementation; ordinary manual removal remains deferred as before.
         var error = await TorrentRemovalCleanupService.TryDeleteDataWithRetryAsync(rejection.DownloadRootPath, candidates);
-        if (error is not null) { throw new IOException("Executable payload deletion remains unconfirmed.", error); }
+        if (error is not null) { throw new IOException("Rejected payload deletion remains unconfirmed.", error); }
         if (candidates.Any(path => File.Exists(path) || Directory.Exists(path)))
-        { throw new IOException("Recorded executable payload paths remain after deletion."); }
+        { throw new IOException("Recorded rejected payload paths remain after deletion."); }
     }
 
     internal static string[] ValidatePaths(string rootPath, IEnumerable<string> paths)

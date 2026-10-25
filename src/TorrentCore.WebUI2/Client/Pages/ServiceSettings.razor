@@ -51,6 +51,11 @@
                     <label><span>Ratio <SettingsHelpIcon Key="SeedingStopRatio" /></span><input type="number" step="any" min="0.01" @bind="draft.SeedingStopRatio" disabled="@(draft.SeedingStopMode is not ("StopAfterRatio" or "StopAfterRatioOrTime"))" /></label>
                     <label><span>Minutes <SettingsHelpIcon Key="SeedingStopMinutes" /></span><input type="number" min="1" @bind="draft.SeedingStopMinutes" disabled="@(draft.SeedingStopMode is not ("StopAfterTime" or "StopAfterRatioOrTime"))" /></label>
                 </section>
+                <section><h2>Media Payload Validation</h2>
+                    <label><span>Required video extensions <SettingsHelpIcon Key="RequiredVideoExtensions" /></span><input type="text" @bind="draft.RequiredVideoExtensions" /></label>
+                    <label><span>Prohibited payload extensions <SettingsHelpIcon Key="ProhibitedPayloadExtensions" /></span><input type="text" @bind="draft.ProhibitedPayloadExtensions" /></label>
+                    <p>Comma-separated final extensions. TV/Movie torrents require video and reject any prohibited file, including mixed payloads. List changes apply only after Service restart, to existing and new torrents. Other categories are unaffected.</p>
+                </section>
                 <section><h2>Completed Torrent Cleanup</h2>
                     <label><span>Mode <SettingsHelpIcon Key="CompletedTorrentCleanupMode" /></span><select @bind="draft.CompletedTorrentCleanupMode"><option value="Never">Never</option><option value="AfterCompletedMinutes">After completion delay</option></select></label>
                     <label><span>Minutes <SettingsHelpIcon Key="CompletedTorrentCleanupMinutes" /></span><input type="number" min="0" @bind="draft.CompletedTorrentCleanupMinutes" disabled="@(draft.CompletedTorrentCleanupMode != "AfterCompletedMinutes")" /></label>
@@ -91,7 +96,7 @@
                     <label><span>Burst limit <SettingsHelpIcon Key="EngineConnectionFailureLogBurstLimit" /></span><input type="number" min="1" @bind="draft.EngineConnectionFailureLogBurstLimit" /></label>
                     <label><span>Window seconds <SettingsHelpIcon Key="EngineConnectionFailureLogWindowSeconds" /></span><input type="number" min="1" @bind="draft.EngineConnectionFailureLogWindowSeconds" /></label>
                 </section>
-                @if (snapshot?.EngineSettingsRequireRestart == true) { <p>Current engine settings require a service restart.</p> }
+                @if (snapshot?.EngineSettingsRequireRestart == true) { <p>Saved engine or payload settings require a service restart.</p> }
                 <p>Applied peer exchange: @(snapshot?.AppliedEngineAllowPeerExchange == true ? "Enabled" : "Disabled")</p>
             }
             else if (selectedGroup == Group.VpnEgress)
@@ -121,7 +126,7 @@
                 <section><h2>Performance Logging</h2>
                     <label class="check"><input type="checkbox" @bind="draft.RuntimeTickDurationSummaryEnabled" /> Performance Timing Summaries <SettingsHelpIcon Key="RuntimeTickDurationSummaryEnabled" /></label>
                 </section>
-                <p>This controls only the one-minute synchronization timing summary written to the Service log.</p>
+                <p>This controls synchronization timing summaries and optional payload-rejection Debug records. Errors and slow-operation warnings remain enabled.</p>
             }
             else if (selectedGroup == Group.CompletionCallback)
             {

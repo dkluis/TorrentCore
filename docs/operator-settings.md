@@ -1,5 +1,26 @@
 # Operator Settings
 
+## Media Payload Validation
+
+TorrentCore owns `RequiredVideoExtensions` (initially `.mkv,.mp4`) and `ProhibitedPayloadExtensions`
+(initially `.exe,.iso,.7z,.zip`). Edit their comma-separated values under Seeding & Cleanup in Native macOS,
+WebUI and WebUI2. The Service normalizes case and leading dots, rejects empty/invalid/overlapping lists, and
+persists values in the existing `runtime_settings` table. TVMaze does not supply these lists.
+
+The Service loads these lists at startup. Saved list edits remain pending until Service restart and use the existing
+restart-required indicator. After restart, the loaded rules apply to existing and new TV/Movie torrents once metadata is resolved.
+Other categories are unaffected. At least one configured video is required; `.srt` alone is insufficient with
+the default video list. Any prohibited final extension rejects the entire torrent, even with video present.
+Archive-only torrents with unlisted extensions still fail when they contain no configured video. No archive
+extraction, media-content inspection, repeated filesystem scan, or per-torrent policy snapshot is added.
+
+Rejection stops/removes the torrent and confirms data deletion before downstream notification. An intentionally
+disabled completion callback leaves a finished local rejection (`NotificationNotRequired`); an enabled callback
+with missing configuration or an unconfirmed reply remains pending. The same hash stays blocked while its
+rejection history remains retained; ordinary cleanup releases the block. Existing `.exe` history remains valid.
+Settings storage/validation failures block the processing pass and log a controlled failure, never authorize deletion.
+
+
 ## VPN Egress Validation
 
 TorrentCore can gate MonoTorrent processing on a scheduled public-IPv4 check while keeping the Service API available.
@@ -137,10 +158,12 @@ effective values returned by the Service.
 
 ## Performance Timing Summaries
 
-`RuntimeTickDurationSummaryEnabled` controls only `runtime.tick.duration_summary` DB log writes.
+`RuntimeTickDurationSummaryEnabled` controls `runtime.tick.duration_summary` DB log writes and optional
+executable-rejection history Debug records (including admission hash checks).
 
 - defaults to `false`
 - applies live through the runtime-settings API and both operator Diagnostics settings groups
+- when off, rejection-history Debug records are not written; existing entries remain subject to normal cleanup
 - leaves the synchronization timer, torrent processing, slow-operation diagnostics, and failure diagnostics unchanged
 - when enabled, writes the existing one-minute summary only while torrent processing is available
 - turning it on starts a fresh one-minute sample window

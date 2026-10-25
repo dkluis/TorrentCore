@@ -88,7 +88,7 @@ Current core tables:
 - migration 23 adds nullable `executable_rejection_json` to existing history rows. It records the offending manifest
   paths, cleanup paths, stable event identity, phase and next attempt for executable rejection. Normal history writes
   preserve it; normal date cleanup deletes it with its row. There is no separate rejection table or permanent blacklist.
-- retained rows with removal reason `executable_payload_rejected` block resubmission of that exact hash. Ordinary
+- retained rows with removal reason `executable_payload_rejected` or `media_payload_rejected` block resubmission of that exact hash. Ordinary
   removal/failure history does not block submission. Retry bookkeeping does not refresh the history retention date.
 - `download_no_progress_started_at_utc` is present only for an active or recovery-suspended download attempt. Durable
   completed-piece growth restarts it; automatic yield and ordinary queue intent clear it.
@@ -125,3 +125,8 @@ This matters most for:
 - history row shape
 - protected log and history cleanup
 - runtime-setting storage semantics
+
+Media validation settings use additive rows in `runtime_settings`, not torrent policy copies. Existing
+`executable_rejection_json` also carries `RejectionReason` and `ObservedFiles`; older records default to `Executable`.
+`NotificationNotRequired` is terminal confirmed deletion when downstream callbacks are intentionally disabled.
+No SQLite migration follows 23 for this extension. Ordinary history cleanup and its retention dates are unchanged.

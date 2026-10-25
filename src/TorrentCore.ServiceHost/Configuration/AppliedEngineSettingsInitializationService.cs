@@ -6,6 +6,7 @@ public sealed class AppliedEngineSettingsInitializationService(IRuntimeSettingsS
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var settings = await runtimeSettingsService.GetEffectiveSettingsAsync(cancellationToken);
+        appliedEngineSettingsState.SetStartupPayloadPolicy(settings.RequiredVideoExtensions, settings.ProhibitedPayloadExtensions);
         appliedEngineSettingsState.Set(
             settings.EngineAllowPeerExchange,
             settings.EngineEncryptionMode, settings.EngineMaximumConnections,

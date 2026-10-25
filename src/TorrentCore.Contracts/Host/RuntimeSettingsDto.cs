@@ -2,6 +2,8 @@ namespace TorrentCore.Contracts.Host;
 
 public sealed class RuntimeSettingsDto
 {
+    public string[] RequiredVideoExtensions { get; init; } = [".mkv", ".mp4"];
+    public string[] ProhibitedPayloadExtensions { get; init; } = [".exe", ".iso", ".7z", ".zip"];
     public string VpnRecoveryProvider { get; init; } = "ExpressVPN";
     public required string          EngineRuntime                                  { get; init; }
     public required bool            SupportsLiveUpdates                            { get; init; }

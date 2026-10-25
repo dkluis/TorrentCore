@@ -2,6 +2,8 @@ namespace TorrentCore.Service.Configuration;
 
 public sealed class RuntimeSettingsSnapshot
 {
+    public string[] RequiredVideoExtensions { get; init; } = [".mkv", ".mp4"];
+    public string[] ProhibitedPayloadExtensions { get; init; } = [".exe", ".iso", ".7z", ".zip"];
     public required bool                        UsesPersistedOverrides                       { get; init; }
     public required bool                        PartialFilesEnabled                          { get; init; }
     public required string                      PartialFileSuffix                            { get; init; }

@@ -6,6 +6,8 @@ namespace TorrentCore.WebUI2.Client.Services;
 // one visible group preserves values from the other groups.
 public sealed class RuntimeSettingsDraft
 {
+    public string RequiredVideoExtensions { get; set; } = "";
+    public string ProhibitedPayloadExtensions { get; set; } = "";
     public string VpnRecoveryProvider { get; set; } = "ExpressVPN";
     public string SeedingStopMode { get; set; } = "Unlimited";
     public double SeedingStopRatio { get; set; }
@@ -98,6 +100,8 @@ public sealed class RuntimeSettingsDraft
         ExpressVpnAutomaticRecoveryMode = x.ExpressVpnAutomaticRecoveryMode,
         ExpressVpnRecoveryDelaySeconds = x.ExpressVpnRecoveryDelaySeconds,
         ExpressVpnUnavailableLaunchDelaySeconds = x.ExpressVpnUnavailableLaunchDelaySeconds,
+        RequiredVideoExtensions = string.Join(",", x.RequiredVideoExtensions),
+        ProhibitedPayloadExtensions = string.Join(",", x.ProhibitedPayloadExtensions),
         RuntimeTickDurationSummaryEnabled = x.RuntimeTickDurationSummaryEnabled,
     };
 
@@ -147,6 +151,8 @@ public sealed class RuntimeSettingsDraft
         ExpressVpnAutomaticRecoveryMode = ExpressVpnAutomaticRecoveryMode,
         ExpressVpnRecoveryDelaySeconds = ExpressVpnRecoveryDelaySeconds,
         ExpressVpnUnavailableLaunchDelaySeconds = ExpressVpnUnavailableLaunchDelaySeconds,
+        RequiredVideoExtensions = RequiredVideoExtensions.Split(',', StringSplitOptions.TrimEntries),
+        ProhibitedPayloadExtensions = ProhibitedPayloadExtensions.Split(',', StringSplitOptions.TrimEntries),
         RuntimeTickDurationSummaryEnabled = RuntimeTickDurationSummaryEnabled,
     };
 }

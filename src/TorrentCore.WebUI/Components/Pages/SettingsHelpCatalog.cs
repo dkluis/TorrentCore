@@ -214,10 +214,16 @@ public static class SettingsHelpCatalog
         "The default is 300 seconds. TorrentCore makes at most two launch requests per degradation episode and keeps MonoTorrent suspended until public egress validates."
     );
 
+    public static readonly SettingHelpContent RequiredVideoExtensions = new(
+        "Required Video Extensions", "A TV/Movie payload must contain at least one configured video file.",
+        "Comma-separated final extensions, initially .mkv and .mp4. Saved list changes apply only after Service restart, to existing and new torrents. Other categories are unaffected.");
+    public static readonly SettingHelpContent ProhibitedPayloadExtensions = new(
+        "Prohibited Payload Extensions", "Any matching file rejects the whole TV/Movie payload, even with video present.",
+        "Initially .exe, .iso, .7z and .zip. List changes require Service restart. Confirmed rejected payloads are removed and deleted before downstream notification. These are TorrentCore-owned settings.");
     public static readonly SettingHelpContent RuntimeTickDurationSummaryEnabled = new(
         "Performance Timing Summaries",
-        "Controls one-minute synchronization timing summaries in the Service log.",
-        "This changes only runtime.tick.duration_summary writes. Synchronization, slow-operation logging, failure logging, and torrent work remain unchanged. Summaries are suppressed while torrent processing is paused for the VPN connection."
+        "Controls one-minute synchronization timing summaries and payload-rejection Debug logging.",
+        "Disabled by default. Turning this off stops timing summaries and rejection-history Debug records; existing entries remain retained. Slow-operation warnings, failure logging, synchronization, and torrent work remain unchanged. Timing summaries are suppressed while torrent processing is paused for the VPN connection."
     );
 
     public static readonly SettingHelpContent CleanupLogEntries = new(

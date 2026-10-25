@@ -15,6 +15,8 @@ public sealed class SettingsTests
         var request = draft.ToRequest();
 
         Assert.Equal(5, request.MaxActiveDownloads);
+        Assert.Equal(current.RequiredVideoExtensions, request.RequiredVideoExtensions);
+        Assert.Equal(current.ProhibitedPayloadExtensions, request.ProhibitedPayloadExtensions);
         Assert.Equal("PIA", request.VpnRecoveryProvider);
         Assert.Equal("EncryptedPreferred", request.EngineEncryptionMode);
         Assert.Equal(150, request.EngineMaximumConnections);
@@ -49,6 +51,8 @@ public sealed class SettingsTests
 
     private static RuntimeSettingsDto CurrentSettings() => new()
     {
+        RequiredVideoExtensions = [".mkv", ".mp4", ".avi"],
+        ProhibitedPayloadExtensions = [".exe", ".iso", ".7z", ".zip", ".rar"],
         VpnRecoveryProvider = "PIA",
         EngineRuntime = "MonoTorrent",
         SupportsLiveUpdates = true,

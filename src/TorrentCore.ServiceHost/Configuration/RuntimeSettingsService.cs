@@ -1,6 +1,7 @@
 #region
 
 using System.Globalization;
+using TorrentCore.Core.Torrents;
 using System.Text.Json;
 using Microsoft.Extensions.Options;
 using TorrentCore.Contracts.Host;
@@ -28,6 +29,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             var snapshot = BuildSnapshot(serviceOptions.Value, persistedSettings);
             runtimeTickDurationSummaryState.Set(snapshot.RuntimeTickDurationSummaryEnabled);
             return snapshot;
+        }
+        catch (Exception exception) when (exception is ArgumentException or JsonException)
+        {
+            try { await activityLogService.WriteAsync(new() { Level = ActivityLogLevel.Error,
+                Category = "settings", EventType = "service.payload_policy.invalid",
+                Message = "Payload validation settings are invalid; processing was not authorized. " + exception.Message,
+                ServiceInstanceId = serviceInstanceContext.ServiceInstanceId }, CancellationToken.None); } catch (Exception) { }
+            throw new ServiceOperationException("invalid_payload_policy", "Payload validation settings require correction; no payload was rejected on this failure.", 503);
         }
         catch (Exception exception) when (ServiceBoundaryExceptionMapper.IsStorageException(exception))
         {
@@ -262,6 +271,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                 currentSettings.ExpressVpnRecoveryDelaySeconds;
         var expressVpnUnavailableLaunchDelaySeconds = request.ExpressVpnUnavailableLaunchDelaySeconds ??
                 currentSettings.ExpressVpnUnavailableLaunchDelaySeconds;
+        MediaPayloadPolicy payloadPolicy;
+        try
+        {
+            payloadPolicy = new MediaPayloadPolicy(request.RequiredVideoExtensions ?? currentSettings.RequiredVideoExtensions,
+                request.ProhibitedPayloadExtensions ?? currentSettings.ProhibitedPayloadExtensions).Validated();
+        }
+        catch (ArgumentException ex)
+        { throw new ServiceOperationException("invalid_runtime_settings", ex.Message, 400, nameof(request.RequiredVideoExtensions)); }
         var runtimeTickDurationSummaryEnabled = request.RuntimeTickDurationSummaryEnabled ??
                 currentSettings.RuntimeTickDurationSummaryEnabled;
 
@@ -498,6 +515,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
                             expressVpnRecoveryDelaySeconds.ToString(CultureInfo.InvariantCulture),
                     [RuntimeSettingsKeys.ExpressVpnUnavailableLaunchDelaySeconds] =
                             expressVpnUnavailableLaunchDelaySeconds.ToString(CultureInfo.InvariantCulture),
+                    [RuntimeSettingsKeys.RequiredVideoExtensions] = JsonSerializer.Serialize(payloadPolicy.RequiredVideoExtensions),
+                    [RuntimeSettingsKeys.ProhibitedPayloadExtensions] = JsonSerializer.Serialize(payloadPolicy.ProhibitedPayloadExtensions),
                     [RuntimeSettingsKeys.RuntimeTickDurationSummaryEnabled] =
                             runtimeTickDurationSummaryEnabled.ToString(),
                 }, cancellationToken
@@ -1010,8 +1029,14 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             vpnEgressRequestTimeoutSeconds = baseOptions.VpnEgressRequestTimeoutSeconds;
         }
 
+        // Missing keys use the declared Service defaults; malformed persisted values never silently fall back.
+        var payloadPolicy = new MediaPayloadPolicy(
+            ReadPayloadExtensions(values, RuntimeSettingsKeys.RequiredVideoExtensions, baseOptions.RequiredVideoExtensions),
+            ReadPayloadExtensions(values, RuntimeSettingsKeys.ProhibitedPayloadExtensions, baseOptions.ProhibitedPayloadExtensions)).Validated();
         return new RuntimeSettingsSnapshot
         {
+            RequiredVideoExtensions = payloadPolicy.RequiredVideoExtensions,
+            ProhibitedPayloadExtensions = payloadPolicy.ProhibitedPayloadExtensions,
             UsesPersistedOverrides                       = persistedSettings.Values.Count > 0,
             PartialFilesEnabled                          = false,
             PartialFileSuffix                            = string.Empty,
@@ -1061,6 +1086,9 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             ExpressVpnUnavailableLaunchDelaySeconds        = expressVpnUnavailableLaunchDelaySeconds,
             RuntimeTickDurationSummaryEnabled            = runtimeTickDurationSummaryEnabled,
             EngineSettingsRequireRestart =
+                    (appliedEngineSettingsState.MediaPayloadPolicy is { } appliedPolicy &&
+                     (!payloadPolicy.RequiredVideoExtensions.SequenceEqual(appliedPolicy.RequiredVideoExtensions) ||
+                      !payloadPolicy.ProhibitedPayloadExtensions.SequenceEqual(appliedPolicy.ProhibitedPayloadExtensions))) ||
                     engineAllowPeerExchange          != appliedEngineSettingsState.EngineAllowPeerExchange          ||
                     engineEncryptionMode             != appliedEngineSettingsState.EngineEncryptionMode             ||
                     engineMaximumConnections         != appliedEngineSettingsState.EngineMaximumConnections         ||
@@ -1077,6 +1105,8 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
     {
         return new RuntimeSettingsDto
         {
+            RequiredVideoExtensions = settings.RequiredVideoExtensions,
+            ProhibitedPayloadExtensions = settings.ProhibitedPayloadExtensions,
             EngineRuntime                                = baseOptions.EngineMode.ToString(),
             SupportsLiveUpdates                          = true,
             UsesPersistedOverrides                       = settings.UsesPersistedOverrides,
@@ -1139,6 +1169,12 @@ public sealed class RuntimeSettingsService(IOptions<TorrentCoreServiceOptions> s
             UpdatedAtUtc                 = settings.UpdatedAtUtc,
             RetrievedAtUtc               = DateTimeOffset.UtcNow,
         };
+    }
+
+    private static string[] ReadPayloadExtensions(IReadOnlyDictionary<string, string> values, string key, string[] defaults)
+    {
+        if (!values.TryGetValue(key, out var json)) { return defaults; }
+        return JsonSerializer.Deserialize<string[]>(json) ?? throw new ArgumentException("Invalid payload extension setting: " + key);
     }
 
     private static string? NormalizePersistedText(string? value)

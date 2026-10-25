@@ -1,7 +1,17 @@
+using TorrentCore.Core.Torrents;
+
 namespace TorrentCore.Service.Configuration;
 
 public sealed class AppliedEngineSettingsState
 {
+    public MediaPayloadPolicy? MediaPayloadPolicy { get; private set; }
+
+    // Captured by the startup settings service before torrent processing begins.
+    public void SetStartupPayloadPolicy(string[] requiredVideoExtensions, string[] prohibitedPayloadExtensions)
+    {
+        MediaPayloadPolicy = new MediaPayloadPolicy(requiredVideoExtensions, prohibitedPayloadExtensions).Validated();
+    }
+
     public bool EngineAllowPeerExchange { get; private set; }
     public TorrentEncryptionMode EngineEncryptionMode            { get; private set; }
     public int EngineMaximumConnections                { get; private set; }

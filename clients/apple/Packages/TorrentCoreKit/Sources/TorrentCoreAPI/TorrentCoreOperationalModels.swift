@@ -332,6 +332,8 @@ public struct TorrentCoreRuntimeSettings: Codable, Hashable, Sendable {
     public var vpnEgressEngineSuspensionTimeoutSeconds: Int
     public var vpnEgressValidationEnabled: Bool
     public var vpnEgressValidationEndpoint: String
+    public var requiredVideoExtensions: [String] = []
+    public var prohibitedPayloadExtensions: [String] = []
     public var runtimeTickDurationSummaryEnabled: Bool
 }
 
@@ -380,6 +382,8 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
     public var vpnEgressEngineSuspensionTimeoutSeconds: Int
     public var vpnEgressValidationEnabled: Bool
     public var vpnEgressValidationEndpoint: String
+    public var requiredVideoExtensions: [String] = []
+    public var prohibitedPayloadExtensions: [String] = []
     public var runtimeTickDurationSummaryEnabled: Bool
 
     public var expressVPNSelected: Bool {
@@ -437,6 +441,8 @@ public struct TorrentCoreRuntimeSettingsUpdate: Codable, Hashable, Sendable {
         vpnEgressEngineSuspensionTimeoutSeconds = settings.vpnEgressEngineSuspensionTimeoutSeconds
         vpnEgressValidationEnabled = settings.vpnEgressValidationEnabled
         vpnEgressValidationEndpoint = settings.vpnEgressValidationEndpoint
+        requiredVideoExtensions = settings.requiredVideoExtensions
+        prohibitedPayloadExtensions = settings.prohibitedPayloadExtensions
         runtimeTickDurationSummaryEnabled = settings.runtimeTickDurationSummaryEnabled
     }
 }

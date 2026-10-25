@@ -2142,7 +2142,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
                 continue;
             }
 
-            if (await RejectExecutablePayloadAsync(snapshot, entry.Value, cancellationToken)) { continue; }
+            if (await RejectInvalidMediaPayloadAsync(snapshot, entry.Value, cancellationToken)) { continue; }
             var observedFiles = GetObservedFilePaths(entry.Value);
             if (snapshot.State == ContractTorrentState.Completed && IsManagerStoppedForCompletion(entry.Value) &&
                 snapshot.CompletionCallbackState == TorrentCompletionCallbackState.PendingFinalization)
@@ -4520,13 +4520,16 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         return finalizationChecker.Check(snapshot, runtimeSettings, observedFiles);
     }
 
-    private async Task<bool> RejectExecutablePayloadAsync(TorrentSnapshot snapshot, TorrentManager manager, CancellationToken token)
+    private async Task<bool> RejectInvalidMediaPayloadAsync(TorrentSnapshot snapshot, TorrentManager manager, CancellationToken token)
     {
         if (payloadRejections is null || !manager.HasMetadata || !TorrentPayloadRejectionCoordinator.IsMediaCategory(snapshot.CategoryKey)) { return false; }
         var metadataFiles = manager.Files.Select(file => file.Path).ToArray();
-        if (TorrentPayloadRejectionCoordinator.Executables(metadataFiles).Length == 0) { return false; }
-        const string heldMessage = "Executable payload blocked pending rejection cleanup.";
-        var held = await payloadRejections.InspectAsync(snapshot, metadataFiles,
+        var policy = appliedEngineSettingsState.MediaPayloadPolicy
+            ?? throw new InvalidOperationException("Startup payload validation settings have not been initialized.");
+        var inspection = policy.Inspect(metadataFiles);
+        if (!inspection.Rejected) { return false; }
+        const string heldMessage = "Invalid media payload blocked pending rejection cleanup.";
+        var held = await payloadRejections.InspectAsync(snapshot, inspection,
             GetCleanupCandidatePaths(manager).Append(snapshot.SavePath).Distinct(StringComparer.Ordinal).ToArray(),
             async () =>
             {

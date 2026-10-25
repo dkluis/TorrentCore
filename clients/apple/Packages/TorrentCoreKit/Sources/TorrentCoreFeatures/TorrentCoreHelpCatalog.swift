@@ -229,10 +229,20 @@ public enum TorrentCoreHelpCatalog {
             "Sets how long TorrentCore waits before asking macOS to launch ExpressVPN.",
             "The default is 300 seconds. TorrentCore makes at most two launch requests per degradation episode."
         )
+        public static let requiredVideoExtensions = help(
+            "Required Video Extensions",
+            "At least one file in a TV/Movie payload must have one of these final extensions.",
+            "Comma-separated extensions; defaults are .mkv and .mp4. Subtitles alone do not satisfy that list. Saved list changes apply only after Service restart, to existing and new torrents; nothing is passed from TVMaze. Other categories are unaffected."
+        )
+        public static let prohibitedPayloadExtensions = help(
+            "Prohibited Payload Extensions",
+            "Any matching file rejects the entire TV/Movie payload, even if it also contains video.",
+            "Defaults are .exe, .iso, .7z and .zip. List edits apply only after Service restart. Rejected torrents are stopped, removed and their data deleted. Rejection history blocks the same hash until ordinary history cleanup. A configured downstream callback receives the rejection after confirmed deletion."
+        )
         public static let runtimeTickDurationSummaryEnabled = help(
             "Performance Timing Summaries",
-            "Controls one-minute synchronization timing summaries in the Service log.",
-            "This setting is disabled by default. It changes only runtime.tick.duration_summary writes; synchronization, slow-operation logging, failure logging, and all torrent work remain unchanged. Summaries are suppressed while torrent processing is paused for the VPN connection."
+            "Controls one-minute synchronization timing summaries and payload-rejection Debug logging.",
+            "Disabled by default. Turning this off stops timing summaries and rejection-history Debug records; existing entries remain retained. Slow-operation warnings, failure logging, synchronization, and torrent work remain unchanged. Timing summaries are suppressed while torrent processing is paused for the VPN connection."
         )
         public static let categoryEnabled = help(
             "Enabled",
@@ -302,7 +312,7 @@ public enum TorrentCoreHelpCatalog {
             vpnEgressReadyCheckIntervalSeconds, vpnEgressRequestTimeoutSeconds,
             vpnEgressEngineSuspensionTimeoutSeconds, expressVPNAutomaticRecoveryMode,
             expressVPNRecoveryDelaySeconds, expressVPNUnavailableLaunchDelaySeconds,
-            runtimeTickDurationSummaryEnabled,
+            requiredVideoExtensions, prohibitedPayloadExtensions, runtimeTickDurationSummaryEnabled,
             categoryEnabled, categoryInvokeCompletionCallback, categoryDisplayName,
             categoryCallbackLabel, categoryDownloadRootPath, categorySortOrder,
             cleanupLogEntries, cleanupHistoryRecords, cleanupOrphanedTorrentLogs,

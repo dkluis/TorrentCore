@@ -6,6 +6,7 @@ using TorrentCore.Persistence.Sqlite.Torrents;
 using TorrentCore.Core.Torrents;
 using TorrentCore.Contracts.Torrents;
 using TorrentCore.Core.Diagnostics;
+using TorrentCore.Service.Configuration;
 
 namespace TorrentCore.Service.Tests;
 
@@ -21,7 +22,7 @@ public sealed class SqliteTorrentPayloadRejectionTests
         {
             await new SqliteSchemaMigrator(path).ApplyMigrationsAsync(default);
             var logs = new CapturedLogs();
-            var store = new SqliteTorrentPayloadRejectionStore(path, logs);
+            var store = new SqliteTorrentPayloadRejectionStore(path, logs, () => true);
             for (var tick = 0; tick < 100; tick++)
             {
                 Assert.Empty(await store.ListPendingAsync(default));
@@ -50,7 +51,44 @@ public sealed class SqliteTorrentPayloadRejectionTests
     }
 
     [Fact]
-    public async Task HistoryOwnsRejectionStateAndNormalCleanupRemovesAdmissionBlock()
+    public async Task ExistingDiagnosticsSwitchGatesDebugLiveWithoutSuppressingErrors()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "torrentcore-rejection-debug-switch-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(directory, "disposable.db");
+        try
+        {
+            await new SqliteSchemaMigrator(path).ApplyMigrationsAsync(default);
+            var logs = new CapturedLogs();
+            var state = new RuntimeTickDurationSummaryState();
+            var store = new SqliteTorrentPayloadRejectionStore(path, logs, () => state.Enabled);
+            const string hash = "ABCDEF0123456789ABCDEF0123456789ABCDEF01";
+
+            Assert.False(await store.IsRejectedAsync(hash, default));
+            Assert.Empty(logs.Requests);
+            state.Set(true);
+            Assert.False(await store.IsRejectedAsync(hash, default));
+            Assert.Equal(2, logs.Requests.Count);
+            Assert.All(logs.Requests, entry => Assert.Equal(ActivityLogLevel.Debug, entry.Level));
+            state.Set(false);
+            Assert.False(await store.IsRejectedAsync(hash, default));
+            Assert.Equal(2, logs.Requests.Count); // No new detail rows after the live switch is turned off.
+            logs.Requests.Clear();
+
+            var row = new TorrentPayloadRejection(Guid.NewGuid(), hash, "/downloads", ["/downloads/payload"], ["setup.exe"]);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(row, default));
+            var failure = Assert.Single(logs.Requests);
+            Assert.Equal(ActivityLogLevel.Error, failure.Level);
+            Assert.Equal("history.payload_rejection.save", failure.EventType);
+        }
+        finally { SqliteConnection.ClearAllPools(); if (Directory.Exists(directory)) { Directory.Delete(directory, true); } }
+    }
+
+    [Theory]
+    [InlineData("Executable", "Notified")]
+    [InlineData("ProhibitedExtension", "Notified")]
+    [InlineData("MissingVideo", "Notified")]
+    [InlineData("MissingVideo", "NotificationNotRequired")]
+    public async Task HistoryOwnsRejectionStateAndNormalCleanupRemovesAdmissionBlock(string reason, string terminalPhase)
     {
         var directory = Path.Combine(Path.GetTempPath(), "torrentcore-executable-unit-" + Guid.NewGuid().ToString("N"));
         var path = Path.Combine(directory, "disposable.db");
@@ -70,7 +108,7 @@ public sealed class SqliteTorrentPayloadRejectionTests
                 InvokeCompletionCallback = false, DataDeleted = false, RemovedByCleanupPolicy = false,
             }, default);
             var store = new SqliteTorrentPayloadRejectionStore(path);
-            var row = new TorrentPayloadRejection(id, hash, "/downloads", ["/downloads/payload"], ["setup.exe"], "EligibilityPending");
+            var row = new TorrentPayloadRejection(id, hash, "/downloads", ["/downloads/payload"], reason == "MissingVideo" ? [] : ["setup.exe"], "EligibilityPending") { RejectionReason = reason, ObservedFiles = ["payload.srt"] };
             await store.SaveAsync(row, default);
             Assert.False(await store.IsRejectedAsync(hash, default)); // Detection is not a rejection until season exclusion is resolved.
             await store.SaveAsync(row with { Phase = "Removing" }, default);
@@ -85,7 +123,7 @@ public sealed class SqliteTorrentPayloadRejectionTests
             // Ordinary history updates preserve the additive rejection column.
             var ordinary = (await history.GetAsync(id, default))!; await history.UpdateAsync(ordinary, default);
             Assert.Single(await store.ListPendingAsync(default));
-            await store.SaveAsync(row with { Phase = "Notified" }, default);
+            await store.SaveAsync(row with { Phase = terminalPhase }, default);
             Assert.True((await history.GetAsync(id, default))!.DataDeleted);
             Assert.Empty(await store.ListPendingAsync(default));
             Assert.Equal(now, (await history.GetAsync(id, default))!.LastUpdatedAtUtc);

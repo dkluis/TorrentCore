@@ -2,6 +2,8 @@ namespace TorrentCore.Service.Configuration;
 
 public static class RuntimeSettingsKeys
 {
+    public const string RequiredVideoExtensions = "required_video_extensions";
+    public const string ProhibitedPayloadExtensions = "prohibited_payload_extensions";
     public const string SeedingStopMode                         = "seeding_stop_mode";
     public const string SeedingStopRatio                        = "seeding_stop_ratio";
     public const string SeedingStopMinutes                      = "seeding_stop_minutes";

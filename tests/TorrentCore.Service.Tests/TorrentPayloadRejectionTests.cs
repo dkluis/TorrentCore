@@ -27,7 +27,7 @@ public sealed class TorrentPayloadRejectionTests
     {
         var events = new List<string>(); var store = new Store(events); var effects = new Effects(events);
         var service = Service(store, effects);
-        var result = await service.InspectAsync(Snapshot(category), ["episode.mkv", "nested/setup.EXE"], ["/downloads/payload"],
+        var result = await service.InspectAsync(Snapshot(category), InspectManifest(["episode.mkv", "nested/setup.EXE"]), ["/downloads/payload"],
             () => { events.Add("stop"); return Task.CompletedTask; }, () => { events.Add("remove"); return Task.CompletedTask; }, default);
         Assert.Equal(blocked, result);
         if (blocked)
@@ -49,7 +49,7 @@ public sealed class TorrentPayloadRejectionTests
         var row = new TorrentPayloadRejection(snapshot.TorrentId, Hash, "/downloads", ["/downloads/payload"], ["setup.exe"], phase);
         var store = new Store(events) { Saved = row }; var effects = new Effects(events);
         var service = Service(store, effects);
-        Assert.True(await service.InspectAsync(snapshot, ["setup.exe"], ["/downloads/payload"],
+        Assert.True(await service.InspectAsync(snapshot, InspectManifest(["setup.exe"]), ["/downloads/payload"],
             () => Task.CompletedTask, () => { events.Add("remove"); return Task.CompletedTask; }, default));
         Assert.DoesNotContain("report", events);
         await service.ReconcileRemovedAsync(default);
@@ -61,7 +61,7 @@ public sealed class TorrentPayloadRejectionTests
     public async Task FailedIntentSaveNeverRemovesOrReportsAcceptance()
     {
         var events = new List<string>(); var store = new Store(events) { ThrowSave = true };
-        Assert.True(await Service(store, new Effects(events)).InspectAsync(Snapshot(), ["setup.exe"], ["/downloads/payload"],
+        Assert.True(await Service(store, new Effects(events)).InspectAsync(Snapshot(), InspectManifest(["setup.exe"]), ["/downloads/payload"],
             () => Task.CompletedTask, () => { events.Add("remove"); return Task.CompletedTask; }, default));
         Assert.DoesNotContain("remove", events); Assert.DoesNotContain("report", events);
     }
@@ -70,7 +70,7 @@ public sealed class TorrentPayloadRejectionTests
     {
         var events = new List<string>(); var store = new Store(events) { Saved = Row("Removing") };
         var service = Service(store, new Effects(events));
-        Assert.True(await service.InspectAsync(Snapshot(), ["setup.exe"], ["/downloads/payload"], () => Task.CompletedTask,
+        Assert.True(await service.InspectAsync(Snapshot(), InspectManifest(["setup.exe"]), ["/downloads/payload"], () => Task.CompletedTask,
             () => { events.Add("remove"); return Task.CompletedTask; }, default));
         Assert.DoesNotContain("remove", events); Assert.DoesNotContain("delete", events);
     }
@@ -79,7 +79,7 @@ public sealed class TorrentPayloadRejectionTests
     {
         var events = new List<string>(); var store = new Store(events); var snapshot = Snapshot();
         var service = Service(store, new Effects(events));
-        Assert.True(await service.InspectAsync(snapshot, ["setup.exe"], ["/downloads/payload"], () => Task.CompletedTask,
+        Assert.True(await service.InspectAsync(snapshot, InspectManifest(["setup.exe"]), ["/downloads/payload"], () => Task.CompletedTask,
             () => throw new IOException("Removal failed"), default));
         Assert.Equal("Removing", store.Saved!.Phase);
         Assert.DoesNotContain("delete", events); Assert.DoesNotContain("report", events);
@@ -147,7 +147,7 @@ public sealed class TorrentPayloadRejectionTests
     [Fact]
     public void DetectionUsesFinalMetadataExtensionAndCleanupCannotLeaveTheRecordedRoot()
     {
-        Assert.Equal(new[] { "nested/setup.ExE" }, TorrentPayloadRejectionCoordinator.Executables(["episode.exe.mkv", "nested/setup.ExE", "subs.srt"]));
+        Assert.Equal(new[] { "nested/setup.ExE" }, InspectManifest(["episode.exe.mkv", "nested/setup.ExE", "subs.srt"]).OffendingFiles);
         Assert.Equal(new[] { "/downloads/payload" }, TorrentPayloadRejectionEffects.ValidatePaths("/downloads", ["/downloads", "/downloads/payload"]));
         Assert.Throws<InvalidOperationException>(() => TorrentPayloadRejectionEffects.ValidatePaths("/downloads", ["/downloads/../other"]));
         Assert.Throws<InvalidOperationException>(() => TorrentPayloadRejectionEffects.ValidatePaths("/downloads", ["/downloads"]));
@@ -156,6 +156,27 @@ public sealed class TorrentPayloadRejectionTests
     private static TorrentPayloadRejectionCoordinator Service(Store store, Effects effects) =>
         new(store, (_, _) => Task.FromResult(false), (_, _) => { effects.Events.Add("mark_removed"); return Task.CompletedTask; }, effects,
             (_, _, _, _) => Task.CompletedTask);
+    [Theory]
+    [InlineData("archive.7z", "ProhibitedExtension")]
+    [InlineData("only.srt", "MissingVideo")]
+    public async Task ExpandedRejectionsPersistReasonBeforeRemovalAndResumeCleanup(string file, string expected)
+    {
+        var events = new List<string>(); var store = new Store(events); var effects = new Effects(events);
+        var policy = new MediaPayloadPolicy([".mkv"], [".exe", ".7z"]).Validated();
+        var inspected = policy.Inspect([file]);
+        var service = Service(store, effects);
+        Assert.True(await service.InspectAsync(Snapshot(), inspected, ["/downloads/payload"],
+            () => Task.CompletedTask, () => { events.Add("remove"); return Task.CompletedTask; }, default));
+        Assert.Equal(expected, store.Saved!.RejectionReason);
+        Assert.True(events.IndexOf("save:Removing") < events.IndexOf("remove"));
+        await Service(store, effects).ReconcileRemovedAsync(default);
+        Assert.Equal("Notified", store.Saved.Phase);
+        Assert.True(events.IndexOf("delete") < events.IndexOf("report"));
+    }
+
+    private static MediaPayloadInspection InspectManifest(string[] files) =>
+        new MediaPayloadPolicy([".mkv", ".mp4"], [".exe"]).Validated().Inspect(files);
+
     private sealed class Store(List<string> events) : ITorrentPayloadRejectionStore
     {
         public TorrentPayloadRejection? Saved; public bool ThrowSave; public bool ThrowRead; public bool Rejected;

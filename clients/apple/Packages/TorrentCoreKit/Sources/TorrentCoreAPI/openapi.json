@@ -1108,6 +1108,20 @@
             "format": "int32",
             "type": "integer"
           },
+          "prohibitedPayloadExtensions": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "requiredVideoExtensions": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
           "retrievedAtUtc": {
             "format": "date-time",
             "type": "string"
@@ -2421,6 +2435,20 @@
             "format": "int32",
             "nullable": true,
             "type": "integer"
+          },
+          "prohibitedPayloadExtensions": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "requiredVideoExtensions": {
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
           },
           "runtimeTickDurationSummaryEnabled": {
             "nullable": true,

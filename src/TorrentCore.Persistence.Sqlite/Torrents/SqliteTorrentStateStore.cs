@@ -202,9 +202,10 @@ public sealed class SqliteTorrentStateStore(string databaseFilePath) : ITorrentS
             // Recheck under the existing insert transaction: removal can race an earlier admission read.
             using var rejectionCheck = connection.CreateCommand();
             rejectionCheck.Transaction = transaction;
-            rejectionCheck.CommandText = "SELECT EXISTS(SELECT 1 FROM torrent_history WHERE info_hash = $hash COLLATE NOCASE AND removal_reason = $reason);";
+            rejectionCheck.CommandText = "SELECT EXISTS(SELECT 1 FROM torrent_history WHERE info_hash = $hash COLLATE NOCASE AND removal_reason IN ($reason, $mediaReason));";
             rejectionCheck.Parameters.AddWithValue("$hash", (object?)torrent.InfoHash ?? DBNull.Value);
             rejectionCheck.Parameters.AddWithValue("$reason", History.SqliteTorrentPayloadRejectionStore.RemovalReason);
+            rejectionCheck.Parameters.AddWithValue("$mediaReason", History.SqliteTorrentPayloadRejectionStore.MediaRemovalReason);
             if (Convert.ToInt32(await rejectionCheck.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) == 1)
             { throw new TorrentCore.Core.History.TorrentPayloadRejectedException(); }
             var command = CreateInsertCommand(connection, transaction, torrent);

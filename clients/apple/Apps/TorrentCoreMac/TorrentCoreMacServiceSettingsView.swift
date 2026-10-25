@@ -397,6 +397,26 @@ struct TorrentCoreMacServiceSettingsView: View {
                         )
                     }
                 }
+                Section("Media Payload Validation") {
+                    LabeledContent {
+                        TextField("Required video extensions", text: Binding(
+                            get: { draft.wrappedValue.requiredVideoExtensions.joined(separator: ",") },
+                            set: { draft.wrappedValue.requiredVideoExtensions = $0.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } }
+                        )).labelsHidden()
+                    } label: {
+                        TorrentCoreMacHelpLabel("Required video extensions", content: TorrentCoreHelpCatalog.Settings.requiredVideoExtensions)
+                    }
+                    LabeledContent {
+                        TextField("Prohibited payload extensions", text: Binding(
+                            get: { draft.wrappedValue.prohibitedPayloadExtensions.joined(separator: ",") },
+                            set: { draft.wrappedValue.prohibitedPayloadExtensions = $0.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) } }
+                        )).labelsHidden()
+                    } label: {
+                        TorrentCoreMacHelpLabel("Prohibited payload extensions", content: TorrentCoreHelpCatalog.Settings.prohibitedPayloadExtensions)
+                    }
+                    Text("Comma-separated final extensions. TV/Movie torrents require video and reject any prohibited file, including mixed payloads. List changes apply only after Service restart, to existing and new torrents. Other categories are unaffected.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Section("Completed Torrent Cleanup") {
                     choiceField(
                         selection: draft.completedTorrentCleanupMode,
@@ -543,7 +563,7 @@ struct TorrentCoreMacServiceSettingsView: View {
                 }
                 if session.runtimeSettings.value?.engineSettingsRequireRestart == true {
                     Label(
-                        "The current engine settings require a service restart.",
+                        "Saved engine or payload settings require a service restart.",
                         systemImage: "arrow.clockwise.circle"
                     )
                     .foregroundStyle(.orange)
@@ -649,7 +669,7 @@ struct TorrentCoreMacServiceSettingsView: View {
                     }
                 }
                 Text(
-                    "This setting controls only the one-minute synchronization timing summary written to the Service log. Torrent processing and all other diagnostics remain unchanged."
+                    "This setting controls synchronization timing summaries and optional payload-rejection Debug records. Errors, slow-operation warnings, and torrent processing remain enabled."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

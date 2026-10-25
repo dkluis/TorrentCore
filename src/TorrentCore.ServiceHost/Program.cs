@@ -131,7 +131,8 @@ builder.Services.AddSingleton<ITorrentCategoryService, TorrentCategoryService>()
 builder.Services.AddSingleton<ITorrentHistoryService, TorrentHistoryService>();
 builder.Services.AddSingleton<ITorrentPayloadRejectionStore>(serviceProvider =>
     new SqliteTorrentPayloadRejectionStore(serviceProvider.GetRequiredService<ResolvedTorrentCoreServicePaths>().DatabaseFilePath,
-        serviceProvider.GetRequiredService<IActivityLogService>()));
+        serviceProvider.GetRequiredService<IActivityLogService>(),
+        () => serviceProvider.GetRequiredService<RuntimeTickDurationSummaryState>().Enabled));
 builder.Services.AddSingleton<ITorrentPayloadRejectionEffects>(services => new TorrentPayloadRejectionEffects(
     services.GetRequiredService<IRuntimeSettingsService>().GetEffectiveSettingsAsync,
     services.GetRequiredService<ITorrentStateStore>().ListAsync,

@@ -133,19 +133,23 @@ State-change DB logs are driven by enabled/phase/reason transitions and include 
 updates from unchanged routine results do not create state-change rows. `/api/health` remains independent of this
 processing state and stays successful while the process and persistence boundary are healthy.
 
-Synchronization timing summaries are an optional DB-log output, not part of engine scheduling. The synchronization
+Synchronization timing summaries are an optional DB-log output, not part of engine scheduling. The same live switch
+also gates executable-rejection history Debug records; rejection failures are always logged. The synchronization
 loop always runs. When `RuntimeTickDurationSummaryEnabled` is off or torrent processing is VPN-degraded, it does not
 accumulate or write `runtime.tick.duration_summary`; re-enabling or returning to ready begins a new one-minute window.
 
-## Executable Payload Rejection
+## Media Payload Rejection
 
-For the existing `TV` and `Movie` category keys, MonoTorrent's resolved manifest is inspected for final `.exe`
-extensions, case-insensitively. Detection blocks queue admission and completion callbacks for that torrent and stops
-its manager. It does not rely on release names or the provider's displayed file list. Music, Audiobook and uncategorized
-work remain outside this feature.
-
+For the existing `TV` and `Movie` category keys, MonoTorrent's resolved manifest is inspected using the Service's
+own `RequiredVideoExtensions` and `ProhibitedPayloadExtensions` runtime settings. Defaults are `.mkv,.mp4` and
+`.exe,.iso,.7z,.zip`. A prohibited file rejects the whole payload even alongside video; no qualifying video rejects
+subtitle/archive-only payloads. Matching uses final extensions case-insensitively. Rules loaded at Service startup apply to existing/new torrents. Saved list edits take effect only after
+Service restart; no per-torrent policy copy or submitter-supplied policy is stored. Unresolved
+metadata remains pending. Music, Audiobook and uncategorized work remain outside this feature. Inspection uses
+in-memory manifest paths and does not extract archives, inspect media bytes or add tracker/network operations.
+Detection blocks queue admission and normal completion callbacks and stops the manager.
 Removal no longer depends on a preliminary TVMaze season check. Per the operator's October 21 decision, all TV/Movie
-executable payloads are rejected, including an unexpected season pack. After removal and awaited file deletion are
+invalid media payloads are rejected, including an unexpected season pack. After removal and awaited file deletion are
 confirmed, TorrentCore launches its configured one-shot completion callback command with `--payload-rejection`.
 The JSON request is delivered through standard input; the updated TVMaze `TransmissionDoneCallback` application uses
 the same DB-backed API configuration and optional overrides as normal completion handling to POST
@@ -154,24 +158,30 @@ are required. No additional URL/key settings are required. An unavailable callba
 notification pending under the same event ID; it does not undo confirmed cleanup. Deploy the updated callback app
 with the Service. Older completion-only apps cannot acknowledge rejection and are given no completion name.
 Deletion and notification run outside engine synchronization. The callback task is polled without holding a runtime
-tick waiting for the process/API reply. Routine rejection-history scans do not emit success rows every tick; actual
-history reads/writes, rejection actions and scan failures retain their logging. Ordinary manual delete-data remains unchanged.
+tick waiting for the process/API reply. Routine rejection-history scans do not emit success rows every tick. History
+read/write Debug details follow the Performance Timing Summaries switch; rejection actions and scan failures retain
+their logging regardless of that switch. Ordinary manual delete-data remains unchanged.
 TVMaze owns operator reporting and saved-alternate/reset recovery for individual episodes/movies; season packs have
 no automatic replacement/reset. Only the recorded individual episode is unmarked remotely and locally when needed.
 
 Progress is stored on the existing history row by migration 23, using the torrent UUID as the notification event ID.
 Restart reconciliation resumes removal/deletion/notification while that history remains retained. A lost final reply
 reuses the event; confirmed data deletion is not repeated just to retry notification. Retained history explicitly marked
-`executable_payload_rejected` blocks that hash at admission, including manual submissions and persistence-only admission
+`executable_payload_rejected` or `media_payload_rejected` blocks that hash at admission, including manual submissions and persistence-only admission
 while VPN processing is disabled. Normal history cleanup removes that block; no permanent blacklist or separate queue
 is added. The existing insert transaction repeats the history check to close admission/removal races. TVMaze keeps
 ownership of candidate selection, companion protection, status reset, Errors, Action Items and
 V2 summaries. Unlinked manual magnets get rejection reporting without guessed media recovery.
 
-The source integration uses APIComplete contract 1.7.0 without a new endpoint, public TorrentCore contract change,
-Native UI change or dependency. Physical deletion, installed configuration, independent service restarts and TVMaze
-recovery require the separately authorized complete CA-Server Test acceptance. A proposed Slice 6 will discuss operator
-UI needs in both products; UI scope has not yet been agreed.
+The one-shot rejection payload carries its reason (`Executable`, `ProhibitedExtension`, `MissingVideo`) and actual
+file evidence, not validation settings. Deploy TVMaze APIComplete 1.8.0/callback/FileOps 1.4 and TVMaze schema 10 before
+the new producer. TVMaze remains responsible for its own local FileOps policy, operator reporting and recovery.
+TorrentCore stores additional evidence in the existing history JSON and uses existing key/value runtime settings;
+no additional SQLite migration/table or retention exception is needed. An intentionally disabled callback completes
+local rejection as `NotificationNotRequired`; an enabled but unavailable/misconfigured callback stays pending.
+TorrentCore API v1 gains additive settings fields and the Native Mac client is 1.0.0 build 17. The broader earlier
+Slice 6 history UI work remains separate. Functional acceptance for the new rejection types remains CA-Server work;
+normal valid-media completion is already accepted.
 
 ## Engine Dependency
 

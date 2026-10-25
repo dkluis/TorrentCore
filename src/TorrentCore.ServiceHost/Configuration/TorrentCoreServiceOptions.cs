@@ -2,6 +2,9 @@ namespace TorrentCore.Service.Configuration;
 
 public sealed class TorrentCoreServiceOptions
 {
+    public string[] RequiredVideoExtensions { get; init; } = [".mkv", ".mp4"];
+    public string[] ProhibitedPayloadExtensions { get; init; } = [".exe", ".iso", ".7z", ".zip"];
+
     public const string SectionName = "TorrentCore";
     public const int MinimumAutomaticMetadataResetStuckThresholdSeconds = 15;
     public const int MaximumAutomaticMetadataResetStuckThresholdSeconds = 300;

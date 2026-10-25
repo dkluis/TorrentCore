@@ -72,13 +72,13 @@ public sealed class TorrentPayloadRejectionCallbackTests
     }
 
     [Fact]
-    public async Task WrongHashAndDisabledCallbackCannotAcknowledgeDeletion()
+    public async Task WrongHashRemainsPendingAndDisabledCallbackFinishesStandaloneRejection()
     {
         Assert.False((await Effects(_ => Success(new string('B', 40))).ReportAsync(Row(), default)).Confirmed);
         var effects = new TorrentPayloadRejectionEffects(_ => Task.FromResult(DisabledSettings()),
             _ => Task.FromResult<IReadOnlyList<TorrentSnapshot>>([]),
             (_, _) => throw new Exception("Unexpected callback"), "/storage");
-        Assert.False((await effects.ReportAsync(Row(), default)).Confirmed);
+        Assert.True((await effects.ReportAsync(Row(), default)).Confirmed);
     }
 
     [Fact]
@@ -93,6 +93,31 @@ public sealed class TorrentPayloadRejectionCallbackTests
         Assert.False(reply.Confirmed); Assert.DoesNotContain("secret", reply.Message);
     }
 
+    [Fact]
+    public async Task MissingVideoReportCarriesEvidenceButNoExtensionSettings()
+    {
+        var row = Row() with { RejectionReason = "MissingVideo", OffendingFiles = [], ObservedFiles = ["only.srt"] };
+        var effects = Effects(request =>
+        {
+            using var body = JsonDocument.Parse(request.StandardInput!);
+            Assert.Equal("MissingVideo", body.RootElement.GetProperty("RejectionReason").GetString());
+            Assert.Equal(0, body.RootElement.GetProperty("OffendingFiles").GetArrayLength());
+            Assert.False(body.RootElement.TryGetProperty("RequiredVideoExtensions", out _));
+            Assert.False(body.RootElement.TryGetProperty("ProhibitedPayloadExtensions", out _));
+            return Success(Hash);
+        });
+        Assert.True((await effects.ReportAsync(row, default)).Confirmed);
+    }
+
+    [Fact]
+    public async Task EnabledCallbackWithMissingCommandRemainsPending()
+    {
+        var effects = new TorrentPayloadRejectionEffects(_ => Task.FromResult(Settings(command: "")),
+            _ => Task.FromResult<IReadOnlyList<TorrentSnapshot>>([]), (_, _) => throw new Exception("Never launch"), "/storage");
+        var result = await effects.ReportAsync(Row(), default);
+        Assert.False(result.Confirmed); Assert.False(result.NotRequired);
+    }
+
     private static TorrentPayloadRejectionEffects Effects(Func<ExternalProcessRequest, ExternalProcessResult> run) =>
         new(_ => Task.FromResult(Settings()), _ => Task.FromResult<IReadOnlyList<TorrentSnapshot>>([]),
             (request, _) => Task.FromResult(run(request)), "/storage");
@@ -103,7 +128,7 @@ public sealed class TorrentPayloadRejectionCallbackTests
             JsonSerializer.Serialize(new { RecoveryId = Guid.NewGuid(), InfoHash = hash }) + "\n",
     };
     private static RuntimeSettingsSnapshot DisabledSettings() => Settings(false);
-    private static RuntimeSettingsSnapshot Settings(bool enabled = true)
+    private static RuntimeSettingsSnapshot Settings(bool enabled = true, string? command = null)
     {
         return new RuntimeSettingsSnapshot
         {
@@ -128,7 +153,7 @@ public sealed class TorrentPayloadRejectionCallbackTests
             MetadataRefreshStaleSeconds = 90,
             MetadataRefreshRestartDelaySeconds = 30,
             CompletionCallbackEnabled = enabled,
-            CompletionCallbackCommandPath = "/configured/DownloadCompleted.TorrentCore.zsh",
+            CompletionCallbackCommandPath = command ?? "/configured/DownloadCompleted.TorrentCore.zsh",
             CompletionCallbackArguments = "--existing-option \"two words\"",
             CompletionCallbackWorkingDirectory = "/configured",
             CompletionCallbackTimeoutSeconds = 30,

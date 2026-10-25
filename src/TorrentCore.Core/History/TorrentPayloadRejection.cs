@@ -3,7 +3,11 @@ namespace TorrentCore.Core.History;
 // Stored on the ordinary history row; ordinary history cleanup also removes this state.
 public sealed record TorrentPayloadRejection(
     Guid TorrentId, string InfoHash, string DownloadRootPath, string[] CandidatePaths,
-    string[] OffendingFiles, string Phase = "Removing", DateTimeOffset? NextAttemptAtUtc = null);
+    string[] OffendingFiles, string Phase = "Removing", DateTimeOffset? NextAttemptAtUtc = null)
+{
+    public string RejectionReason { get; init; } = "Executable";
+    public string[] ObservedFiles { get; init; } = [];
+}
 
 public interface ITorrentPayloadRejectionStore
 {
@@ -14,4 +18,4 @@ public interface ITorrentPayloadRejectionStore
 }
 
 public sealed class TorrentPayloadRejectedException()
-    : Exception("This info hash has an executable payload rejection in retained history.");
+    : Exception("This info hash has a media payload rejection in retained history.");

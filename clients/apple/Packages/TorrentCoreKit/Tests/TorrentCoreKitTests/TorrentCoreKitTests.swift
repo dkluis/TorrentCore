@@ -52,7 +52,7 @@ func torrentListPresentationShowsPriorityOrdinaryAndHeldPositions() {
 
 @Test
 func sharedHelpCatalogCoversEveryServiceSetting() {
-    #expect(TorrentCoreHelpCatalog.Settings.all.count == 53)
+    #expect(TorrentCoreHelpCatalog.Settings.all.count == 55)
     #expect(
         Set(TorrentCoreHelpCatalog.Settings.all.map(\.label)).count
             == TorrentCoreHelpCatalog.Settings.all.count
@@ -83,6 +83,8 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     settings.expressVPNAutomaticRecoveryMode = "AnyValidationFailure"
     settings.expressVPNRecoveryDelaySeconds = 181
     settings.expressVPNUnavailableLaunchDelaySeconds = 301
+    settings.requiredVideoExtensions = [".mkv", ".mp4", ".avi"]
+    settings.prohibitedPayloadExtensions = [".exe", ".iso", ".7z", ".zip"]
     settings.runtimeTickDurationSummaryEnabled = true
 
     let update = TorrentCoreRuntimeSettingsUpdate(settings: settings)
@@ -117,6 +119,8 @@ func runtimeSettingsDraftAndRequestPreserveAdditiveSettings() throws {
     #expect(body["expressVpnAutomaticRecoveryMode"] as? String == "AnyValidationFailure")
     #expect(body["expressVpnRecoveryDelaySeconds"] as? Int == 181)
     #expect(body["expressVpnUnavailableLaunchDelaySeconds"] as? Int == 301)
+    #expect(body["requiredVideoExtensions"] as? [String] == [".mkv", ".mp4", ".avi"])
+    #expect(body["prohibitedPayloadExtensions"] as? [String] == [".exe", ".iso", ".7z", ".zip"])
     #expect(body["runtimeTickDurationSummaryEnabled"] as? Bool == true)
 }
 
