@@ -225,6 +225,12 @@ runbook-directed manual drag after Service verify. The final DMG additionally re
 outside-sandbox notarization, stapling, Gatekeeper, and disk-image verification; a broad product test-suite rerun is not
 part of this packaging-only proof.
 
+The October 25 combined-package identity correction passed shell syntax checks and isolated direct-input checks
+for Xcode Release identity loading, exact Native builder arguments, malformed/missing and invalid identity refusal,
+separate managed/Native `release.json` identities, and README rendering. Native identity is `1.0.0`/build `17`;
+managed identities remain `0.8.0`/build `15`. Verification used temporary files only and did not stage a release,
+archive an app, sign/notarize a DMG, access a database, or change installed services.
+
 The August 5 Dick Intel deployment release added distinct native supervisor launchers at the established Service and
 WebUI executable paths while retaining the framework-dependent apphosts as sibling `.apphost` helpers. Release
 verification proved distinct launcher UUIDs, valid signatures on all five Mach-O payload files, both required .NET

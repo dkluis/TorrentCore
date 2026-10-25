@@ -102,7 +102,8 @@ Generated: `{local_time()}`
 - Machine: `{release['machine']}`
 - Runtime: `{release['runtime']}`
 - Release ID: `{release['releaseId']}`
-- Component version: `{release['componentVersion']}`
+- Managed component version: `{release['componentVersion']}`
+- Native UI: version `{release['nativeUi']['version']}`, build `{release['nativeUi']['build']}`
 - Git SHA: `{release['gitSha']}`
 - Built at: `{local_time(str(release['builtAtUtc']))}`
 

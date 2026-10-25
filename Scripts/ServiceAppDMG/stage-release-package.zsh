@@ -83,6 +83,36 @@ if [[ "$SOURCE_DIRTY" == true ]]; then
     fail "The TorrentCore source tree is dirty. Commit the intended package source before staging."
 fi
 
+# The Native app has its own approved identity in the Xcode Release configuration.
+# Do not override it with the managed-app package version/build.
+NATIVE_UI_IDENTITY="$(python3 - "$REPO_ROOT/clients/apple/TorrentCoreApple.xcodeproj/project.pbxproj" <<'PY_NATIVE'
+import json, re, subprocess, sys
+try:
+    result = subprocess.run(["/usr/bin/plutil", "-convert", "json", "-o", "-", sys.argv[1]],
+                            check=True, capture_output=True, text=True)
+    objects = json.loads(result.stdout)["objects"]
+    targets = [item for item in objects.values()
+               if item.get("isa") == "PBXNativeTarget" and item.get("name") == "TorrentCoreMac"]
+    if len(targets) != 1:
+        raise ValueError("Expected exactly one TorrentCoreMac target.")
+    configurations = objects[targets[0]["buildConfigurationList"]]["buildConfigurations"]
+    releases = [objects[key]["buildSettings"] for key in configurations if objects[key]["name"] == "Release"]
+    if len(releases) != 1:
+        raise ValueError("Expected exactly one Native Release configuration.")
+    version = str(releases[0]["MARKETING_VERSION"])
+    build = str(releases[0]["CURRENT_PROJECT_VERSION"])
+    if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) or not re.fullmatch(r"[1-9][0-9]*", build):
+        raise ValueError("Native Release version/build must be explicit valid values.")
+    print(version)
+    print(build)
+except (OSError, subprocess.CalledProcessError, ValueError, KeyError, TypeError, AttributeError) as error:
+    print(f"Could not read Native Release identity: {error}", file=sys.stderr)
+    sys.exit(1)
+PY_NATIVE
+)" || fail "Native Release identity could not be determined; staging stopped."
+NATIVE_UI_VERSION="${NATIVE_UI_IDENTITY%%$'\n'*}"
+NATIVE_UI_BUILD_NUMBER="${NATIVE_UI_IDENTITY##*$'\n'}"
+
 if [[ "$INSTALLATION" == "Shared" ]]; then
     RELEASE_ID="torrentcore.$RELEASE_DATE.$RELEASE_NAME"
 else
@@ -137,7 +167,7 @@ print -r -- "Description:  $NOTES"
 "$REPO_ROOT/Scripts/WebUI2App/build-macos-webui2-app.zsh" --output-bundle "$WEBUI2_APP_PATH" --signing-identity "$SIGNING_IDENTITY"
 "$REPO_ROOT/Scripts/WebUI2App/verify-macos-webui2-static-assets.zsh" "$WEBUI2_APP_PATH"
 "$REPO_ROOT/Scripts/MacOSApp/build-signed-macos-ui-app.zsh" \
-    --output-bundle "$UI_APP_PATH" --version "$COMPONENT_VERSION" --build-number "$BUILD_NUMBER" \
+    --output-bundle "$UI_APP_PATH" --version "$NATIVE_UI_VERSION" --build-number "$NATIVE_UI_BUILD_NUMBER" \
     --git-sha "$GIT_SHA" --built-at-utc "$BUILT_AT_UTC" --signing-identity "$SIGNING_IDENTITY"
 
 tree_sha256() {
@@ -171,10 +201,10 @@ done
 ditto --noqtn "$REPO_ROOT/Scripts/lib/torrentcore-common.zsh" "$RUNTIME_SCRIPTS/lib/torrentcore-common.zsh"
 [[ ! -e "$RUNTIME_SCRIPTS/torrentcore.env" ]] || fail "Machine-local torrentcore.env must not be staged."
 
-python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$MACHINE" "$TARGET_HOME" "$RUNTIME" "$NOTES" "$GIT_SHA" "$BUILT_AT_UTC" "$SOURCE_DIRTY" "$SERVICE_SHA" "$WEBUI_SHA" "$WEBUI2_SHA" "$UI_SHA" "$COMPONENT_VERSION" "$BUILD_NUMBER" <<'PY'
+python3 - "$PACKAGE_ROOT/release.json" "$RELEASE_ID" "$RELEASE_DATE" "$INSTALLATION" "$MACHINE" "$TARGET_HOME" "$RUNTIME" "$NOTES" "$GIT_SHA" "$BUILT_AT_UTC" "$SOURCE_DIRTY" "$SERVICE_SHA" "$WEBUI_SHA" "$WEBUI2_SHA" "$UI_SHA" "$COMPONENT_VERSION" "$BUILD_NUMBER" "$NATIVE_UI_VERSION" "$NATIVE_UI_BUILD_NUMBER" <<'PY'
 import json, pathlib, sys
 (output, release_id, release_date, installation, machine, target_home, runtime, notes,
- git_sha, built_at, dirty, service_sha, webui_sha, webui2_sha, ui_sha, component_version, build_number)=sys.argv[1:]
+ git_sha, built_at, dirty, service_sha, webui_sha, webui2_sha, ui_sha, component_version, build_number, native_ui_version, native_ui_build)=sys.argv[1:]
 value={
  "schemaVersion":2, "product":"TorrentCoreManagedApps", "installation":installation,
  "machine":machine, "targetHome":target_home, "runtime":runtime, "releaseId":release_id,
@@ -187,7 +217,7 @@ value={
    "bundleIdentifier":"com.conadv.torrentcore.webui", "version":component_version, "build":build_number, "sha256":webui_sha},
   "webUi2":{"path":f"payload/{runtime}/TorrentCoreWebUI2.app", "runtime":runtime,
    "bundleIdentifier":"com.conadv.torrentcore.webui2", "version":component_version, "build":build_number, "sha256":webui2_sha}},
- "nativeUi":{"path":"TorrentCore.app", "version":component_version, "build":build_number, "runtime":runtime,
+ "nativeUi":{"path":"TorrentCore.app", "version":native_ui_version, "build":native_ui_build, "runtime":runtime,
   "sha256":ui_sha, "installPath":"/Applications/TorrentCore.app", "installMode":"DragToApplications"},
  "protectedFiles":["Scripts/torrentcore.env", "WebUI/Config/service-connection.json", "WebUI2/appsettings.json", "WebUI2/Config/browser-connections/"],
 }

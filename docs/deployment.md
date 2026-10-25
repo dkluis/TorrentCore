@@ -10,7 +10,7 @@ Managed components:
 - `TorrentCore.WebUI`
 - `TorrentCore.WebUI2` (parallel desktop browser UI)
 
-Current source Service, WebUI, WebUI2, and native macOS UI version: `0.8.0`, build `15`.
+Managed-app packaging identity: `0.8.0`, build `15`. Native macOS Release identity: `1.0.0`, build `17`.
 
 Launch agent labels:
 
@@ -239,8 +239,11 @@ Gatekeeper, stapler-ticket, disk-image, checksum, and architecture verification 
 The package `release.json` records all managed-app checksums, the short change description, and the manual
 `/Applications/TorrentCore.app` target.
 
-The current combined-package tooling defaults `TorrentCoreService.app`, `TorrentCoreWebUI.app`, `TorrentCoreWebUI2.app`, and `TorrentCore.app`
-to source version `0.8.0`, build `15`.
+The combined-package tooling retains managed-app version `0.8.0`, build `15` for `TorrentCoreService.app`,
+`TorrentCoreWebUI.app`, and `TorrentCoreWebUI2.app`. Native `TorrentCore.app` uses its own explicit Release
+`MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` from the `TorrentCoreMac` Xcode target (currently `1.0.0`, build `17`).
+Staging stops if those values cannot be read or validated; it never substitutes the managed-app identity.
+The Native builder, package `nativeUi` metadata, and generated README all use that Native identity.
 
 WebUI2 is a third managed app alongside the existing WebUI. The existing WebUI remains on port `7053`; WebUI2 binds to
 LAN port `7510` by default. `TORRENTCORE_WEBUI2_URLS` in the host-local `Scripts/torrentcore.env` can override that binding.
@@ -444,9 +447,9 @@ Current release identity:
 |---|---|
 | App bundle identifier | `com.conadv.TorrentCore.mac` |
 | Apple Developer Team ID | `5GRR76N48V` |
-| Current version | `0.5.1` |
-| Current build | `10` |
-| Default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.5.1.dmg` |
+| Current version | `1.0.0` |
+| Current build | `17` |
+| Standalone script default DMG | `/Volumes/CA-Desktop-HD-2/Development/Deployments/DMGs/TorrentCore-macOS-App-0.8.0.dmg` |
 
 The first 0.1.0/build 1 artifact was accepted by Apple and stapled on July 26, 2026. Its SHA-256 checksum is
 `adda66f813b45ea54afee388f991635bd0c221fd3c182e2e0fd95a533aa0a82c`.
@@ -546,10 +549,11 @@ Validate both one-time prerequisites without building:
 ### Construct A Release
 
 Before constructing a release, confirm the working tree contains the intended commit and run the relevant native tests
-from [testing.md](testing.md). Then run:
+from [testing.md](testing.md). The standalone script still has historical defaults; pass the approved Native identity
+explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh
+./Scripts/release-macos-app.zsh --version 1.0.0 --build 17
 ```
 
 The script:
@@ -570,7 +574,7 @@ directory and are removed when the script exits. The script refuses to replace a
 For a later release, supply the new values explicitly:
 
 ```bash
-./Scripts/release-macos-app.zsh --version 0.5.1 --build 10
+./Scripts/release-macos-app.zsh --version 1.0.0 --build 17
 ```
 
 The script accepts `--output-dir`, `--notary-profile`, and `--signing-identity` overrides. Run `--help` for the complete
