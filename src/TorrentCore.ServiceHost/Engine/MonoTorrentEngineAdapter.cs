@@ -4527,7 +4527,7 @@ public sealed class MonoTorrentEngineAdapter(ITorrentStateStore torrentStateStor
         var policy = appliedEngineSettingsState.MediaPayloadPolicy
             ?? throw new InvalidOperationException("Startup payload validation settings have not been initialized.");
         var inspection = policy.Inspect(metadataFiles);
-        if (!inspection.Rejected) { return false; }
+        if (!inspection.Rejected && !inspection.IsPending) { return false; }
         const string heldMessage = "Invalid media payload blocked pending rejection cleanup.";
         var held = await payloadRejections.InspectAsync(snapshot, inspection,
             GetCleanupCandidatePaths(manager).Append(snapshot.SavePath).Distinct(StringComparer.Ordinal).ToArray(),

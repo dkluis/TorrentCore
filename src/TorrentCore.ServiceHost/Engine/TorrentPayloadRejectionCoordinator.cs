@@ -95,6 +95,8 @@ public sealed class TorrentPayloadRejectionCoordinator
         IReadOnlyList<string> cleanupPaths, Func<Task> stop, Func<Task> remove, CancellationToken token)
     {
         if (!IsMediaCategory(snapshot.CategoryKey)) { return false; }
+        // Defer this synchronization pass without recording a rejection or admitting completion.
+        if (inspection.IsPending) { return true; }
         if (!inspection.Rejected) { return false; }
         var offending = inspection.OffendingFiles;
         _blocked.TryAdd(snapshot.TorrentId, 0);
@@ -113,6 +115,8 @@ public sealed class TorrentPayloadRejectionCoordinator
             // Older retained intents can still contain the former pre-removal season-check phases.
             if (row.Phase is not ("EligibilityPending" or "Excluded" or "Removing"))
             { throw new InvalidOperationException("Stored cleanup phase conflicts with a current torrent; review required."); }
+            // Keep the stopped torrent available if its recorded payload cannot be safely cleaned up.
+            _ = TorrentPayloadRejectionEffects.ValidatePaths(row.DownloadRootPath, row.CandidatePaths);
             row = row with { Phase = "Removing", NextAttemptAtUtc = null };
             await LogAsync(row.TorrentId, "rejected", $"Invalid media payload rejected. Reason={row.RejectionReason}; Hash={row.InfoHash}; files={string.Join(", ", row.OffendingFiles)}.", true);
             // Persist the rejection before removal. TVMaze is notified only after confirmed data deletion.

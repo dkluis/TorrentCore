@@ -145,9 +145,13 @@ own `RequiredVideoExtensions` and `ProhibitedPayloadExtensions` runtime settings
 `.exe,.iso,.7z,.zip`. A prohibited file rejects the whole payload even alongside video; no qualifying video rejects
 subtitle/archive-only payloads. Matching uses final extensions case-insensitively. Rules loaded at Service startup apply to existing/new torrents. Saved list edits take effect only after
 Service restart; no per-torrent policy copy or submitter-supplied policy is stored. Unresolved
-metadata remains pending. Music, Audiobook and uncategorized work remain outside this feature. Inspection uses
-in-memory manifest paths and does not extract archives, inspect media bytes or add tracker/network operations.
+metadata remains pending. An empty manager file list also defers inspection and completion to a later synchronization
+pass; it does not establish a `MissingVideo` rejection. Music, Audiobook and uncategorized work remain outside this
+feature. Inspection uses in-memory manifest paths and does not extract archives, inspect media bytes or add
+tracker/network operations.
 Detection blocks queue admission and normal completion callbacks and stops the manager.
+The recorded cleanup paths must pass the existing download-root safety checks before the rejection is saved and the
+torrent is removed. An unusable plan leaves the stopped torrent available and cleanup unconfirmed.
 Removal no longer depends on a preliminary TVMaze season check. Per the operator's October 21 decision, all TV/Movie
 invalid media payloads are rejected, including an unexpected season pack. After removal and awaited file deletion are
 confirmed, TorrentCore launches its configured one-shot completion callback command with `--payload-rejection`.

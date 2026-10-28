@@ -21,9 +21,29 @@ public sealed class MediaPayloadPolicyTests
     public void ActualFinalExtensionDeterminesRejection(string path, string? reason)
     {
         var result = Policy().Inspect([path]);
+        Assert.False(result.IsPending);
         Assert.Equal(reason, result.RejectionReason);
         Assert.Equal(reason is not null, result.Rejected);
         if (reason == "MissingVideo") { Assert.Empty(result.OffendingFiles); Assert.Equal([path], result.ObservedFiles); }
+    }
+
+    [Theory]
+    [InlineData("episode.mkv", null)]
+    [InlineData("only.srt", "MissingVideo")]
+    [InlineData("archive.7z", "ProhibitedExtension")]
+    public void EmptyManifestStaysPendingUntilFilesCanBeInspected(string file, string? reason)
+    {
+        var policy = Policy();
+        var pending = policy.Inspect([]);
+        Assert.True(pending.IsPending);
+        Assert.False(pending.Rejected);
+        Assert.Null(pending.RejectionReason);
+        Assert.Empty(pending.ObservedFiles);
+        Assert.Empty(pending.OffendingFiles);
+
+        var inspected = policy.Inspect([file]);
+        Assert.False(inspected.IsPending);
+        Assert.Equal(reason, inspected.RejectionReason);
     }
 
     [Theory]

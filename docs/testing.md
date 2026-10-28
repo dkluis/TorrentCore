@@ -14,6 +14,7 @@ The current suite focuses on service, persistence, engine-adapter, and client-bo
 Representative coverage areas:
 
 - media payload rejection in TV/Movie categories: direct-input and fake-I/O cases cover save-before-removal,
+  empty-file-list deferral followed by populated-manifest inspection, cleanup-path validation before removal,
   no preliminary season/API exchange, deletion failure, callback invocation with blank API overrides, nonblocking
   callback polling, structured
   acknowledgement validation, lost notification replies and retained-history admission errors. Process configuration
@@ -22,6 +23,11 @@ Representative coverage areas:
   preservation by ordinary history writes and removal of the admission block by unchanged history cleanup. These tests
   never use installed TorrentCore storage or a TVMaze database. Physical removal and cross-service acceptance belong
   to the operator-controlled CA-Server Test installation.
+
+  October 28 empty-manifest/cleanup-plan correction: the Service test-project build passed without warnings or errors,
+  and 64 selected policy, rejection-coordinator and callback cases passed. These cases use direct inputs and fake I/O;
+  they access no database, engine, callback process or external service. Installed metadata-transition and physical
+  cleanup acceptance remain separate operator-controlled Test checks.
 
   October 22 Debug-switch verification passed 10 selected Service tests: rejection-history persistence/logging,
   live synchronization-summary switching and operation-duration diagnostics. Persistence cases created disposable

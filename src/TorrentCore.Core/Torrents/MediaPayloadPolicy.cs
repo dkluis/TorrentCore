@@ -24,6 +24,8 @@ public sealed record MediaPayloadPolicy(string[] RequiredVideoExtensions, string
 
     public MediaPayloadInspection Inspect(IReadOnlyList<string> files)
     {
+        // Metadata readiness alone does not establish that a file list is available to inspect.
+        if (files.Count == 0) { return new(null, [], []) { IsPending = true }; }
         var prohibited = files.Where(path => ProhibitedPayloadExtensions.Contains(Path.GetExtension(path),
             StringComparer.OrdinalIgnoreCase)).Distinct(StringComparer.Ordinal).ToArray();
         if (prohibited.Length > 0)
@@ -36,5 +38,6 @@ public sealed record MediaPayloadPolicy(string[] RequiredVideoExtensions, string
 
 public sealed record MediaPayloadInspection(string? RejectionReason, string[] OffendingFiles, string[] ObservedFiles)
 {
+    public bool IsPending { get; init; }
     public bool Rejected => RejectionReason is not null;
 }

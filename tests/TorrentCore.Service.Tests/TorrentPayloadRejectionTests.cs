@@ -23,6 +23,83 @@ public sealed class TorrentPayloadRejectionTests
 
     [Theory]
     [InlineData("TV", true)] [InlineData("Movie", true)] [InlineData("Music", false)] [InlineData("Audiobook", false)]
+    public async Task EmptyManifestDefersMediaProcessingWithoutRecordingOrRemovingATorrent(string category, bool deferred)
+    {
+        var events = new List<string>(); var store = new Store(events); var effects = new Effects(events);
+        var snapshot = Snapshot(category);
+        var service = new TorrentPayloadRejectionCoordinator(store,
+            (_, _) => throw new Exception("Unexpected state read"),
+            (_, _) => throw new Exception("Unexpected history update"), effects,
+            (_, _, _, _) => { events.Add("log"); return Task.CompletedTask; });
+
+        for (var pass = 0; pass < 2; pass++)
+        {
+            Assert.Equal(deferred, await service.InspectAsync(snapshot, InspectManifest([]), ["/downloads"],
+                () => { events.Add("stop"); return Task.CompletedTask; },
+                () => { events.Add("remove"); return Task.CompletedTask; }, default));
+        }
+        Assert.Null(store.Saved);
+        Assert.False(service.IsBlocked(snapshot.TorrentId));
+        Assert.Empty(events);
+
+        Assert.False(await service.InspectAsync(snapshot, InspectManifest(["episode.mkv"]), ["/downloads/payload"],
+            () => throw new Exception("Unexpected stop"), () => throw new Exception("Unexpected removal"), default));
+        Assert.Empty(events);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("/downloads")]
+    [InlineData("/downloads/../other")]
+    [InlineData("relative/payload")]
+    public async Task InvalidCleanupPlanStopsButCannotRemoveOrRecordARejection(string? path)
+    {
+        var events = new List<string>(); var store = new Store(events); var effects = new Effects(events);
+        var snapshot = Snapshot(); var service = Service(store, effects);
+        string[] paths = path is null ? [] : [path];
+        Assert.True(await service.InspectAsync(snapshot, InspectManifest(["setup.exe"]), paths,
+            () => { events.Add("stop"); return Task.CompletedTask; },
+            () => { events.Add("remove"); return Task.CompletedTask; }, default));
+        Assert.Equal(new[] { "stop" }, events);
+        Assert.Null(store.Saved);
+        Assert.True(service.IsBlocked(snapshot.TorrentId));
+        await service.ReconcileRemovedAsync(default);
+        Assert.Equal(new[] { "stop" }, events);
+    }
+
+    [Fact]
+    public async Task RetainedCleanupPlanMustBeValidEvenWhenNewCandidatesAreUsable()
+    {
+        var events = new List<string>(); var snapshot = Snapshot();
+        var retained = new TorrentPayloadRejection(snapshot.TorrentId, Hash, "/downloads", ["/downloads"], ["setup.exe"]);
+        var store = new Store(events) { Saved = retained };
+        var service = Service(store, new Effects(events));
+        Assert.True(await service.InspectAsync(snapshot, InspectManifest(["setup.exe"]), ["/downloads/payload"],
+            () => { events.Add("stop"); return Task.CompletedTask; },
+            () => { events.Add("remove"); return Task.CompletedTask; }, default));
+        Assert.Same(retained, store.Saved);
+        Assert.Equal(new[] { "stop" }, events);
+    }
+
+    [Fact]
+    public async Task RejectionCanProceedWhenAnInitiallyUnavailableCleanupPlanBecomesUsable()
+    {
+        var events = new List<string>(); var store = new Store(events); var effects = new Effects(events);
+        var snapshot = Snapshot(); var service = Service(store, effects);
+        Task Stop() { events.Add("stop"); return Task.CompletedTask; }
+        Task Remove() { events.Add("remove"); return Task.CompletedTask; }
+        Assert.True(await service.InspectAsync(snapshot, InspectManifest(["setup.exe"]), ["/downloads"], Stop, Remove, default));
+        Assert.Null(store.Saved);
+        Assert.DoesNotContain("remove", events);
+        Assert.True(await service.InspectAsync(snapshot, InspectManifest(["setup.exe"]), ["/downloads/payload"], Stop, Remove, default));
+        Assert.Equal("Removed", store.Saved!.Phase);
+        Assert.True(events.IndexOf("save:Removing") < events.IndexOf("remove"));
+        await service.ReconcileRemovedAsync(default);
+        Assert.Equal("Notified", store.Saved.Phase);
+    }
+
+    [Theory]
+    [InlineData("TV", true)] [InlineData("Movie", true)] [InlineData("Music", false)] [InlineData("Audiobook", false)]
     public async Task ManifestInspectionIsScopedToMediaCategories(string category, bool blocked)
     {
         var events = new List<string>(); var store = new Store(events); var effects = new Effects(events);
