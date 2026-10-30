@@ -146,10 +146,10 @@ The bundle identity is `com.conadv.torrentcore.service`, while the LaunchAgent l
 `http://0.0.0.0:7033` by default, and changes only the Service LaunchAgent. Do not run it merely to build or inspect an
 app, because it boots out and replaces the active Service agent. Slice 8 owns the supported DMG install/rollback path.
 
-The builder requires the `net10.0/osx-arm64` restore graph to exist. Restore it once, then build an unsigned proof:
+The builder uses the normal `dotnet publish` restore for `net10.0/osx-arm64`, so it does not depend on cached
+restore assets from an earlier Intel or ARM build. No separate restore command is required. Build an unsigned proof:
 
 ```bash
-dotnet restore src/TorrentCore.ServiceHost/TorrentCore.Service.csproj --runtime osx-arm64
 ./Scripts/ServiceApp/build-macos-service-app.zsh \
   --output-bundle /private/tmp/TorrentCoreService-proof/TorrentCoreService.app
 ```
@@ -179,6 +179,9 @@ The bundle identity is `com.conadv.torrentcore.webui`; the existing LaunchAgent 
 `com.torrentcore.webui`. The installer retains `TORRENTCORE_WEBUI_URLS`, `TORRENTCORE_WEBUI_SERVICE_BASE_URL`, and the
 optional saved Service Connection override. The static-assets verifier launches the bundle with an empty temporary
 working directory and compares a served fingerprinted CSS route byte-for-byte with the bundled source.
+
+The WebUI builder also permits the normal ARM restore during `dotnet publish`, matching the existing WebUI2 builder.
+The combined release command therefore prepares each managed app's required restore assets automatically.
 
 ## Combined Service/WebUI And Native-UI DMG
 

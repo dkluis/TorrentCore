@@ -34,7 +34,6 @@ dotnet publish "$REPO_ROOT/src/TorrentCore.ServiceHost/TorrentCore.Service.cspro
     --configuration Release \
     --runtime osx-arm64 \
     --self-contained false \
-    --no-restore \
     --disable-build-servers \
     --output "$PUBLISH_ROOT"
 
